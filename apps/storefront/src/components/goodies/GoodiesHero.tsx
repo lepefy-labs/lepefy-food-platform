@@ -7,10 +7,12 @@ import { formatPrice } from '@/lib/utils/format';
 import type { ProductCardProduct } from '@/components/catalog/ProductCard';
 import { useQuickAdd } from '@/components/catalog/useQuickAdd';
 import { LepefyImage } from '@/components/images/LepefyImage';
+import { useAddToCartUiStore } from '@/stores/addToCartUiStore';
 
 export function GoodiesHero({ product }: { product: ProductCardProduct & { description?: string | null } }) {
   const { currency } = useTenant();
   const { addToCart, added, outOfStock } = useQuickAdd(product);
+  const showConfirmation = useAddToCartUiStore((s) => s.show);
   return (
     <section aria-label="Produit phare" className="relative grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] overflow-hidden rounded-2xl bg-[var(--color-primary-light)] sm:rounded-3xl">
       <div className="relative z-10 flex min-w-0 flex-col items-start p-4 pr-0 sm:p-8 lg:p-10">
@@ -20,7 +22,7 @@ export function GoodiesHero({ product }: { product: ProductCardProduct & { descr
         </h2>
         {product.description && <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-gray-600 sm:text-base">{product.description}</p>}
         <p className="mb-3 mt-4 whitespace-nowrap text-xl font-bold text-gray-900 sm:text-2xl">{formatPrice(product.price, currency)}</p>
-        <button type="button" onClick={addToCart} disabled={outOfStock} className="mt-auto flex min-h-11 max-w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 disabled:opacity-50 sm:px-5 sm:text-sm">
+        <button type="button" onClick={() => { if (addToCart()) showConfirmation(product); }} disabled={outOfStock} className="mt-auto flex min-h-11 max-w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 disabled:opacity-50 sm:px-5 sm:text-sm">
           <IconShoppingCart size={17} className="shrink-0" aria-hidden="true" />
           <span aria-live="polite">{outOfStock ? 'Épuisé' : added ? 'Ajouté au panier' : 'Ajouter au panier'}</span>
         </button>

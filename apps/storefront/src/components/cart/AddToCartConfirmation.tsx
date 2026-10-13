@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { LepefyImage } from '@/components/images/LepefyImage';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { IconCheck, IconPhoto, IconX } from '@tabler/icons-react';
 import type { ProductCardProduct } from '@/components/catalog/ProductCard';
 import { useQuickAdd } from '@/components/catalog/useQuickAdd';
@@ -71,8 +71,14 @@ function RecommendationItem({ product, onAdded, onClose }: {
   );
 }
 
-function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; onClose: () => void }) {
+function ConfirmationPanel({ product, continueHref, onClose }: {
+  product: ProductCardProduct;
+  /** Depuis la fiche produit : retour au catalogue / aux résultats d'origine. */
+  continueHref: string | null;
+  onClose: () => void;
+}) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   const { currency } = useTenant();
   const items = useCartStore(s => s.items);
   const cartItem = items.find(item => item.product.id === product.id);
@@ -146,6 +152,11 @@ function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; 
   const hasMinRule = minOrderQuantity > 1;
   const price = describePrice(product.price, resolveSellingFormat(product), currency);
 
+  function continueShopping() {
+    onClose();
+    if (continueHref) router.push(continueHref);
+  }
+
   return createPortal(
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/40 sm:items-center sm:p-4"
       data-testid="add-confirmation-overlay" onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
@@ -156,7 +167,7 @@ function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; 
           <div aria-hidden="true" className="mx-auto mb-1 h-1 w-10 rounded-full bg-gray-200 sm:hidden" />
           <div className="mb-3 flex items-center justify-between gap-2">
             <h2 id="add-confirmation-title" className="flex items-center gap-2 text-lg font-bold text-gray-900">
-              <IconCheck size={22} className="shrink-0 text-green-600" aria-hidden="true" />Ajouté au panier
+              <IconCheck size={22} className="shrink-0 text-green-600" aria-hidden="true" />Produit ajouté au panier !
             </h2>
             <button type="button" onClick={onClose} aria-label="Fermer la confirmation"
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2">
@@ -195,7 +206,7 @@ function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; 
           </div>
           <div data-testid="confirmation-actions" className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
             <Link href="/cart" onClick={onClose} className={`${mainActionClass} order-1 text-white hover:opacity-90 active:opacity-80 sm:order-2`} style={primary}>Voir mon panier</Link>
-            <button type="button" onClick={onClose} className={`${mainActionClass} order-2 border border-gray-400 bg-white text-gray-900 hover:bg-gray-50 active:bg-gray-100 sm:order-1`}>Continuer mes achats</button>
+            <button type="button" onClick={continueShopping} className={`${mainActionClass} order-2 border border-gray-400 bg-white text-gray-900 hover:bg-gray-50 active:bg-gray-100 sm:order-1`}>Continuer mes achats</button>
           </div>
         </div>
         {(loading || visible.length > 0) && (
@@ -222,6 +233,7 @@ function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; 
 /** One global instance; no dialog markup is duplicated by catalogue cards. */
 export function AddToCartConfirmation() {
   const product = useAddToCartUiStore(s => s.product);
+  const continueHref = useAddToCartUiStore(s => s.continueHref);
   const revision = useAddToCartUiStore(s => s.revision);
   const close = useAddToCartUiStore(s => s.close);
   const drawerOpen = useCartUiStore(s => s.isDrawerOpen);
@@ -231,5 +243,5 @@ export function AddToCartConfirmation() {
   useEffect(() => { close(); }, [pathname, search, close]);
   useEffect(() => { if (drawerOpen) close(); }, [drawerOpen, close]);
 
-  return product && !drawerOpen ? <ConfirmationPanel key={revision} product={product} onClose={close} /> : null;
+  return product && !drawerOpen ? <ConfirmationPanel key={revision} product={product} continueHref={continueHref} onClose={close} /> : null;
 }

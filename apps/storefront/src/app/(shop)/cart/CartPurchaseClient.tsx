@@ -79,6 +79,7 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
       <button type="button" onClick={continueShopping} className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-800 hover:bg-gray-50">
         <IconArrowLeft size={17} /> Continuer mes achats
       </button>
+      <h1 className="mb-4 font-display text-2xl font-bold text-gray-950">Mon panier</h1>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4 lg:order-1">
           <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)] sm:p-5 lg:hidden" aria-label="Total du panier">

@@ -131,7 +131,9 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (addToCart() && variant === 'grid' && !merchandise) {
+    // Même confirmation pour toute card (grille, shelf, Goodies) : actions
+    // « Voir mon panier » / « Continuer mes achats » qui ne disparaissent pas.
+    if (addToCart()) {
       (e.currentTarget as HTMLElement).focus({ preventScroll: true });
       showConfirmation(product);
     }

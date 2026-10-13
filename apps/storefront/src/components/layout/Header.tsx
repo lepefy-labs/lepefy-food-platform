@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { Suspense, useCallback, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { IconArrowLeft, IconLock, IconMenu2, IconShoppingCart, IconStar } from '@tabler/icons-react';
@@ -10,6 +10,12 @@ import { useCartStore } from '@/stores/cartStore';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { TenantLogo } from '@/components/branding/TenantLogo';
+import { GlobalProductSearch } from '@/components/search/GlobalProductSearch';
+import { SearchFieldPlaceholder } from '@/components/search/ShopSearchBar';
+import { cartAriaLabel, formatCartBadge } from '@/lib/cart/cartBadge';
+import { useCartAddPulse } from '@/lib/cart/useCartAttention';
+import { shouldShowGlobalSearch } from '@/lib/storefront/shopChrome';
+import { readableOn } from '@/lib/utils/color';
 import {
   BrandNavigationDrawer,
   type BrandNavigationSection,
@@ -29,6 +35,7 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
   const tenant = useTenant();
   const totalItems = useCartStore((s) => s.totalItems());
   const openCartDrawer = useCartUiStore((s) => s.openDrawer);
+  const cartPulse = useCartAddPulse();
   const { customer } = useSessionCustomer();
   const isCheckout = pathname === '/checkout' || pathname.startsWith('/checkout/');
   const accountHref = customer ? '/compte' : '/compte/connexion';
@@ -141,10 +148,16 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
     );
   }
 
+  const onPrimary = readableOn(tenant.primary_color);
+  const onSecondary = readableOn(tenant.secondary_color, 4.5);
+  const showSearch = shouldShowGlobalSearch(pathname);
+
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-gray-200 bg-white">
-        <div className="relative mx-auto flex h-24 max-w-7xl items-center gap-3 px-4">
+      {/* Mobile : l'header défile avec la page, seule la recherche reste fixée
+          (ShopSearchBar) et la BottomNav porte panier et destinations. */}
+      <header className="relative z-40 border-b border-gray-200 bg-white md:sticky md:top-0">
+        <div className="relative mx-auto flex h-24 max-w-7xl items-center gap-3 px-4 lg:gap-6">
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
@@ -156,44 +169,50 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
             <IconMenu2 size={24} />
           </button>
 
-          <Link href="/" className="absolute left-[46%] -translate-x-1/2 md:static md:translate-x-0" aria-label={tenant.name}>
+          <Link href="/" className="absolute left-[46%] -translate-x-1/2 md:static md:shrink-0 md:translate-x-0" aria-label={tenant.name}>
             <TenantLogo variant="header" priority className="!max-w-[40vw] md:!max-w-none" />
           </Link>
+
+          {showSearch && (
+            <div className="hidden min-w-0 max-w-xl flex-1 lg:block">
+              <Suspense fallback={<SearchFieldPlaceholder variant="header" />}>
+                <GlobalProductSearch variant="header" />
+              </Suspense>
+            </div>
+          )}
 
           <div className="ml-auto flex min-w-0 items-center gap-4">
             {reviewsAvailable && (
               <Link href="/avis" aria-label="Voir les avis clients" aria-current={pathname === '/avis' ? 'page' : undefined}
-                className="absolute right-16 flex h-11 w-11 flex-col items-center justify-center rounded-lg text-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] md:hidden">
+                className="absolute right-4 flex h-11 w-11 flex-col items-center justify-center rounded-lg text-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] md:hidden">
                 <IconStar size={23} stroke={2} aria-hidden="true" />
                 <span className="text-xs font-semibold leading-none text-gray-700">Avis</span>
               </Link>
             )}
-            <Link
-              href="/cart"
-              onClick={handleCartClick}
-              aria-haspopup="dialog"
-              aria-label={`Ouvrir le panier${totalItems > 0 ? `, ${totalItems} article${totalItems > 1 ? 's' : ''}` : ''}`}
-              className="absolute right-4 flex h-11 w-11 items-center justify-center rounded-lg text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] md:hidden"
-            >
-              <IconShoppingCart size={24} />
-              {totalItems > 0 && (
-                <span className="absolute right-0.5 top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-0.5 text-2xs font-bold" style={{ background: 'var(--color-secondary)', color: '#1a1a1a' }}>
-                  {totalItems > 99 ? '99+' : totalItems}
-                </span>
-              )}
-            </Link>
 
             <nav className="hidden items-center gap-4 md:flex lg:gap-6" aria-label="Navigation principale">
               <Link href="/" aria-current={isActive('/') ? 'page' : undefined} className={`text-sm font-medium transition-colors ${isActive('/') ? 'text-[var(--color-primary)]' : 'text-gray-700 hover:text-gray-900'}`}>Catalogue</Link>
               <Link href="/accueil" aria-current={isActive('/accueil') ? 'page' : undefined} className={`text-sm font-medium transition-colors ${isActive('/accueil') ? 'text-[var(--color-primary)]' : 'text-gray-700 hover:text-gray-900'}`}>Découvrir</Link>
               {reviewsAvailable && <Link href="/avis" aria-current={pathname === '/avis' ? 'page' : undefined} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"><IconStar size={19} stroke={2} className="text-amber-500" aria-hidden="true" />Avis</Link>}
-              <Link href="/cart" onClick={handleCartClick} aria-haspopup="dialog" className="relative text-sm font-medium text-gray-700 hover:text-gray-900">
-                Panier
-                {totalItems > 0 && <span className="absolute -right-4 -top-2 flex h-5 w-5 items-center justify-center rounded-full text-xs text-white" style={{ backgroundColor: 'var(--color-primary)' }}>{totalItems}</span>}
-              </Link>
               <Link href={accountHref} aria-current={isActive('/compte') ? 'page' : undefined} className={`relative text-sm font-medium transition-colors ${isActive('/compte') ? 'text-[var(--color-primary)]' : 'text-gray-700 hover:text-gray-900'}`}>
                 Compte
                 {customer && <span className="absolute -right-2.5 -top-1 h-2 w-2 rounded-full" style={{ backgroundColor: 'var(--color-primary)' }} />}
+              </Link>
+              <Link
+                href="/cart"
+                onClick={handleCartClick}
+                aria-haspopup="dialog"
+                aria-label={cartAriaLabel(totalItems, 'Ouvrir le panier')}
+                className={`inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full px-4 text-sm font-bold shadow-sm transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:animate-none ${cartPulse ? 'animate-cart-pop' : ''}`}
+                style={{ backgroundColor: 'var(--color-primary)', color: onPrimary, outlineColor: 'var(--color-primary)' }}
+              >
+                <IconShoppingCart size={20} stroke={2} aria-hidden="true" />
+                Mon panier
+                {totalItems > 0 && (
+                  <span aria-hidden="true" className="flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-xs font-extrabold tabular-nums" style={{ background: 'var(--color-secondary)', color: onSecondary }}>
+                    {formatCartBadge(totalItems)}
+                  </span>
+                )}
               </Link>
             </nav>
           </div>

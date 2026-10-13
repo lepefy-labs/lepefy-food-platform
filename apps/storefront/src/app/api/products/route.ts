@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createClient } from '@/lib/supabase/server';
-import { catalogRankingDay, getCatalogPage, parseCatalogSort, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
+import { catalogRankingDay, getCatalogPage, parseCatalogSort, parseLimitParam, parsePageParam } from '@/lib/catalog/pagination';
 import { getActiveQuantityGroupFilter } from '@/lib/catalog/quantityGroupFilter';
 import { getShopCategories } from '@/lib/catalog/catalogCache';
 
@@ -16,6 +16,8 @@ export const dynamic = 'force-dynamic';
  * Contrairement au SSR de /products (range cumulatif), cette route ne
  * renvoie que la tranche de la page demandée : le client accumule déjà les
  * pages précédentes en mémoire, inutile de les re-transférer.
+ * `?limit=` (≤ taille de page) sert aux propositions de la recherche globale :
+ * même requête, mêmes filtres tenant/scope, seulement moins de lignes.
  */
 export async function GET(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -25,6 +27,7 @@ export async function GET(req: NextRequest) {
   const categories = await getShopCategories(tenant.id).catch(() => []);
 
   const page = parsePageParam(req.nextUrl.searchParams.get('page') ?? undefined);
+  const limit = parseLimitParam(req.nextUrl.searchParams.get('limit'));
   const q = req.nextUrl.searchParams.get('q') ?? undefined;
   const category = req.nextUrl.searchParams.get('category') ?? undefined;
   const groupId = req.nextUrl.searchParams.get('quantityGroup');
@@ -37,7 +40,7 @@ export async function GET(req: NextRequest) {
     category,
     productIds: groupId ? group?.productIds ?? [] : undefined,
     sort: parseCatalogSort(req.nextUrl.searchParams.get('sort') ?? undefined),
-  }, (page - 1) * PRODUCTS_PAGE_SIZE, PRODUCTS_PAGE_SIZE,
+  }, (page - 1) * limit, limit,
   catalogRankingDay(req.nextUrl.searchParams.get('day') ?? undefined));
 
   if (error) {
@@ -46,7 +49,7 @@ export async function GET(req: NextRequest) {
 
   const products = productsRaw ?? [];
   const totalCount = count ?? 0;
-  const hasNextPage = page * PRODUCTS_PAGE_SIZE < totalCount;
+  const hasNextPage = page * limit < totalCount;
 
   return NextResponse.json({ products, hasNextPage, totalCount });
 }

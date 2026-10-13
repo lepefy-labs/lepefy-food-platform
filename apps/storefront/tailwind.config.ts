@@ -65,6 +65,26 @@ const config: Config = {
       boxShadow: {
         card: 'var(--shadow-card)',
       },
+      /* Retour visuel du panier (BottomNav, header) : transform uniquement,
+         jamais de décalage de mise en page ; neutralisé par motion-reduce. */
+      keyframes: {
+        'cart-pop': {
+          '0%, 100%': { transform: 'scale(1)' },
+          '35%': { transform: 'scale(1.18)' },
+          '70%': { transform: 'scale(0.96)' },
+        },
+        'cart-nudge': {
+          '0%, 100%': { transform: 'rotate(0deg)' },
+          '20%': { transform: 'rotate(-9deg)' },
+          '40%': { transform: 'rotate(8deg)' },
+          '60%': { transform: 'rotate(-5deg)' },
+          '80%': { transform: 'rotate(3deg)' },
+        },
+      },
+      animation: {
+        'cart-pop': 'cart-pop 450ms ease-out',
+        'cart-nudge': 'cart-nudge 700ms ease-in-out',
+      },
     },
   },
   plugins: [],
