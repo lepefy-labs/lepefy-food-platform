@@ -104,6 +104,9 @@ test.describe('photo hero /card', () => {
       .toEqual({ src: '/images/card/other.webp', position: 'right top' });
     expect(resolveCardHeroImage({ slug: 'chloefood', config: { hero_image_url: 'https://evil.example/x.jpg', hero_image_position: null }, supabaseUrl }))
       .toEqual(CARD_HERO_ASSETS.chloefood);
+    // Un cadrage configuré remplace aussi le cadrage mobile de l'asset.
+    expect(resolveCardHeroImage({ slug: 'chloefood', config: { hero_image_url: null, hero_image_position: 'left top' }, supabaseUrl }))
+      .toEqual({ src: CARD_HERO_ASSETS.chloefood!.src, sources: CARD_HERO_ASSETS.chloefood!.sources, position: 'left top' });
     expect(resolveCardHeroImage({ slug: 'unknown-tenant', config: null, supabaseUrl })).toBeNull();
   });
 

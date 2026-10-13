@@ -114,7 +114,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
               onPay={paymentMethods.length > 0 ? openPayment : undefined}
               showShop={tenant.storefront_ready}
             />
-            <div className="mt-4 grid gap-5 px-4 lg:mt-6 lg:grid-cols-12 lg:items-start lg:gap-6 lg:px-0">
+            <div className="mt-3 grid gap-4 px-4 sm:gap-5 lg:mt-6 lg:grid-cols-12 lg:items-start lg:gap-6 lg:px-0">
               <CardPaymentBrands strip={cardPaymentBrandStrip(paymentMethods)} lang={lang} className="lg:col-span-5 lg:col-start-1 lg:row-start-1" />
               <div className="lg:col-span-7 lg:col-start-6 lg:row-span-2 lg:row-start-1">
                 <CardShowcase
@@ -126,7 +126,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
                   primaryColor={tenant.primary_color}
                 />
               </div>
-              <div className="flex flex-col gap-5 lg:col-span-5 lg:col-start-1 lg:row-start-2">
+              <div className="flex flex-col gap-4 sm:gap-5 lg:col-span-5 lg:col-start-1 lg:row-start-2">
                 <CardStoreInfo lang={lang} tenant={tenant} socialLinks={socialLinks} reviewsEnabled={reviewsEnabled} />
               </div>
             </div>

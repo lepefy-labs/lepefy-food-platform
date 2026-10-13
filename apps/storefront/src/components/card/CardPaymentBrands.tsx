@@ -1,11 +1,11 @@
-import { IconBuildingBank, IconCash, IconLock } from '@tabler/icons-react';
+import { IconLock } from '@tabler/icons-react';
 import type { CardPaymentBrand, CardPaymentBrandStrip, CardPaymentChip } from '@/lib/card/cardPaymentBrands';
 
 type Lang = 'fr' | 'it';
 
 const COPY = {
-  fr: { title: 'Moyens de paiement acceptés', stripe: 'Paiement par carte sécurisé par Stripe', bank_transfer: 'Virement', cash: 'Espèces' },
-  it: { title: 'Metodi di pagamento accettati', stripe: 'Pagamento con carta protetto da Stripe', bank_transfer: 'Bonifico', cash: 'Contanti' },
+  fr: { title: 'Moyens de paiement acceptés', stripe: 'Carte sécurisée par Stripe', also: 'Aussi :', bank_transfer: 'virement', cash: 'espèces' },
+  it: { title: 'Metodi di pagamento accettati', stripe: 'Carta protetta da Stripe', also: 'Anche:', bank_transfer: 'bonifico', cash: 'contanti' },
 } as const;
 
 // Marques d'acceptation : tracés Simple Icons (CC0) pour Visa, Apple Pay et le
@@ -45,32 +45,29 @@ export function PaymentBrandMark({ brand, size = 'md' }: { brand: CardPaymentBra
   }
 }
 
-const CHIP_ICONS: Record<CardPaymentChip, typeof IconCash> = { bank_transfer: IconBuildingBank, cash: IconCash };
-
-/** Fascia orizzontale compacte sous les CTA : uniquement les moyens réellement proposés. */
+/** Fascia orizzontale compacte sous les CTA : uniquement les moyens réellement proposés, logos sur une ligne. */
 export function CardPaymentBrands({ strip, lang, className = '' }: { strip: CardPaymentBrandStrip; lang: Lang; className?: string }) {
   const t = COPY[lang];
   if (strip.brands.length === 0 && strip.chips.length === 0) return null;
+  const others = strip.chips.map((chip: CardPaymentChip) => t[chip]).join(', ');
   return (
-    <section aria-label={t.title} className={`rounded-2xl bg-white p-3 shadow-[0_1px_2px_rgba(17,24,39,0.06)] ring-1 ring-black/[0.04] ${className}`}>
+    <section aria-label={t.title} className={`rounded-2xl bg-white px-2.5 py-2 shadow-[0_1px_2px_rgba(17,24,39,0.06)] ring-1 ring-black/[0.04] ${className}`}>
       <h2 className="sr-only">{t.title}</h2>
-      <ul className="flex flex-wrap items-center gap-2">
-        {strip.brands.map((brand) => (
-          <li key={brand} className="flex h-11 min-w-[3.5rem] items-center justify-center rounded-xl border border-gray-200 bg-white px-2.5">
-            <PaymentBrandMark brand={brand} />
-          </li>
-        ))}
-        {strip.chips.map((chip) => {
-          const Icon = CHIP_ICONS[chip];
-          return (
-            <li key={chip} className="flex h-11 items-center gap-1.5 rounded-xl bg-gray-100 px-3 text-sm font-semibold text-gray-800">
-              <Icon size={18} aria-hidden="true" />{t[chip]}
+      {strip.brands.length > 0 && (
+        <ul className="flex flex-wrap items-center gap-1.5">
+          {strip.brands.map((brand) => (
+            <li key={brand} className="flex h-9 min-w-[2.75rem] items-center justify-center rounded-lg border border-gray-200 bg-white px-2">
+              <PaymentBrandMark brand={brand} size="sm" />
             </li>
-          );
-        })}
-      </ul>
-      {strip.processedByStripe && (
-        <p className="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-gray-700"><IconLock size={14} aria-hidden="true" />{t.stripe}</p>
+          ))}
+        </ul>
+      )}
+      {(strip.processedByStripe || others) && (
+        <p className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-medium text-gray-700 ${strip.brands.length > 0 ? 'mt-1.5' : ''}`}>
+          {strip.processedByStripe && <span className="inline-flex items-center gap-1"><IconLock size={14} aria-hidden="true" />{t.stripe}</span>}
+          {strip.processedByStripe && others && <span aria-hidden="true">·</span>}
+          {others && <span>{t.also} {others}</span>}
+        </p>
       )}
     </section>
   );

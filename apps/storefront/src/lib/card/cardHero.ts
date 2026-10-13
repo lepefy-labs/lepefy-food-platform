@@ -34,19 +34,22 @@ export interface CardHeroImageSource {
 export interface CardHeroImage {
   /** Image de repli du `<img>` (navigateur sans `<picture>`/AVIF). */
   src: string;
-  /** Valeur CSS `object-position` : garde le sujet visible sur mobile comme sur desktop. */
+  /** Valeur CSS `object-position` côte à côte (≥ 540 px) : garde le sujet visible. */
   position: string;
+  /** Cadrage de la bande photo mobile (4:3) ; par défaut `position`. */
+  mobilePosition?: string;
   /** Variantes statiques pré-générées, de la plus compacte à la plus compatible. */
   sources?: CardHeroImageSource[];
 }
 
 /** Asset public décliné en `<base>-<largeur>.avif|webp` (jamais agrandi au-delà de l'original). */
-export function staticHeroAsset(base: string, widths: readonly number[], position: string): CardHeroImage {
+export function staticHeroAsset(base: string, widths: readonly number[], position: string, mobilePosition?: string): CardHeroImage {
   const srcSet = (ext: string) => widths.map((w) => `${base}-${w}.${ext} ${w}w`).join(', ');
   const fallback = widths[Math.min(1, widths.length - 1)];
   return {
     src: `${base}-${fallback}.webp`,
     position,
+    ...(mobilePosition ? { mobilePosition } : {}),
     sources: [{ type: 'image/avif', srcSet: srcSet('avif') }, { type: 'image/webp', srcSet: srcSet('webp') }],
   };
 }
@@ -55,7 +58,7 @@ const DEFAULT_POSITION = 'center';
 
 /** Assets livrés avec le code, par slug : photo réelle d'un client qui paie, sujet à droite. */
 export const CARD_HERO_ASSETS: Record<string, CardHeroImage> = {
-  chloefood: staticHeroAsset('/images/card/chloefood-hero-payment', [480, 800, 1122], '72% 28%'),
+  chloefood: staticHeroAsset('/images/card/chloefood-hero-payment', [480, 800, 1122], '72% 28%', '74% 52%'),
 };
 
 const POSITION_TOKEN = /^(?:left|center|right|top|bottom|\d{1,3}%)$/;
@@ -81,10 +84,12 @@ export function resolveCardHeroImage(input: {
   supabaseUrl?: string | null;
 }): CardHeroImage | null {
   const configured = input.config?.hero_image_url;
+  const configuredPosition = normalizeHeroPosition(input.config?.hero_image_position);
   if (configured && isAllowedHeroImageUrl(configured, input.supabaseUrl)) {
-    return { src: configured.trim(), position: normalizeHeroPosition(input.config?.hero_image_position) ?? DEFAULT_POSITION };
+    return { src: configured.trim(), position: configuredPosition ?? DEFAULT_POSITION };
   }
   const asset = CARD_HERO_ASSETS[input.slug];
   if (!asset) return null;
-  return { ...asset, position: normalizeHeroPosition(input.config?.hero_image_position) ?? asset.position };
+  // Un cadrage configuré s'applique partout (mobile compris).
+  return configuredPosition ? { src: asset.src, sources: asset.sources, position: configuredPosition } : asset;
 }

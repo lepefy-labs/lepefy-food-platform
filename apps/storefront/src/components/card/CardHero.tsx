@@ -10,7 +10,7 @@ import { hexToRgba } from '@/lib/card/methodColor';
 
 type Lang = 'fr' | 'it';
 
-const HERO_SIZES = '(min-width: 1024px) 600px, 100vw';
+const HERO_SIZES = '(min-width: 1024px) 600px, (min-width: 540px) 50vw, 100vw';
 
 const COPY = {
   fr: { title: 'Payez ici, simplement.', subtitle: 'Réglez votre achat en quelques instants.', pay: 'Payer maintenant', shop: 'Commander sur la boutique', language: 'Langue' },
@@ -50,16 +50,24 @@ export function CardHero({ lang, onLangChange, tenant, image: configuredImage, o
   const background = darkenHex(tenant.primary_color, 0.8);
   const fade = (alpha: number) => hexToRgba(background, alpha);
 
+  // Photo présente : bande basse au cadrage centré sur le geste de paiement
+  // (mobile), puis texte et photo côte à côte dès 540 px. Sans photo : une
+  // seule colonne, bande décorative courte.
+  const split = Boolean(image);
+  const positions = image
+    ? ({ '--hero-pos': image.mobilePosition ?? image.position, '--hero-pos-wide': image.position } as React.CSSProperties)
+    : undefined;
+
   return (
     <section
-      className="relative isolate overflow-hidden text-white lg:grid lg:min-h-[560px] lg:grid-cols-2 lg:rounded-[2rem]"
+      className={`relative isolate overflow-hidden text-white lg:rounded-[2rem] ${split ? 'min-[540px]:grid min-[540px]:min-h-[400px] min-[540px]:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] md:grid-cols-2 lg:min-h-[470px]' : ''}`}
       style={{ backgroundColor: background }}
     >
-      <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 px-4 pt-[max(.875rem,env(safe-area-inset-top))] lg:px-7 lg:pt-6">
-        <span className="inline-flex min-h-12 items-center rounded-2xl bg-white/95 px-3 py-1 shadow-sm">
-          <TenantLogo variant="compact" priority identity={{ name: tenant.name, logo_url: tenant.logo_url }} className="max-w-[44vw]" fallbackClassName="text-gray-900" />
+      <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 px-4 pt-[max(.75rem,env(safe-area-inset-top))] lg:px-7 lg:pt-6">
+        <span className="inline-flex min-h-11 items-center rounded-2xl bg-white/95 px-2.5 py-1 shadow-sm">
+          <TenantLogo variant="compact" priority identity={{ name: tenant.name, logo_url: tenant.logo_url }} className="max-w-[40vw]" fallbackClassName="text-gray-900" />
         </span>
-        <div role="group" aria-label={t.language} className="inline-flex rounded-xl bg-black/40 p-1 backdrop-blur-sm">
+        <div role="group" aria-label={t.language} className="inline-flex rounded-xl bg-black/45 p-1 backdrop-blur-sm">
           {(['fr', 'it'] as const).map((code) => (
             <button
               key={code}
@@ -76,8 +84,8 @@ export function CardHero({ lang, onLangChange, tenant, image: configuredImage, o
       </div>
 
       <div
-        className={`relative lg:order-2 lg:h-auto ${image ? 'h-[clamp(220px,48svh,460px)]' : 'h-[clamp(120px,22svh,180px)]'}`}
-        style={image ? undefined : { background: `radial-gradient(120% 90% at 80% 10%, ${hexToRgba(tenant.primary_color, 0.55)} 0%, transparent 70%)` }}
+        className={`relative ${split ? 'aspect-[4/3] max-h-[300px] w-full min-[540px]:order-2 min-[540px]:aspect-auto min-[540px]:h-full min-[540px]:max-h-none' : 'h-[clamp(84px,14svh,128px)]'}`}
+        style={split ? positions : { background: `radial-gradient(120% 90% at 80% 10%, ${hexToRgba(tenant.primary_color, 0.55)} 0%, transparent 70%)` }}
       >
         {image && (
           // <picture> statique, jamais /_next/image (quota Vercel épuisée → 402, cf. lib/card/cardHero.ts).
@@ -93,29 +101,28 @@ export function CardHero({ lang, onLangChange, tenant, image: configuredImage, o
               fetchPriority="high"
               decoding="async"
               onError={() => setImageFailed(true)}
-              className="absolute inset-0 h-full w-full object-cover"
-              style={{ objectPosition: image.position }}
+              className="absolute inset-0 h-full w-full object-cover [object-position:var(--hero-pos)] min-[540px]:[object-position:var(--hero-pos-wide)]"
             />
           </picture>
         )}
-        {/* Haut : lisibilité du logo et du sélecteur ; bas (mobile) / gauche (desktop) : fondu vers le fond du texte. */}
-        <div aria-hidden className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/45 to-transparent" />
-        <div aria-hidden className="absolute inset-x-0 bottom-0 h-2/5 lg:hidden" style={{ background: `linear-gradient(180deg, ${fade(0)} 0%, ${fade(1)} 100%)` }} />
-        <div aria-hidden className="absolute inset-y-0 left-0 hidden w-1/3 lg:block" style={{ background: `linear-gradient(90deg, ${fade(1)} 0%, ${fade(0)} 100%)` }} />
+        {/* Haut : lisibilité du logo et du sélecteur ; bas (mobile) / gauche (côte à côte) : fondu court vers le fond du texte, qui ne recouvre jamais le geste de paiement. */}
+        <div aria-hidden className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/45 to-transparent" />
+        {split && <div aria-hidden className="absolute inset-x-0 bottom-0 h-1/5 min-[540px]:hidden" style={{ background: `linear-gradient(180deg, ${fade(0)} 0%, ${fade(1)} 100%)` }} />}
+        {split && <div aria-hidden className="absolute inset-y-0 left-0 hidden w-1/4 min-[540px]:block" style={{ background: `linear-gradient(90deg, ${fade(1)} 0%, ${fade(0)} 100%)` }} />}
       </div>
 
-      <div className="relative z-10 -mt-12 flex flex-col gap-3 px-5 pb-6 lg:order-1 lg:mt-0 lg:justify-end lg:px-14 lg:pb-14 lg:pt-28">
-        {onPay && <p className="text-sm font-bold uppercase tracking-[0.08em] text-white/90">{tenant.name}</p>}
-        <h1 className="text-[2.25rem] font-extrabold leading-[1.05] min-[390px]:text-[2.5rem] sm:text-5xl lg:text-6xl" style={{ fontFamily: 'var(--font-card-heading)' }}>
+      <div className={`relative z-10 flex flex-col gap-2.5 px-5 pb-5 ${split ? '-mt-3 min-[540px]:order-1 min-[540px]:mt-0 min-[540px]:justify-end min-[540px]:px-6 min-[540px]:pb-7 min-[540px]:pt-24 lg:gap-3 lg:px-14 lg:pb-12' : 'lg:px-14 lg:pb-12'}`}>
+        {onPay && <p className="hidden text-sm font-bold uppercase tracking-[0.08em] text-white/90 min-[540px]:block">{tenant.name}</p>}
+        <h1 className="text-[2rem] font-extrabold leading-[1.05] min-[390px]:text-[2.25rem] md:text-5xl lg:text-[3.5rem]" style={{ fontFamily: 'var(--font-card-heading)' }}>
           {onPay ? t.title : tenant.name}
         </h1>
-        {(onPay || tenant.tagline) && <p className="max-w-md text-[17px] leading-snug text-white/95 lg:text-xl">{onPay ? t.subtitle : tenant.tagline}</p>}
-        <div className="mt-2 flex flex-col gap-3">
+        {(onPay || tenant.tagline) && <p className="max-w-md text-base leading-snug text-white/95 lg:text-xl">{onPay ? t.subtitle : tenant.tagline}</p>}
+        <div className="mt-1.5 flex flex-col gap-2.5">
           {onPay && (
             <button
               type="button"
               onClick={onPay}
-              className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl px-5 text-left text-lg font-extrabold text-white shadow-[0_10px_28px_rgba(0,0,0,0.35)] ring-1 ring-white/30 transition-transform focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white active:scale-[0.99] motion-reduce:transition-none lg:max-w-md"
+              className="flex min-h-14 w-full items-center gap-2.5 rounded-2xl px-4 text-left md:gap-3 md:px-5 text-lg font-extrabold text-white shadow-[0_10px_28px_rgba(0,0,0,0.35)] ring-1 ring-white/30 transition-transform focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white active:scale-[0.99] motion-reduce:transition-none lg:min-h-[60px] lg:max-w-md"
               style={{ backgroundColor: CARD_PAY_COLOR, fontFamily: 'var(--font-card-heading)' }}
             >
               <IconCreditCard size={26} aria-hidden="true" className="shrink-0" />
@@ -126,7 +133,7 @@ export function CardHero({ lang, onLangChange, tenant, image: configuredImage, o
           {showShop && (
             <Link
               href="/"
-              className="flex min-h-[56px] w-full items-center gap-3 rounded-2xl bg-white px-5 text-base font-bold text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/70 lg:max-w-md"
+              className="flex min-h-[52px] w-full items-center gap-2.5 rounded-2xl bg-white px-4 text-base font-bold md:gap-3 md:px-5 text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/70 lg:min-h-14 lg:max-w-md"
             >
               <IconShoppingBag size={24} aria-hidden="true" className="shrink-0" />
               <span className="flex-1">{t.shop}</span>
