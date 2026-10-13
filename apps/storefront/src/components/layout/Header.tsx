@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { IconArrowLeft, IconLock, IconMenu2, IconShoppingBag, IconStar } from '@tabler/icons-react';
+import { IconArrowLeft, IconLock, IconMenu2, IconShoppingCart, IconStar } from '@tabler/icons-react';
 import type { TenantSocialLink } from '@lepefy/types';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
@@ -206,8 +206,8 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
                 className={`inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full px-4 text-sm font-bold shadow-sm transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:animate-none ${cartPulse ? 'animate-cart-pop' : ''}`}
                 style={{ backgroundColor: 'var(--color-primary)', color: onPrimary, outlineColor: 'var(--color-primary)' }}
               >
-                <IconShoppingBag size={20} stroke={2} aria-hidden="true" />
-                Panier
+                <IconShoppingCart size={20} stroke={2} aria-hidden="true" />
+                Mon panier
                 {totalItems > 0 && (
                   <span aria-hidden="true" className="flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-xs font-extrabold tabular-nums" style={{ background: 'var(--color-secondary)', color: onSecondary }}>
                     {formatCartBadge(totalItems)}

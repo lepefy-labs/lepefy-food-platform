@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import {
   IconSmartHome,
   IconCategory,
-  IconShoppingBag,
+  IconShoppingCart,
   IconGift,
   IconUserCircle,
 } from '@tabler/icons-react';
@@ -100,7 +100,7 @@ export function BottomNav() {
                 : '0 0 0 3px #fff, 0 4px 10px color-mix(in srgb, var(--color-primary) 40%, transparent)',
             }}
           >
-            <IconShoppingBag size={26} stroke={2} aria-hidden="true" />
+            <IconShoppingCart size={26} stroke={2} aria-hidden="true" />
             {totalItems > 0 && (
               <span aria-hidden="true"
                 className="absolute -right-2.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-xs font-extrabold tabular-nums ring-2 ring-white"
