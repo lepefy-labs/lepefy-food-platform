@@ -100,7 +100,7 @@ Verifiche:
 - 257 set da 7 oggetti controllati in sequenza;
 - nessuna richiesta `/_next/image` per prodotti, nessun 402, nessuna immagine rotta.
 
-I set v2 restano in Storage (~60 MB recuperabili con approvazione).
+Pulizia del 13/10/2026, approvata dal richiedente: cancellati i set v2 dei set v3 in uso, cioè 1.280 file e circa 146 MB su 256 set. I master v2 erano identici byte per byte ai master v3 e non esisteva alcun riferimento: DB, pagine pubbliche (518 riferimenti, tutti v3) ed email. Escluso un solo set (5 file), quello di una foto di `arachide-sale` scollegata dall'admin alle 20:01 UTC del 12/10, dopo l'aggiornamento: anche la sua copia v3 resta. Dopo la pulizia: 258 set v3 completi, smoke 10/10. Gli originali storici restano fino al 12/11/2026 circa: 234 file e 49 MB nel percorso tenant, 19 file e 32 MB in `assets/products/`. Servono per carrelli ospite salvati nei browser, link e indicizzazioni esistenti e rollback pre-backfill. I 14 file di `assets/products/` non riferiti da ChloeFood non vanno toccati.
 
 | Home, stesso protocollo | v2 | v3 |
 |---|---|---|
@@ -109,7 +109,7 @@ I set v2 restano in Storage (~60 MB recuperabili con approvazione).
 | Mobile, DPR 3 | 2.006 KB | 1.563 KB (−22 %) |
 | Desktop 1440 px | 2.075 KB | 1.683 KB (−19 %) |
 
-Le card prodotto `grid` misurano circa 44vw fino a 640 px, circa 30vw fino a 767 px, 234 px fino a 1279 px e 266 px oltre (home, `/accueil`, `/gadgets`, ricerca). Il `sizes` precedente (`50vw / 33vw / 25vw`) le sovrastimava fino a 2,4 volte sugli schermi larghi: per esempio `w480` a 1440 px e `w640` a 2560 px. Nello stesso commit di questo documento il `sizes` diventa `45vw / 31vw / 236px / 268px`.
+Le card prodotto `grid` misurano circa 44vw fino a 640 px, circa 30vw fino a 767 px, 234 px fino a 1279 px e 266 px oltre (home, `/accueil`, `/gadgets`, ricerca). Il `sizes` precedente (`50vw / 33vw / 25vw`) le sovrastimava fino a 2,4 volte sugli schermi larghi: per esempio `w480` a 1440 px e `w640` a 2560 px. Il `sizes` è diventato `45vw / 31vw / 236px / 268px` (`cdd711f2`). Misura dopo il deploy, home: desktop 1440 px 662 KB (tutto `w320`, −68 % rispetto a v2), mobile DPR 3 1.409 KB (−30 %), laptop 1440 px DPR 2 1.421 KB.
 
 **Residui osservati.** Il master PNG di `mutzig` è passato da 1,6 a 2,4 MB perché Sharp ricodifica il PNG con i parametri di default. Il browser non lo scarica (riceve le varianti WebP, 5–86 KB), ma occupa Storage. Una compressione PNG più forte va introdotta solo dopo il backfill completo: il riuso idempotente confronta i byte e un retry con encoder diverso fallirebbe. Chat e admin non verificati, perché richiedono autenticazione. Le miniature della gallery hanno `alt=""` già prima del pilota (sono decorative dentro un bottone etichettato). Il CLS di circa 0,11–0,12 della pagina carrello non dipende dalle immagini prodotto: va analizzato a parte.
 
