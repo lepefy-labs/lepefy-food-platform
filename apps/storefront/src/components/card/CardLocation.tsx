@@ -35,7 +35,7 @@ export function CardLocation({ address, googleMapsUrl, lang, primaryColor, secon
 
   if (!googleMapsUrl) {
     return (
-      <div className="flex items-start gap-3 border-t border-gray-100 px-4 py-3.5">
+      <div className="flex items-start gap-3 px-4 py-3.5">
         <span
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-gray-50"
           style={{ color: primaryColor }}
@@ -44,7 +44,7 @@ export function CardLocation({ address, googleMapsUrl, lang, primaryColor, secon
           <IconMapPin size={19} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-xs font-bold uppercase tracking-wide text-gray-500">{t.title}</span>
+          <span className="block text-xs font-bold uppercase tracking-wide text-gray-600">{t.title}</span>
           <span className="mt-1 block break-words text-sm font-medium leading-5 text-gray-800">{displayAddress}</span>
         </span>
       </div>
@@ -52,7 +52,7 @@ export function CardLocation({ address, googleMapsUrl, lang, primaryColor, secon
   }
 
   return (
-    <div className="border-t border-gray-100 px-3.5 py-3.5">
+    <div className="px-3.5 py-3.5">
       <div className="mb-3 flex items-start gap-3 px-0.5">
         <span
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-gray-50"
@@ -62,7 +62,7 @@ export function CardLocation({ address, googleMapsUrl, lang, primaryColor, secon
           <IconMapPin size={19} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-xs font-bold uppercase tracking-wide text-gray-500">{t.title}</span>
+          <span className="block text-xs font-bold uppercase tracking-wide text-gray-600">{t.title}</span>
           <span className="mt-1 block break-words text-sm font-semibold leading-5 text-gray-800">{displayAddress}</span>
         </span>
       </div>

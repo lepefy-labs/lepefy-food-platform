@@ -38,6 +38,8 @@ export function revalidateCatalogCache(tenantId: string) {
     revalidatePath('/products/[slug]', 'page');
     revalidatePath('/accueil');
     revalidatePath('/gadgets');
+    // Vitrine « Nos produits en vedette » de /card (ISR 300 s).
+    revalidatePath('/card');
   });
 }
 

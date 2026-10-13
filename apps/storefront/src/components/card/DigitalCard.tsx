@@ -1,42 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import {
-  IconClock, IconShoppingBag, IconUserPlus, IconBrandWhatsapp,
-  IconBrandInstagram, IconBrandFacebook, IconBrandTiktok, IconBrandYoutube,
-  IconBrandLinkedin, IconBrandX, IconCreditCard, IconExternalLink, IconStar,
-} from '@tabler/icons-react';
-import { SOCIAL_PLATFORM_REGISTRY, type TenantSocialLink, type TenantPaymentMethod } from '@lepefy/types';
-import { TenantLogo } from '@/components/branding/TenantLogo';
+import { IconUserPlus } from '@tabler/icons-react';
+import type { TenantSocialLink, TenantPaymentMethod } from '@lepefy/types';
 import { AddToHomeScreen } from './AddToHomeScreen';
-import { CardLocation } from './CardLocation';
+import { CardHero } from './CardHero';
+import { CardPaymentBrands } from './CardPaymentBrands';
+import { CardShowcase } from './CardShowcase';
+import { CardStoreInfo } from './CardStoreInfo';
 import { PaymentMethodsAccordion } from './PaymentMethodsAccordion';
 import { CardPaymentResult } from './CardPaymentResult';
 import { useCardPaymentReturn } from '@/lib/card/useCardPaymentReturn';
 import { visibleCardPaymentMethods } from '@/lib/payments/applePay';
 import { useApplePaySupport } from '@/lib/payments/useApplePaySupport';
+import { cardPaymentBrandStrip } from '@/lib/card/cardPaymentBrands';
+import { CARD_PAGE_BACKGROUND, readableForeground } from '@/lib/card/cardTheme';
+import type { CardHeroImage } from '@/lib/card/cardHero';
+import type { CardShowcaseProduct } from '@/lib/card/getCardShowcaseProducts';
 
-const ICONS = { IconBrandInstagram, IconBrandFacebook, IconBrandTiktok, IconBrandYoutube, IconBrandLinkedin, IconBrandX };
 type Lang = 'fr' | 'it';
 
 const COPY = {
-  fr: {
-    descriptor: 'Carte digitale', heroSupport: 'Toutes nos infos, services et paiements à portée de main.',
-    followUs: 'Suivez-nous', whatsapp: 'Contacter sur WhatsApp', products: 'Découvrir notre boutique',
-    addContact: 'Ajouter aux contacts', comingSoon: 'Boutique en ligne bientôt disponible', payTitle: 'Comment payer ?',
-    payText: 'Plusieurs méthodes sûres et rapides sont disponibles pour régler vos commandes.', payCta: 'Voir les moyens de paiement',
-    reviewsTitle: 'Votre avis compte', reviewsText: 'Découvrez les avis de nos clients vérifiés, ou partagez le vôtre si vous avez déjà commandé.', reviewsCta: 'Voir les avis',
-    googleReviewText: 'Acheté en boutique ? Laissez-nous un avis Google.', googleReviewCta: 'Avis Google',
-  },
-  it: {
-    descriptor: 'Card digitale', heroSupport: 'Tutte le informazioni, i servizi e i pagamenti sempre a portata di mano.',
-    followUs: 'Seguici', whatsapp: 'Contatta su WhatsApp', products: 'Scopri il nostro negozio', addContact: 'Aggiungi ai contatti',
-    comingSoon: 'Negozio online in arrivo', payTitle: 'Come pagare?', payText: 'Sono disponibili diversi metodi sicuri e rapidi per effettuare i tuoi pagamenti.',
-    payCta: 'Vedi i metodi di pagamento',
-    reviewsTitle: 'La tua opinione conta', reviewsText: 'Scopri le recensioni dei nostri clienti verificati, o lascia la tua se hai già ordinato.', reviewsCta: 'Vedi le recensioni',
-    googleReviewText: 'Hai acquistato in negozio? Lasciaci una recensione Google.', googleReviewCta: 'Recensione Google',
-  },
+  fr: { addContact: 'Ajouter aux contacts' },
+  it: { addContact: 'Aggiungi ai contatti' },
 } as const;
 
 interface Props {
@@ -50,59 +36,114 @@ interface Props {
   paymentMethods: TenantPaymentMethod[];
   applePayEnabled: boolean;
   reviewsEnabled: boolean;
+  heroImage: CardHeroImage | null;
+  showcaseProducts: CardShowcaseProduct[];
 }
 
-function readableForeground(hex: string): '#111827' | '#ffffff' {
-  const normalized = hex.replace('#', '');
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return '#111827';
-  const r = parseInt(normalized.slice(0, 2), 16) / 255; const g = parseInt(normalized.slice(2, 4), 16) / 255; const b = parseInt(normalized.slice(4, 6), 16) / 255;
-  const linear = (v: number) => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b) > 0.42 ? '#111827' : '#ffffff';
-}
-
-export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethods, applePayEnabled, reviewsEnabled }: Props) {
-  // Filtre unique pour le bouton « Voir les moyens de paiement » et pour la
-  // liste : si seule la ligne apple_pay existe et que l'appareil ne supporte
-  // pas Apple Pay, la section entière reste masquée (jamais de page vide).
+/**
+ * /card : landing payment-first (1. payer, 2. découvrir la boutique, 3. infos
+ * du commerce). Écrans de paiement et d'issue inchangés dans leur logique :
+ * PaymentMethodsAccordion → CardQuickPay → Stripe, retour après redirection
+ * via useCardPaymentReturn.
+ */
+export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethods, applePayEnabled, reviewsEnabled, heroImage, showcaseProducts }: Props) {
+  // Filtre unique pour le bouton « Payer maintenant », la fascia des marques et
+  // la liste : si seule la ligne apple_pay existe et que l'appareil ne supporte
+  // pas Apple Pay, rien n'est proposé (jamais de page de paiement vide).
   const applePaySupported = useApplePaySupport();
   const paymentMethods = visibleCardPaymentMethods(allCardMethods, applePayEnabled, applePaySupported);
-  const [lang, setLang] = useState<Lang>(() => typeof window !== 'undefined' ? ((localStorage.getItem('lepefy-card-lang') as Lang) ?? 'fr') : 'fr');
+  const [lang, setLang] = useState<Lang>(() => {
+    if (typeof window === 'undefined') return 'fr';
+    try { return (localStorage.getItem('lepefy-card-lang') as Lang | null) === 'it' ? 'it' : 'fr'; } catch { return 'fr'; }
+  });
   const [inPayment, setInPayment] = useState(false);
   const paymentReturn = useCardPaymentReturn();
-  // CTA boutique après paiement : seulement si la boutique est ouverte (même règle que le lien « Produits »).
+  // CTA boutique après paiement : seulement si la boutique est ouverte.
   const shop = tenant.storefront_ready ? { color: tenant.primary_color, foreground: readableForeground(tenant.primary_color) } : null;
   const paymentView = inPayment || paymentReturn.result !== null;
-  const t = COPY[lang]; const initials = tenant.name.slice(0, 2).toUpperCase(); const secondaryForeground = readableForeground(tenant.secondary_color);
-  const hours = lang === 'it' ? (tenant.click_collect_hours_it || tenant.click_collect_hours) : tenant.click_collect_hours;
-  function changeLang(next: Lang) { setLang(next); localStorage.setItem('lepefy-card-lang', next); }
+  const t = COPY[lang];
+  const contactForeground = readableForeground(tenant.primary_color);
 
-  return <div className="min-h-screen bg-gray-50 sm:flex sm:items-start sm:justify-center sm:px-4 sm:py-10">
-    <div className="mx-auto w-full max-w-md overflow-hidden bg-white shadow-sm sm:rounded-[2rem] sm:border sm:border-gray-200" style={{ fontFamily: 'var(--font-card-body)' }}>
+  function changeLang(next: Lang) {
+    setLang(next);
+    try { localStorage.setItem('lepefy-card-lang', next); } catch { /* stockage indisponible : la langue reste celle de la session */ }
+  }
+
+  function openPayment() {
+    setInPayment(true);
+    window.scrollTo({ top: 0 });
+  }
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: CARD_PAGE_BACKGROUND, fontFamily: 'var(--font-card-body)' }}>
       <AddToHomeScreen lang={lang} tenant={{ name: tenant.name, primary_color: tenant.primary_color }} />
-      {!paymentView && <header className="relative overflow-hidden px-5 pb-5 pt-3 text-center" style={{ backgroundColor: tenant.primary_color }}>
-        <div aria-hidden className="absolute -left-12 top-10 h-28 w-28 rounded-full opacity-[0.045]" style={{ backgroundColor: tenant.secondary_color }} /><div aria-hidden className="absolute -right-14 -top-12 h-36 w-36 rounded-full opacity-[0.045]" style={{ backgroundColor: tenant.secondary_color }} />
-        <div className="absolute right-3 top-2 z-10"><div className="inline-flex rounded-lg border border-white/15 bg-black/[0.05] p-px backdrop-blur-sm" aria-label="Language">{(['fr','it'] as Lang[]).map(l=><button key={l} type="button" onClick={()=>changeLang(l)} aria-pressed={lang===l} className="min-h-11 min-w-11 rounded-[7px] px-1.5 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" style={lang===l?{backgroundColor:tenant.secondary_color,color:secondaryForeground}:{color:'rgba(255,255,255,.66)'}}>{l.toUpperCase()}</button>)}</div></div>
-        <div className="relative mx-auto flex min-h-24 items-center justify-center">{tenant.logo_url?<TenantLogo variant="hero" identity={{name:tenant.name,logo_url:tenant.logo_url}} priority className="mx-auto max-w-[72vw]"/>:<span className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/10 text-2xl font-extrabold text-white ring-1 ring-white/20" style={{fontFamily:'var(--font-card-heading)'}}>{initials}</span>}</div>
-        <h1 className="relative mt-0.5 text-xl font-extrabold text-white" style={{fontFamily:'var(--font-card-heading)'}}>{tenant.name}</h1><p className="relative mt-0.5 text-sm font-bold text-white/95" style={{fontFamily:'var(--font-card-heading)'}}>{t.descriptor}</p><p className="relative mx-auto mt-0.5 max-w-xs text-[13px] leading-snug text-white/75">{t.heroSupport}</p><div className="relative mx-auto mt-2 h-0.5 w-8 rounded-full" style={{backgroundColor:tenant.secondary_color}}/>
-      </header>}
-      <div className={paymentView?'p-5 sm:p-7':'relative -mt-4 rounded-t-[1.75rem] bg-white px-4 pb-28 pt-5 sm:px-5'}>{paymentReturn.result?<CardPaymentResult outcome={paymentReturn.result.outcome} receipt={paymentReturn.result.receipt} currency={tenant.currency} lang={lang} tenantName={tenant.name} shop={shop} onReturnToCard={()=>{paymentReturn.clear();setInPayment(false);}} onRetry={paymentMethods.length>0?()=>{paymentReturn.clear();setInPayment(true);}:undefined}/>:inPayment?<PaymentMethodsAccordion paymentMethods={paymentMethods} primaryColor={tenant.primary_color} currency={tenant.currency} tenantName={tenant.name} shop={shop} lang={lang} onClose={()=>setInPayment(false)}/>:<>
-        {paymentMethods.length>0&&<section className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.035)]"><div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-white" style={{backgroundColor:tenant.primary_color}}><IconCreditCard size={18}/></div><div className="min-w-0 flex-1"><h2 className="font-bold text-gray-900" style={{fontFamily:'var(--font-card-heading)'}}>{t.payTitle}</h2><div className="mt-1 h-0.5 w-7 rounded-full" style={{backgroundColor:tenant.secondary_color}}/><p className="mt-2 text-sm leading-relaxed text-gray-500">{t.payText}</p></div></div><button type="button" onClick={()=>setInPayment(true)} className="mt-3.5 min-h-12 w-full rounded-xl px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{backgroundColor:tenant.primary_color,'--tw-ring-color':tenant.primary_color} as React.CSSProperties}>{t.payCta}</button></section>}
-        <section className="mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.035)]">
-          {tenant.whatsapp_number&&<div className="p-2.5"><a href={`https://wa.me/${tenant.whatsapp_number}`} target="_blank" rel="noopener noreferrer" className="flex min-h-12 w-full items-center justify-center gap-2.5 rounded-[11px] px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{backgroundColor:tenant.secondary_color,color:secondaryForeground,'--tw-ring-color':tenant.primary_color} as React.CSSProperties}><IconBrandWhatsapp size={20} stroke={2}/>{t.whatsapp}</a></div>}
-          <CardLocation address={tenant.click_collect_address} googleMapsUrl={tenant.google_maps_url} lang={lang} primaryColor={tenant.primary_color} secondaryColor={tenant.secondary_color}/>
-          {hours&&<div className="flex items-start gap-3 border-t border-gray-100 px-4 py-3.5"><IconClock size={18} className="mt-0.5 shrink-0" style={{color:tenant.primary_color}}/><span className="text-sm leading-5 text-gray-700">{hours}</span></div>}
-        </section>
-        {(reviewsEnabled||tenant.google_review_url)&&<section className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.035)]"><div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-white" style={{backgroundColor:tenant.primary_color}}><IconStar size={18}/></div><div className="min-w-0 flex-1"><h2 className="font-bold text-gray-900" style={{fontFamily:'var(--font-card-heading)'}}>{t.reviewsTitle}</h2><div className="mt-1 h-0.5 w-7 rounded-full" style={{backgroundColor:tenant.secondary_color}}/>{reviewsEnabled&&<p className="mt-2 text-sm leading-relaxed text-gray-500">{t.reviewsText}</p>}</div></div>
-          {reviewsEnabled&&<Link href="/avis" className="mt-3.5 flex min-h-12 w-full items-center justify-center rounded-xl px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{backgroundColor:tenant.primary_color,'--tw-ring-color':tenant.primary_color} as React.CSSProperties}>{t.reviewsCta}</Link>}
-          {tenant.google_review_url&&<div className={reviewsEnabled?'mt-2.5 flex items-center justify-between gap-2 border-t border-gray-100 pt-2.5':'mt-3.5'}>
-            {reviewsEnabled&&<span className="text-xs leading-snug text-gray-500">{t.googleReviewText}</span>}
-            <a href={tenant.google_review_url} target="_blank" rel="noopener noreferrer" className={reviewsEnabled?'inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700':'flex min-h-12 w-full items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-bold text-gray-800'}>{t.googleReviewCta}</a>
-          </div>}
-        </section>}
-        <section className="mb-4">{tenant.storefront_ready?<Link href="/" className="flex min-h-12 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.025)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{'--tw-ring-color':tenant.primary_color} as React.CSSProperties}><IconShoppingBag size={18} style={{color:tenant.primary_color}}/><span className="flex-1">{t.products}</span><IconExternalLink size={16} className="text-gray-400"/></Link>:<div className="flex min-h-12 items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 text-sm italic text-gray-500"><IconShoppingBag size={18} style={{color:tenant.primary_color}}/>{t.comingSoon}</div>}</section>
-        {socialLinks.length>0&&<section className="mb-1 px-1"><h2 className="mb-2.5 text-sm font-bold text-gray-800" style={{fontFamily:'var(--font-card-heading)'}}>{t.followUs}</h2><div className="flex flex-wrap gap-3">{socialLinks.map(link=>{const meta=SOCIAL_PLATFORM_REGISTRY[link.platform];const Icon=ICONS[meta.iconName];return <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" aria-label={meta.label} className="flex h-11 w-11 items-center justify-center rounded-full shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{background:meta.badgeBackground,'--tw-ring-color':tenant.primary_color} as React.CSSProperties}><Icon size={19} style={{color:'#fff'}}/></a>})}</div></section>}
-      </>}</div>
+      {paymentView ? (
+        <main className="mx-auto w-full max-w-xl px-4 pb-10 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-8">
+          {paymentReturn.result ? (
+            <CardPaymentResult
+              outcome={paymentReturn.result.outcome}
+              receipt={paymentReturn.result.receipt}
+              currency={tenant.currency}
+              lang={lang}
+              tenantName={tenant.name}
+              shop={shop}
+              onReturnToCard={() => { paymentReturn.clear(); setInPayment(false); }}
+              onRetry={paymentMethods.length > 0 ? () => { paymentReturn.clear(); setInPayment(true); } : undefined}
+            />
+          ) : (
+            <PaymentMethodsAccordion
+              paymentMethods={paymentMethods}
+              primaryColor={tenant.primary_color}
+              currency={tenant.currency}
+              tenantName={tenant.name}
+              tenantLogoUrl={tenant.logo_url}
+              shop={shop}
+              lang={lang}
+              onClose={() => setInPayment(false)}
+            />
+          )}
+        </main>
+      ) : (
+        <>
+          <main className="mx-auto w-full max-w-6xl pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:px-6 lg:pt-6">
+            <CardHero
+              lang={lang}
+              onLangChange={changeLang}
+              tenant={tenant}
+              image={heroImage}
+              onPay={paymentMethods.length > 0 ? openPayment : undefined}
+              showShop={tenant.storefront_ready}
+            />
+            <div className="mt-4 grid gap-5 px-4 lg:mt-6 lg:grid-cols-12 lg:items-start lg:gap-6 lg:px-0">
+              <CardPaymentBrands strip={cardPaymentBrandStrip(paymentMethods)} lang={lang} className="lg:col-span-5 lg:col-start-1 lg:row-start-1" />
+              <div className="lg:col-span-7 lg:col-start-6 lg:row-span-2 lg:row-start-1">
+                <CardShowcase
+                  lang={lang}
+                  products={showcaseProducts}
+                  storefrontReady={tenant.storefront_ready}
+                  tagline={tenant.tagline}
+                  currency={tenant.currency}
+                  primaryColor={tenant.primary_color}
+                />
+              </div>
+              <div className="flex flex-col gap-5 lg:col-span-5 lg:col-start-1 lg:row-start-2">
+                <CardStoreInfo lang={lang} tenant={tenant} socialLinks={socialLinks} reviewsEnabled={reviewsEnabled} />
+              </div>
+            </div>
+          </main>
+          {/* Toujours présent sur la landing (pas sur les écrans de paiement) : enregistre la vCard. */}
+          <div className="fixed inset-x-0 bottom-0 z-50 border-t border-black/5 bg-white/90 px-4 pt-2 backdrop-blur-md" style={{ paddingBottom: 'calc(.5rem + env(safe-area-inset-bottom))' }}>
+            <a
+              href="/api/card/vcard"
+              download
+              className="mx-auto flex min-h-[52px] w-full max-w-md items-center justify-center gap-2.5 rounded-2xl px-4 text-base font-extrabold shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              style={{ backgroundColor: tenant.primary_color, color: contactForeground, '--tw-ring-color': tenant.primary_color, fontFamily: 'var(--font-card-heading)' } as React.CSSProperties}
+            >
+              <IconUserPlus size={20} aria-hidden="true" />{t.addContact}
+            </a>
+          </div>
+        </>
+      )}
     </div>
-    {!paymentView&&<div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center border-t border-gray-200/70 bg-white/90 px-4 pt-2 backdrop-blur-md" style={{paddingBottom:'calc(.5rem + env(safe-area-inset-bottom))'}}><a href="/api/card/vcard" download className="flex min-h-12 w-full max-w-md items-center justify-center gap-2 rounded-xl text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{backgroundColor:tenant.primary_color,'--tw-ring-color':tenant.primary_color} as React.CSSProperties}><IconUserPlus size={18}/><span style={{fontFamily:'var(--font-card-heading)'}}>{t.addContact}</span></a></div>}
-  </div>;
+  );
 }

@@ -154,10 +154,14 @@ export function AddToHomeScreen({ lang, tenant }: AddToHomeScreenProps) {
           0%, 100% { box-shadow: 0 0 0 0   color-mix(in srgb, ${tenant.primary_color} 40%, transparent); }
           50%       { box-shadow: 0 0 0 6px transparent; }
         }
+        @media (prefers-reduced-motion: reduce) {
+          [data-pwa-banner], [data-pwa-banner] * { animation: none !important; }
+        }
       `}</style>
 
       <div
         role="banner"
+        data-pwa-banner
         style={{
           background:   tenant.primary_color,
           borderBottom: `2px solid color-mix(in srgb, ${tenant.primary_color} 80%, black)`,
