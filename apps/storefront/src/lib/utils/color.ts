@@ -33,3 +33,31 @@ export function mixWithBlack(hex: string, percent: number): string {
   const toHex = (c: number) => Math.round(c * factor).toString(16).padStart(2, '0');
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
+
+/**
+ * Couleur de texte/icône lisible sur un fond tenant (`primary_color`,
+ * `secondary_color`). Le blanc reste le choix de la boutique tant qu'il atteint
+ * `minimumForLight` (3:1 pour une icône, 4.5:1 pour un petit texte) ; sinon la
+ * plus contrastée des deux candidates. Une valeur non hexadécimale garde le blanc.
+ */
+export function readableOn(
+  background: string | null | undefined,
+  minimumForLight = 3,
+  light = '#ffffff',
+  dark = '#111827',
+): string {
+  const value = background?.trim() ?? '';
+  if (!/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value)) return light;
+  const bg = value.startsWith('#') ? value : `#${value}`;
+  const lightContrast = contrastRatio(bg, light);
+  if (lightContrast >= minimumForLight) return light;
+  return lightContrast >= contrastRatio(bg, dark) ? light : dark;
+}
+
+/** Couleur tenant utilisée comme texte sur fond blanc, si elle reste lisible (4.5:1). */
+export function accentTextOnWhite(color: string | null | undefined, fallback = '#111827'): string {
+  const value = color?.trim() ?? '';
+  if (!/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value)) return fallback;
+  const hex = value.startsWith('#') ? value : `#${value}`;
+  return contrastRatio(hex, '#ffffff') >= 4.5 ? hex : fallback;
+}

@@ -6,6 +6,8 @@ import { ProductGrid, ProductCardSkeleton } from '@/components/catalog/ProductGr
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { CatalogCategoryRow } from '@/components/catalog/CatalogCategoryRow';
 import { semanticMatchToProductCardProduct } from '@/lib/catalog/productCardAdapters';
+import { buildCatalogUrl } from '@/lib/catalog/catalogSearchUrl';
+import { useCatalogSearchStore } from '@/stores/catalogSearchStore';
 import type { Category, ProductWithCategory, SemanticMatch } from '@lepefy/types';
 import type { CatalogSort } from '@/lib/catalog/pagination';
 
@@ -43,9 +45,11 @@ export function CatalogClient({
   const pathname      = usePathname();
   const router        = useRouter();
   const searchParams  = useSearchParams();
-  const [query, setQuery]            = useState(initialQuery);
-  const [isPending, startTransition] = useTransition();
-  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isNavigating, startTransition] = useTransition();
+  // Le champ de recherche vit dans le layout (GlobalProductSearch) : sa
+  // transition affiche le même squelette que les changements de filtre.
+  const searchPending = useCatalogSearchStore((s) => s.pending);
+  const isPending = isNavigating || searchPending;
 
   // Accumulation des pages chargées par le scroll infini — remise à zéro
   // chaque fois qu'un nouveau rendu serveur arrive (recherche/catégorie
@@ -63,10 +67,6 @@ export function CatalogClient({
 
   const [semanticResults, setSemanticResults]     = useState<SemanticMatch[]>([]);
   const [isSemanticLoading, setIsSemanticLoading] = useState(false);
-
-  useEffect(() => {
-    setQuery(initialQuery);
-  }, [initialQuery]);
 
   useEffect(() => {
     // Une page suivante encore en vol appartient à l'ancien filtre : elle ne
@@ -112,26 +112,7 @@ export function CatalogClient({
   const semanticOnly = semanticResults.filter(p => !textualIds.has(p.id));
 
   function buildUrl(overrides: { q?: string; category?: string | null; sort?: CatalogSort }) {
-    const params = new URLSearchParams(searchParams.toString());
-    const newQ = overrides.q !== undefined ? overrides.q : query;
-    if (newQ.trim()) params.set('q', newQ.trim());
-    else params.delete('q');
-    if (overrides.category !== undefined) {
-      if (overrides.category) params.set('category', overrides.category);
-      else params.delete('category');
-      params.delete('quantityGroup');
-    }
-    if (overrides.sort !== undefined) {
-      if (overrides.sort === 'recommended') params.delete('sort');
-      else params.set('sort', overrides.sort);
-    }
-    // A new filter/sort starts with today's daily ranking.
-    params.delete('day');
-    // Changer de filtre repart toujours de la page 1 — jamais de ?page=
-    // résiduel d'une navigation précédente.
-    params.delete('page');
-    const qs = params.toString();
-    return `${pathname}${qs ? '?' + qs : ''}`;
+    return buildCatalogUrl(pathname, searchParams.toString(), overrides);
   }
 
   async function handleLoadMore() {
@@ -213,19 +194,13 @@ export function CatalogClient({
 
   useEffect(() => () => loadMoreAbortRef.current?.abort(), []);
 
-  function handleQueryChange(value: string) {
-    setQuery(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      startTransition(() => {
-        router.replace(buildUrl({ q: value }));
-      });
-    }, 300);
+  function clearSearch() {
+    startTransition(() => {
+      router.replace(buildUrl({ q: '' }));
+    });
   }
 
   function handleCategorySelect(slug: string | null) {
-    setQuery('');
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     startTransition(() => {
       router.push(buildUrl({ q: '', category: slug }));
     });
@@ -240,64 +215,8 @@ export function CatalogClient({
 
   return (
     <div className="max-w-6xl mx-auto px-4 pb-6 md:pb-8">
-      <h1 className="sr-only">Catalogue</h1>
-      {/* Search bar */}
-      <div className="sticky top-24 z-30 -mx-4 bg-white/95 px-4 py-2 backdrop-blur">
-        <div className="flex h-[52px] max-w-2xl items-center gap-3 rounded-xl border-[1.5px] border-[color:var(--field-border)] bg-[color:var(--field-bg)] px-4 transition-shadow focus-within:border-[var(--color-primary)] focus-within:bg-white focus-within:shadow-[0_0_0_1px_var(--color-primary),0_0_0_5px_var(--field-ring)]">
-        {isPending ? (
-          <svg
-            className="shrink-0 animate-spin"
-            xmlns="http://www.w3.org/2000/svg"
-            width="20" height="20" viewBox="0 0 24 24"
-            fill="none" stroke="#4B5563" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-            <path d="M12 3a9 9 0 1 0 9 9" />
-          </svg>
-        ) : (
-          <svg
-            className="shrink-0"
-            xmlns="http://www.w3.org/2000/svg"
-            width="20" height="20" viewBox="0 0 24 24"
-            fill="none" stroke="#4B5563" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-            <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
-            <path d="M21 21l-6 -6" />
-          </svg>
-        )}
-        <input
-          type="search"
-          value={query}
-          onChange={e => handleQueryChange(e.target.value)}
-          placeholder="Rechercher un produit..."
-          className="min-w-0 flex-1 bg-transparent text-base text-gray-950
-                     placeholder:text-[color:var(--field-placeholder)] outline-none border-none focus-visible:outline-none"
-          aria-label="Rechercher un produit"
-          onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
-        />
-        {query && (
-          <button
-            type="button"
-            onClick={() => handleQueryChange('')}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2"
-            aria-label="Effacer la recherche"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
-              viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              aria-hidden="true">
-              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-              <path d="M18 6l-12 12" /><path d="M6 6l12 12" />
-            </svg>
-          </button>
-        )}
-        </div>
-      </div>
+      {/* La recherche est le champ global juste au-dessus (layout boutique). */}
+      <h1 className="pt-4 font-display text-2xl font-bold text-gray-900 md:pt-6">Catalogue</h1>
 
       {/* Visual category navigation — hidden during textual search. */}
       {!hasActiveSearch && (
@@ -321,11 +240,12 @@ export function CatalogClient({
         </div>
         {hasActiveSearch && (
           <button
-            onClick={() => handleQueryChange('')}
-            className="text-sm font-medium"
+            type="button"
+            onClick={clearSearch}
+            className="min-h-11 text-sm font-medium"
             style={{ color: 'var(--color-primary)' }}
           >
-            Effacer
+            Effacer la recherche
           </button>
         )}
         <label className="ml-auto flex shrink-0 flex-col gap-1 text-xs font-medium text-gray-600 sm:flex-row sm:items-center sm:gap-2">

@@ -1,11 +1,6 @@
-'use client';
-
-import { usePathname } from 'next/navigation';
-
+// Affiché uniquement sur /accueil (PromoTickerGate). Les textes restent ceux
+// d'origine : leur paramétrage par tenant est un debt connu (LEPEFY_PROJECT_CONTEXT §17).
 export function ShopNotificationBar() {
-  const pathname = usePathname();
-  if (pathname === '/') return null;
-
   return (
     <div
       className="relative overflow-hidden shrink-0"
@@ -29,6 +24,13 @@ export function ShopNotificationBar() {
         }
         .lepefy-ticker-track:hover {
           animation-play-state: paused;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .lepefy-ticker-track {
+            animation: none;
+            transform: none;
+            left: 16px;
+          }
         }
         .lepefy-ticker-item {
           display: inline-flex;

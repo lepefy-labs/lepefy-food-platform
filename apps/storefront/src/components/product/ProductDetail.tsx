@@ -1,11 +1,13 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getShoppingReturn } from '@/lib/catalog/shoppingReturn';
 import { useLocaleStore, resolveLocale } from '@/lib/store/localeStore';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
+import { useAddToCartUiStore } from '@/stores/addToCartUiStore';
+import type { ProductCardProduct } from '@/components/catalog/ProductCard';
 import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
 import { QuantitySelector } from './QuantitySelector';
 import { ProductTitle } from './ProductTitle';
@@ -40,7 +42,14 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const minOrderQuantity = product.min_order_quantity ?? 1;
   const orderQuantityStep = product.order_quantity_step ?? 1;
   const [quantity, setQuantity] = useState(minOrderQuantity);
-  const [added, setAdded] = useState(false);
+  // « ✓ Ajouté » : retour bref sur le bouton uniquement. Les actions de
+  // navigation vivent dans la confirmation partagée et dans la ligne « dans
+  // votre panier », lue du panier : elles ne disparaissent jamais sur un timer.
+  const [justAdded, setJustAdded] = useState(false);
+  const justAddedTimer = useRef<ReturnType<typeof setTimeout>>();
+  const showConfirmation = useAddToCartUiStore((s) => s.show);
+  const [returnToResults, setReturnToResults] = useState(false);
+  const inCartQuantity = cartItems.find((item) => item.product.id === product.id)?.quantity ?? 0;
   const maxPurchasable = getMaximumValidQuantity(product.stock, minOrderQuantity, orderQuantityStep);
   const outOfStock = maxPurchasable === 0;
   const availability = deriveAvailability({ stock: product.stock, minimum: minOrderQuantity, step: orderQuantityStep, maxPurchasable });
@@ -65,12 +74,26 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const fulfillmentHint = productFulfillmentHint(fulfillmentPolicy, Boolean(tenant.click_collect_enabled));
   const FulfillmentIcon = fulfillmentPolicy === 'pickup_only' ? IconBuildingStore : fulfillmentPolicy === 'delivery_only' ? IconTruck : IconTruckDelivery;
 
+  // Lu après l'hydratation (sessionStorage) : la page reste identique au rendu ISR.
+  useEffect(() => {
+    setReturnToResults(new URL(getShoppingReturn(catalogHref), window.location.origin).searchParams.has('q'));
+  }, [catalogHref]);
+  useEffect(() => () => clearTimeout(justAddedTimer.current), []);
+  // La ligne « dans votre panier » agrandit la barre d'achat mobile : Nala
+  // (ChatWidget) lit cet attribut pour rester au-dessus, sans couplage de state.
+  const showsCartLine = inCartQuantity > 0 && !outOfStock;
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-pdp-cart-line', showsCartLine);
+    return () => document.documentElement.removeAttribute('data-pdp-cart-line');
+  }, [showsCartLine]);
+
   function continueShopping() {
     router.push(getShoppingReturn(catalogHref));
   }
 
   function handleAddToCart() {
     if (outOfStock || quantity > maxPurchasable) return;
+    const previous = useCartStore.getState().items.find((item) => item.product.id === product.id)?.quantity ?? 0;
     addItem({
       id:           product.id,
       name:         product.name,
@@ -85,9 +108,27 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
       fulfillment_policy: normalizeFulfillmentPolicy(product.fulfillment_policy),
       ...pickSellingFormatFields(product),
     }, quantity);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+    const updated = useCartStore.getState().items.find((item) => item.product.id === product.id)?.quantity ?? 0;
+    if (updated <= previous) return;
+    clearTimeout(justAddedTimer.current);
+    setJustAdded(true);
+    justAddedTimer.current = setTimeout(() => setJustAdded(false), 1200);
+    const cardProduct: ProductCardProduct = {
+      ...product,
+      category: product.category ? { name: product.category.name } : null,
+      min_order_quantity: minOrderQuantity,
+      order_quantity_step: orderQuantityStep,
+      fulfillment_policy: normalizeFulfillmentPolicy(product.fulfillment_policy),
+    };
+    showConfirmation(cardProduct, { continueHref: getShoppingReturn(catalogHref) });
   }
+
+  const inCartLine = showsCartLine && (
+    <p role="status" className="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-1 text-sm text-green-900">
+      <span>✓ <span className="font-bold">{formatCount(sellingFormat, inCartQuantity)}</span> dans votre panier</span>
+      <Link href="/cart" className="inline-flex min-h-10 shrink-0 items-center font-bold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>Voir mon panier</Link>
+    </p>
+  );
 
   return (
     <div>
@@ -107,7 +148,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
 
       <button type="button" onClick={continueShopping}
         className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-800 hover:bg-gray-50">
-        ← Retour au catalogue
+        {returnToResults ? '← Retour aux résultats' : '← Retour au catalogue'}
       </button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-14">
@@ -203,6 +244,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
           ) : (
             <>
               <div className="hidden flex-col gap-3 md:flex">
+                {inCartLine}
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-medium text-gray-700">Quantité</span>
                   <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={maxPurchasable} onChange={setQuantity} />
@@ -211,13 +253,14 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                 <button
                   onClick={handleAddToCart}
                   className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all active:scale-95 flex items-center justify-center gap-2"
-                  style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
+                  style={{ backgroundColor: justAdded ? '#16a34a' : 'var(--color-primary)' }}
                 >
-                  {added ? '✓ Ajouté au panier' : `${explicitQuantityLabel} au panier · ${formatPrice(totalPrice, currency)}`}
+                  {justAdded ? '✓ Ajouté au panier' : `${explicitQuantityLabel} au panier · ${formatPrice(totalPrice, currency)}`}
                 </button>
               </div>
 
               <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[55] border-t border-gray-200 bg-white/95 shadow-[0_-8px_24px_rgba(15,23,42,0.10)] backdrop-blur md:hidden">
+                {inCartLine && <div className="mx-auto max-w-7xl px-3 pt-2">{inCartLine}</div>}
                 <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-2.5">
                   <div className="shrink-0">
                     <span className="sr-only">Quantité</span>
@@ -227,31 +270,16 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                     onClick={handleAddToCart}
                     aria-live="polite"
                     className="flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-3 py-2 font-semibold text-white transition-all active:scale-[0.98]"
-                    style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
+                    style={{ backgroundColor: justAdded ? '#16a34a' : 'var(--color-primary)' }}
                   >
-                    <span className="max-w-full truncate text-sm">{added ? '✓ Ajouté au panier' : explicitQuantityLabel}</span>
-                    {!added && <span className="text-xs font-medium opacity-90">Total : {formatPrice(totalPrice, currency)}</span>}
+                    <span className="max-w-full truncate text-sm">{justAdded ? '✓ Ajouté au panier' : explicitQuantityLabel}</span>
+                    {!justAdded && <span className="text-xs font-medium opacity-90">Total : {formatPrice(totalPrice, currency)}</span>}
                   </button>
                 </div>
-                {added && (
-                  <div className="mx-auto flex max-w-7xl gap-2 px-3 pb-2">
-                    <button type="button" onClick={continueShopping} className="min-h-11 flex-1 rounded-lg border border-gray-300 bg-white text-xs font-bold">Continuer mes achats</button>
-                    <Link href="/cart" className="flex min-h-11 flex-1 items-center justify-center rounded-lg text-xs font-bold text-white" style={{ backgroundColor: 'var(--color-primary)' }}>Voir mon panier</Link>
-                  </div>
-                )}
               </div>
             </>
           )}
 
-          {added && (
-            <div role="status" className="hidden rounded-xl border border-green-200 bg-green-50 p-3 md:block">
-              <p className="mb-2 text-sm font-semibold text-green-900">✓ {quantityLabel} dans le panier</p>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={continueShopping} className="min-h-11 flex-1 rounded-lg px-3 font-semibold text-white" style={{ backgroundColor: 'var(--color-primary)' }}>Continuer mes achats</button>
-                <Link href="/cart" className="flex min-h-11 flex-1 items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-semibold">Voir mon panier</Link>
-              </div>
-            </div>
-          )}
           <TrustBadges storageType={product.storage_type} />
         </div>
       </div>
@@ -264,6 +292,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
         conservationAfterOpening={product.conservation_after_opening}
         usageInstructions={product.usage_instructions}
       />
+      {showsCartLine && <div aria-hidden="true" className="h-14 md:hidden" />}
     </div>
   );
 }

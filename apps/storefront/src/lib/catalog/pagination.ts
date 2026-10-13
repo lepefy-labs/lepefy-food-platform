@@ -144,6 +144,16 @@ export async function getCatalogPage(
   return buildProductsQuery(supabase, tenantId, categories, filters).range(offset, offset + limit - 1);
 }
 
+/** Taille de tranche demandée à `/api/products` (`?limit=`) : jamais au-delà
+ *  de la page de plateforme, défaut identique au scroll infini. Les propositions
+ *  de la recherche globale n'ont besoin que de quelques lignes. */
+export function parseLimitParam(raw: string | null | undefined): number {
+  if (raw == null || raw === '') return PRODUCTS_PAGE_SIZE;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1) return PRODUCTS_PAGE_SIZE;
+  return Math.min(Math.floor(n), PRODUCTS_PAGE_SIZE);
+}
+
 /** Parse et normalise le paramètre `?page=` — jamais < 1, jamais NaN,
  *  jamais au-delà de MAX_PAGE (numéro non-numérique, négatif, décimal ou
  *  absurdement grand retombent tous sur une valeur sûre, sans jamais lever). */

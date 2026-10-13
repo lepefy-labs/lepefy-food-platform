@@ -77,7 +77,8 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
   const clientSessionIdRef = useRef<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
   const mobileBottomClass = raiseForProductPurchaseBar
-    ? 'bottom-[calc(9rem+env(safe-area-inset-bottom))]'
+    // +3.5rem quand la fiche affiche « dans votre panier » (attribut posé par ProductDetail).
+    ? 'bottom-[calc(9rem+env(safe-area-inset-bottom))] max-md:[[data-pdp-cart-line]_&]:bottom-[calc(12.5rem+env(safe-area-inset-bottom))]'
     : 'bottom-[calc(5rem+env(safe-area-inset-bottom))]';
   const mobileDialogMaxHeightClass = raiseForProductPurchaseBar
     ? 'max-h-[calc(100dvh-10rem-env(safe-area-inset-bottom))]'

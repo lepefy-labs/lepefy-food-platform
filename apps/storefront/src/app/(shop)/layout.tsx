@@ -4,7 +4,8 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { PWABanner } from '@/components/PWABanner';
 import { BottomNav } from '@/components/layout/BottomNav';
-import { CheckoutNotificationBarGate } from '@/components/layout/CheckoutNotificationBarGate';
+import { PromoTickerGate } from '@/components/layout/PromoTickerGate';
+import { ShopSearchBar } from '@/components/search/ShopSearchBar';
 import { ActiveCheckoutRecovery } from '@/components/checkout-session/ActiveCheckoutRecovery';
 import { ChatWidgetGate } from '@/components/chat/ChatWidgetGate';
 import { CookieConsentBanner } from '@/components/consent/CookieConsentBanner';
@@ -35,7 +36,10 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       <PWABanner />
       <Suspense fallback={<div className="h-24" />}><Header socialLinks={socialLinks} storyEnabled={storyEnabled} reviewsAvailable={reviewsAvailable} /></Suspense>
 
-      <CheckoutNotificationBarGate />
+      {/* Recherche juste sous l'header (mobile/tablette ; dans l'header en desktop),
+          puis le bandeau défilant réservé à « Découvrir ». */}
+      <ShopSearchBar />
+      <PromoTickerGate />
       <ActiveCheckoutRecovery />
 
       <Suspense fallback={<main className="flex-1 pb-20 md:pb-0">{children}</main>}><ShopMain>{children}</ShopMain></Suspense>

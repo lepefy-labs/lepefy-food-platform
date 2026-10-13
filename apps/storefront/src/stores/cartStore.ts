@@ -4,6 +4,7 @@ import type { CartItem } from '@lepefy/types';
 import type { CartMutationInput, CartSyncStatus, PendingMutation } from '@/lib/cart/cartTypes';
 import { enqueueMutation } from '@/lib/cart/cartQueue';
 import { trackNalaAddToCart } from '@/lib/ai/nalaAttributionClient';
+import { useCartUiStore } from './cartUiStore';
 import { computeQuantityRuleState, getMaximumValidQuantity, getNextValidQuantity, getPreviousValidQuantity } from '@/lib/purchaseQuantityRules';
 
 interface CartState {
@@ -116,7 +117,12 @@ export const useCartStore = create<CartState>()(
         });
         if (mutationQuantity !== 0) {
           flushScheduler();
-          if (mutationQuantity > 0) void trackNalaAddToCart(product.id, mutationQuantity);
+          if (mutationQuantity > 0) {
+            void trackNalaAddToCart(product.id, mutationQuantity);
+            // Retour visuel (BottomNav, header) : seul un ajout du client passe ici,
+            // jamais la réconciliation serveur ni le merge à la connexion.
+            useCartUiStore.getState().notifyAdd();
+          }
         }
       },
 
