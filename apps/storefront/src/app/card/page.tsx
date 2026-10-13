@@ -52,6 +52,7 @@ export default async function CardPage() {
           storefront_ready: tenant.storefront_ready,
           currency: tenant.currency,
           google_review_url: tenant.google_review_url,
+          legal_email: tenant.legal_email,
         }}
         socialLinks={socialLinks}
         paymentMethods={paymentMethods}

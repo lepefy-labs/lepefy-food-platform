@@ -11,6 +11,7 @@ import { CardStoreInfo } from './CardStoreInfo';
 import { PaymentMethodsAccordion } from './PaymentMethodsAccordion';
 import { CardPaymentResult } from './CardPaymentResult';
 import { useCardPaymentReturn } from '@/lib/card/useCardPaymentReturn';
+import { useCardHistoryStep } from '@/lib/card/useCardHistoryStep';
 import { visibleCardPaymentMethods } from '@/lib/payments/applePay';
 import { useApplePaySupport } from '@/lib/payments/useApplePaySupport';
 import { cardPaymentBrandStrip } from '@/lib/card/cardPaymentBrands';
@@ -31,6 +32,7 @@ interface Props {
     click_collect_address: string | null; google_maps_url: string | null; click_collect_hours: string | null; click_collect_hours_it: string | null;
     whatsapp_number: string | null; storefront_ready: boolean; currency: string;
     google_review_url: string | null;
+    legal_email: string | null;
   };
   socialLinks: TenantSocialLink[];
   paymentMethods: TenantPaymentMethod[];
@@ -61,6 +63,8 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
   // CTA boutique après paiement : seulement si la boutique est ouverte.
   const shop = tenant.storefront_ready ? { color: tenant.primary_color, foreground: readableForeground(tenant.primary_color) } : null;
   const paymentView = inPayment || paymentReturn.result !== null;
+  // Retour système depuis le paiement (ou son issue) : revient à la landing au lieu de quitter /card.
+  useCardHistoryStep(paymentView, () => { paymentReturn.clear(); setInPayment(false); });
   const t = COPY[lang];
   const contactForeground = readableForeground(tenant.primary_color);
 
@@ -96,6 +100,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
               currency={tenant.currency}
               tenantName={tenant.name}
               tenantLogoUrl={tenant.logo_url}
+              tenantEmail={tenant.legal_email}
               shop={shop}
               lang={lang}
               onClose={() => setInPayment(false)}

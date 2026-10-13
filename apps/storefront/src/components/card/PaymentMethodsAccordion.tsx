@@ -11,6 +11,7 @@ import { CardQuickPay, type CardQuickPayStage } from './CardQuickPay';
 import { PaymentBrandMark } from './CardPaymentBrands';
 import { methodColor, hexToRgba, isEmailValue } from '@/lib/card/methodColor';
 import { isOnlineCardMethod, isRevolutMethod } from '@/lib/card/cardPaymentBrands';
+import { useCardHistoryStep } from '@/lib/card/useCardHistoryStep';
 import { CARD_PAY_COLOR } from '@/lib/card/cardTheme';
 
 const PAYMENT_ICONS = { IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet, IconCreditCard, IconBrandApple };
@@ -19,25 +20,25 @@ type Lang = 'fr' | 'it';
 const COPY = {
   fr: {
     back: 'Retour', secure: 'Paiement sécurisé', title: 'Comment voulez-vous payer ?', subtitle: 'Réglez votre achat en quelques instants.',
-    online: 'Payer maintenant, en ligne', others: 'Autres moyens de paiement',
+    others: 'Autres moyens de paiement',
     othersText: 'Vous payez dans l’application du service ou en boutique : ce paiement n’est pas confirmé ici automatiquement.',
-    card: 'Carte bancaire', applePay: 'Apple Pay', onlineInfo: 'Carte et Apple Pay : confirmation immédiate à l’écran, et par e-mail si vous indiquez votre adresse.',
+    card: 'Carte bancaire', applePay: 'Apple Pay', onlineInfo: 'Carte et Apple Pay : confirmation immédiate à l’écran, et par e-mail si vous indiquez votre adresse.', onlineInfoCard: 'Carte : confirmation immédiate à l’écran, et par e-mail si vous indiquez votre adresse.',
     bank: 'Copiez l’IBAN et payez depuis votre banque', paypal: 'Ouvre PayPal pour payer', satispay: 'Ouvre Satispay pour payer', revolut: 'Ouvre Revolut pour payer',
     cash: 'À régler directement en boutique', other: 'Moyen de paiement alternatif',
     beneficiary: 'Bénéficiaire', copy: 'Copier', copied: 'Copié !', bankTitle: 'Virement bancaire', cashTitle: 'Paiement en espèces',
     cashText: 'Les espèces sont acceptées directement en boutique.', externalText: 'Vous allez continuer dans l’application ou le site du service de paiement.',
-    open: (x: string) => `Ouvrir ${x}`, choose: 'Moyen de paiement',
+    open: (x: string) => `Ouvrir ${x}`, choose: 'Moyen de paiement', othersTile: 'Autres moyens',
   },
   it: {
     back: 'Indietro', secure: 'Pagamento sicuro', title: 'Come vuoi pagare?', subtitle: 'Salda il tuo acquisto in pochi istanti.',
-    online: 'Paga ora, online', others: 'Altri metodi di pagamento',
+    others: 'Altri metodi di pagamento',
     othersText: 'Paghi nell’app del servizio o in negozio: questo pagamento non viene confermato qui automaticamente.',
-    card: 'Carta bancaria', applePay: 'Apple Pay', onlineInfo: 'Carta e Apple Pay: conferma immediata sullo schermo, e via email se indichi il tuo indirizzo.',
+    card: 'Carta bancaria', applePay: 'Apple Pay', onlineInfo: 'Carta e Apple Pay: conferma immediata sullo schermo, e via email se indichi il tuo indirizzo.', onlineInfoCard: 'Carta: conferma immediata sullo schermo, e via email se indichi il tuo indirizzo.',
     bank: 'Copia l’IBAN e paga dalla tua banca', paypal: 'Apre PayPal per pagare', satispay: 'Apre Satispay per pagare', revolut: 'Apre Revolut per pagare',
     cash: 'Da saldare direttamente in negozio', other: 'Metodo di pagamento alternativo',
     beneficiary: 'Beneficiario', copy: 'Copia', copied: 'Copiato!', bankTitle: 'Bonifico bancario', cashTitle: 'Pagamento in contanti',
     cashText: 'I contanti sono accettati direttamente in negozio.', externalText: 'Continuerai nell’app o nel sito del servizio di pagamento.',
-    open: (x: string) => `Apri ${x}`, choose: 'Metodo di pagamento',
+    open: (x: string) => `Apri ${x}`, choose: 'Metodo di pagamento', othersTile: 'Altri metodi',
   },
 } as const;
 
@@ -69,11 +70,19 @@ function CopyValue({ value, color, label, copiedLabel }: { value: string; color:
   );
 }
 
+function tileClass(selected: boolean) {
+  return `flex min-h-[104px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl border-2 bg-white px-1.5 py-3 text-center text-sm font-bold text-gray-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 motion-reduce:transition-none ${selected ? '' : 'border-gray-200'}`;
+}
+
+function tileStyle(selected: boolean): React.CSSProperties {
+  return { ...(selected ? { borderColor: CARD_PAY_COLOR, backgroundColor: hexToRgba(CARD_PAY_COLOR, 0.05) } : {}), '--tw-ring-color': CARD_PAY_COLOR } as React.CSSProperties;
+}
+
 const SURFACE = 'rounded-3xl bg-white shadow-[0_1px_2px_rgba(17,24,39,0.06)] ring-1 ring-black/[0.04]';
 
-export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency, lang, onClose, tenantName, tenantLogoUrl, shop }: {
+export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency, lang, onClose, tenantName, tenantLogoUrl, tenantEmail, shop }: {
   paymentMethods: TenantPaymentMethod[]; primaryColor: string; currency: string; lang: Lang; onClose: () => void;
-  tenantName: string; tenantLogoUrl: string | null; shop: { color: string; foreground: string } | null;
+  tenantName: string; tenantLogoUrl: string | null; tenantEmail: string | null; shop: { color: string; foreground: string } | null;
 }) {
   const t = COPY[lang];
   // La liste reçue est déjà filtrée par DigitalCard (tuile apple_pay seulement
@@ -82,8 +91,14 @@ export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency
   const otherMethods = paymentMethods.filter((m) => !isOnlineCardMethod(m));
   const cardRow = onlineMethods.find((m) => m.method === 'card');
   // La carte (ou à défaut Apple Pay) est présélectionnée : le montant se saisit tout de suite.
-  const [onlineId, setOnlineId] = useState<string | null>(onlineMethods[0]?.id ?? null);
+  // Un seul sélecteur : tuiles des moyens en ligne + tuile « Autres moyens ».
+  // La carte (ou à défaut Apple Pay) est présélectionnée ; sans moyen en ligne,
+  // la liste des autres moyens s'affiche directement.
+  const OTHERS = 'others';
+  const [choice, setChoice] = useState<string>(onlineMethods[0]?.id ?? OTHERS);
+  const onlineId = choice === OTHERS ? null : choice;
   const [detail, setDetail] = useState<TenantPaymentMethod | null>(null);
+  useCardHistoryStep(detail !== null, () => setDetail(null));
   const [stage, setStage] = useState<CardQuickPayStage>('amount');
   const handleStage = useCallback((next: CardQuickPayStage) => setStage(next), []);
   const ring = { '--tw-ring-color': primaryColor } as React.CSSProperties;
@@ -108,9 +123,10 @@ export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency
       onBack={onClose}
       onReturnToCard={onClose}
       tenantName={tenantName}
+      placeholders={{ name: tenantName, email: tenantEmail }}
       shop={shop}
       onStageChange={handleStage}
-      onUseCard={selectedOnline.method === 'apple_pay' && cardRow ? () => { setStage('amount'); setOnlineId(cardRow.id); } : undefined}
+      onUseCard={selectedOnline.method === 'apple_pay' && cardRow ? () => { setStage('amount'); setChoice(cardRow.id); } : undefined}
     />
   );
 
@@ -180,36 +196,32 @@ export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency
         </header>
       )}
       {!focus && onlineMethods.length > 0 && (
-        <section aria-labelledby="card-online-title" className="space-y-4">
-          <h2 id="card-online-title" className="text-sm font-bold uppercase tracking-wide text-gray-800">{t.online}</h2>
-          <div role="group" aria-label={t.choose} className="grid grid-cols-2 gap-3">
-            {onlineMethods.map((pm) => {
-              const selected = pm.id === onlineId;
-              const isCard = pm.method === 'card';
-              return (
-                <button
-                  key={pm.id}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => { setStage('amount'); setOnlineId(pm.id); }}
-                  className={`flex min-h-[104px] flex-col items-center justify-center gap-2 rounded-2xl border-2 bg-white px-2 py-3 text-center text-sm font-bold text-gray-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 motion-reduce:transition-none ${selected ? '' : 'border-gray-200'}`}
-                  style={{ ...(selected ? { borderColor: CARD_PAY_COLOR, backgroundColor: hexToRgba(CARD_PAY_COLOR, 0.05) } : {}), '--tw-ring-color': CARD_PAY_COLOR } as React.CSSProperties}
-                >
-                  {isCard ? (
-                    <span className="flex h-10 w-12 items-center justify-center rounded-lg text-white" style={{ backgroundColor: CARD_PAY_COLOR }}><IconCreditCard size={24} aria-hidden="true" /></span>
-                  ) : (
-                    <span className="flex h-10 items-center"><PaymentBrandMark brand="apple_pay" /></span>
-                  )}
-                  <span>{isCard ? (pm.label ?? t.card) : t.applePay}</span>
-                  {isCard && <span className="flex items-center gap-1.5" aria-hidden="true"><PaymentBrandMark brand="visa" size="sm" /><PaymentBrandMark brand="mastercard" size="sm" /></span>}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        <div role="group" aria-label={t.choose} className={`grid gap-2.5 ${onlineMethods.length + (otherMethods.length > 0 ? 1 : 0) >= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          {onlineMethods.map((pm) => {
+            const isCard = pm.method === 'card';
+            return (
+              <button key={pm.id} type="button" aria-pressed={pm.id === choice} onClick={() => { setStage('amount'); setChoice(pm.id); }} className={tileClass(pm.id === choice)} style={tileStyle(pm.id === choice)}>
+                {isCard ? (
+                  <span className="flex h-10 w-12 items-center justify-center rounded-lg text-white" style={{ backgroundColor: CARD_PAY_COLOR }}><IconCreditCard size={24} aria-hidden="true" /></span>
+                ) : (
+                  <span className="flex h-10 items-center"><PaymentBrandMark brand="apple_pay" /></span>
+                )}
+                <span className="leading-tight">{isCard ? (pm.label ?? t.card) : t.applePay}</span>
+                {isCard && <span className="flex items-center gap-1" aria-hidden="true"><PaymentBrandMark brand="visa" size="sm" /><PaymentBrandMark brand="mastercard" size="sm" /></span>}
+              </button>
+            );
+          })}
+          {otherMethods.length > 0 && (
+            <button type="button" aria-pressed={choice === OTHERS} onClick={() => setChoice(OTHERS)} className={tileClass(choice === OTHERS)} style={tileStyle(choice === OTHERS)}>
+              <span className="flex h-10 w-12 items-center justify-center rounded-lg bg-gray-100 text-gray-800"><IconWallet size={24} aria-hidden="true" /></span>
+              <span className="leading-tight">{t.othersTile}</span>
+              <span className="line-clamp-1 text-xs font-medium text-gray-600">{otherMethods.map((m) => m.label ?? PAYMENT_METHOD_REGISTRY[m.method].label).join(', ')}</span>
+            </button>
+          )}
+        </div>
       )}
       {quickPay}
-      {!focus && otherMethods.length > 0 && (
+      {!focus && otherMethods.length > 0 && choice === OTHERS && (
         <section aria-labelledby="card-other-title">
           <h2 id="card-other-title" className="text-sm font-bold uppercase tracking-wide text-gray-800">{t.others}</h2>
           <p className="mt-1 text-sm leading-snug text-gray-700">{t.othersText}</p>
@@ -234,9 +246,9 @@ export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency
           </ul>
         </section>
       )}
-      {!focus && onlineMethods.length > 0 && (
+      {!focus && selectedOnline && (
         <p className="flex items-start gap-2.5 rounded-2xl bg-blue-50 p-4 text-sm leading-snug text-blue-900">
-          <IconInfoCircle size={20} aria-hidden="true" className="mt-px shrink-0" />{t.onlineInfo}
+          <IconInfoCircle size={20} aria-hidden="true" className="mt-px shrink-0" />{onlineMethods.some((m) => m.method === 'apple_pay') ? t.onlineInfo : t.onlineInfoCard}
         </p>
       )}
     </div>
