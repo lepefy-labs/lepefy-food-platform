@@ -46,6 +46,13 @@ export const AUDIT_EVENT_TYPES = {
   'catalog.product.quantity_rule_changed': { label: 'Règle de vente modifiée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'catalog.product.stock_adjusted': { label: 'Stock ajusté', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'catalog.product.updated': { label: 'Fiche produit modifiée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
+  'catalog.campaign.created': { label: 'Campagne créée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
+  'catalog.campaign.updated': { label: 'Campagne modifiée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
+  'catalog.campaign.products_changed': { label: 'Produits de campagne modifiés', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
+  'catalog.campaign.published': { label: 'Campagne publiée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
+  'catalog.campaign.suspended': { label: 'Campagne suspendue', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
+  'catalog.campaign.resumed': { label: 'Campagne reprise', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
+  'catalog.campaign.ended': { label: 'Campagne terminée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'customers.customer.created': { label: 'Client créé', module: 'customers', category: 'activity', severity: 'info', retention: 'business' },
   'customers.customer.updated': { label: 'Client modifié', module: 'customers', category: 'activity', severity: 'info', retention: 'business' },
   'admin.settings.updated': { label: 'Paramètres de la boutique modifiés', module: 'admin', category: 'activity', severity: 'notice', retention: 'business' },
@@ -274,6 +281,7 @@ export function auditResourceHref(resourceType: string | null, resourceId: strin
     case 'order': return id && `/admin/orders/${id}`;
     case 'preorder': return id && `/admin/orders/precommandes/${id}`;
     case 'product': return id && `/admin/catalogue/${id}`;
+    case 'catalog_campaign': return id && `/admin/catalogue/campagnes/${id}`;
     case 'customer': return id && `/admin/clients/${id}`;
     case 'supplier': return id && `/admin/gestion/fournisseurs/${id}`;
     case 'purchase': return id && `/admin/gestion/achats/${id}`;

@@ -56,6 +56,7 @@ interface ProductEditProps {
     promo_until_sold_out: boolean;
     promo_applied: boolean;
     new_until: string | null;
+    manual_new_until: string | null;
     position: number;
     weight_grams: number | null;
     stock: number;
@@ -257,8 +258,8 @@ function pricingFormState(product: ProductEditProps['product']) {
     promo_starts_at:      isoToShopLocal(pricing.promo?.starts_at),
     promo_ends_at:        isoToShopLocal(pricing.promo?.ends_at),
     promo_until_sold_out: Boolean(pricing.promo?.until_sold_out),
-    new_enabled:          Boolean(product.new_until),
-    new_until:            isoToShopLocal(product.new_until),
+    new_enabled:          Boolean(product.manual_new_until),
+    new_until:            isoToShopLocal(product.manual_new_until),
   };
 }
 

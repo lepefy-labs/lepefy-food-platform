@@ -34,7 +34,7 @@ export default async function AdminProductEditPage({
     .from('products')
     .select(`
       id, name, name_alt, slug, description, descriptions, description_source,
-      price, compare_at_price, promo_price, promo_starts_at, promo_ends_at, promo_until_sold_out, promo_applied, new_until,
+      price, compare_at_price, promo_price, promo_starts_at, promo_ends_at, promo_until_sold_out, promo_applied, new_until, manual_new_until,
       position, weight_grams, stock,
       min_order_quantity, order_quantity_step,
       active, featured, storage_type, image_url, images,
@@ -52,6 +52,14 @@ export default async function AdminProductEditPage({
     .single();
 
   if (!product) notFound();
+
+  const { data: campaignLinks } = await supabase.from('catalog_campaign_products')
+    .select('campaign_id').eq('tenant_id',tenant.id).eq('product_id',product.id);
+  const campaignIds = (campaignLinks ?? []).map((link: { campaign_id:string }) => link.campaign_id);
+  const { data: linkedCampaigns } = campaignIds.length
+    ? await supabase.from('catalog_campaigns').select('id,name,status,kind')
+      .eq('tenant_id',tenant.id).in('id',campaignIds).in('status',['scheduled','running','suspended'])
+    : { data:[] };
 
   const { data: categories } = await supabase
     .from('categories')
@@ -78,7 +86,7 @@ export default async function AdminProductEditPage({
   if (searchParams.from_category && !fromState.category) fromState.category = searchParams.from_category;
   const backQuery = catalogueQueryString(fromState);
   const backHref = backQuery ? `/admin/catalogue?${backQuery}` : '/admin/catalogue';
-  const categoryName = categories?.find((category) => category.id === product.category_id)?.name ?? null;
+  const categoryName = categories?.find((category: { id:string;name:string }) => category.id === product.category_id)?.name ?? null;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -88,6 +96,12 @@ export default async function AdminProductEditPage({
       >
         ← Catalogue
       </Link>
+      {linkedCampaigns && linkedCampaigns.length>0 && <div className="mb-4 rounded-xl border border-tone-info-border bg-tone-info-bg px-4 py-3 text-sm text-tone-info-fg">
+        Ce produit appartient à {linkedCampaigns.length>1?'des campagnes':'une campagne'} :{' '}
+        {linkedCampaigns.map((campaign: { id:string;name:string;status:string },index:number) => <span key={campaign.id}>
+          {index>0?', ':''}<Link href={`/admin/catalogue/campagnes/${campaign.id}`} className="font-semibold underline">{campaign.name}</Link>
+        </span>)}. Les prix d’une campagne programmée ou en cours se modifient depuis sa fiche.
+      </div>}
       <ProductEditWorkspace
         isNew={false}
         productName={product.name}

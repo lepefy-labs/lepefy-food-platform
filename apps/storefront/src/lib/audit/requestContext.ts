@@ -104,6 +104,8 @@ const AUDITED_WRITE_RPCS = new Set([
   'delete_customer_account_data', 'select_shipping_tariff_shadow_version', 'activate_shipping_tariff_version',
   'rollback_shipping_tariff_to_provider_cost', 'retire_shipping_tariff_country', 'process_manual_purchase_points_atomic',
   'record_audit_event', 'apply_product_promotion_schedule',
+  'catalog_campaign_select_products', 'catalog_campaign_remove_products', 'catalog_campaign_override_price',
+  'catalog_campaign_create', 'catalog_campaign_duplicate', 'catalog_campaign_action',
 ]);
 
 /** Does this PostgREST request change data the triggers audit? */

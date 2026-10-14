@@ -36,13 +36,15 @@ export async function POST(request: NextRequest) {
       if (tenant && summary.tenantIds.includes(tenant.id)) revalidateCatalogCache(tenant.id);
     }
     return NextResponse.json({
-      ok: true,
+      ok: summary.campaignErrors === 0,
       started: summary.started,
       ended: summary.ended,
       expired: summary.expired,
       noveltiesEnded: summary.noveltiesEnded,
+      campaignsChanged: summary.campaignsChanged,
+      campaignErrors: summary.campaignErrors,
       tenants: summary.tenantIds.length,
-    }, { headers });
+    }, { headers,status:summary.campaignErrors>0 ? 503 : 200 });
   } catch {
     console.error('[catalog-schedule] tick unavailable');
     return NextResponse.json({ error: 'catalog_schedule_unavailable' }, { status: 503, headers });

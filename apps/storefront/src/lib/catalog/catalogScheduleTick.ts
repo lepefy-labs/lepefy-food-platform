@@ -7,7 +7,7 @@
 
 export interface CatalogScheduleChange {
   out_tenant_id: string;
-  out_product_id: string;
+  out_product_id: string | null;
   out_change: 'promo_started' | 'promo_ended' | 'promo_expired' | 'novelty_ended' | string;
 }
 
@@ -16,6 +16,8 @@ export interface CatalogScheduleSummary {
   ended: number;
   expired: number;
   noveltiesEnded: number;
+  campaignsChanged: number;
+  campaignErrors: number;
   tenantIds: string[];
 }
 
@@ -26,6 +28,8 @@ export function summarizeCatalogSchedule(rows: readonly CatalogScheduleChange[])
     ended: count('promo_ended'),
     expired: count('promo_expired'),
     noveltiesEnded: count('novelty_ended'),
+    campaignsChanged: count('campaign_changed'),
+    campaignErrors: count('campaign_error'),
     tenantIds: [...new Set(rows.map((row) => row.out_tenant_id))].sort(),
   };
 }

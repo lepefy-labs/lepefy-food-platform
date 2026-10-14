@@ -23,6 +23,7 @@ import { useAdminToast } from '../../_components/ui/Toaster';
 import { EmptyState } from '../../_components/ui/States';
 import DataTable, { type DataColumn } from '../../_components/data/DataTable';
 import { BulkBar, RowSelectionProvider } from '../../_components/data/RowSelection';
+import CampaignBulkAction from './CampaignBulkAction';
 
 interface Props {
   products: Product[];
@@ -260,6 +261,7 @@ export default function CatalogueTable({ products, tenantCurrency, canManage, li
       {canManage && (
         <BulkBar rowIds={rowIds} noun="produit sélectionné" nounPlural="produits sélectionnés">
           {(ids, clear) => <>
+            <CampaignBulkAction ids={ids} clear={clear} />
             <Button variant="secondary" size="sm" onClick={() => void bulkSetActive(ids, true, clear)}>Activer</Button>
             <Button variant="secondary" size="sm" onClick={() => void bulkSetActive(ids, false, clear)}>Désactiver</Button>
           </>}

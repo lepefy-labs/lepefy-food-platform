@@ -73,6 +73,7 @@ export default async function AdminCataloguePage({ searchParams }: { searchParam
         meta={counts.all != null ? pluralize(counts.all, 'produit') : undefined}
         description="Gérez rapidement disponibilité, stock et contenu."
         actions={<>
+          <ButtonLink href="/admin/catalogue/campagnes">Promotions &amp; Nouveautés</ButtonLink>
           <ButtonLink href="/admin/catalogue/categories">Catégories</ButtonLink>
           <ButtonLink href="/admin/catalogue/quantity-groups">Règles de quantité</ButtonLink>
           {canManage && <ButtonLink href="/admin/catalogue/nouveau" variant="primary"><IconPlus size={17} aria-hidden="true" /> Nouveau produit</ButtonLink>}

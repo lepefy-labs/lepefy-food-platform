@@ -1,0 +1,49 @@
+-- psql-only rollback for migration 157 BEFORE any campaign row is created.
+-- Run from this repository with: psql -v ON_ERROR_STOP=1 -f supabase/rollback/157_catalog_campaigns_pre_activation.psql
+-- Review a fresh backup and the production state before execution. The 157
+-- audit event types are intentionally retained for journal history.
+\set ON_ERROR_STOP on
+begin;
+
+do $$ begin
+  if exists(select 1 from public.catalog_campaigns) then
+    raise exception '157 rollback requires zero campaign rows; export/review drafts first';
+  end if;
+  if exists(select 1 from public.products where promo_campaign_id is not null) then
+    raise exception '157 rollback blocked: a campaign still owns a product price';
+  end if;
+end $$;
+
+-- 156 is intentionally repeatable (its CI job applies it twice). Restore the
+-- exact scheduler and stock-trigger definitions before removing 157 objects.
+\ir ../migrations/156_product_promotions_novelties.sql
+
+drop trigger if exists products_campaign_price_guard on public.products;
+drop trigger if exists catalog_product_manual_novelty on public.products;
+drop trigger if exists audit_catalog_campaigns on public.catalog_campaigns;
+drop trigger if exists audit_catalog_campaign_products on public.catalog_campaign_products;
+
+drop function public.catalog_campaign_action(uuid,uuid,text,integer,uuid,timestamptz);
+drop function public.catalog_campaign_tick(timestamptz);
+drop function public.catalog_campaign_reconcile(uuid,uuid,timestamptz,boolean);
+drop function public.catalog_campaign_refresh_novelty(uuid,uuid,timestamptz);
+drop function public.catalog_campaign_preview(uuid,uuid,integer,integer);
+drop function public.catalog_campaign_search_products(uuid,uuid,text,uuid,boolean,boolean,integer,integer);
+drop function public.catalog_campaign_select_products(uuid,uuid,uuid[],text,uuid,boolean,boolean);
+drop function public.catalog_campaign_remove_products(uuid,uuid,uuid[]);
+drop function public.catalog_campaign_override_price(uuid,uuid,uuid,numeric);
+drop function public.catalog_campaign_duplicate(uuid,uuid,uuid,uuid);
+drop function public.catalog_campaign_create(uuid,jsonb,uuid,uuid);
+drop function public.catalog_campaign_price(numeric,text,numeric,numeric);
+drop function public.catalog_campaign_price_guard();
+drop function public.catalog_product_manual_novelty_trigger();
+drop function public.audit_catalog_campaigns_trigger();
+drop function public.audit_catalog_campaign_products_trigger();
+
+drop table public.catalog_campaign_requests;
+drop table public.catalog_campaign_products;
+alter table public.products drop column promo_campaign_id;
+alter table public.products drop column manual_new_until;
+drop table public.catalog_campaigns;
+
+commit;

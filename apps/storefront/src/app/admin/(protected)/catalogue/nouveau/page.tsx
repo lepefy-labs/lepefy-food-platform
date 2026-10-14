@@ -54,6 +54,7 @@ export default async function AdminNouveauProduitPage() {
     promo_until_sold_out:        false,
     promo_applied:               false,
     new_until:                   null,
+    manual_new_until:            null,
     position:                    9999,
     weight_grams:                null,
     stock:                       0,

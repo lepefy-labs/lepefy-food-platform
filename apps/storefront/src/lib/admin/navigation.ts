@@ -102,6 +102,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
 export const ADMIN_QUICK_ACTIONS: AdminQuickAction[] = [
   { id: 'new-order', label: 'Nouvelle commande', href: '/admin/orders/new', icon: IconPlus, workspace: 'shop', anyOf: ['orders.manage'], keywords: ['précommande', 'whatsapp', 'téléphone'] },
   { id: 'new-product', label: 'Nouveau produit', href: '/admin/catalogue/nouveau', icon: IconPlus, workspace: 'shop', anyOf: ['catalog.manage'] },
+  { id: 'new-catalog-campaign', label: 'Nouvelle campagne catalogue', href: '/admin/catalogue/campagnes/nouvelle', icon: IconPlus, workspace: 'shop', anyOf: ['catalog.manage'], keywords: ['promotion', 'nouveauté'] },
   { id: 'new-customer', label: 'Ajouter un client', href: '/admin/clients?new=1', icon: IconUserPlus, workspace: 'shop', anyOf: ['customers.manage'] },
 ];
 

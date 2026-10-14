@@ -133,6 +133,7 @@ async function handlePOST(req: NextRequest) {
       compare_at_price: compareAtPrice,
       ...(pricingColumns ?? {}),
       new_until: novelty.value,
+      manual_new_until: novelty.value,
       producer_id: body.producer_id || null,
       importer_id: body.importer_id || null,
       ingredients_text: body.ingredients_text ? String(body.ingredients_text).trim() : null,

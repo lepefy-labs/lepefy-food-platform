@@ -74,6 +74,14 @@ export const PRODUCT_NOVELTY_META: Record<string, AdminStatusMeta> = {
   none: { label: 'Pas une nouveauté', tone: 'neutral' },
 };
 
+export const CATALOG_CAMPAIGN_STATUS_META: Record<string, AdminStatusMeta> = {
+  draft: { label: 'Brouillon', tone: 'neutral' },
+  scheduled: { label: 'Programmée', tone: 'info' },
+  running: { label: 'En cours', tone: 'success' },
+  suspended: { label: 'Suspendue', tone: 'warning' },
+  ended: { label: 'Terminée', tone: 'neutral' },
+};
+
 export function statusMeta(registry: Record<string, AdminStatusMeta>, status: string | null | undefined): AdminStatusMeta {
   if (!status) return { label: '—', tone: 'neutral' };
   return registry[status] ?? { label: status, tone: 'neutral' };

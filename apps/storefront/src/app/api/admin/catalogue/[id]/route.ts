@@ -46,6 +46,23 @@ async function handlePATCH(
 
   const updatePayload: Record<string, unknown> = {};
 
+  if ('pricing' in body || 'price' in body || 'compare_at_price' in body) {
+    const { data: links, error: linksError } = await supabase.from('catalog_campaign_products')
+      .select('campaign_id').eq('tenant_id',tenant.id).eq('product_id',params.id);
+    if (linksError) return NextResponse.json({ error:'Contrôle des campagnes indisponible.' },{ status:503 });
+    const campaignIds = (links ?? []).map((link) => link.campaign_id);
+    if (campaignIds.length) {
+      const { data: owners, error: ownersError } = await supabase.from('catalog_campaigns')
+        .select('id,name').eq('tenant_id',tenant.id).in('id',campaignIds)
+        .in('status',['scheduled','running']).in('kind',['promotion','mixed']).limit(1);
+      if (ownersError) return NextResponse.json({ error:'Contrôle des campagnes indisponible.' },{ status:503 });
+      if (owners?.length) return NextResponse.json({
+        error:`Le prix est géré par la campagne « ${owners[0]!.name} ». Suspendez ou terminez cette campagne avant de modifier le prix.`,
+        campaignId:owners[0]!.id,
+      },{ status:409 });
+    }
+  }
+
   try {
     if ('pricing' in body) {
       // Prix normal + promotion (programmée ou non), migration 156 : les colonnes
@@ -94,7 +111,7 @@ async function handlePATCH(
   if ('new_until' in body) {
     const novelty = parseNoveltyUntil(body.new_until);
     if (!novelty.ok) return NextResponse.json({ error: novelty.error }, { status: 400 });
-    updatePayload.new_until = novelty.value;
+    updatePayload.manual_new_until = novelty.value;
   }
 
   // Mode de réception (migration 155) : valeur connue uniquement, jamais déduite.
@@ -158,6 +175,9 @@ async function handlePATCH(
     .eq('tenant_id', tenant.id);
 
   if (error) {
+    if (error.message.includes('campaign_price_owned')) return NextResponse.json({
+      error:'Le prix est désormais géré par une campagne. Actualisez la fiche et modifiez le prix depuis cette campagne.',
+    },{ status:409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

@@ -200,8 +200,10 @@ test.describe('Tick et liste admin', () => {
       { out_tenant_id: 't1', out_product_id: 'b', out_change: 'promo_ended' },
       { out_tenant_id: 't1', out_product_id: 'c', out_change: 'novelty_ended' },
       { out_tenant_id: 't1', out_product_id: 'd', out_change: 'promo_expired' },
-    ])).toEqual({ started: 1, ended: 1, expired: 1, noveltiesEnded: 1, tenantIds: ['t1', 't2'] });
-    expect(summarizeCatalogSchedule([])).toEqual({ started: 0, ended: 0, expired: 0, noveltiesEnded: 0, tenantIds: [] });
+    ])).toEqual({ started: 1, ended: 1, expired: 1, noveltiesEnded: 1, campaignsChanged: 0, campaignErrors: 0, tenantIds: ['t1', 't2'] });
+    expect(summarizeCatalogSchedule([])).toEqual({ started: 0, ended: 0, expired: 0, noveltiesEnded: 0, campaignsChanged: 0, campaignErrors: 0, tenantIds: [] });
+    expect(summarizeCatalogSchedule([{ out_tenant_id: 't1', out_product_id: null, out_change: 'campaign_error' }]))
+      .toMatchObject({ campaignErrors: 1, tenantIds: ['t1'] });
   });
 
   test('filtres « Mise en avant » de la liste catalogue', () => {
