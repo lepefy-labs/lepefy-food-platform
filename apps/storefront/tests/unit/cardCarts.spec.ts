@@ -70,6 +70,33 @@ test.describe('Lecture Stripe en français', () => {
     expect(view.explanation).toContain('Fonds insuffisants');
     expect(view.card).toBe('Visa ·· 4242');
     expect(view.lastAttempt).toMatchObject({ result: 'Refusé', reason: 'Fonds insuffisants' });
+    expect(view.errorCode).toBe('insufficient_funds');
+  });
+
+  test('échec sans transaction = non abouti (cas du 11/10), jamais « refusé par la banque »', () => {
+    const view = describeStripeIntent({
+      ...base, status: 'requires_payment_method',
+      last_payment_error: { code: 'payment_intent_authentication_failure', type: 'invalid_request_error', payment_method: { card: { brand: 'mastercard', last4: '4444' } } },
+    });
+    expect(view.statusLabel).toBe('Paiement non abouti');
+    expect(view.tone).toBe('warning');
+    expect(view.explanation).toContain('3-D Secure');
+    expect(view.card).toBe('Mastercard ·· 4444');
+    expect(view.lastAttempt).toEqual({ at: null, result: 'Non aboutie', reason: 'Vérification 3-D Secure abandonnée ou échouée' });
+    expect(view.errorCode).toBe('payment_intent_authentication_failure');
+
+    const unknown = describeStripeIntent({ ...base, status: 'requires_payment_method', last_payment_error: { code: 'some_new_code', payment_method: 'pm_1' } });
+    expect(unknown.statusLabel).toBe('Paiement non abouti');
+    expect(unknown.card).toBeNull();
+    expect(unknown.errorCode).toBe('some_new_code');
+    expect(unknown.lastAttempt).toEqual({ at: null, result: 'Non aboutie', reason: null });
+  });
+
+  test('un échec 3-D Secure du webhook n’est pas un refus de la banque', () => {
+    const authFailure = ev('payment_failed_server', { code: 'payment_intent_authentication_failure' });
+    expect(classifyCardCart([ev('intent_created'), authFailure])).toBe('authentication_pending');
+    expect(journeyLabel(authFailure)).toBe('Vérification 3-D Secure non aboutie');
+    expect(classifyCardCart([authFailure, ev('payment_failed_server', { code: 'card_declined' })])).toBe('declined');
   });
 
   test('carte jamais validée, payé, annulé', () => {

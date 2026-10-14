@@ -84,12 +84,16 @@ export default function StripePaymentPanel({ sessionId }: { sessionId: string })
             <div className="flex justify-between gap-3 sm:block"><dt className="text-a-text-3">Créé chez Stripe</dt><dd className="font-semibold text-a-text">{dateTime(result.view.createdAt)}</dd></div>
             <div className="flex justify-between gap-3 sm:block"><dt className="text-a-text-3">Dernière tentative</dt><dd className="font-semibold text-a-text">
               {result.view.lastAttempt
-                ? `${dateTime(result.view.lastAttempt.at)} · ${result.view.lastAttempt.result}${result.view.lastAttempt.reason ? ` · ${result.view.lastAttempt.reason}` : ''}`
+                ? [result.view.lastAttempt.at && dateTime(result.view.lastAttempt.at), result.view.lastAttempt.result, result.view.lastAttempt.reason].filter(Boolean).join(' · ')
                 : 'Aucune'}
             </dd></div>
             <div className="flex justify-between gap-3 sm:block"><dt className="text-a-text-3">Carte</dt><dd className="font-semibold text-a-text">{result.view.card ?? '—'}</dd></div>
           </dl>
-          <p className="text-xs text-a-text-3">Statut Stripe : {result.view.rawStatus}{result.view.charged ? ' · montant encaissé' : ' · aucun montant débité'}</p>
+          <p className="text-xs text-a-text-3">
+            Statut Stripe : {result.view.rawStatus}
+            {result.view.errorCode && <> · Code Stripe : <code className="font-mono">{result.view.errorCode}</code></>}
+            {result.view.charged ? ' · montant encaissé' : ' · aucun montant débité'}
+          </p>
         </div>
       )}
     </section>
