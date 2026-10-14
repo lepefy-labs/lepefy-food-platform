@@ -18,6 +18,7 @@ import { formatProductCount } from '@/lib/cart/formatProductCount';
 import { formatPrice } from '@/lib/utils/format';
 import { decrementRemovesLine } from '@/lib/purchaseQuantityRules';
 import { useCartStore } from '@/stores/cartStore';
+import { useHasMounted } from '@/hooks/useHasMounted';
 import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
 import { ACTION_COPY, SUMMARY_COPY, productsPriceLabel } from '@/lib/storefrontCopy/copy';
 import type { CartItem as CartItemType, PublicTenant } from '@lepefy/types';
@@ -40,6 +41,7 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
   const removeItem = useCartStore((state) => state.removeItem);
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const addItem = useCartStore((state) => state.addItem);
+  const hydrated = useHasMounted();
   const [undo, setUndo] = useState<{ item: CartItemType; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
   const [leaving, setLeaving] = useState(false);
   const leavingRef = useRef(false);
@@ -53,6 +55,9 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
   useEffect(() => () => clearTimeout(leavingTimer.current), []);
   useEffect(() => { setReturnHref(getShoppingReturn('/')); }, []);
 
+  // Le serveur ne connaît pas le panier (localStorage) : état neutre jusqu'à la
+  // fin de l'hydratation, jamais « panier vide » affiché puis remplacé.
+  if (!hydrated) return <CartLoading />;
   if (isEmpty) return <div className="flex min-h-[60vh]"><CartEmpty headingLevel="h1" /></div>;
 
   function increment(productId: string) {
@@ -208,6 +213,15 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
         leaving={leaving}
         onCheckout={startCheckout}
       />
+    </div>
+  );
+}
+
+function CartLoading() {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center" role="status" aria-live="polite">
+      <IconLoader2 size={28} className="animate-spin text-gray-400 motion-reduce:animate-none" aria-hidden="true" />
+      <span className="sr-only">Chargement du panier…</span>
     </div>
   );
 }

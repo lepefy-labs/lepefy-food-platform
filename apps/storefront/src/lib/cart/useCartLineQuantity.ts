@@ -1,6 +1,7 @@
 'use client';
 
 import { useCartStore } from '@/stores/cartStore';
+import { useHydratedCartSelector } from './useHydratedCart';
 import { decrementRemovesLine, stepPurchaseQuantity } from '@/lib/purchaseQuantityRules';
 
 export interface CartLineQuantity {
@@ -23,7 +24,8 @@ export interface CartLineQuantity {
  * Le premier ajout (0 → minimum) reste `addItem` (useQuickAdd / fiche produit).
  */
 export function useCartLineQuantity(productId: string): CartLineQuantity {
-  const line = useCartStore((s) => s.items.find((item) => item.product.id === productId));
+  // Absent (0) au rendu serveur et pendant l'hydratation : pas d'écart avec le HTML ISR.
+  const line = useHydratedCartSelector((s) => s.items.find((item) => item.product.id === productId), undefined);
   const quantity = line?.quantity ?? 0;
   const minimum = line?.product.min_order_quantity ?? 1;
   const step = line?.product.order_quantity_step ?? 1;

@@ -9,14 +9,13 @@ import {
   IconGift,
   IconUserCircle,
 } from '@tabler/icons-react';
-import { useCartStore } from '@/stores/cartStore';
+import { useHydratedCartCount } from '@/lib/cart/useHydratedCart';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { useTenant } from '@/providers/TenantProvider';
 import { cartAriaLabel, formatCartBadge } from '@/lib/cart/cartBadge';
 import { useCartAddPulse, useCartNudge } from '@/lib/cart/useCartAttention';
 import { accentTextOnWhite, readableOn } from '@/lib/utils/color';
 import { shouldShowBottomNav } from '@/lib/storefront/shopChrome';
-import { useHasMounted } from '@/hooks/useHasMounted';
 
 interface Tab {
   href: string;
@@ -32,15 +31,13 @@ export function BottomNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const goodiesContext = pathname.startsWith('/products/') && searchParams.get('from') === 'gadgets';
-  const totalItems = useCartStore((s) => s.totalItems());
+  // Panier persisté lu après l'hydratation : premier rendu identique au serveur.
+  const totalItems = useHydratedCartCount();
   const { customer } = useSessionCustomer();
   const tenant = useTenant();
   const pulsing = useCartAddPulse();
   const nudging = useCartNudge(pathname);
-  const mounted = useHasMounted();
-
-  // Panier persisté lu après le montage : premier rendu identique au serveur.
-  if (!shouldShowBottomNav(pathname, mounted ? totalItems : 0)) return null;
+  if (!shouldShowBottomNav(pathname, totalItems)) return null;
 
   // Couleurs dérivées des tokens tenant, jamais fixées : icône et pastille
   // restent lisibles quel que soit le couple primary/secondary configuré.

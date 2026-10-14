@@ -1,17 +1,15 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useCartStore } from '@/stores/cartStore';
+import { useHydratedCartSelector } from '@/lib/cart/useHydratedCart';
 import { shouldShowBottomNav } from '@/lib/storefront/shopChrome';
-import { useHasMounted } from '@/hooks/useHasMounted';
 
 export function ShopMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isReview = pathname === '/avis/donner';
-  const cartItemCount = useCartStore((s) => s.items.length);
-  const mounted = useHasMounted();
+  const cartItemCount = useHydratedCartSelector((s) => s.items.length, 0);
   // Réserve la hauteur de la BottomNav seulement quand elle est affichée.
-  const reserveBottomNav = shouldShowBottomNav(pathname, mounted ? cartItemCount : 0);
+  const reserveBottomNav = shouldShowBottomNav(pathname, cartItemCount);
 
   return (
     <main

@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { IconArrowLeft, IconLock, IconMenu2, IconShoppingCart, IconStar } from '@tabler/icons-react';
 import type { TenantSocialLink } from '@lepefy/types';
 import { useTenant } from '@/providers/TenantProvider';
-import { useCartStore } from '@/stores/cartStore';
+import { useHydratedCartCount } from '@/lib/cart/useHydratedCart';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { TenantLogo } from '@/components/branding/TenantLogo';
@@ -33,7 +33,7 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
   const searchParams = useSearchParams();
   const goodiesContext = pathname.startsWith('/products/') && searchParams.get('from') === 'gadgets';
   const tenant = useTenant();
-  const totalItems = useCartStore((s) => s.totalItems());
+  const totalItems = useHydratedCartCount();
   const openCartDrawer = useCartUiStore((s) => s.openDrawer);
   const cartPulse = useCartAddPulse();
   const { customer } = useSessionCustomer();

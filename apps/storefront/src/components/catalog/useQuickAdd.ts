@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useCartStore } from '@/stores/cartStore';
+import { useHydratedCartSelector } from '@/lib/cart/useHydratedCart';
 import type { ProductCardProduct } from './ProductCard';
 import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import { deriveAvailability } from '@/lib/storefrontCopy/availability';
@@ -10,8 +11,9 @@ import { pickSellingFormatFields } from '@/lib/storefrontCopy/sellingFormat';
 /** Shared quick-add behavior; merchandise retains its existing cart behavior. */
 export function useQuickAdd(product: ProductCardProduct, enforceStockLimit = false) {
   const addItem = useCartStore(s => s.addItem);
-  const quantity = useCartStore(s => s.items.find(item => item.product.id === product.id)?.quantity ?? 0);
-  const storedStock = useCartStore(s => s.items.find(item => item.product.id === product.id)?.product.stock ?? 999);
+  // Rendu (CTA, disponibilité) : panier lu après l'hydratation ; addToCart relit le store.
+  const quantity = useHydratedCartSelector(s => s.items.find(item => item.product.id === product.id)?.quantity ?? 0, 0);
+  const storedStock = useHydratedCartSelector(s => s.items.find(item => item.product.id === product.id)?.product.stock ?? 999, 999);
   const [added, setAdded] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   const maxPurchasable = getMaximumValidQuantity(
