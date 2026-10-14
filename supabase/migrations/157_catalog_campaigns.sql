@@ -2,6 +2,16 @@
 -- Apply separately from the code deploy after reviewing production dependencies.
 begin;
 
+-- Composite key for the (tenant_id, product_id) FK below. Already created by 139
+-- in production; guarded so 157 also applies on a database without 139 (CI).
+do $$
+begin
+  if not exists (select 1 from pg_constraint c where c.conname = 'products_tenant_id_id_key') then
+    alter table public.products add constraint products_tenant_id_id_key unique (tenant_id, id);
+  end if;
+end
+$$;
+
 create table public.catalog_campaigns (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,

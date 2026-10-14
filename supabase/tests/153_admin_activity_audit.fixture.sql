@@ -145,6 +145,7 @@ create table public.products (
   conservation_after_opening text,
   min_order_quantity integer not null default 1,
   order_quantity_step integer not null default 1,
+  barcode_value text,
   embedding text,
   updated_at timestamptz not null default now()
 );
