@@ -6,12 +6,15 @@ import {
   loadFunnelSessions,
   parseFunnelRange,
   recoverableCarts,
+  loadCardCartOutcomes,
   RECOVERY_WINDOW_DAYS,
   sessionValue,
   summarizeFunnel,
   type FunnelRange,
 } from '@/lib/admin/checkoutFunnel';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
+import Badge from '../../_components/ui/Badge';
+import { CARD_CART_STATUS_META, statusMeta } from '@/lib/admin/statusRegistry';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -52,6 +55,9 @@ export default async function CheckoutFunnelPage({ searchParams }: { searchParam
 
   const summary = summarizeFunnel(sessions);
   const toRecover = recoverableCarts(sessions);
+  // Paniers carte : ce que dit le journal (refus Stripe, 3-D Secure, carte non saisie…).
+  const cardOutcomes = await loadCardCartOutcomes(createServiceClient(), tenant.id,
+    toRecover.filter((cart) => cart.paymentMethod === 'stripe').map((cart) => cart.id));
   const toVerify = sessions.filter((session) => session.status === 'awaiting_verification');
 
   const steps = [
@@ -120,7 +126,12 @@ export default async function CheckoutFunnelPage({ searchParams }: { searchParam
                 <li key={cart.id} className="flex items-center gap-3 py-2.5 text-sm">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium text-a-text">{cart.customer}</span>
-                    <span className="text-xs text-a-text-3">{day(cart.createdAt)} · {cart.status === 'open' ? 'en cours' : 'expiré'}</span>
+                    <span className="flex flex-wrap items-center gap-1.5 text-xs text-a-text-3">{day(cart.createdAt)} · {cart.status === 'open' ? 'en cours' : 'expiré'} · {cart.paymentMethod === 'stripe' ? 'carte' : 'paiement externe'}
+                      {cardOutcomes.has(cart.id) && (() => {
+                        const meta = statusMeta(CARD_CART_STATUS_META, cardOutcomes.get(cart.id));
+                        return <Badge tone={meta.tone}>{meta.label}</Badge>;
+                      })()}
+                    </span>
                   </span>
                   <strong className="shrink-0">{money(cart.value, currency)}</strong>
                   <Link href={`/admin/paiements-en-attente/${cart.id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-a-brand-fg hover:underline">Fiche <IconArrowUpRight size={14} /></Link>

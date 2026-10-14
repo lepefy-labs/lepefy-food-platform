@@ -122,6 +122,13 @@ The shipping logic is the most complex part of the codebase:
 - Every conversion (assisted Stripe webhook `metadata.type = assisted_preorder`, manual confirmation, "Déjà payé") goes through `src/lib/orders/convertCheckoutSessionToOrder.ts` → RPC `convert_checkout_session_to_order` (migration 128): row lock + order/items/stock in one transaction, unique `orders.checkout_session_id`; side effects run only when `created = true`.
 - `orders.email` can be null for assisted orders: never assume an email; tracking tokens are `HMAC(orderId + (email ?? ''))`.
 
+### Unpaid card carts (Stripe) — admin sheet, Stripe lookup, comeback link (no migration)
+
+- `/admin/paiements-en-attente/[id]` serves both `external_link` and `stripe` storefront sessions; « Paniers à relancer » (checkout funnel) links there and labels card carts with `CARD_CART_STATUS_META`.
+- What happened = `classifyCardCart(events)` in `src/lib/payments/cardCartOutcome.ts` (pure, tested) over the session's `payment_funnel_logs`: the browser events (now carrying the session id via `referenceIdRef`, `confirm_attempted` logged after `createIntent`) plus `payment_failed_server`, written by the Stripe webhook through `recordCardPaymentFailure` (idempotent per Stripe event, codes only, fail-open).
+- Live Stripe status: `GET /api/admin/checkout-sessions/[id]/stripe` (`orders.view`) — read-only `paymentIntents.retrieve` (shop key, fallback test key), `describeStripeIntent` → status, reason, brand + last4. Never any action on the payment.
+- Reminder (`POST .../reminder`): `cartRecoveryMode` (`src/lib/checkout/cartComeback.ts`) — open session → `/checkout/reprendre/...`; expired card cart within 14 days → signed `/panier/retrouver/[id]?token=` (HMAC `cart-comeback:` + TRACKING_SECRET), email `cartComebackEmail` (never the decline reason). The page rebuilds the cart at today's prices/stock (`rebuildCartLines`), then the normal checkout re-validates everything. No email → « Copier le lien » only.
+
 ### Order documents & QR portal — `docs/ORDER_DOCUMENTS.md`
 
 - Two separate renderers on one batch loader (`src/lib/orders/documents/`): internal **liste de préparation** and customer **bon de colis**. The slip only ever receives `CustomerOrderDocumentViewModel` (built field by field — never the `orders` row, never warehouse locations, notes, e-mail, phone, payment or UUID).

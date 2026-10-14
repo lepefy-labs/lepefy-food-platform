@@ -17,6 +17,7 @@ import { createEventReservationFromRequest } from '@/lib/events/createEventReser
 import { createRentalReservationFromRequest } from '@/lib/rental/createRentalReservationFromRequest';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import { getConfiguredWebhookSecrets, getStripeClient, type PaymentModule } from '@/lib/payments/stripeServerConfig';
+import { recordCardPaymentFailure } from '@/lib/payments/recordCardPaymentFailure';
 import { verifyE2EStripeWebhookSignature } from '@/lib/e2e/verifyStripeWebhookSignature';
 import type { EventCheckoutItemInput, RentalCheckoutItemInput } from '@lepefy/types';
 import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
@@ -575,6 +576,8 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.warn('[webhook] Could not update failed order (may not exist yet):', error);
     }
+    // Panier carte non finalisé : le refus est visible dans la fiche admin et le funnel.
+    await recordCardPaymentFailure(intent, event.id);
   }
 
   return NextResponse.json({ received: true });

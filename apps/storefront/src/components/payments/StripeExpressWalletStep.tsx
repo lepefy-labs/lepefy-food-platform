@@ -61,7 +61,7 @@ function InnerExpressWalletStep({
 
   useEffect(() => {
     logFunnelEvent({ module, event_type: 'elements_mounted', reference_id: null, detail: WALLET_DETAIL });
-    return registerAbandonmentListener({ module, reference_id: referenceIdRef.current, hasSucceededRef });
+    return registerAbandonmentListener({ module, referenceIdRef, hasSucceededRef });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -91,8 +91,6 @@ function InnerExpressWalletStep({
         return;
       }
 
-      logFunnelEvent({ module, event_type: 'confirm_attempted', reference_id: referenceIdRef.current, detail: WALLET_DETAIL });
-
       const result = await createIntent();
       if (result.error || !result.clientSecret) {
         // Échec avant confirmPayment : fermer la feuille Apple Pay tout de
@@ -104,6 +102,8 @@ function InnerExpressWalletStep({
         return;
       }
       if (result.reference_id) referenceIdRef.current = result.reference_id;
+      // « Payer » cliqué, rattaché à la session créée (paiement différé : elle n'existe qu'ici).
+      logFunnelEvent({ module, event_type: 'confirm_attempted', reference_id: referenceIdRef.current, detail: WALLET_DETAIL });
 
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,

@@ -1,4 +1,5 @@
 import type { AdminTone } from './tokens';
+import { CARD_CART_OUTCOME_META } from '@/lib/payments/cardCartOutcome';
 
 /**
  * Domain state → label + semantic tone, shared by every admin badge so the same
@@ -81,6 +82,11 @@ export const CATALOG_CAMPAIGN_STATUS_META: Record<string, AdminStatusMeta> = {
   suspended: { label: 'Suspendue', tone: 'warning' },
   ended: { label: 'Terminée', tone: 'neutral' },
 };
+
+/** Panier carte non finalisé : ce que montrent le journal et Stripe (lib/payments/cardCartOutcome.ts). */
+export const CARD_CART_STATUS_META: Record<string, AdminStatusMeta> = Object.fromEntries(
+  Object.entries(CARD_CART_OUTCOME_META).map(([key, meta]) => [key, { label: meta.label, tone: meta.tone }]),
+);
 
 export function statusMeta(registry: Record<string, AdminStatusMeta>, status: string | null | undefined): AdminStatusMeta {
   if (!status) return { label: '—', tone: 'neutral' };

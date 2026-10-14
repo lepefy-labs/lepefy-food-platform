@@ -72,7 +72,7 @@ test('full shop admin sees the shop and common entries, flagged modules only wit
     'loyalty', 'ambassadors', 'reviews', 'nala-analytics', 'ai-lab',
     'public-content', 'tools', 'settings', 'billing', 'ai-usage',
   ]);
-  expect(full.actions).toEqual(['new-order', 'new-product', 'new-customer']);
+  expect(full.actions).toEqual(['new-order', 'new-product', 'new-catalog-campaign', 'new-customer']);
   expect(full.platform).toBe(false);
 
   const withFlags = resolveAdminNavigation(ctx({ permissions: ['*'], flags: { gestion: true, whatsapp: true, activity: true } }));

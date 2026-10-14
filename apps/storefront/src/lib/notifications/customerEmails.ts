@@ -375,6 +375,33 @@ ${signature(context, 'Merci pour votre confiance.')}`,
   };
 }
 
+/**
+ * Relance d'un panier carte expiré : remettre les articles dans le panier
+ * (prix et stock du jour). Ne cite jamais le motif d'un éventuel refus de la
+ * banque : invite seulement à réessayer ou à choisir un autre moyen de paiement.
+ */
+export function cartComebackEmail(context: TenantNotificationContext, input: {
+  fullName: string | null; comebackLink: string; items: Array<{ quantity: number; name: string; unitPrice: number }>;
+  validDays: number; testMode?: boolean;
+}): RenderedEmail {
+  return {
+    subject: subject(input.testMode, `🛒 Votre panier vous attend chez ${context.tenantName}`),
+    replyTo: context.emailBranding?.supportEmail,
+    html: page(context, {
+      testMode: input.testMode,
+      title: '🛒 Votre panier vous attend',
+      body: `${greeting(input.fullName)}
+<p>Votre paiement chez <strong>${esc(context.tenantName)}</strong> n’a pas été finalisé et aucun montant n’a été débité.</p>
+${itemsBox(context, 'Votre sélection', input.items)}
+<p>En un clic, vous pouvez remettre ces articles dans votre panier, puis payer par carte (avec la même carte ou une autre) ou choisir un autre moyen de paiement disponible.</p>
+${cta(input.comebackLink, 'Retrouver mon panier')}
+<p class="note">Les prix et les disponibilités sont ceux du jour. Ce lien est valable ${esc(input.validDays)} jours après votre visite.</p>
+${supportBox(context, '💬 Une question sur votre commande ?')}
+${signature(context, 'À très vite !')}`,
+    }),
+  };
+}
+
 // ─── Batch B ────────────────────────────────────────────────────────────────
 
 function dateTime(context: TenantNotificationContext, value: string | null | undefined, style: 'long' | 'medium' | 'full' = 'long') {

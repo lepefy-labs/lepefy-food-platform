@@ -45,7 +45,7 @@ function InnerPaymentStep({
 
   useEffect(() => {
     logFunnelEvent({ module, event_type: 'elements_mounted', reference_id: referenceIdRef.current });
-    return registerAbandonmentListener({ module, reference_id: referenceIdRef.current, hasSucceededRef });
+    return registerAbandonmentListener({ module, referenceIdRef, hasSucceededRef });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -87,8 +87,6 @@ function InnerPaymentStep({
         return;
       }
 
-      logFunnelEvent({ module, event_type: 'confirm_attempted', reference_id: referenceIdRef.current });
-
       const result = await createIntent();
       if (result.error || !result.clientSecret) {
         onError(result.error ?? 'Erreur lors du paiement.');
@@ -97,6 +95,8 @@ function InnerPaymentStep({
         return;
       }
       if (result.reference_id) referenceIdRef.current = result.reference_id;
+      // « Payer » cliqué, rattaché à la session créée (paiement différé : elle n'existe qu'ici).
+      logFunnelEvent({ module, event_type: 'confirm_attempted', reference_id: referenceIdRef.current });
 
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,

@@ -1,3 +1,4 @@
+import { classifyCardCart, type CardCartOutcome, type FunnelEvent } from '@/lib/payments/cardCartOutcome';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
@@ -30,6 +31,8 @@ export interface FunnelSession {
   ambassador_discount_amount: number | string | null;
   resume_count: number | null;
   order_id: string | null;
+  /** `stripe` (carte) ou `external_link`. */
+  payment_method?: string | null;
 }
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
@@ -85,6 +88,7 @@ export function summarizeFunnel(sessions: FunnelSession[]): FunnelSummary {
 export interface RecoverableCart {
   id: string;
   status: 'open' | 'expired';
+  paymentMethod: string | null;
   customer: string;
   value: number;
   createdAt: string;
@@ -99,6 +103,7 @@ export function recoverableCarts(sessions: FunnelSession[], now: Date = new Date
     .map((session) => ({
       id: session.id,
       status: session.status as 'open' | 'expired',
+      paymentMethod: session.payment_method ?? null,
       customer: session.full_name?.trim() || session.email || session.phone || 'Client',
       value: sessionValue(session),
       createdAt: session.created_at,
@@ -107,13 +112,37 @@ export function recoverableCarts(sessions: FunnelSession[], now: Date = new Date
     .slice(0, limit);
 }
 
+/**
+ * Résultat de paiement des paniers carte à relancer, d'après leur journal
+ * (`classifyCardCart`). Lecture bornée aux ids reçus, toujours sur le tenant ;
+ * en cas d'erreur, aucun libellé (la liste reste affichée).
+ */
+export async function loadCardCartOutcomes(supabase: SupabaseClient, tenantId: string, sessionIds: string[]): Promise<Map<string, CardCartOutcome>> {
+  const outcomes = new Map<string, CardCartOutcome>();
+  if (sessionIds.length === 0) return outcomes;
+  const { data, error } = await supabase
+    .from('payment_funnel_logs')
+    .select('reference_id, event_type, created_at')
+    .eq('tenant_id', tenantId)
+    .eq('module', 'shop')
+    .in('reference_id', sessionIds)
+    .limit(2000);
+  if (error) return outcomes;
+  const byId = new Map<string, FunnelEvent[]>();
+  for (const row of (data ?? []) as Array<FunnelEvent & { reference_id: string }>) {
+    byId.set(row.reference_id, [...(byId.get(row.reference_id) ?? []), row]);
+  }
+  for (const id of sessionIds) outcomes.set(id, classifyCardCart(byId.get(id) ?? []));
+  return outcomes;
+}
+
 export async function loadFunnelSessions(supabase: SupabaseClient, tenantId: string, rangeDays: FunnelRange, now: Date = new Date()): Promise<FunnelSession[]> {
   const since = new Date(now.getTime() - rangeDays * 86_400_000).toISOString();
   const rows: FunnelSession[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await supabase
       .from('checkout_sessions')
-      .select('id, status, created_at, email, full_name, phone, items, shipping_total, ambassador_discount_amount, resume_count, order_id')
+      .select('id, status, created_at, email, full_name, phone, items, shipping_total, ambassador_discount_amount, resume_count, order_id, payment_method')
       .eq('tenant_id', tenantId)
       .eq('origin', 'storefront')
       .gte('created_at', since)

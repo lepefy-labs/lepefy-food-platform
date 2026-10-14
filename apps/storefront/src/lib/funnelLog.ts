@@ -54,6 +54,8 @@ function sendBeaconLog(params: FunnelLogParams): void {
 export function registerAbandonmentListener(params: {
   module:        FunnelModule;
   reference_id?: string | null;
+  /** Lu au moment de l'abandon : la session n'existe qu'après « Payer » (paiement différé). */
+  referenceIdRef?: { current: string | null };
   hasSucceededRef: { current: boolean };
 }): () => void {
   let fired = false;
@@ -64,7 +66,7 @@ export function registerAbandonmentListener(params: {
     sendBeaconLog({
       module:       params.module,
       event_type:   'abandoned_payment_form',
-      reference_id: params.reference_id ?? null,
+      reference_id: params.referenceIdRef?.current ?? params.reference_id ?? null,
     });
   }
 

@@ -9,6 +9,11 @@ import { formatPrice } from '@/lib/utils/format';
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
 import PaymentRecoveryActions from './PaymentRecoveryActions';
 import PaymentRecoveryDetails from './PaymentRecoveryDetails';
+import StripePaymentPanel from './StripePaymentPanel';
+import Badge from '../../../_components/ui/Badge';
+import { cartRecoveryMode, generateCartComebackToken } from '@/lib/checkout/cartComeback';
+import { classifyCardCart, journeyLabel, type FunnelEvent } from '@/lib/payments/cardCartOutcome';
+import { CARD_CART_STATUS_META, statusMeta } from '@/lib/admin/statusRegistry';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -67,6 +72,21 @@ function statusPresentation(status: string) {
   };
 }
 
+function cardStatusPresentation(status: string, expiresAt: string) {
+  const open = status === 'open' && new Date(expiresAt).getTime() > Date.now();
+  return open
+    ? {
+      label: 'Panier carte en cours',
+      description: 'Le client n’a pas encore payé. La session est ouverte : il peut reprendre son achat.',
+      tone: 'border-tone-info-border bg-tone-info-bg text-tone-info-fg',
+    }
+    : {
+      label: 'Panier carte expiré',
+      description: 'Le paiement par carte n’a pas abouti et la session a expiré. Le rappel propose de remettre les articles dans le panier.',
+      tone: 'border-a-border bg-a-surface-2 text-a-text-2',
+    };
+}
+
 export default async function PendingPaymentManagementPage({ params }: { params: { id: string } }) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
   const access = await getCurrentAdminAccessContext(tenant.id);
@@ -79,7 +99,8 @@ export default async function PendingPaymentManagementPage({ params }: { params:
     .select('id, email, full_name, phone, fulfillment_type, shipping_address, items, shipping_total, ambassador_discount_amount, status, expires_at, payment_method, external_payment_type, external_payment_label, external_payment_link, order_id, created_at, origin')
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)
-    .eq('payment_method', 'external_link')
+    // Paiements externes à vérifier et paniers carte non finalisés (même fiche).
+    .in('payment_method', ['external_link', 'stripe'])
     .in('status', ['open', 'expired', 'awaiting_verification'])
     .is('order_id', null)
     .maybeSingle();
@@ -100,7 +121,7 @@ export default async function PendingPaymentManagementPage({ params }: { params:
     ambassador_discount_amount: number | null;
     status: 'open' | 'expired' | 'awaiting_verification';
     expires_at: string;
-    payment_method: 'external_link';
+    payment_method: 'external_link' | 'stripe';
     external_payment_type: string | null;
     external_payment_label: string | null;
     external_payment_link: string | null;
@@ -108,17 +129,19 @@ export default async function PendingPaymentManagementPage({ params }: { params:
     created_at: string;
   };
 
-  const { data: rawReminderLogs } = await supabase
+  const isCard = session.payment_method === 'stripe';
+  // Tout le journal de la session : rappels, et pour un panier carte le parcours client.
+  const { data: rawLogs } = await supabase
     .from('payment_funnel_logs')
-    .select('created_at, detail')
+    .select('event_type, created_at, detail')
     .eq('tenant_id', tenant.id)
     .eq('module', 'shop')
     .eq('reference_id', session.id)
-    .eq('event_type', 'checkout_reused')
     .order('created_at', { ascending: false })
-    .limit(30);
+    .limit(100);
+  const sessionEvents = (rawLogs ?? []) as FunnelEvent[];
 
-  const reminders = ((rawReminderLogs ?? []) as ReminderLog[])
+  const reminders = (sessionEvents.filter((log) => log.event_type === 'checkout_reused') as ReminderLog[])
     .filter((log) => log.detail?.kind === 'payment_reminder_sent');
   const lastReminderAt = reminders[0]?.created_at ?? null;
   const nextReminderAt = lastReminderAt && reminders.length < 2
@@ -126,18 +149,24 @@ export default async function PendingPaymentManagementPage({ params }: { params:
     : null;
   const firstReminderAt = new Date(new Date(session.created_at).getTime() + FIRST_REMINDER_DELAY_MS).toISOString();
 
-  const canResume = session.status === 'awaiting_verification'
-    || (session.status === 'open' && new Date(session.expires_at).getTime() > Date.now());
-  const accessToken = canResume && process.env.TRACKING_SECRET
-    ? generateCheckoutSessionAccessToken(session.id, session.email)
-    : null;
+  // Paiement externe : reprise. Carte : reprise si ouverte, sinon « Retrouver mon panier » (14 jours).
+  const recoveryMode = cartRecoveryMode(session);
+  const canResume = recoveryMode !== 'none';
   const storefrontUrl = tenant.storefront_url?.replace(/\/$/, '')
     ?? tenant.legal_website?.replace(/\/$/, '')
     ?? process.env.NEXT_PUBLIC_STOREFRONT_URL?.replace(/\/$/, '')
     ?? '';
-  const resumeLink = accessToken && storefrontUrl
-    ? `${storefrontUrl}/checkout/reprendre/${session.id}?token=${encodeURIComponent(accessToken)}`
-    : null;
+  const resumeLink = !canResume || !process.env.TRACKING_SECRET || !storefrontUrl
+    ? null
+    : recoveryMode === 'comeback'
+      ? `${storefrontUrl}/panier/retrouver/${session.id}?token=${encodeURIComponent(generateCartComebackToken(session.id, session.email))}`
+      : `${storefrontUrl}/checkout/reprendre/${session.id}?token=${encodeURIComponent(generateCheckoutSessionAccessToken(session.id, session.email))}`;
+  const cardOutcome = isCard ? statusMeta(CARD_CART_STATUS_META, classifyCardCart(sessionEvents)) : null;
+  const journey = isCard
+    ? [...sessionEvents].reverse()
+      .map((event) => ({ at: event.created_at, label: journeyLabel(event) }))
+      .filter((step): step is { at: string; label: string } => Boolean(step.label))
+    : [];
 
   const subtotal = (session.items ?? []).reduce(
     (sum, item) => sum + Number(item.price) * Number(item.quantity),
@@ -146,9 +175,9 @@ export default async function PendingPaymentManagementPage({ params }: { params:
   const discountTotal = Number(session.ambassador_discount_amount ?? 0);
   const shippingTotal = Number(session.shipping_total ?? 0);
   const total = Number((subtotal + shippingTotal - discountTotal).toFixed(2));
-  const status = statusPresentation(session.status);
+  const status = isCard ? cardStatusPresentation(session.status, session.expires_at) : statusPresentation(session.status);
   const customerLabel = session.full_name ?? session.email;
-  const paymentLabel = session.external_payment_label ?? session.external_payment_type ?? 'Paiement externe';
+  const paymentLabel = isCard ? 'Carte bancaire' : session.external_payment_label ?? session.external_payment_type ?? 'Paiement externe';
   const reference = `#${session.id.slice(0, 8).toUpperCase()}`;
 
   return (
@@ -158,8 +187,10 @@ export default async function PendingPaymentManagementPage({ params }: { params:
       </Link>
 
       <AdminPageHeader
-        title="Gérer le paiement"
-        description="Vérifiez la situation avant de relancer le client, confirmer la réception ou annuler la demande."
+        title={isCard ? 'Panier carte non finalisé' : 'Gérer le paiement'}
+        description={isCard
+          ? 'Voyez ce qui s’est passé chez Stripe et dans le parcours du client avant de le relancer.'
+          : 'Vérifiez la situation avant de relancer le client, confirmer la réception ou annuler la demande.'}
         meta={reference}
         actions={(
           <PaymentRecoveryDetails
@@ -185,10 +216,34 @@ export default async function PendingPaymentManagementPage({ params }: { params:
       </div>
 
       <div className={`mb-5 rounded-2xl border p-4 ${status.tone}`}>
-        <div className="flex items-start gap-2"><IconAlertTriangle size={19} className="mt-0.5 shrink-0" /><div><p className="font-bold">{status.label}</p><p className="mt-1 text-sm leading-6 opacity-90">{status.description}</p><p className="mt-1 text-xs font-semibold">Aucun stock n’est réservé tant que le paiement n’est pas confirmé.</p></div></div>
+        <div className="flex items-start gap-2"><IconAlertTriangle size={19} className="mt-0.5 shrink-0" /><div><p className="flex flex-wrap items-center gap-2 font-bold">{status.label}{cardOutcome && <Badge tone={cardOutcome.tone} dot>{cardOutcome.label}</Badge>}</p><p className="mt-1 text-sm leading-6 opacity-90">{status.description}</p><p className="mt-1 text-xs font-semibold">Aucun stock n’est réservé tant que le paiement n’est pas confirmé.</p></div></div>
       </div>
 
+      {isCard && (
+        <div className="mb-5 grid gap-5 lg:grid-cols-2">
+          <StripePaymentPanel sessionId={session.id} />
+          <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm" aria-labelledby="journey-title">
+            <h2 id="journey-title" className="font-bold text-a-text">Parcours du client</h2>
+            {journey.length === 0 ? (
+              <p className="mt-3 text-sm text-a-text-3">Aucun évènement enregistré pour ce panier.</p>
+            ) : (
+              <ol className="mt-3 grid gap-2 text-sm">
+                {journey.map((step, index) => (
+                  <li key={`${step.at}-${index}`} className="flex gap-3">
+                    <span className="w-24 shrink-0 tabular-nums text-a-text-3">{new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }).format(new Date(step.at))}</span>
+                    <span className="text-a-text">{step.label}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <p className="mt-3 text-xs text-a-text-3">Évènements du formulaire carte et réponses de Stripe. Les paniers antérieurs au 15/10/2026 peuvent avoir un parcours incomplet.</p>
+          </section>
+        </div>
+      )}
+
       <PaymentRecoveryActions
+        variant={isCard ? 'card' : 'external'}
+        linkKind={recoveryMode === 'comeback' ? 'comeback' : 'resume'}
         sessionId={session.id}
         customerLabel={customerLabel}
         resumeLink={resumeLink}

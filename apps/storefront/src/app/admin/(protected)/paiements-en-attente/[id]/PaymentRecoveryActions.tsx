@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconExternalLink, IconMailForward, IconX } from '@tabler/icons-react';
+import { IconCopy, IconExternalLink, IconMailForward, IconX } from '@tabler/icons-react';
 import ConfirmPaymentButton from '../../../_components/ui/ConfirmPaymentButton';
 import ConfirmDialog from '../../../_components/ui/ConfirmDialog';
 
@@ -17,6 +17,10 @@ interface Props {
   canResume: boolean;
   canManageSession: boolean;
   canConfirmPayment: boolean;
+  /** `card` : panier payé par carte (confirmation uniquement via Stripe, pas d'annulation manuelle). */
+  variant?: 'external' | 'card';
+  /** `comeback` : le lien remet les articles dans le panier (panier carte expiré). */
+  linkKind?: 'resume' | 'comeback';
 }
 
 function formatDateTime(value: string | null) {
@@ -35,7 +39,21 @@ export default function PaymentRecoveryActions({
   canResume,
   canManageSession,
   canConfirmPayment,
+  variant = 'external',
+  linkKind = 'resume',
 }: Props) {
+  const card = variant === 'card';
+  const [copied, setCopied] = useState<'ok' | 'error' | null>(null);
+
+  async function copyLink() {
+    if (!resumeLink) return;
+    try {
+      await navigator.clipboard.writeText(resumeLink);
+      setCopied('ok');
+    } catch {
+      setCopied('error');
+    }
+  }
   const router = useRouter();
   const [reminderCount, setReminderCount] = useState(initialReminderCount);
   const [lastReminderAt, setLastReminderAt] = useState(initialLastReminderAt);
@@ -49,7 +67,7 @@ export default function PaymentRecoveryActions({
 
   const reminderEligibility = useMemo(() => {
     if (!canManageSession) return { allowed: false, reason: 'Votre rôle ne permet pas d’envoyer des rappels.' };
-    if (!canResume) return { allowed: false, reason: 'Cette demande ne peut plus être reprise.' };
+    if (!canResume) return { allowed: false, reason: card ? 'Ce panier date de plus de 14 jours : il ne peut plus être relancé.' : 'Cette demande ne peut plus être reprise.' };
     if (reminderCount >= 2) return { allowed: false, reason: 'Les 2 rappels maximum ont déjà été envoyés.' };
     const now = Date.now();
     const firstAt = new Date(firstReminderAt).getTime();
@@ -113,7 +131,11 @@ export default function PaymentRecoveryActions({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="font-bold text-a-text">Relancer le client</h2>
-              <p className="mt-1 max-w-xl text-sm leading-6 text-a-text-3">Le message reste prudent : si le client a déjà payé, il lui demande de ne pas payer une seconde fois. Sinon il peut reprendre l’achat et conserver ou changer le moyen de paiement.</p>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-a-text-3">{card
+                ? linkKind === 'comeback'
+                  ? 'Le panier a expiré : l’email propose de remettre les articles dans son panier, aux prix et stocks du jour. Il ne cite jamais le motif d’un refus de la banque.'
+                  : 'Le panier est encore ouvert : l’email propose de reprendre l’achat et de payer avec la même carte, une autre carte ou un autre moyen.'
+                : 'Le message reste prudent : si le client a déjà payé, il lui demande de ne pas payer une seconde fois. Sinon il peut reprendre l’achat et conserver ou changer le moyen de paiement.'}</p>
               <div className="mt-3 text-xs text-a-text-3"><span className="font-semibold">Rappels envoyés :</span> {reminderCount}/2{lastReminderAt && <span> · dernier {formatDateTime(lastReminderAt)}</span>}</div>
               {!reminderEligibility.allowed && reminderEligibility.reason && <p className="mt-2 text-xs font-medium text-tone-warning-fg">{reminderEligibility.reason}</p>}
               {reminderMessage && <p className={`mt-2 text-sm ${reminderError ? 'text-tone-danger-fg' : 'text-tone-success-fg'}`} role="status">{reminderMessage}</p>}
@@ -125,12 +147,20 @@ export default function PaymentRecoveryActions({
         </section>
 
         <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm">
-          <h2 className="font-bold text-a-text">Reprise client</h2>
-          <p className="mt-1 text-sm leading-6 text-a-text-3">Le lien sécurisé permet au client de reprendre son achat. Il peut continuer avec le moyen actuel ou en choisir un autre, sans créer de commande tant que le paiement n’est pas confirmé.</p>
-          {resumeLink && canResume ? <a href={resumeLink} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-a-border-strong bg-a-surface px-4 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-border-strong">Ouvrir le lien de reprise client <IconExternalLink size={17} /></a> : <p className="mt-3 text-sm font-medium text-a-text-3">Lien de reprise indisponible pour cette demande.</p>}
+          <h2 className="font-bold text-a-text">{linkKind === 'comeback' ? 'Lien « Retrouver mon panier »' : 'Reprise client'}</h2>
+          <p className="mt-1 text-sm leading-6 text-a-text-3">{linkKind === 'comeback'
+            ? 'Le lien sécurisé remet les articles disponibles dans le panier du client, valable 14 jours après sa visite. À copier dans un WhatsApp ou un SMS si le client n’a pas d’email.'
+            : 'Le lien sécurisé permet au client de reprendre son achat. Il peut continuer avec le moyen actuel ou en choisir un autre, sans créer de commande tant que le paiement n’est pas confirmé.'}</p>
+          {resumeLink && canResume ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <a href={resumeLink} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-a-border-strong bg-a-surface px-4 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-border-strong">Ouvrir le lien client <IconExternalLink size={17} /></a>
+              <button type="button" onClick={() => void copyLink()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-a-border-strong bg-a-surface px-4 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-border-strong"><IconCopy size={17} aria-hidden="true" /> Copier le lien</button>
+              {copied && <p role="status" className={`w-full text-sm ${copied === 'ok' ? 'text-tone-success-fg' : 'text-tone-danger-fg'}`}>{copied === 'ok' ? 'Lien copié.' : 'Copie impossible : ouvrez le lien et copiez l’adresse.'}</p>}
+            </div>
+          ) : <p className="mt-3 text-sm font-medium text-a-text-3">Lien client indisponible pour ce panier.</p>}
         </section>
 
-        {canConfirmPayment ? (
+        {card ? null : canConfirmPayment ? (
           <section className="rounded-2xl border border-tone-warning-border bg-tone-warning-bg p-5">
             <h2 className="font-bold text-a-text">Décision paiement</h2>
             <p className="mt-1 text-sm leading-6 text-a-text-2">Confirmez uniquement après avoir réellement constaté la réception du paiement externe.</p>
@@ -140,7 +170,7 @@ export default function PaymentRecoveryActions({
           <section className="rounded-2xl border border-a-border bg-a-surface p-5 text-sm text-a-text-3">Votre rôle permet de consulter cette demande, mais pas de confirmer manuellement un paiement externe.</section>
         )}
 
-        {canManageSession && (
+        {canManageSession && !card && (
           <section className="rounded-2xl border border-tone-danger-border bg-a-surface p-5">
             <h2 className="font-bold text-a-text">Zone sensible</h2>
             <p className="mt-1 text-sm leading-6 text-a-text-3">Annuler retire la demande de la file. Cela n’annule ni ne rembourse un éventuel paiement déjà effectué chez le prestataire externe.</p>
@@ -150,7 +180,7 @@ export default function PaymentRecoveryActions({
         )}
       </div>
 
-      {canManageSession && <ConfirmDialog open={cancelOpen} title="Annuler cette demande de paiement ?" description={`La demande de ${customerLabel} sera retirée de la file de vérification. Cette action n’annule ni ne rembourse un éventuel paiement déjà effectué sur le service externe.`} confirmLabel="Annuler la demande" cancelLabel="Conserver" destructive loading={cancelling} onCancel={() => { if (!cancelling) setCancelOpen(false); }} onConfirm={() => void cancelSession()} />}
+      {canManageSession && !card && <ConfirmDialog open={cancelOpen} title="Annuler cette demande de paiement ?" description={`La demande de ${customerLabel} sera retirée de la file de vérification. Cette action n’annule ni ne rembourse un éventuel paiement déjà effectué sur le service externe.`} confirmLabel="Annuler la demande" cancelLabel="Conserver" destructive loading={cancelling} onCancel={() => { if (!cancelling) setCancelOpen(false); }} onConfirm={() => void cancelSession()} />}
     </>
   );
 }

@@ -6,7 +6,8 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import { generateCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessionAccessToken';
 import { deliverEmail } from '@/lib/notifications/sendEmail';
-import { paymentReminderEmail } from '@/lib/notifications/customerEmails';
+import { cartComebackEmail, paymentReminderEmail } from '@/lib/notifications/customerEmails';
+import { cartRecoveryMode, COMEBACK_WINDOW_DAYS, generateCartComebackToken } from '@/lib/checkout/cartComeback';
 
 const FIRST_REMINDER_DELAY_MS = 2 * 60 * 60 * 1000;
 const REMINDER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
@@ -45,8 +46,8 @@ export async function POST(
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)
     .eq('origin', 'storefront')
-    .eq('payment_method', 'external_link')
-    .in('status', ['open', 'awaiting_verification'])
+    .in('payment_method', ['external_link', 'stripe'])
+    .in('status', ['open', 'awaiting_verification', 'expired'])
     .is('order_id', null)
     .maybeSingle();
 
@@ -65,17 +66,22 @@ export async function POST(
     items: SessionItem[];
     shipping_total: number;
     ambassador_discount_amount: number | null;
-    status: 'open' | 'awaiting_verification';
+    status: 'open' | 'awaiting_verification' | 'expired';
     expires_at: string;
-    payment_method: 'external_link';
+    payment_method: 'external_link' | 'stripe';
     external_payment_type: string | null;
     external_payment_label: string | null;
     order_id: string | null;
     created_at: string;
   };
 
-  if (session.status === 'open' && new Date(session.expires_at).getTime() <= now.getTime()) {
-    return NextResponse.json({ error: 'Cette session a expiré et ne peut plus être relancée.' }, { status: 409 });
+  // Paiement externe : reprise uniquement (règles inchangées). Carte : reprise
+  // si la session est ouverte, sinon « Retrouver mon panier » (14 jours).
+  const mode = cartRecoveryMode(session, now);
+  if (mode === 'none') {
+    return NextResponse.json({ error: session.payment_method === 'stripe'
+      ? `Ce panier date de plus de ${COMEBACK_WINDOW_DAYS} jours et ne peut plus être relancé.`
+      : 'Cette session a expiré et ne peut plus être relancée.' }, { status: 409 });
   }
 
   const firstEligibleAt = new Date(new Date(session.created_at).getTime() + FIRST_REMINDER_DELAY_MS);
@@ -126,8 +132,9 @@ export async function POST(
     return NextResponse.json({ error: 'L’URL canonique de la boutique n’est pas configurée.' }, { status: 503 });
   }
 
-  const accessToken = generateCheckoutSessionAccessToken(session.id, session.email);
-  const resumeLink = `${tenantContext.storefrontUrl}/checkout/reprendre/${session.id}?token=${encodeURIComponent(accessToken)}`;
+  const resumeLink = mode === 'comeback'
+    ? `${tenantContext.storefrontUrl}/panier/retrouver/${session.id}?token=${encodeURIComponent(generateCartComebackToken(session.id, session.email))}`
+    : `${tenantContext.storefrontUrl}/checkout/reprendre/${session.id}?token=${encodeURIComponent(generateCheckoutSessionAccessToken(session.id, session.email))}`;
   const subtotal = (session.items ?? []).reduce(
     (sum, item) => sum + Number(item.price) * Number(item.quantity),
     0,
@@ -152,6 +159,7 @@ export async function POST(
         reminderNumber,
         idempotencyKey,
         paymentStatus: session.status,
+        recoveryMode: mode,
       },
     })
     .select('id, created_at')
@@ -162,15 +170,25 @@ export async function POST(
     return NextResponse.json({ error: 'Impossible de réserver l’envoi du rappel.' }, { status: 500 });
   }
 
-  const delivered = await deliverEmail(tenantContext, {
-    ...paymentReminderEmail(tenantContext, {
+  const rendered = mode === 'comeback'
+    ? cartComebackEmail(tenantContext, {
+      fullName: session.full_name ?? '',
+      comebackLink: resumeLink,
+      items: (session.items ?? []).map((item) => ({ quantity: Number(item.quantity), name: item.name, unitPrice: Number(item.price) })),
+      validDays: COMEBACK_WINDOW_DAYS,
+    })
+    : paymentReminderEmail(tenantContext, {
       paymentReference: `#${session.id.slice(0, 8).toUpperCase()}`,
       fullName: session.full_name ?? '',
-      paymentMethodLabel: session.external_payment_label ?? session.external_payment_type ?? 'Paiement externe',
+      paymentMethodLabel: session.payment_method === 'stripe'
+        ? 'Carte bancaire'
+        : session.external_payment_label ?? session.external_payment_type ?? 'Paiement externe',
       amount,
       resumeLink,
       providerHandoffStarted: session.status === 'awaiting_verification',
-    }),
+    });
+  const delivered = await deliverEmail(tenantContext, {
+    ...rendered,
     notificationType: 'payment_reminder',
     idempotencyKey,
     recipients: [session.email],
