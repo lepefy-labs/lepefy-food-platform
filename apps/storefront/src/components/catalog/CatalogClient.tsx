@@ -8,6 +8,9 @@ import { CatalogCategoryRow } from '@/components/catalog/CatalogCategoryRow';
 import { semanticMatchToProductCardProduct } from '@/lib/catalog/productCardAdapters';
 import { buildCatalogUrl, CATALOG_NOVELTIES_HREF, CATALOG_PROMOS_HREF, type CatalogUrlOverrides } from '@/lib/catalog/catalogSearchUrl';
 import { CatalogShelf } from '@/components/catalog/CatalogShelf';
+import { IconLayoutGrid } from '@tabler/icons-react';
+
+const SEE_ALL_FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 motion-reduce:transition-none';
 import { rememberCatalogPosition, takeCatalogScrollRestore } from '@/lib/catalog/shoppingReturn';
 import { useCatalogSearchStore } from '@/stores/catalogSearchStore';
 import type { Category, ProductWithCategory, SemanticMatch } from '@lepefy/types';
@@ -283,9 +286,10 @@ export function CatalogClient({
           <button
             type="button"
             onClick={leaveSpecialView}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-gray-300 bg-white px-4 text-sm font-bold text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"
+            className={`inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-extrabold text-white shadow-sm hover:opacity-90 ${SEE_ALL_FOCUS}`}
+            style={{ backgroundColor: 'var(--color-primary)' }}
           >
-            <span aria-hidden="true">←</span> Tout le catalogue
+            <IconLayoutGrid size={18} aria-hidden="true" /> Voir tout le catalogue
           </button>
         )}
       </div>
@@ -364,6 +368,20 @@ export function CatalogClient({
 
       {/* Griglia */}
       {!(specialView && totalCount === 0 && !isPending) && <ProductGrid products={items} loading={isPending} />}
+
+      {/* Fin des vues « Nos promos » / « Nouveautés » : retour bien visible au catalogue complet. */}
+      {specialView && totalCount > 0 && !isPending && (
+        <div className="mt-8 flex justify-center">
+          <button
+            type="button"
+            onClick={leaveSpecialView}
+            className={`inline-flex min-h-[52px] w-full max-w-sm items-center justify-center gap-2 rounded-2xl px-6 text-base font-extrabold text-white shadow-sm hover:opacity-90 ${SEE_ALL_FOCUS}`}
+            style={{ backgroundColor: 'var(--color-primary)' }}
+          >
+            <IconLayoutGrid size={20} aria-hidden="true" /> Voir tout le catalogue
+          </button>
+        </div>
+      )}
 
       {/* Scroll infini — pagination server-side déclenchée par le sentinel.
           Masqué pendant une transition de filtre (isPending) : la grille va

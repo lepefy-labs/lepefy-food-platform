@@ -152,11 +152,12 @@ for (const view of [
     await page.goto(view.url);
     await expect(page.getByRole('heading', { name: view.title }).first()).toBeVisible();
     // Les anciens accès de l'en-tête n'existent plus ; un bouton ramène au catalogue complet.
-    await expect(page.getByRole('button', { name: /Tout le catalogue/ })).toBeVisible();
-    if (await page.getByText(view.empty).count()) {
-      await expect(page.getByRole('button', { name: 'Voir tout le catalogue' })).toBeVisible();
-      return;
-    }
+    const seeAll = page.getByRole('button', { name: 'Voir tout le catalogue' });
+    await expect(seeAll.first()).toBeVisible();
+    if (await page.getByText(view.empty).count()) return;
+    // En haut et en fin de liste.
+    await expect(seeAll).toHaveCount(2);
+    expect((await seeAll.last().boundingBox())!.height).toBeGreaterThanOrEqual(48);
     const count = await page.locator('main').getByText(view.badge).count();
     expect(count).toBeGreaterThan(0);
     await page.goto('/');
