@@ -183,6 +183,8 @@ The shipping logic is the most complex part of the codebase:
 
 Cart state lives in Zustand (`src/stores/cartStore.ts`), persisted to `localStorage` under key `lepefy-cart`. No other global client state.
 
+Hydration: while React hydrates, zustand `persist` serves the empty initial state, but selectors calling store methods (`s.totalItems()` reads `get()`) see the live persisted cart → mismatch, the whole root switches to client rendering. Render-time cart reads in server-rendered components go through `src/lib/cart/useHydratedCart.ts` (`useHydratedCartSelector/Items/Count`, server value until hydrated; `useHasMounted` is `useSyncExternalStore`-based). Effects acting on an empty cart (e.g. the `/checkout` → `/cart` guard) wait for hydration and re-read `useCartStore.getState()`.
+
 ### Cross-device cart sync
 
 For **authenticated** customers the cart is mirrored server-side (`carts` table) with optimistic concurrency control. Guest carts stay purely in `localStorage` — zero network calls.

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { IconShoppingCart } from '@tabler/icons-react';
-import { useCartStore } from '@/stores/cartStore';
+import { useHydratedCartCount } from '@/lib/cart/useHydratedCart';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import { useTenant } from '@/providers/TenantProvider';
 import { cartAriaLabel, formatCartBadge } from '@/lib/cart/cartBadge';
@@ -19,7 +19,7 @@ import { readableOn } from '@/lib/utils/color';
 export function CartShortcutButton({ className = '' }: { className?: string }) {
   const pathname = usePathname();
   const tenant = useTenant();
-  const totalItems = useCartStore((s) => s.totalItems());
+  const totalItems = useHydratedCartCount();
   const openDrawer = useCartUiStore((s) => s.openDrawer);
   const pulsing = useCartAddPulse();
   const onCartPage = pathname === '/cart';

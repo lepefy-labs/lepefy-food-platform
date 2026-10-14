@@ -31,6 +31,7 @@ import {
   externalPaymentCtaLabel,
 } from '@/components/payment/ExternalPaymentMethodPicker';
 import { StripePaymentStep } from '@/components/payments/StripePaymentStep';
+import { useHasMounted } from '@/hooks/useHasMounted';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import type { CheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
 import { marketingConsentLabel } from '@/lib/legal/consentCopy';
@@ -150,6 +151,7 @@ export default function CheckoutFlow({
 }) {
   const router = useRouter();
   const { items, totalPrice, shippingPayload } = useCartStore();
+  const hydrated = useHasMounted();
   // Pré-contrôle des minimums et du stock (même moteur que /cart et le
   // serveur) : guide seulement, /api/checkout reste l'autorité.
   const purchaseGate = useCartPurchaseGate(items);
@@ -238,9 +240,13 @@ export default function CheckoutFlow({
 
   usePaymentRedirectRecovery('shop', () => completeCheckout('/order-confirmation'));
 
+  // Pendant l'hydratation, le store rend l'état serveur (panier vide) : le
+  // garde n'agit qu'ensuite et relit le panier réel, sinon un chargement
+  // direct de /checkout renverrait toujours vers /cart.
   useEffect(() => {
-    if (items.length === 0 && !checkoutCompletedRef.current) router.push('/cart');
-  }, [items.length, router]);
+    if (!hydrated || checkoutCompletedRef.current) return;
+    if (useCartStore.getState().items.length === 0) router.push('/cart');
+  }, [hydrated, items.length, router]);
 
   useEffect(() => {
     if (!sessionCustomer || prefilledForCustomerRef.current === sessionCustomer.id) return;
@@ -660,7 +666,7 @@ export default function CheckoutFlow({
     </section>
   );
 
-  if (items.length === 0) return null;
+  if (!hydrated || items.length === 0) return null;
 
   const fullSummary = (
     <section className="rounded-2xl border border-gray-200 bg-white p-4" aria-label="Montant de la commande">

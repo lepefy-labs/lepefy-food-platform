@@ -3,6 +3,7 @@
 import { decrementRemovesLine } from '@/lib/purchaseQuantityRules';
 import { useEffect, useRef, useState } from 'react';
 import { useCartStore } from '@/stores/cartStore';
+import { useHydratedCartSelector } from '@/lib/cart/useHydratedCart';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import { useTenant } from '@/providers/TenantProvider';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
@@ -24,6 +25,7 @@ import type { CartItem as CartItemType } from '@lepefy/types';
 
 const TITLE_ID = 'cart-drawer-title';
 const UNDO_TIMEOUT_MS = 5000;
+const NO_ITEMS: CartItemType[] = [];
 
 /**
  * Point d'accès rapide au panier — remplace la navigation directe vers /cart
@@ -42,10 +44,12 @@ export function CartDrawer() {
   const closeDrawer = useCartUiStore((s) => s.closeDrawer);
   const tenant = useTenant();
 
-  const items = useCartStore(selectCartItems);
-  const itemCount = useCartStore(selectCartItemCount);
-  const subtotal = useCartStore(selectCartSubtotal);
-  const isEmpty = useCartStore(selectCartIsEmpty);
+  // Toujours dans le DOM (rendu serveur compris) : panier vide jusqu'à la fin
+  // de l'hydratation, sinon le HTML serveur ne correspond plus.
+  const items = useHydratedCartSelector(selectCartItems, NO_ITEMS);
+  const itemCount = useHydratedCartSelector(selectCartItemCount, 0);
+  const subtotal = useHydratedCartSelector(selectCartSubtotal, 0);
+  const isEmpty = useHydratedCartSelector(selectCartIsEmpty, true);
   const pendingProductIds = useCartStore(selectPendingProductIds);
   const unavailableProductIds = useCartStore((s) => s.unavailableProductIds);
   const syncStatus = useCartStore((s) => s.syncStatus);

@@ -22,7 +22,6 @@ import { hasValidPromotion } from '@/lib/catalog/promotions';
 import { useCartLineQuantity } from '@/lib/cart/useCartLineQuantity';
 import { CartStepper } from '@/components/cart/CartStepper';
 import { PromoBadge } from './PromoBadge';
-import { useHasMounted } from '@/hooks/useHasMounted';
 
 /**
  * Forme minimale requise par la card — satisfaite à la fois par
@@ -98,7 +97,6 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   const { addToCart, added, outOfStock, atLimit, availability } = useQuickAdd(product, !merchandise);
   const showConfirmation = useAddToCartUiStore(s => s.show);
   const line = useCartLineQuantity(product.id);
-  const mounted = useHasMounted();
   const ctaRef = useRef<HTMLButtonElement>(null);
   const stepperRef = useRef<HTMLDivElement>(null);
   const focusStepperAfterAdd = useRef(false);
@@ -137,8 +135,8 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
       : hasMinRule ? `Ajouter ${minOrderQuantity} au panier` : 'Ajouter au panier';
 
   // Une fois dans le panier, la card montre le même +/− que le panier (hors Goodies).
-  // Après le montage seulement : le HTML serveur (panier inconnu) reste identique au premier rendu.
-  const showStepper = mounted && !merchandise && line.quantity > 0 && !unavailable;
+  // `line` est lu après l'hydratation : le HTML serveur (panier inconnu) reste identique au premier rendu.
+  const showStepper = !merchandise && line.quantity > 0 && !unavailable;
   const stepperCaption = line.canIncrement ? 'dans le panier' : 'maximum disponible';
 
   // Le bouton « Ajouter » disparaît au profit du +/− : le focus clavier le suit

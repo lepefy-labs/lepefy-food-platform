@@ -6,7 +6,7 @@ import { getShoppingReturn, markShoppingReturn } from '@/lib/catalog/shoppingRet
 import { useCartLineQuantity } from '@/lib/cart/useCartLineQuantity';
 import { CartStepper } from '@/components/cart/CartStepper';
 import { PromoBadge } from '@/components/catalog/PromoBadge';
-import { useHasMounted } from '@/hooks/useHasMounted';
+import { useHydratedCartItems } from '@/lib/cart/useHydratedCart';
 import { useLocaleStore, resolveLocale } from '@/lib/store/localeStore';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
@@ -41,7 +41,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const activeLocale = resolveLocale(storeLocale, tenantLocales);
 
   const addItem = useCartStore((s) => s.addItem);
-  const cartItems = useCartStore((s) => s.items);
+  const cartItems = useHydratedCartItems();
   const { groups, loading: groupsLoading, error: groupsError, reload: reloadGroups } = useQuantityGroups();
   const minOrderQuantity = product.min_order_quantity ?? 1;
   const orderQuantityStep = product.order_quantity_step ?? 1;
@@ -54,7 +54,6 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const showConfirmation = useAddToCartUiStore((s) => s.show);
   const [returnToResults, setReturnToResults] = useState(false);
   const line = useCartLineQuantity(product.id);
-  const mounted = useHasMounted();
   const inCartQuantity = line.quantity;
   const maxPurchasable = getMaximumValidQuantity(product.stock, minOrderQuantity, orderQuantityStep);
   const outOfStock = maxPurchasable === 0;
@@ -88,7 +87,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   // Déjà dans le panier : la fiche montre le même +/− que le panier (la
   // quantité réelle du panier), au lieu d'un sélecteur qui ajouterait par-dessus.
   // La barre d'achat mobile garde la même hauteur dans les deux états.
-  const showsCartLine = mounted && inCartQuantity > 0 && !outOfStock;
+  const showsCartLine = inCartQuantity > 0 && !outOfStock;
 
   function continueShopping() {
     markShoppingReturn();
