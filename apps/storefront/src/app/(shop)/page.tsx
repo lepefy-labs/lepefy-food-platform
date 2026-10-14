@@ -7,7 +7,7 @@ import { catalogRankingDay, getCatalogPage, parseCatalogSort, parsePageParam, PR
 import { getActiveQuantityGroupFilter } from '@/lib/catalog/quantityGroupFilter';
 import { getCategoryPreviewRows, getShopCategories } from '@/lib/catalog/catalogCache';
 import { getActivePromotions, PROMOTIONS_SHELF_LIMIT } from '@/lib/catalog/promotions';
-import { getActiveNovelties } from '@/lib/catalog/novelties';
+import { getActiveNovelties, NOVELTIES_SHELF_LIMIT } from '@/lib/catalog/novelties';
 import { isPromoFilter } from '@/lib/catalog/catalogSearchUrl';
 import type { ProductWithCategory } from '@lepefy/types';
 
@@ -65,19 +65,27 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     .catch(() => [] as ProductWithCategory[]);
   const noveltiesPromise = getActiveNovelties<ProductWithCategory>(supabase, tenant.id, shopCategoryIds)
     .catch(() => [] as ProductWithCategory[]);
-  const [previewRows, promotions, novelties, { data: productsRaw, count }] = await Promise.all([
-    previewRowsPromise,
-    promotionsPromise,
-    noveltiesPromise,
-    promoView || noveltyView
-      ? Promise.resolve({ data: null, count: null })
-      : getCatalogPage(supabase, tenant.id, categories, {
-        q: searchQuery,
-        category: searchParams.category,
-        productIds: quantityGroupId ? quantityGroup?.productIds ?? [] : undefined,
-        sort,
-      }, 0, page * PRODUCTS_PAGE_SIZE, rankingDay),
-  ]);
+  // Catalogue non filtré : blocs « Nos promos » puis « Nouveautés » ; leurs
+  // produits ne sont pas répétés dans « Tous les produits » (exclus avant la
+  // découpe en pages, pour la page et pour /api/products).
+  const showShelves = !promoView && !noveltyView && !searchQuery && !searchParams.category && !quantityGroupId;
+  const [previewRows, promotions, novelties] = await Promise.all([previewRowsPromise, promotionsPromise, noveltiesPromise]);
+  const promoShelf = showShelves ? promotions.slice(0, PROMOTIONS_SHELF_LIMIT) : [];
+  const promoShelfIds = new Set(promoShelf.map(product => product.id));
+  // Un produit en promo et nouveauté n'apparaît que dans le bloc Promos.
+  const noveltyShelf = showShelves
+    ? novelties.filter(product => !promoShelfIds.has(product.id)).slice(0, NOVELTIES_SHELF_LIMIT)
+    : [];
+  const excludeIds = [...promoShelf, ...noveltyShelf].map(product => product.id);
+  const { data: productsRaw, count } = promoView || noveltyView
+    ? { data: null, count: null }
+    : await getCatalogPage(supabase, tenant.id, categories, {
+      q: searchQuery,
+      category: searchParams.category,
+      productIds: quantityGroupId ? quantityGroup?.productIds ?? [] : undefined,
+      excludeIds,
+      sort,
+    }, 0, page * PRODUCTS_PAGE_SIZE, rankingDay);
 
   const previewImagesByCategory: Record<string, string[]> = {};
   for (const row of previewRows) {
@@ -98,7 +106,6 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       : (productsRaw as unknown as ProductWithCategory[] | null) ?? [];
   const totalCount = promoView || noveltyView ? products.length : count ?? products.length;
   const hasNextPage = !promoView && !noveltyView && page * PRODUCTS_PAGE_SIZE < totalCount;
-  const showPromoShelf = !promoView && !noveltyView && !searchQuery && !searchParams.category && !quantityGroupId;
 
   return (
     <CatalogClient
@@ -119,7 +126,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       noveltyView={noveltyView}
       noveltyCount={novelties.length}
       promoCount={promotions.length}
-      promoShelf={showPromoShelf ? promotions.slice(0, PROMOTIONS_SHELF_LIMIT) : []}
+      promoShelf={promoShelf}
+      noveltyShelf={noveltyShelf}
+      excludeIds={excludeIds}
     />
   );
 }

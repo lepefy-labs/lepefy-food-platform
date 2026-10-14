@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createClient } from '@/lib/supabase/server';
-import { catalogRankingDay, getCatalogPage, parseCatalogSort, parseLimitParam, parsePageParam } from '@/lib/catalog/pagination';
+import { catalogRankingDay, getCatalogPage, parseCatalogSort, parseExcludeParam, parseLimitParam, parsePageParam } from '@/lib/catalog/pagination';
 import { getActiveQuantityGroupFilter } from '@/lib/catalog/quantityGroupFilter';
 import { getShopCategories } from '@/lib/catalog/catalogCache';
 
@@ -34,11 +34,17 @@ export async function GET(req: NextRequest) {
   const group = groupId
     ? await getActiveQuantityGroupFilter(supabase, tenant.id, groupId)
     : null;
+  // Produits des blocs Promos / Nouveautés : seulement sur le catalogue non filtré,
+  // comme la page (une recherche ou une catégorie montre toute la liste).
+  const excludeIds = !q?.trim() && !category && !groupId
+    ? parseExcludeParam(req.nextUrl.searchParams.get('exclude'))
+    : [];
 
   const { data: productsRaw, count, error } = await getCatalogPage(supabase, tenant.id, categories, {
     q,
     category,
     productIds: groupId ? group?.productIds ?? [] : undefined,
+    excludeIds,
     sort: parseCatalogSort(req.nextUrl.searchParams.get('sort') ?? undefined),
   }, (page - 1) * limit, limit,
   catalogRankingDay(req.nextUrl.searchParams.get('day') ?? undefined));

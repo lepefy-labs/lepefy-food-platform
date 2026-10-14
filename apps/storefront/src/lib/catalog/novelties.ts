@@ -74,6 +74,8 @@ export function selectActiveNovelties<T extends NoveltyCandidate>(rows: readonly
 export const NOVELTIES_QUERY_LIMIT = 200;
 /** Cartes de la rangée « Nouveautés » de Découvrir. */
 export const NOVELTIES_ROW_LIMIT = 8;
+/** Cartes du bloc « Nouveautés » du catalogue (même limite que le bloc Promos). */
+export const NOVELTIES_SHELF_LIMIT = 10;
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

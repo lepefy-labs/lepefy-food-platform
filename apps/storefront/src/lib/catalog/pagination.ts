@@ -42,6 +42,8 @@ interface ProductsFilters {
   sort?: CatalogSort;
   /** Explicit active group membership resolved on the server. */
   productIds?: string[];
+  /** Products already shown in the catalogue shelves (Promos, Nouveautés), left out of the list. */
+  excludeIds?: string[];
 }
 
 export function catalogRankingDay(value?: string): string {
@@ -72,6 +74,7 @@ export function buildProductsQuery(
     .in('category_id', categories.map(category => category.id));
 
   if (filters.productIds !== undefined) query = query.in('id', filters.productIds);
+  if (filters.excludeIds?.length) query = query.not('id', 'in', `(${filters.excludeIds.join(',')})`);
 
   const searchQuery = (filters.q?.trim() ?? '').slice(0, MAX_SEARCH_QUERY_LENGTH);
 
@@ -124,6 +127,7 @@ export async function getCatalogPage(
         offset,
         limit,
         rankingDay,
+        excludeIds: [...(filters.excludeIds ?? [])].sort(),
       });
     } catch (error) {
       // An absent RPC during deployment is expected; other errors deserve a log.
@@ -142,6 +146,21 @@ export async function getCatalogPage(
     }
   }
   return buildProductsQuery(supabase, tenantId, categories, filters).range(offset, offset + limit - 1);
+}
+
+/** Maximum de produits exclus (deux blocs de 10 cartes). */
+export const MAX_EXCLUDED_IDS = 20;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * `?exclude=` de `/api/products` : identifiants des produits déjà montrés dans
+ * les blocs du catalogue. UUID uniquement, sans doublon, au plus 20 ; toute
+ * autre valeur est ignorée (exclure ne fait que masquer, jamais élargir).
+ */
+export function parseExcludeParam(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  const ids = raw.split(',').map((id) => id.trim().toLowerCase()).filter((id) => UUID_PATTERN.test(id));
+  return [...new Set(ids)].slice(0, MAX_EXCLUDED_IDS);
 }
 
 /** Taille de tranche demandée à `/api/products` (`?limit=`) : jamais au-delà

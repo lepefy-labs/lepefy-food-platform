@@ -75,6 +75,8 @@ export interface RankingInput {
   offset: number;
   limit: number;
   rankingDay: string;
+  /** Produits des blocs Promos / Nouveautés, retirés avant la découpe en pages (triés : clé de cache stable). */
+  excludeIds?: string[];
 }
 
 export interface RankingResult {
@@ -101,6 +103,9 @@ export function getRankedCatalogIds(tenantId: string, input: RankingInput): Prom
     if (pins.error) throw Object.assign(new Error(pins.error.message), { code: pins.error.code });
     const pinnedIds = (pins.data ?? []).map(product => product.id);
     const hasPins = pinnedIds.length > 0;
+    const excludeIds = args.excludeIds ?? [];
+    // Épinglés ou exclusions : on lit depuis le début et on découpe après coup.
+    const mergeBeforeSlice = hasPins || excludeIds.length > 0;
 
     const { data: ranking, error } = await service.rpc('catalog_ranked_product_ids', {
       p_tenant_id: tenantId,
@@ -108,19 +113,20 @@ export function getRankedCatalogIds(tenantId: string, input: RankingInput): Prom
       p_query: args.q,
       p_sort: args.sort,
       p_day: args.rankingDay,
-      p_offset: hasPins ? 0 : args.offset,
-      p_limit: hasPins ? Math.min(2400, args.offset + args.limit + pinnedIds.length) : args.limit,
+      p_offset: mergeBeforeSlice ? 0 : args.offset,
+      p_limit: mergeBeforeSlice ? Math.min(2400, args.offset + args.limit + pinnedIds.length + excludeIds.length) : args.limit,
     });
     if (error || !ranking) {
       throw Object.assign(new Error(error?.message ?? 'Empty ranking'), { code: error?.code });
     }
     const rows = ranking as { product_id: string; total_count: number }[];
     const rankedIds = rows.map(row => row.product_id);
-    const ids = hasPins ? prioritizedCatalogIds(rankedIds, pinnedIds, args.offset, args.limit) : rankedIds;
-    if (ids.length) return { ids, count: Number(rows[0]?.total_count ?? 0) };
+    const ids = mergeBeforeSlice ? prioritizedCatalogIds(rankedIds, pinnedIds, args.offset, args.limit, excludeIds) : rankedIds;
+    // Les produits exclus sont des produits actifs du catalogue : ils comptent dans total_count.
+    if (ids.length) return { ids, count: Math.max(0, Number(rows[0]?.total_count ?? 0) - excludeIds.length) };
 
     // Even a deep-link past the last page retains the real result count.
-    const { count, error: countError } = await buildProductsQuery(service, tenantId, args.categories, filters).range(0, 0);
+    const { count, error: countError } = await buildProductsQuery(service, tenantId, args.categories, { ...filters, excludeIds }).range(0, 0);
     if (countError) throw new Error(countError.message);
     return { ids: [], count: count ?? 0 };
   })(input);

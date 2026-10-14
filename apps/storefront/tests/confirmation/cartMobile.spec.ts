@@ -140,44 +140,48 @@ test('card: first tap adds the minimum, + adds the step, − at the minimum remo
   await expect(card.getByRole('button', { name: /^Ajouter( \d+)? au panier$/ })).toBeVisible();
 });
 
-test('« Nos promos »: count, dedicated view, Promo badges, or a clear empty state', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?promo=1');
-  const empty = page.getByText('Aucune promotion en ce moment.');
-  const heading = page.getByRole('heading', { name: /Nos promos/ }).first();
-  await expect(heading).toBeVisible();
-  if (await empty.count()) {
-    await expect(page.getByRole('button', { name: 'Voir tout le catalogue' })).toBeVisible();
-    return;
-  }
-  const badges = page.locator('main').getByText(/^Promo −\d+ %$/);
-  const count = await badges.count();
-  expect(count).toBeGreaterThan(0);
-  const pill = page.getByRole('button', { name: /Nos promos/ });
-  await expect(pill).toHaveAttribute('aria-pressed', 'true');
-  await expect(pill).toContainText(String(count));
-  // Chaque carte promo montre aussi le prix barré.
-  expect(await page.locator('main .line-through').count()).toBeGreaterThanOrEqual(count);
-});
+/** Le bloc « Tout voir » d'une vue complète, ou rien quand le bloc est absent. */
+const shelfButton = (page: Page, name: RegExp) => page.locator('main').getByRole('link', { name });
 
-test('« Nouveautés »: count, dedicated view, Nouveau badges, or a clear empty state', async ({ page }) => {
+for (const view of [
+  { url: '/?promo=1', title: /Nos promos/, empty: 'Aucune promotion en ce moment.', badge: /^Promo −\d+ %$/, all: /^Tout voir les promos \((\d+)\)$/ },
+  { url: '/?new=1', title: /Nouveautés/, empty: 'Aucune nouveauté en ce moment.', badge: /^Nouveau$/, all: /^Tout voir les nouveautés \((\d+)\)$/ },
+]) {
+  test(`${view.url}: full view, badges, way back, and the shelf « Tout voir » count`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(view.url);
+    await expect(page.getByRole('heading', { name: view.title }).first()).toBeVisible();
+    // Les anciens accès de l'en-tête n'existent plus ; un bouton ramène au catalogue complet.
+    await expect(page.getByRole('button', { name: /Tout le catalogue/ })).toBeVisible();
+    if (await page.getByText(view.empty).count()) {
+      await expect(page.getByRole('button', { name: 'Voir tout le catalogue' })).toBeVisible();
+      return;
+    }
+    const count = await page.locator('main').getByText(view.badge).count();
+    expect(count).toBeGreaterThan(0);
+    await page.goto('/');
+    const button = shelfButton(page, view.all);
+    await expect(button).toBeVisible();
+    expect(Number(view.all.exec((await button.getAttribute('aria-label')) ?? '')?.[1])).toBe(count);
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await button.click();
+    await expect(page).toHaveURL(new RegExp(view.url.replace('?', '\\?') + '$'));
+  });
+}
+
+test('catalogue: no header pills, sort renamed, and no product repeated below the shelves', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?new=1');
-  await expect(page.getByRole('heading', { name: /Nouveautés/ }).first()).toBeVisible();
-  // Le tri par date de création ne s'appelle plus « Nouveautés ».
   await page.goto('/');
   await expect(page.getByRole('option', { name: 'Derniers ajoutés' })).toHaveCount(1);
-  await page.goto('/?new=1');
-  if (await page.getByText('Aucune nouveauté en ce moment.').count()) {
-    await expect(page.getByRole('button', { name: 'Voir tout le catalogue' })).toBeVisible();
-    return;
-  }
-  const badges = page.locator('main').getByText(/^Nouveau$/);
-  const count = await badges.count();
-  expect(count).toBeGreaterThan(0);
-  const pill = page.getByRole('button', { name: /Nouveautés/ });
-  await expect(pill).toHaveAttribute('aria-pressed', 'true');
-  await expect(pill).toContainText(String(count));
+  await expect(page.getByRole('button', { name: /Nos promos|Nouveautés/ })).toHaveCount(0);
+  const hrefs = (selector: string) => page.locator(selector).evaluateAll((links) => links.map((link) => link.getAttribute('href')));
+  const shelves = await hrefs('main section[aria-labelledby$="-shelf-title"] li a[href^="/products/"]');
+  // Charge au moins une page suivante (scroll infini) avant de comparer.
+  for (let i = 0; i < 3; i++) { await page.mouse.wheel(0, 6000); await page.waitForTimeout(700); }
+  const grid = await hrefs('main > div > div.grid a[href^="/products/"]');
+  expect(grid.length).toBeGreaterThan(0);
+  expect(grid.filter((href) => shelves.includes(href))).toEqual([]);
+  expect(new Set(grid).size).toBe(grid.length);
 });
 
 test('desktop cart keeps its summary column and has no mobile bar', async ({ page }) => {

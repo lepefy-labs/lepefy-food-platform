@@ -6,8 +6,8 @@ import { ProductGrid, ProductCardSkeleton } from '@/components/catalog/ProductGr
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { CatalogCategoryRow } from '@/components/catalog/CatalogCategoryRow';
 import { semanticMatchToProductCardProduct } from '@/lib/catalog/productCardAdapters';
-import Link from 'next/link';
-import { buildCatalogUrl, CATALOG_PROMOS_HREF, type CatalogUrlOverrides } from '@/lib/catalog/catalogSearchUrl';
+import { buildCatalogUrl, CATALOG_NOVELTIES_HREF, CATALOG_PROMOS_HREF, type CatalogUrlOverrides } from '@/lib/catalog/catalogSearchUrl';
+import { CatalogShelf } from '@/components/catalog/CatalogShelf';
 import { rememberCatalogPosition, takeCatalogScrollRestore } from '@/lib/catalog/shoppingReturn';
 import { useCatalogSearchStore } from '@/stores/catalogSearchStore';
 import type { Category, ProductWithCategory, SemanticMatch } from '@lepefy/types';
@@ -35,8 +35,12 @@ interface Props {
   promoShelf?: ProductWithCategory[];
   /** `?new=1` : la grille montre toutes les nouveautés actives. */
   noveltyView?: boolean;
-  /** Nouveautés actives et achetables du tenant (0 = aucun accès affiché). */
+  /** Nouveautés actives et achetables du tenant. */
   noveltyCount?: number;
+  /** Bloc « Nouveautés » du catalogue non filtré (vide = masqué). */
+  noveltyShelf?: ProductWithCategory[];
+  /** Produits déjà montrés dans les blocs : exclus des pages suivantes aussi. */
+  excludeIds?: string[];
 }
 
 export function CatalogClient({
@@ -58,6 +62,8 @@ export function CatalogClient({
   promoShelf = [],
   noveltyView = false,
   noveltyCount = 0,
+  noveltyShelf = [],
+  excludeIds = [],
 }: Props) {
   const pathname      = usePathname();
   const router        = useRouter();
@@ -146,6 +152,7 @@ export function CatalogClient({
       params.set('day', rankingDay);
       if (sort !== 'recommended') params.set('sort', sort);
       if (quantityGroupId) params.set('quantityGroup', quantityGroupId);
+      if (excludeIds.length > 0) params.set('exclude', excludeIds.join(','));
       const trimmedQuery = initialQuery.trim();
       if (trimmedQuery) params.set('q', trimmedQuery);
       else if (activeSlug) params.set('category', activeSlug);
@@ -245,18 +252,6 @@ export function CatalogClient({
     });
   }
 
-  function togglePromoView() {
-    startTransition(() => {
-      router.push(buildUrl({ promo: !promoView }));
-    });
-  }
-
-  function toggleNoveltyView() {
-    startTransition(() => {
-      router.push(buildUrl({ novelty: !noveltyView }));
-    });
-  }
-
   function leaveSpecialView() {
     startTransition(() => {
       router.push(buildUrl(promoView ? { promo: false } : { novelty: false }));
@@ -276,8 +271,6 @@ export function CatalogClient({
     : promoView ? '🔥 Nos promos'
     : noveltyView ? '✨ Nouveautés'
     : quantityGroupName ? `Compléter : ${quantityGroupName}` : activeCategory?.name ?? 'Tous les produits';
-  const showPromoAccess = promoCount > 0 || promoView;
-  const showNoveltyAccess = noveltyCount > 0 || noveltyView;
   const specialView = promoView || noveltyView;
   const availableLabel = `${totalCount} produit${totalCount === 1 ? '' : 's'} disponible${totalCount === 1 ? '' : 's'}`;
 
@@ -286,38 +279,15 @@ export function CatalogClient({
       {/* La recherche est le champ global juste au-dessus (layout boutique). */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-4 md:pt-6">
         <h1 className="font-display text-2xl font-bold text-gray-900">Catalogue</h1>
-        {(showPromoAccess || showNoveltyAccess) && <div className="flex flex-wrap gap-2">
-        {showNoveltyAccess && (
+        {specialView && (
           <button
             type="button"
-            onClick={toggleNoveltyView}
-            aria-pressed={noveltyView}
-            className={`inline-flex min-h-11 items-center gap-2 rounded-full border-2 px-4 text-sm font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-700 focus-visible:ring-offset-2 motion-reduce:transition-none ${noveltyView ? 'border-violet-700 bg-violet-700 text-white' : 'border-violet-700 bg-violet-50 text-violet-800 hover:bg-violet-100'}`}
+            onClick={leaveSpecialView}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-gray-300 bg-white px-4 text-sm font-bold text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"
           >
-            <span aria-hidden="true">✨</span> Nouveautés
-            {noveltyCount > 0 && (
-              <span className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${noveltyView ? 'bg-white text-violet-800' : 'bg-violet-700 text-white'}`}>
-                <span className="sr-only">(</span>{noveltyCount}<span className="sr-only">)</span>
-              </span>
-            )}
+            <span aria-hidden="true">←</span> Tout le catalogue
           </button>
         )}
-        {showPromoAccess && (
-          <button
-            type="button"
-            onClick={togglePromoView}
-            aria-pressed={promoView}
-            className={`inline-flex min-h-11 items-center gap-2 rounded-full border-2 px-4 text-sm font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2 motion-reduce:transition-none ${promoView ? 'border-red-700 bg-red-700 text-white' : 'border-red-700 bg-red-50 text-red-800 hover:bg-red-100'}`}
-          >
-            <span aria-hidden="true">🔥</span> Nos promos
-            {promoCount > 0 && (
-              <span className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${promoView ? 'bg-white text-red-800' : 'bg-red-700 text-white'}`}>
-                <span className="sr-only">(</span>{promoCount}<span className="sr-only"> en cours)</span>
-              </span>
-            )}
-          </button>
-        )}
-        </div>}
       </div>
 
       {/* Visual category navigation — hidden during textual search. */}
@@ -325,23 +295,12 @@ export function CatalogClient({
         <CatalogCategoryRow categories={categories} previewImagesByCategory={previewImagesByCategory} activeSlug={activeSlug} onSelect={handleCategorySelect} />
       )}
 
-      {promoShelf.length > 0 && (
-        <section aria-labelledby="promo-shelf-title" className="mt-5">
-          <div className="mb-3 flex items-baseline justify-between gap-3">
-            <h2 id="promo-shelf-title" className="font-display text-xl font-bold text-gray-900"><span aria-hidden="true">🔥 </span>Nos promos</h2>
-            <Link href={CATALOG_PROMOS_HREF} className="inline-flex min-h-11 items-center text-sm font-bold underline-offset-2 hover:underline" style={{ color: 'var(--color-primary)' }}>
-              Tout voir ({promoCount})
-            </Link>
-          </div>
-          <ul className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 md:gap-4">
-            {promoShelf.map(product => (
-              <li key={product.id} className="w-[44vw] max-w-[220px] shrink-0 snap-start sm:w-[30vw]">
-                <ProductCard product={product} compactMobile />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* Catalogue non filtré : blocs Promos puis Nouveautés, chacun avec « Tout voir ».
+          Leurs produits sont exclus de « Tous les produits » (excludeIds). */}
+      <CatalogShelf id="promo-shelf" title="Nos promos" icon="🔥" tone="promo" href={CATALOG_PROMOS_HREF}
+        count={promoCount} allLabel="Tout voir les promos" products={promoShelf} />
+      <CatalogShelf id="novelty-shelf" title="Nouveautés" icon="✨" tone="novelty" href={CATALOG_NOVELTIES_HREF}
+        count={noveltyCount} allLabel="Tout voir les nouveautés" products={noveltyShelf} />
 
       {quantityGroupId && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 p-3 text-sm">

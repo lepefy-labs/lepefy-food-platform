@@ -16,7 +16,18 @@ export function parseCatalogPosition(raw: unknown): number {
   return value;
 }
 
-/** Merge before slicing so promoted products cannot cause gaps or duplicates. */
-export function prioritizedCatalogIds(rankedIds: string[], pinnedIds: string[], offset: number, limit: number): string[] {
-  return [...new Set([...pinnedIds, ...rankedIds])].slice(offset, offset + limit);
+/**
+ * Merge before slicing so promoted products cannot cause gaps or duplicates.
+ * `excludedIds` (products already shown in the catalogue shelves) are removed
+ * before slicing too: every page keeps its full size, no product is repeated.
+ */
+export function prioritizedCatalogIds(
+  rankedIds: string[],
+  pinnedIds: string[],
+  offset: number,
+  limit: number,
+  excludedIds: readonly string[] = [],
+): string[] {
+  const excluded = new Set(excludedIds);
+  return [...new Set([...pinnedIds, ...rankedIds])].filter((id) => !excluded.has(id)).slice(offset, offset + limit);
 }
