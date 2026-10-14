@@ -60,6 +60,20 @@ export const RENTAL_DELIVERY_FEE_STATUS_META: Record<string, AdminStatusMeta> = 
   paid: { label: 'Payé', tone: 'success' },
 };
 
+/** Catalogue : promotion d'un produit (lib/catalog/promotionSchedule.ts, migration 156). */
+export const PRODUCT_PROMOTION_META: Record<string, AdminStatusMeta> = {
+  none: { label: 'Sans promotion', tone: 'neutral' },
+  manual: { label: 'Promo sans date', tone: 'success' },
+  scheduled: { label: 'Promo programmée', tone: 'info' },
+  active: { label: 'En promo', tone: 'success' },
+};
+
+/** Catalogue : nouveauté d'un produit (lib/catalog/novelties.ts, migration 156). */
+export const PRODUCT_NOVELTY_META: Record<string, AdminStatusMeta> = {
+  active: { label: 'Nouveauté', tone: 'info' },
+  none: { label: 'Pas une nouveauté', tone: 'neutral' },
+};
+
 export function statusMeta(registry: Record<string, AdminStatusMeta>, status: string | null | undefined): AdminStatusMeta {
   if (!status) return { label: '—', tone: 'neutral' };
   return registry[status] ?? { label: status, tone: 'neutral' };

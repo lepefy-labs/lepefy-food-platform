@@ -8,7 +8,7 @@ export type ProductBody = Record<string, unknown>;
 /** Readable labels of the PATCH keys, for the "unsaved changes" bar. */
 export const PRODUCT_FIELD_LABELS: Record<string, string> = {
   name: 'Nom', name_alt: 'Traduction du nom', description: 'Description', descriptions: 'Descriptions',
-  description_source: 'Relecture IA', price: 'Prix', compare_at_price: 'Prix avant remise', position: 'Position',
+  description_source: 'Relecture IA', price: 'Prix', compare_at_price: 'Prix avant remise', pricing: 'Prix et promotion', new_until: 'Nouveauté', position: 'Position',
   weight_grams: 'Poids', stock: 'Stock', min_order_quantity: 'Quantité minimale', order_quantity_step: 'Incrément',
   active: 'Statut', featured: 'En vedette', storage_type: 'Stockage', category_id: 'Catégorie',
   warehouse_location: 'Emplacement', image_url: 'Image', images: 'Images', producer_id: 'Producteur',

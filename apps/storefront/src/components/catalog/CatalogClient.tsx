@@ -33,6 +33,10 @@ interface Props {
   promoCount?: number;
   /** Section « Nos promos » du catalogue non filtré (vide = masquée). */
   promoShelf?: ProductWithCategory[];
+  /** `?new=1` : la grille montre toutes les nouveautés actives. */
+  noveltyView?: boolean;
+  /** Nouveautés actives et achetables du tenant (0 = aucun accès affiché). */
+  noveltyCount?: number;
 }
 
 export function CatalogClient({
@@ -52,6 +56,8 @@ export function CatalogClient({
   promoView = false,
   promoCount = 0,
   promoShelf = [],
+  noveltyView = false,
+  noveltyCount = 0,
 }: Props) {
   const pathname      = usePathname();
   const router        = useRouter();
@@ -245,6 +251,18 @@ export function CatalogClient({
     });
   }
 
+  function toggleNoveltyView() {
+    startTransition(() => {
+      router.push(buildUrl({ novelty: !noveltyView }));
+    });
+  }
+
+  function leaveSpecialView() {
+    startTransition(() => {
+      router.push(buildUrl(promoView ? { promo: false } : { novelty: false }));
+    });
+  }
+
   function handleCategorySelect(slug: string | null) {
     startTransition(() => {
       router.push(buildUrl({ q: '', category: slug }));
@@ -256,8 +274,11 @@ export function CatalogClient({
   const productHeading = hasActiveSearch
     ? `Résultats pour “${initialQuery}”`
     : promoView ? '🔥 Nos promos'
+    : noveltyView ? '✨ Nouveautés'
     : quantityGroupName ? `Compléter : ${quantityGroupName}` : activeCategory?.name ?? 'Tous les produits';
   const showPromoAccess = promoCount > 0 || promoView;
+  const showNoveltyAccess = noveltyCount > 0 || noveltyView;
+  const specialView = promoView || noveltyView;
   const availableLabel = `${totalCount} produit${totalCount === 1 ? '' : 's'} disponible${totalCount === 1 ? '' : 's'}`;
 
   return (
@@ -265,6 +286,22 @@ export function CatalogClient({
       {/* La recherche est le champ global juste au-dessus (layout boutique). */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-4 md:pt-6">
         <h1 className="font-display text-2xl font-bold text-gray-900">Catalogue</h1>
+        {(showPromoAccess || showNoveltyAccess) && <div className="flex flex-wrap gap-2">
+        {showNoveltyAccess && (
+          <button
+            type="button"
+            onClick={toggleNoveltyView}
+            aria-pressed={noveltyView}
+            className={`inline-flex min-h-11 items-center gap-2 rounded-full border-2 px-4 text-sm font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-700 focus-visible:ring-offset-2 motion-reduce:transition-none ${noveltyView ? 'border-violet-700 bg-violet-700 text-white' : 'border-violet-700 bg-violet-50 text-violet-800 hover:bg-violet-100'}`}
+          >
+            <span aria-hidden="true">✨</span> Nouveautés
+            {noveltyCount > 0 && (
+              <span className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${noveltyView ? 'bg-white text-violet-800' : 'bg-violet-700 text-white'}`}>
+                <span className="sr-only">(</span>{noveltyCount}<span className="sr-only">)</span>
+              </span>
+            )}
+          </button>
+        )}
         {showPromoAccess && (
           <button
             type="button"
@@ -280,6 +317,7 @@ export function CatalogClient({
             )}
           </button>
         )}
+        </div>}
       </div>
 
       {/* Visual category navigation — hidden during textual search. */}
@@ -322,6 +360,9 @@ export function CatalogClient({
           {promoView && totalCount > 0 && (
             <p className="mt-1 text-sm text-gray-600">{totalCount} produit{totalCount === 1 ? '' : 's'} en promotion</p>
           )}
+          {noveltyView && totalCount > 0 && (
+            <p className="mt-1 text-sm text-gray-600">{totalCount} nouveauté{totalCount === 1 ? '' : 's'}</p>
+          )}
         </div>
         {hasActiveSearch && (
           <button
@@ -333,7 +374,7 @@ export function CatalogClient({
             Effacer la recherche
           </button>
         )}
-        {!promoView && <label className="ml-auto flex shrink-0 flex-col gap-1 text-xs font-medium text-gray-600 sm:flex-row sm:items-center sm:gap-2">
+        {!specialView && <label className="ml-auto flex shrink-0 flex-col gap-1 text-xs font-medium text-gray-600 sm:flex-row sm:items-center sm:gap-2">
           <span className="sr-only sm:not-sr-only">Trier par</span>
           <select
             value={sort}
@@ -343,18 +384,18 @@ export function CatalogClient({
           >
             <option value="recommended">Recommandés</option>
             <option value="bestsellers">Meilleures ventes</option>
-            <option value="newest">Nouveautés</option>
+            <option value="newest">Derniers ajoutés</option>
             <option value="price_asc">Prix croissant</option>
             <option value="price_desc">Prix décroissant</option>
           </select>
         </label>}
       </div>
 
-      {promoView && totalCount === 0 && !isPending && (
+      {specialView && totalCount === 0 && !isPending && (
         <div className="rounded-2xl border border-gray-200 bg-white px-4 py-8 text-center" role="status">
-          <p className="font-semibold text-gray-900">Aucune promotion en ce moment.</p>
+          <p className="font-semibold text-gray-900">{promoView ? 'Aucune promotion en ce moment.' : 'Aucune nouveauté en ce moment.'}</p>
           <p className="mt-1 text-sm text-gray-600">Revenez bientôt, ou parcourez tout le catalogue.</p>
-          <button type="button" onClick={togglePromoView}
+          <button type="button" onClick={leaveSpecialView}
             className="mt-4 inline-flex min-h-11 items-center rounded-xl px-5 text-sm font-bold text-white"
             style={{ backgroundColor: 'var(--color-primary)' }}>
             Voir tout le catalogue
@@ -363,7 +404,7 @@ export function CatalogClient({
       )}
 
       {/* Griglia */}
-      {!(promoView && totalCount === 0 && !isPending) && <ProductGrid products={items} loading={isPending} />}
+      {!(specialView && totalCount === 0 && !isPending) && <ProductGrid products={items} loading={isPending} />}
 
       {/* Scroll infini — pagination server-side déclenchée par le sentinel.
           Masqué pendant une transition de filtre (isPending) : la grille va

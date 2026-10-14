@@ -103,7 +103,7 @@ const AUDITED_WRITE_RPCS = new Set([
   'record_supplier_receipt', 'reverse_supplier_receipt', 'adjust_inventory', 'adjust_event_capacity',
   'delete_customer_account_data', 'select_shipping_tariff_shadow_version', 'activate_shipping_tariff_version',
   'rollback_shipping_tariff_to_provider_cost', 'retire_shipping_tariff_country', 'process_manual_purchase_points_atomic',
-  'record_audit_event',
+  'record_audit_event', 'apply_product_promotion_schedule',
 ]);
 
 /** Does this PostgREST request change data the triggers audit? */

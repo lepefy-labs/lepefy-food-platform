@@ -6,12 +6,13 @@ import { isFulfillmentPolicy } from '../fulfillment/fulfillmentPolicy';
 
 export type CatalogueStatus =
   | 'all' | 'active' | 'inactive' | 'out' | 'low' | 'ai'
-  | 'no_weight' | 'no_image' | 'no_category';
+  | 'no_weight' | 'no_image' | 'no_category'
+  | 'promo' | 'promo_scheduled' | 'novelty';
 
 /** Stock from 1 to LOW_STOCK_MAX is "low" (same threshold as the amber stock field). */
 export const LOW_STOCK_MAX = 9;
 
-export const CATALOGUE_STATUS_OPTIONS: ReadonlyArray<{ key: CatalogueStatus; label: string; group: 'state' | 'quality' }> = [
+export const CATALOGUE_STATUS_OPTIONS: ReadonlyArray<{ key: CatalogueStatus; label: string; group: 'state' | 'quality' | 'highlight' }> = [
   { key: 'all', label: 'Tous', group: 'state' },
   { key: 'active', label: 'Actifs', group: 'state' },
   { key: 'inactive', label: 'Inactifs', group: 'state' },
@@ -21,6 +22,10 @@ export const CATALOGUE_STATUS_OPTIONS: ReadonlyArray<{ key: CatalogueStatus; lab
   { key: 'no_weight', label: 'Sans poids', group: 'quality' },
   { key: 'no_image', label: 'Sans photo', group: 'quality' },
   { key: 'no_category', label: 'Sans catégorie', group: 'quality' },
+  // Mise en avant (migration 156) : promotions et nouveautés.
+  { key: 'promo', label: 'En promo', group: 'highlight' },
+  { key: 'promo_scheduled', label: 'Promo programmée', group: 'highlight' },
+  { key: 'novelty', label: 'Nouveautés', group: 'highlight' },
 ];
 
 const STATUS_KEYS = new Set<string>(CATALOGUE_STATUS_OPTIONS.map((option) => option.key));
@@ -67,7 +72,7 @@ export function catalogueQueryString(state: CatalogueListState): string {
 
 /** Applies one status filter to a products query (shared by the list and the counters). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function applyCatalogueStatus<Q extends Record<string, any>>(query: Q, status: CatalogueStatus): Q {
+export function applyCatalogueStatus<Q extends Record<string, any>>(query: Q, status: CatalogueStatus, now: Date = new Date()): Q {
   switch (status) {
     case 'active': return query.eq('active', true);
     case 'inactive': return query.eq('active', false);
@@ -77,6 +82,10 @@ export function applyCatalogueStatus<Q extends Record<string, any>>(query: Q, st
     case 'no_weight': return query.or('weight_grams.is.null,weight_grams.lte.0');
     case 'no_image': return query.is('image_url', null);
     case 'no_category': return query.is('category_id', null);
+    // Un prix barré présent = promotion en cours (manuelle ou programmée appliquée).
+    case 'promo': return query.not('compare_at_price', 'is', null);
+    case 'promo_scheduled': return query.not('promo_price', 'is', null).eq('promo_applied', false);
+    case 'novelty': return query.gt('new_until', now.toISOString());
     default: return query;
   }
 }

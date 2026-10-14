@@ -60,7 +60,7 @@ export default async function AdminCataloguePage({ searchParams }: { searchParam
   const chips: ActiveFilterChip[] = [
     ...(state.category ? [{ key: 'category', label: `Catégorie : ${categoryName ?? state.category}`, href: href({ category: '' }) }] : []),
     ...(state.reception ? [{ key: 'reception', label: `Réception : ${FULFILLMENT_POLICY_ADMIN_LABELS[state.reception]}`, href: href({ reception: '' }) }] : []),
-    ...(CATALOGUE_STATUS_OPTIONS.find((option) => option.key === state.status && option.group === 'quality')
+    ...(CATALOGUE_STATUS_OPTIONS.find((option) => option.key === state.status && option.group !== 'state')
       ? [{ key: 'status', label: CATALOGUE_STATUS_OPTIONS.find((option) => option.key === state.status)!.label, href: href({ status: 'all' }) }]
       : []),
   ];
@@ -87,6 +87,20 @@ export default async function AdminCataloguePage({ searchParams }: { searchParam
             <Link key={option.key} href={href({ status: active ? 'all' : option.key })} aria-current={active ? 'true' : undefined}
               className={cn('inline-flex min-h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium hover:underline',
                 count ? TONE_BADGE_CLASS.warning : 'border-a-border bg-a-surface text-a-text-3', active && 'ring-1 ring-a-brand')}>
+              {option.label}{count !== null && <b className="font-semibold tabular-nums">{formatNumber(count)}</b>}
+            </Link>
+          );
+        })}
+      </div>
+      <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs text-a-text-3">
+        <span className="mr-0.5">Mise en avant</span>
+        {CATALOGUE_STATUS_OPTIONS.filter((option) => option.group === 'highlight').map((option) => {
+          const count = counts[option.key] ?? null;
+          const active = state.status === option.key;
+          return (
+            <Link key={option.key} href={href({ status: active ? 'all' : option.key })} aria-current={active ? 'true' : undefined}
+              className={cn('inline-flex min-h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium hover:underline',
+                count ? TONE_BADGE_CLASS.info : 'border-a-border bg-a-surface text-a-text-3', active && 'ring-1 ring-a-brand')}>
               {option.label}{count !== null && <b className="font-semibold tabular-nums">{formatNumber(count)}</b>}
             </Link>
           );

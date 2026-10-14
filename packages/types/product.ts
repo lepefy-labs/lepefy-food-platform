@@ -63,6 +63,16 @@ export interface Product {
   pack_count: number | null;
   // Mode de réception (migration 155). Défaut `delivery_or_pickup`.
   fulfillment_policy: ProductFulfillmentPolicy;
+  // Promotion programmée (migration 156, lib/catalog/promotionSchedule.ts).
+  // Pendant la fenêtre : price = promo_price, compare_at_price = prix normal,
+  // promo_applied = true. `price` reste toujours le prix payé.
+  promo_price: number | null;
+  promo_starts_at: string | null;
+  promo_ends_at: string | null;
+  promo_until_sold_out: boolean;
+  promo_applied: boolean;
+  // Nouveauté jusqu'à cette date (migration 156, lib/catalog/novelties.ts).
+  new_until: string | null;
   created_at: string;
   updated_at: string;
 }

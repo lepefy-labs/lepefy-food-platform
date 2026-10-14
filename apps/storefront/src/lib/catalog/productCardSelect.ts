@@ -13,9 +13,12 @@
 /** Colonnes du format de vente affiché au client (lib/storefrontCopy/sellingFormat.ts, migration 154). */
 export const PRODUCT_SELLING_FORMAT_COLUMNS = 'net_quantity_display, sale_unit, net_content_value, net_content_unit, pack_count';
 
+/** Fin de promotion programmée et nouveauté affichées sur les cards (migration 156). */
+export const PRODUCT_HIGHLIGHT_COLUMNS = 'promo_applied, promo_ends_at, promo_until_sold_out, new_until';
+
 /** Colonnes scalaires communes, sans la relation `category` (jointure dont la
  *  forme — `left join` ou `!inner` — varie selon l'appelant, cf. gadgets). */
 export const PRODUCT_CARD_BASE_COLUMNS =
-  `id, name, slug, price, compare_at_price, image_url, weight_grams, stock, storage_type, min_order_quantity, order_quantity_step, fulfillment_policy, ${PRODUCT_SELLING_FORMAT_COLUMNS}`;
+  `id, name, slug, price, compare_at_price, image_url, weight_grams, stock, storage_type, min_order_quantity, order_quantity_step, fulfillment_policy, ${PRODUCT_SELLING_FORMAT_COLUMNS}, ${PRODUCT_HIGHLIGHT_COLUMNS}`;
 
 export const PRODUCT_CARD_SELECT = `${PRODUCT_CARD_BASE_COLUMNS}, category:categories(name)`;

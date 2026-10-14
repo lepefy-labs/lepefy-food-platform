@@ -8,6 +8,8 @@ import { syncProductEmbedding } from '@/lib/ai/embeddings';
 import { normalizeProductImages } from '@/lib/catalog/productImages';
 
 import { parseCompareAtPrice, parseCatalogPosition } from '@/lib/catalog/productMerchandising';
+import { parsePricingBody, PRICING_ROW_COLUMNS, promotionState, resolvePricingColumns, type PricingRow } from '@/lib/catalog/promotionSchedule';
+import { parseNoveltyUntil } from '@/lib/catalog/novelties';
 import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const runtime = 'nodejs';
@@ -45,10 +47,30 @@ async function handlePATCH(
   const updatePayload: Record<string, unknown> = {};
 
   try {
-    if ('compare_at_price' in body || 'price' in body) {
+    if ('pricing' in body) {
+      // Prix normal + promotion (programmée ou non), migration 156 : les colonnes
+      // sont calculées pour maintenant, le tick n8n fait ensuite les transitions.
+      const pricing = parsePricingBody(body.pricing);
+      if (!pricing) return NextResponse.json({ error: 'Tarification invalide.' }, { status: 400 });
       const { data: current, error } = await supabase.from('products')
-        .select('price, compare_at_price').eq('tenant_id', tenant.id).eq('id', params.id).single();
+        .select(PRICING_ROW_COLUMNS).eq('tenant_id', tenant.id).eq('id', params.id).single();
       if (error || !current) return NextResponse.json({ error: 'Produit introuvable.' }, { status: 404 });
+      const row = current as unknown as PricingRow & { stock: number; min_order_quantity: number };
+      const resolved = resolvePricingColumns(pricing, {
+        stock: 'stock' in body ? parseInt(String(body.stock ?? 0), 10) || 0 : Number(row.stock),
+        minimum: 'min_order_quantity' in body ? Number(body.min_order_quantity) : Number(row.min_order_quantity),
+      });
+      if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 });
+      Object.assign(updatePayload, resolved.columns);
+    } else if ('compare_at_price' in body || 'price' in body) {
+      const { data: current, error } = await supabase.from('products')
+        .select(PRICING_ROW_COLUMNS).eq('tenant_id', tenant.id).eq('id', params.id).single();
+      if (error || !current) return NextResponse.json({ error: 'Produit introuvable.' }, { status: 404 });
+      // Une promotion programmée ne se modifie que par `pricing` (prix et dates ensemble).
+      const state = promotionState(current as unknown as PricingRow);
+      if (state === 'active' || state === 'scheduled') {
+        return NextResponse.json({ error: 'Ce produit a une promotion programmée : modifiez le prix depuis la section Promotion.' }, { status: 409 });
+      }
       const price = 'price' in body ? parseFloat(String(body.price)) || 0 : Number(current.price);
       updatePayload.compare_at_price = parseCompareAtPrice(
         'compare_at_price' in body ? body.compare_at_price : current.compare_at_price, price);
@@ -68,6 +90,13 @@ async function handlePATCH(
   if (!sellingFormat.ok) return NextResponse.json({ error: sellingFormat.error }, { status: 400 });
   Object.assign(updatePayload, sellingFormat.values);
 
+  // Nouveauté jusqu'à une date future (migration 156) ; null la retire.
+  if ('new_until' in body) {
+    const novelty = parseNoveltyUntil(body.new_until);
+    if (!novelty.ok) return NextResponse.json({ error: novelty.error }, { status: 400 });
+    updatePayload.new_until = novelty.value;
+  }
+
   // Mode de réception (migration 155) : valeur connue uniquement, jamais déduite.
   if ('fulfillment_policy' in body) {
     if (!isFulfillmentPolicy(body.fulfillment_policy)) return NextResponse.json({ error: FULFILLMENT_POLICY_INVALID }, { status: 400 });
@@ -84,7 +113,7 @@ async function handlePATCH(
     if (firstLocale) updatePayload.description = descriptions[firstLocale]?.trim() || null;
   }
   if ('description_source' in body) updatePayload.description_source = body.description_source === 'ai' || body.description_source === 'human' ? body.description_source : null;
-  if ('price'              in body) updatePayload.price              = parseFloat(String(body.price)) || 0;
+  if ('price' in body && !('pricing' in body)) updatePayload.price = parseFloat(String(body.price)) || 0;
   if ('weight_grams'       in body) updatePayload.weight_grams       = body.weight_grams ? parseInt(String(body.weight_grams), 10) : null;
   if ('stock'              in body) updatePayload.stock              = parseInt(String(body.stock ?? 0), 10) || 0;
   if ('min_order_quantity' in body) updatePayload.min_order_quantity = Number(body.min_order_quantity);

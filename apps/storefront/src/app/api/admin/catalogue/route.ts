@@ -8,6 +8,8 @@ import { syncProductEmbedding } from '@/lib/ai/embeddings';
 import { assignBarcodeToProduct } from '@/lib/barcode';
 
 import { parseCompareAtPrice, parseCatalogPosition } from '@/lib/catalog/productMerchandising';
+import { parsePricingBody, resolvePricingColumns, type PricingColumns } from '@/lib/catalog/promotionSchedule';
+import { parseNoveltyUntil } from '@/lib/catalog/novelties';
 import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 import { parseCatalogueState } from '@/lib/catalog/catalogueFilters';
 import { loadCatalogueList } from '@/lib/catalog/catalogueList';
@@ -58,12 +60,29 @@ async function handlePOST(req: NextRequest) {
 
   let compareAtPrice: number | null;
   let position: number;
+  // Prix normal + promotion éventuelle (migration 156) ; sinon l'ancien couple prix / prix barré.
+  let pricingColumns: PricingColumns | null = null;
   try {
-    compareAtPrice = parseCompareAtPrice(body.compare_at_price, parseFloat(body.price) || 0);
+    if ('pricing' in body) {
+      const pricing = parsePricingBody(body.pricing);
+      if (!pricing) return NextResponse.json({ error: 'Tarification invalide.' }, { status: 400 });
+      const resolved = resolvePricingColumns(pricing, {
+        stock: parseInt(body.stock, 10) || 0,
+        minimum: Number(body.min_order_quantity ?? 1),
+      });
+      if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 });
+      pricingColumns = resolved.columns;
+      compareAtPrice = resolved.columns.compare_at_price;
+    } else {
+      compareAtPrice = parseCompareAtPrice(body.compare_at_price, parseFloat(body.price) || 0);
+    }
     position = parseCatalogPosition(body.position);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Tarification invalide.' }, { status: 400 });
   }
+
+  const novelty = parseNoveltyUntil(body.new_until);
+  if (!novelty.ok) return NextResponse.json({ error: novelty.error }, { status: 400 });
 
   if (![Number(body.min_order_quantity ?? 1), Number(body.order_quantity_step ?? 1)]
     .every((value) => Number.isInteger(value) && value >= 1)) {
@@ -112,6 +131,8 @@ async function handlePOST(req: NextRequest) {
       warehouse_location: body.warehouse_location || null,
       position,
       compare_at_price: compareAtPrice,
+      ...(pricingColumns ?? {}),
+      new_until: novelty.value,
       producer_id: body.producer_id || null,
       importer_id: body.importer_id || null,
       ingredients_text: body.ingredients_text ? String(body.ingredients_text).trim() : null,

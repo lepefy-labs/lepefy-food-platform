@@ -29,5 +29,10 @@ export function semanticMatchToProductCardProduct(match: SemanticMatch): Product
     net_content_unit: match.net_content_unit ?? null,
     pack_count: match.pack_count ?? null,
     fulfillment_policy: normalizeFulfillmentPolicy(match.fulfillment_policy),
+    // match_products ne renvoie promo_ends_at que pour une promotion en cours.
+    promo_applied: match.promo_ends_at != null || Boolean(match.promo_until_sold_out),
+    promo_ends_at: match.promo_ends_at ?? null,
+    promo_until_sold_out: Boolean(match.promo_until_sold_out),
+    new_until: match.new_until ?? null,
   };
 }

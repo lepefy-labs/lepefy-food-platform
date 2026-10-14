@@ -27,6 +27,9 @@ import { CONTENT_UNITS, describePrice, resolveSellingFormat } from '@/lib/storef
 import { FULFILLMENT_POLICIES, normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { FULFILLMENT_POLICY_ADMIN_LABELS } from '@/lib/storefrontCopy/fulfillmentCopy';
 import { controlClasses, labelClasses } from '@/app/admin/_components/ui/Form';
+import ProductHighlightsSection, { type HighlightsValue } from './ProductHighlightsSection';
+import { pricingInputFromRow, promotionState } from '@/lib/catalog/promotionSchedule';
+import { isoToShopLocal, shopLocalToIso } from '@/lib/time/shopTime';
 
 /** Une ligne d'aide sous le choix : ce que vivra le client. */
 const FULFILLMENT_POLICY_HELP: Record<ProductFulfillmentPolicy, string> = {
@@ -46,6 +49,13 @@ interface ProductEditProps {
     description_source: 'ai' | 'human' | null;
     price: number;
     compare_at_price: number | null;
+    // Promotion programmée et nouveauté (migration 156).
+    promo_price: number | null;
+    promo_starts_at: string | null;
+    promo_ends_at: string | null;
+    promo_until_sold_out: boolean;
+    promo_applied: boolean;
+    new_until: string | null;
     position: number;
     weight_grams: number | null;
     stock: number;
@@ -107,8 +117,15 @@ interface FormState {
   description: string;
   descriptions: Record<string, string>;
   descriptionSource: 'ai' | 'human' | null;
+  /** Prix normal (hors promotion). */
   price: string;
-  compare_at_price: string;
+  promo_enabled: boolean;
+  promo_price: string;
+  promo_starts_at: string;
+  promo_ends_at: string;
+  promo_until_sold_out: boolean;
+  new_enabled: boolean;
+  new_until: string;
   position: string;
   weight_grams: string;
   stock: string;
@@ -179,8 +196,17 @@ function buildBody(formData: FormState): ProductBody {
     description:        formData.description,
     descriptions:       formData.descriptions,
     description_source: formData.descriptionSource,
-    price:              formData.price,
-    compare_at_price:   formData.compare_at_price,
+    // Prix normal + promotion : un seul objet, calculé côté serveur (promotionSchedule.ts).
+    pricing: {
+      regular_price: formData.price,
+      promo: formData.promo_enabled ? {
+        price: formData.promo_price,
+        starts_at: shopLocalToIso(formData.promo_starts_at),
+        ends_at: shopLocalToIso(formData.promo_ends_at),
+        until_sold_out: formData.promo_until_sold_out,
+      } : null,
+    },
+    new_until:          formData.new_enabled ? shopLocalToIso(formData.new_until) : null,
     position:           formData.position,
     weight_grams:       formData.weight_grams,
     stock:              formData.stock,
@@ -221,6 +247,21 @@ function buildBody(formData: FormState): ProductBody {
   };
 }
 
+/** Prix normal + promotion éventuelle (promo sans date incluse) pour le formulaire. */
+function pricingFormState(product: ProductEditProps['product']) {
+  const pricing = pricingInputFromRow(product);
+  return {
+    price:                Number(pricing.regular_price).toFixed(2),
+    promo_enabled:        pricing.promo != null,
+    promo_price:          pricing.promo ? Number(pricing.promo.price).toFixed(2) : '',
+    promo_starts_at:      isoToShopLocal(pricing.promo?.starts_at),
+    promo_ends_at:        isoToShopLocal(pricing.promo?.ends_at),
+    promo_until_sold_out: Boolean(pricing.promo?.until_sold_out),
+    new_enabled:          Boolean(product.new_until),
+    new_until:            isoToShopLocal(product.new_until),
+  };
+}
+
 function initFormState(product: ProductEditProps['product'], tenantLocales: string[]): FormState {
   const descriptions = { ...(product.descriptions ?? {}) };
   if (Object.keys(descriptions).length === 0 && product.description && tenantLocales[0]) {
@@ -233,8 +274,7 @@ function initFormState(product: ProductEditProps['product'], tenantLocales: stri
     description:                 product.description ?? '',
     descriptions,
     descriptionSource:           product.description_source ?? null,
-    price:                       product.price.toFixed(2),
-    compare_at_price:            product.compare_at_price?.toFixed(2) ?? '',
+    ...pricingFormState(product),
     position:                    String(product.position ?? 9999),
     weight_grams:                product.weight_grams != null ? String(product.weight_grams) : '',
     stock:                       String(product.stock),
@@ -686,11 +726,6 @@ export default function ProductEditClient({
               <h2 className={SECTION_TITLE_CLS}>Tarification &amp; Logistique</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label htmlFor="compare-at-price" className={LABEL_CLS}>Prix avant remise (€)</label>
-                  <input id="compare-at-price" type="number" step="0.01" min="0" value={formData.compare_at_price} onChange={(e) => setField('compare_at_price', e.target.value)} className={INPUT_CLS} />
-                  <p className="text-xs text-a-text-3 mt-1">Laisser vide sans remise. Doit dépasser le prix de vente.</p>
-                </div>
-                <div>
                   <label htmlFor="catalog-position" className={LABEL_CLS}>Position catalogue</label>
                   <input id="catalog-position" type="number" step="1" value={formData.position} onChange={(e) => setField('position', e.target.value)} className={INPUT_CLS} />
                   <p className="text-xs text-a-text-3 mt-1">Une position négative donne priorité au classement recommandé, si le produit est en stock.</p>
@@ -698,7 +733,7 @@ export default function ProductEditClient({
               </div>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label htmlFor="product-price" className={LABEL_CLS}>Prix (€)</label>
+                  <label htmlFor="product-price" className={LABEL_CLS}>Prix normal (€)</label>
                   <input
                     id="product-price"
                     type="number"
@@ -706,8 +741,10 @@ export default function ProductEditClient({
                     min="0"
                     value={formData.price}
                     onChange={(e) => setField('price', e.target.value)}
+                    aria-describedby="product-price-hint"
                     className={INPUT_CLS}
                   />
+                  <p id="product-price-hint" className="text-xs text-a-text-3 mt-1">Prix hors promotion. Une promotion se règle dans la section Promotion.</p>
                 </div>
                 <div>
                   <label htmlFor="product-weight" className={LABEL_CLS}>Poids (grammes)</label>
@@ -739,6 +776,17 @@ export default function ProductEditClient({
                 />
               </div>
             </section>
+
+            <ProductHighlightsSection
+              value={formData}
+              onChange={(patch: Partial<HighlightsValue>) => setFormData((prev) => ({ ...prev, ...patch }))}
+              savedPromotionState={promotionState(product)}
+              savedNewUntil={product.new_until}
+              stock={Number(formData.stock) || 0}
+              minimum={Math.max(1, parseInt(formData.min_order_quantity, 10) || 1)}
+              currency={tenantCurrency}
+              disabled={!canManage}
+            />
 
             {!isNew && (
               <section className="bg-a-surface rounded-xl border border-a-border p-5">

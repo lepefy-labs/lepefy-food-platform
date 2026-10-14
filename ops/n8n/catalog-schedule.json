@@ -1,0 +1,125 @@
+{
+  "name": "Lepefy · Catalogue schedule (promotions & nouveautés, multi-tenant)",
+  "nodes": [
+    {
+      "id": "4f2a9c1e-7b3d-4e8a-9c5f-1a2b3c4d5e61",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        180,
+        240
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8d1e2f3a-4b5c-4d6e-8f7a-9b0c1d2e3f42",
+      "name": "Manual test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        440
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c63",
+      "name": "Apply promotion schedule",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://shop.chloefood.com/api/internal/catalog-schedule",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 25000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 15000
+    },
+    {
+      "id": "6b7c8d9e-0f1a-4b2c-8d3e-4f5a6b7c8d94",
+      "name": "Check schedule outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        770,
+        320
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const result = $input.first()?.json ?? {};\nconst counts = ['started', 'ended', 'expired', 'noveltiesEnded'].map((key) => Number(result[key] ?? 0));\nif (result.ok !== true || counts.some((value) => !Number.isSafeInteger(value) || value < 0)) {\n  // Throw without echoing upstream responses, HTTP headers, or credentials.\n  throw new Error(\"catalog_schedule_tick_failed\");\n}\nconst [started, ended, expired, noveltiesEnded] = counts;\nreturn [{ json: { ok: true, started, ended, expired, noveltiesEnded } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Apply promotion schedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual test": {
+      "main": [
+        [
+          {
+            "node": "Apply promotion schedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply promotion schedule": {
+      "main": [
+        [
+          {
+            "node": "Check schedule outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Paris"
+  },
+  "active": false,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

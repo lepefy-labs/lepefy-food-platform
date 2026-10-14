@@ -85,5 +85,9 @@ export interface SemanticMatch {
   pack_count?: number | null;
   // Mode de réception (migration 155) ; absent tant que la 155 n'est pas appliquée.
   fulfillment_policy?: ProductFulfillmentPolicy | null;
+  // Migration 156 : fin de promotion programmée en cours et nouveauté.
+  promo_ends_at?: string | null;
+  promo_until_sold_out?: boolean | null;
+  new_until?: string | null;
   similarity: number;
 }

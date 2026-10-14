@@ -10,6 +10,8 @@ import { CategoryBlock } from '@/components/home/CategoryBlock';
 import { CategoryBlocksRow } from '@/components/home/CategoryBlocksRow';
 import { CategoryBlocksGrid } from '@/components/home/CategoryBlocksGrid';
 import { SuggestionsRow, type SuggestionProduct } from '@/components/home/SuggestionsRow';
+import { getActiveNovelties, NOVELTIES_ROW_LIMIT } from '@/lib/catalog/novelties';
+import { getShopCategories } from '@/lib/catalog/catalogCache';
 import { formatDate, formatPrice } from '@/lib/utils/format';
 import type { EventRow, ProductFulfillmentPolicy, ServiceOffering } from '@lepefy/types';
 
@@ -211,6 +213,13 @@ export default async function HomePage() {
   const categoryProducts: Record<string, HomeProduct[]> = Object.fromEntries(categoryProductsEntries);
   const categoryCounts: Record<string, number> = Object.fromEntries(categoryCountsEntries);
   const recentProducts: SuggestionProduct[] = (recentRaw as unknown as SuggestionProduct[] | null) ?? [];
+  // Nouveautés choisies par le commerçant (migration 156) : elles remplacent la
+  // « Sélection du moment » (derniers ajoutés) tant qu'il y en a.
+  const shopCategories = await getShopCategories(tenant.id).catch(() => []);
+  const noveltyProducts: SuggestionProduct[] = (await getActiveNovelties<SuggestionProduct>(
+    supabase, tenant.id, shopCategories.map((category) => category.id),
+  ).catch(() => [] as SuggestionProduct[])).slice(0, NOVELTIES_ROW_LIMIT);
+  const hasNovelties = noveltyProducts.length > 0;
 
   // Catégories réellement rendables (au moins 1 produit) — calculé une seule
   // fois ici pour piloter à la fois le rendu JSX et la durée de l'autoscroll
@@ -356,15 +365,17 @@ export default async function HomePage() {
     });
   }
 
-  const recentHeroProducts = heroProducts(recentProducts, tenant.currency);
+  const recentHeroProducts = heroProducts(hasNovelties ? noveltyProducts : recentProducts, tenant.currency);
   if (recentHeroProducts.length > 0) {
     dynamicSlides.push({
       id: 'new-arrivals-live',
       badge_text: 'Nouveautés',
       title: 'Tout juste arrivés en boutique.',
-      subtitle: `Découvrez les derniers produits ajoutés au catalogue ${tenant.name}.`,
+      subtitle: hasNovelties
+        ? `Les nouveautés choisies par ${tenant.name}.`
+        : `Découvrez les derniers produits ajoutés au catalogue ${tenant.name}.`,
       cta_primary_label: 'Voir les nouveautés',
-      cta_primary_url: '/accueil#nouveautes',
+      cta_primary_url: hasNovelties ? '/?new=1' : '/accueil#nouveautes',
       cta_secondary_label: null,
       cta_secondary_url: null,
       image_url: null,
@@ -474,7 +485,7 @@ export default async function HomePage() {
 
       {/* ── SUGGESTIONS POUR VOUS ── */}
       <SuggestionsRow id="offres" label="Offre pour vous" products={offerProducts} currency={tenant.currency} />
-      <SuggestionsRow id="nouveautes" label="Sélection du moment" products={recentProducts} currency={tenant.currency} />
+      <SuggestionsRow id="nouveautes" label={hasNovelties ? 'Nouveautés' : 'Sélection du moment'} products={hasNovelties ? noveltyProducts : recentProducts} currency={tenant.currency} />
 
       {/* ── NOTRE ORIGINE ── */}
       <StorySection

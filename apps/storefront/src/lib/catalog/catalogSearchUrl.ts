@@ -8,6 +8,8 @@ export interface CatalogUrlOverrides {
   sort?: CatalogSort;
   /** `true` ouvre « Nos promos » (sans recherche, catégorie ni groupe) ; `false` la ferme. */
   promo?: boolean;
+  /** `true` ouvre « Nouveautés » (même règle que les promos) ; `false` la ferme. */
+  novelty?: boolean;
 }
 
 /**
@@ -20,7 +22,7 @@ export function buildCatalogUrl(pathname: string, current: string | URLSearchPar
   const params = new URLSearchParams(current);
   if (overrides.q !== undefined) {
     const q = overrides.q.trim();
-    if (q) { params.set('q', q); params.delete('promo'); }
+    if (q) { params.set('q', q); params.delete('promo'); params.delete('new'); }
     else params.delete('q');
   }
   if (overrides.category !== undefined) {
@@ -28,12 +30,19 @@ export function buildCatalogUrl(pathname: string, current: string | URLSearchPar
     else params.delete('category');
     params.delete('quantityGroup');
     params.delete('promo');
+    params.delete('new');
   }
   if (overrides.promo === true) {
     params.set('promo', '1');
-    for (const key of ['q', 'category', 'quantityGroup']) params.delete(key);
+    for (const key of ['q', 'category', 'quantityGroup', 'new']) params.delete(key);
   } else if (overrides.promo === false) {
     params.delete('promo');
+  }
+  if (overrides.novelty === true) {
+    params.set('new', '1');
+    for (const key of ['q', 'category', 'quantityGroup', 'promo']) params.delete(key);
+  } else if (overrides.novelty === false) {
+    params.delete('new');
   }
   if (overrides.sort !== undefined) {
     if (overrides.sort === 'recommended') params.delete('sort');
@@ -48,7 +57,10 @@ export function buildCatalogUrl(pathname: string, current: string | URLSearchPar
 /** Accès « Nos promos » depuis n'importe quelle page (catalogue filtré sur les promotions). */
 export const CATALOG_PROMOS_HREF = '/?promo=1';
 
-/** `?promo=1` est la seule valeur reconnue. */
+/** Accès « Nouveautés » depuis n'importe quelle page. */
+export const CATALOG_NOVELTIES_HREF = '/?new=1';
+
+/** `?promo=1` / `?new=1` : seule la valeur 1 est reconnue. */
 export function isPromoFilter(value: string | null | undefined): boolean {
   return value === '1';
 }

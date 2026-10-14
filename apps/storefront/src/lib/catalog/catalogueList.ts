@@ -28,6 +28,12 @@ export interface CatalogueListProduct {
   warehouse_location: string | null;
   description_source: 'ai' | 'human' | null;
   barcode_value: string | null;
+  // Mise en avant (migration 156).
+  compare_at_price: number | null;
+  promo_price: number | null;
+  promo_applied: boolean;
+  promo_ends_at: string | null;
+  new_until: string | null;
   categories: { name: string; slug: string } | null;
 }
 
@@ -65,6 +71,7 @@ export async function loadCatalogueList(
     .select(`
       id, name, slug, price, stock, active, weight_grams, category_id,
       image_url, storage_type, fulfillment_policy, warehouse_location, description_source,
+      compare_at_price, promo_price, promo_applied, promo_ends_at, new_until,
       barcode_value, categories(name, slug)
     `, { count: 'exact' })
     .eq('tenant_id', tenantId);

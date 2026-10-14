@@ -7,6 +7,7 @@ import { catalogRankingDay, getCatalogPage, parseCatalogSort, parsePageParam, PR
 import { getActiveQuantityGroupFilter } from '@/lib/catalog/quantityGroupFilter';
 import { getCategoryPreviewRows, getShopCategories } from '@/lib/catalog/catalogCache';
 import { getActivePromotions, PROMOTIONS_SHELF_LIMIT } from '@/lib/catalog/promotions';
+import { getActiveNovelties } from '@/lib/catalog/novelties';
 import { isPromoFilter } from '@/lib/catalog/catalogSearchUrl';
 import type { ProductWithCategory } from '@lepefy/types';
 
@@ -24,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 interface ProductsPageProps {
-  searchParams: { category?: string; q?: string; page?: string; sort?: string; day?: string; quantityGroup?: string; promo?: string };
+  searchParams: { category?: string; q?: string; page?: string; sort?: string; day?: string; quantityGroup?: string; promo?: string; new?: string };
 }
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
@@ -57,12 +58,18 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   // « Nos promos » : promotions actives de ce tenant (prix barré > prix,
   // achetables), lues fraîches à chaque rendu comme les autres lignes produit.
   const promoView = isPromoFilter(searchParams.promo) && !searchQuery && !quantityGroupId;
-  const promotionsPromise = getActivePromotions<ProductWithCategory>(supabase, tenant.id, categories.map(category => category.id))
+  // « Nouveautés » : produits choisis par le commerçant, jusqu'à leur date (migration 156).
+  const noveltyView = !promoView && isPromoFilter(searchParams.new) && !searchQuery && !quantityGroupId;
+  const shopCategoryIds = categories.map(category => category.id);
+  const promotionsPromise = getActivePromotions<ProductWithCategory>(supabase, tenant.id, shopCategoryIds)
     .catch(() => [] as ProductWithCategory[]);
-  const [previewRows, promotions, { data: productsRaw, count }] = await Promise.all([
+  const noveltiesPromise = getActiveNovelties<ProductWithCategory>(supabase, tenant.id, shopCategoryIds)
+    .catch(() => [] as ProductWithCategory[]);
+  const [previewRows, promotions, novelties, { data: productsRaw, count }] = await Promise.all([
     previewRowsPromise,
     promotionsPromise,
-    promoView
+    noveltiesPromise,
+    promoView || noveltyView
       ? Promise.resolve({ data: null, count: null })
       : getCatalogPage(supabase, tenant.id, categories, {
         q: searchQuery,
@@ -86,10 +93,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   // triées par remise) : pas de page suivante.
   const products: ProductWithCategory[] = promoView
     ? promotions
-    : (productsRaw as unknown as ProductWithCategory[] | null) ?? [];
-  const totalCount = promoView ? promotions.length : count ?? products.length;
-  const hasNextPage = !promoView && page * PRODUCTS_PAGE_SIZE < totalCount;
-  const showPromoShelf = !promoView && !searchQuery && !searchParams.category && !quantityGroupId;
+    : noveltyView
+      ? novelties
+      : (productsRaw as unknown as ProductWithCategory[] | null) ?? [];
+  const totalCount = promoView || noveltyView ? products.length : count ?? products.length;
+  const hasNextPage = !promoView && !noveltyView && page * PRODUCTS_PAGE_SIZE < totalCount;
+  const showPromoShelf = !promoView && !noveltyView && !searchQuery && !searchParams.category && !quantityGroupId;
 
   return (
     <CatalogClient
@@ -107,6 +116,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       sort={sort}
       rankingDay={rankingDay}
       promoView={promoView}
+      noveltyView={noveltyView}
+      noveltyCount={novelties.length}
       promoCount={promotions.length}
       promoShelf={showPromoShelf ? promotions.slice(0, PROMOTIONS_SHELF_LIMIT) : []}
     />

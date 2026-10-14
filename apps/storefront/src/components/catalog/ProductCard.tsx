@@ -22,6 +22,9 @@ import { hasValidPromotion } from '@/lib/catalog/promotions';
 import { useCartLineQuantity } from '@/lib/cart/useCartLineQuantity';
 import { CartStepper } from '@/components/cart/CartStepper';
 import { PromoBadge } from './PromoBadge';
+import { NoveltyBadge } from './NoveltyBadge';
+import { promotionEndLabel } from '@/lib/catalog/promotions';
+import { hasNoveltyBadge } from '@/lib/catalog/novelties';
 
 /**
  * Forme minimale requise par la card — satisfaite à la fois par
@@ -55,6 +58,12 @@ export interface ProductCardProduct extends SellingFormatSource {
    * Une source sans la colonne passe `'delivery_or_pickup'`.
    */
   fulfillment_policy: ProductFulfillmentPolicy;
+  /** Promotion programmée en cours et sa fin (migration 156) ; absent = aucune fin annoncée. */
+  promo_applied?: boolean | null;
+  promo_ends_at?: string | null;
+  promo_until_sold_out?: boolean | null;
+  /** Nouveauté jusqu'à cette date (migration 156). */
+  new_until?: string | null;
 }
 
 interface ProductCardProps {
@@ -104,6 +113,10 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   const gridStorageLabel = getGridStorageLabel(product);
   const compactGrid = variant === 'grid' && compactMobile;
   const hasDiscount = hasValidPromotion(product);
+  // Fin annoncée d'une promotion programmée (« Jusqu'au ven. 31 oct. », « … ou épuisement des stocks »).
+  const promoEnd = promotionEndLabel(product);
+  // Goodies : pas de nouveautés boutique (même règle que les promotions du catalogue).
+  const showNovelty = !merchandise && hasNoveltyBadge(product);
   const savings = hasDiscount ? (product.compare_at_price as number) - product.price : 0;
   const sellingFormat = resolveSellingFormat(product);
   // Legacy: pack quantities from the explicit product name, only while the
@@ -206,13 +219,18 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
         }
       >
         <div className={`${compactGrid && !merchandise ? 'aspect-[4/3] sm:aspect-square' : 'aspect-square'} bg-primary-light relative overflow-hidden`}>
-          {variant === 'grid' && !merchandise && gridStorageLabel && (
-            <span className="absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-full border border-gray-200/90 bg-white/95 px-2 py-1 text-xs font-semibold text-gray-800 shadow-sm">
-              {gridStorageLabel === 'Surgelé' && (
-                <IconSnowflake size={13} aria-hidden="true" className="shrink-0" />
+          {((variant === 'grid' && !merchandise && gridStorageLabel) || showNovelty) && (
+            <div className={`absolute left-2 z-10 flex flex-col items-start gap-1 ${variant === 'shelf' && tagLabel ? 'top-5' : 'top-2'}`}>
+              {showNovelty && <NoveltyBadge product={product} size={variant === 'shelf' ? 'sm' : 'md'} />}
+              {variant === 'grid' && !merchandise && gridStorageLabel && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200/90 bg-white/95 px-2 py-1 text-xs font-semibold text-gray-800 shadow-sm">
+                  {gridStorageLabel === 'Surgelé' && (
+                    <IconSnowflake size={13} aria-hidden="true" className="shrink-0" />
+                  )}
+                  {gridStorageLabel}
+                </span>
               )}
-              {gridStorageLabel}
-            </span>
+            </div>
           )}
 
           {hasDiscount && !unavailable && (
@@ -250,6 +268,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
               <div className="min-w-0">
                 <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} />
                 {hasDiscount && <p className="mt-1 text-xs font-semibold leading-snug text-red-700">Économisez {formatPrice(savings, currency)}</p>}
+                {promoEnd && !unavailable && <p className="mt-0.5 text-xs font-semibold leading-snug text-red-900">{promoEnd}</p>}
               </div>
               {merchandise && <button
                 onClick={handleAddToCart}
@@ -299,6 +318,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
                 <span aria-hidden="true" className="ml-1 text-xs font-medium text-gray-600 line-through">{formatPrice(product.compare_at_price as number, currency)}</span>
               )}
             </p>
+            {promoEnd && !unavailable && <p className="mt-0.5 text-xs font-semibold leading-snug text-red-900">{promoEnd}</p>}
             {hasMinRule && (
               <span className="mt-1 inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold leading-tight text-amber-900">
                 {minOrderQuantity} minimum

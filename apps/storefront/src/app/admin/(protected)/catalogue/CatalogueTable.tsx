@@ -7,6 +7,9 @@ import { IconCopy, IconDotsVertical, IconPhoto, IconSparkles } from '@tabler/ico
 import { completenessIssues, stockTone } from '@/lib/catalog/catalogueFilters';
 import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { FULFILLMENT_POLICY_ADMIN_LABELS } from '@/lib/storefrontCopy/fulfillmentCopy';
+import { promotionState } from '@/lib/catalog/promotionSchedule';
+import { PRODUCT_NOVELTY_META, PRODUCT_PROMOTION_META } from '@/lib/admin/statusRegistry';
+import { formatShopDate } from '@/lib/time/shopTime';
 import type { CatalogueListProduct as Product } from '@/lib/catalog/catalogueList';
 import { formatMoney } from '@/lib/admin/format';
 import { resolveProductImage } from '@/lib/images/productImageDelivery';
@@ -179,9 +182,17 @@ export default function CatalogueTable({ products, tenantCurrency, canManage, li
     // Seul un mode de réception imposé est signalé ; « retrait uniquement » sans retrait activé est une incohérence.
     const policy = normalizeFulfillmentPolicy(product.fulfillment_policy);
     const showPolicy = policy !== 'delivery_or_pickup';
-    if (product.description_source !== 'ai' && list.length === 0 && !showPolicy) return null;
+    const promo = promotionState(product);
+    const promoMeta = promo === 'none' ? null : PRODUCT_PROMOTION_META[promo]!;
+    if (product.description_source !== 'ai' && list.length === 0 && !showPolicy && !promoMeta && !product.new_until) return null;
     return (
       <span className="mt-1 flex flex-wrap gap-1">
+        {promoMeta && (
+          <Badge tone={promoMeta.tone}>
+            {promoMeta.label}{promo === 'active' && product.promo_ends_at ? ` · jusqu’au ${formatShopDate(product.promo_ends_at)}` : ''}
+          </Badge>
+        )}
+        {product.new_until && <Badge tone={PRODUCT_NOVELTY_META.active!.tone}>Nouveauté · jusqu’au {formatShopDate(product.new_until)}</Badge>}
         {showPolicy && (
           <Badge tone={policy === 'pickup_only' && pickupDisabled ? 'warning' : 'neutral'}>
             {FULFILLMENT_POLICY_ADMIN_LABELS[policy]}{policy === 'pickup_only' && pickupDisabled ? ' · retrait désactivé' : ''}

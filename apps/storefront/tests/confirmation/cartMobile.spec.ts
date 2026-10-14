@@ -160,6 +160,26 @@ test('« Nos promos »: count, dedicated view, Promo badges, or a clear empty st
   expect(await page.locator('main .line-through').count()).toBeGreaterThanOrEqual(count);
 });
 
+test('« Nouveautés »: count, dedicated view, Nouveau badges, or a clear empty state', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/?new=1');
+  await expect(page.getByRole('heading', { name: /Nouveautés/ }).first()).toBeVisible();
+  // Le tri par date de création ne s'appelle plus « Nouveautés ».
+  await page.goto('/');
+  await expect(page.getByRole('option', { name: 'Derniers ajoutés' })).toHaveCount(1);
+  await page.goto('/?new=1');
+  if (await page.getByText('Aucune nouveauté en ce moment.').count()) {
+    await expect(page.getByRole('button', { name: 'Voir tout le catalogue' })).toBeVisible();
+    return;
+  }
+  const badges = page.locator('main').getByText(/^Nouveau$/);
+  const count = await badges.count();
+  expect(count).toBeGreaterThan(0);
+  const pill = page.getByRole('button', { name: /Nouveautés/ });
+  await expect(pill).toHaveAttribute('aria-pressed', 'true');
+  await expect(pill).toContainText(String(count));
+});
+
 test('desktop cart keeps its summary column and has no mobile bar', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await seedCart(page, 2);

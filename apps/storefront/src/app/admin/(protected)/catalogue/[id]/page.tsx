@@ -34,7 +34,8 @@ export default async function AdminProductEditPage({
     .from('products')
     .select(`
       id, name, name_alt, slug, description, descriptions, description_source,
-      price, compare_at_price, position, weight_grams, stock,
+      price, compare_at_price, promo_price, promo_starts_at, promo_ends_at, promo_until_sold_out, promo_applied, new_until,
+      position, weight_grams, stock,
       min_order_quantity, order_quantity_step,
       active, featured, storage_type, image_url, images,
       warehouse_location, category_id,

@@ -6,6 +6,8 @@ import { getShoppingReturn, markShoppingReturn } from '@/lib/catalog/shoppingRet
 import { useCartLineQuantity } from '@/lib/cart/useCartLineQuantity';
 import { CartStepper } from '@/components/cart/CartStepper';
 import { PromoBadge } from '@/components/catalog/PromoBadge';
+import { NoveltyBadge } from '@/components/catalog/NoveltyBadge';
+import { promotionEndLabel } from '@/lib/catalog/promotions';
 import { useHydratedCartItems } from '@/lib/cart/useHydratedCart';
 import { useLocaleStore, resolveLocale } from '@/lib/store/localeStore';
 import { useTenant } from '@/providers/TenantProvider';
@@ -182,8 +184,16 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
           )}
           <ProductTitle product={product} />
           <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
-            <PromoBadge product={product} className="mb-2" />
+            {(product.new_until || product.compare_at_price != null) && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                <NoveltyBadge product={product} />
+                <PromoBadge product={product} />
+              </div>
+            )}
             <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} size="detail" />
+            {promotionEndLabel(product, 'long') && (
+              <p className="mt-2 text-sm font-semibold text-red-900">{promotionEndLabel(product, 'long')}</p>
+            )}
           </div>
 
           {availability === 'sold_out' || availability === 'below_minimum' ? (

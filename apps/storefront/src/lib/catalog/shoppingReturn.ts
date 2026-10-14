@@ -15,7 +15,7 @@ const KEY = 'lepefy-shopping-return';
 const SCROLL_KEY = 'lepefy-shopping-return-scroll';
 const RESTORE_KEY = 'lepefy-shopping-return-restore';
 const CATALOG_PATHS = new Set(['/', '/gadgets']);
-const FILTERS = ['category', 'q', 'sort', 'day', 'page', 'quantityGroup', 'promo'];
+const FILTERS = ['category', 'q', 'sort', 'day', 'page', 'quantityGroup', 'promo', 'new'];
 
 /** Same-origin catalogue path + allow-listed filters, or null for any other page. */
 export function safeCatalogTarget(pathname: string, search: string): string | null {
