@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { IconArrowRight, IconLoader2, IconPhoto, IconRefresh, IconSearch, IconX } from '@tabler/icons-react';
 import type { ProductCardProduct } from '@/components/catalog/ProductCard';
+import { PromoBadge } from '@/components/catalog/PromoBadge';
 import { AvailabilityBadge } from '@/components/catalog/AvailabilityBadge';
 import { LepefyImage } from '@/components/images/LepefyImage';
 import { useTenant } from '@/providers/TenantProvider';
@@ -390,6 +391,7 @@ function SuggestionRow({ id, product, active, onSelect }: {
           <span className="block text-sm font-semibold leading-5 text-gray-900 line-clamp-2">{product.name}</span>
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-900">
             <span><span className="font-bold">{price.amount}</span> <span className="text-xs font-medium text-gray-700">{price.unitPhrase}</span></span>
+            {!unavailable && <PromoBadge product={product} size="sm" />}
             {unavailable
               ? <AvailabilityBadge state={availability} />
               : minimum > 1 && (

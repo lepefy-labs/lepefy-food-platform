@@ -6,7 +6,7 @@ const suggestion = (id: string, stock = 3) => ({
 });
 const dialog = (page: Page) => page.getByRole('dialog', { name: 'Produit ajouté au panier !', exact: true });
 const trigger = (page: Page) => page.getByRole('button', { name: 'Ajouter au panier', exact: true }).filter({ hasText: 'Ajouter au panier' }).first();
-const readItems = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('lepefy-cart') ?? '{"state":{"items":[]}}').state.items as { product: { id: string; stock: number }; quantity: number }[]);
+const readItems = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('lepefy-cart') ?? '{"state":{"items":[]}}').state.items as { product: { id: string; slug: string; stock: number }; quantity: number }[]);
 
 test.beforeEach(async ({ context, page, baseURL }) => {
   await context.addCookies([{
@@ -43,10 +43,12 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
     expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
     const panel = dialog(page);
     const quantity = panel.getByTestId('confirmation-quantity');
-    const minus = panel.getByRole('button', { name: /^Diminuer la quantité de / });
+    // Au minimum, «−» devient « Retirer … du panier » (même bouton, jamais désactivé).
+    const minus = panel.getByRole('button', { name: /^(Diminuer la quantité de|Retirer) / });
     const plus = panel.getByRole('button', { name: /^Augmenter la quantité de / });
     await expect(quantity).toHaveText('Quantité dans le panier : 1');
-    await expect(minus).toBeDisabled();
+    await expect(minus).toHaveAccessibleName(/^Retirer .+ du panier$/);
+    await expect(minus).toBeEnabled();
     const sourceItem = (await readItems(page))[0]!;
     if (sourceItem.product.stock > 1) {
       await plus.click();
@@ -54,12 +56,15 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
       expect((await readItems(page))[0]!.quantity).toBe(2);
       await minus.click();
       await expect(quantity).toHaveText('Quantité dans le panier : 1');
-      await expect(minus).toBeDisabled();
+      await expect(minus).toHaveAccessibleName(/^Retirer .+ du panier$/);
       // Both clicks happen in one task: no stale React quantity closure.
       await plus.evaluate(el => { (el as HTMLButtonElement).click(); (el as HTMLButtonElement).click(); });
       expect((await readItems(page))[0]!.quantity).toBe(Math.min(3, sourceItem.product.stock));
-      await minus.evaluate(el => { for (let i = 0; i < 5; i++) (el as HTMLButtonElement).click(); });
+      // Rapid clicks down to the minimum, never below it.
+      const steps = (await readItems(page))[0]!.quantity - 1;
+      await minus.evaluate((el, n) => { for (let i = 0; i < n; i++) (el as HTMLButtonElement).click(); }, steps);
       await expect(quantity).toHaveText('Quantité dans le panier : 1');
+      await expect(minus).toHaveAccessibleName(/^Retirer .+ du panier$/);
     } else {
       await expect(plus).toBeDisabled();
     }
@@ -118,8 +123,9 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
     await testInfo.attach('confirmation-' + width, { body: await page.screenshot(), contentType: 'image/png' });
     await page.keyboard.press('Escape');
     await expect(dialog(page)).toHaveCount(0);
-    // The source stays keyboard-focusable even when its last unit was added.
-    expect(await page.evaluate(() => document.activeElement?.textContent?.includes('Ajouté') || document.activeElement?.textContent?.includes('Ajouter') || document.activeElement?.textContent?.includes('Maximum atteint'))).toBe(true);
+    // Focus returns to the card, now showing the cart +/− in place of « Ajouter ».
+    expect(await page.evaluate(() => /Ajout|Maximum atteint|Augmenter la quantité|Retirer/.test(
+      (document.activeElement?.getAttribute('aria-label') ?? '') + (document.activeElement?.textContent ?? '')))).toBe(true);
     expect(await page.evaluate(() => document.body.style.overflow)).not.toBe('hidden');
   });
 }
@@ -212,19 +218,21 @@ test('stepper respects the cart item stock and a product already in the cart', a
     localStorage.setItem('lepefy-cart', JSON.stringify(persisted));
   });
   await page.reload();
-  await trigger(page).click();
-  const panel = dialog(page);
-  const quantity = panel.getByTestId('confirmation-quantity');
-  const minus = panel.getByRole('button', { name: /^Diminuer la quantité de / });
-  const plus = panel.getByRole('button', { name: /^Augmenter la quantité de / });
-  await expect(quantity).toHaveText('Quantité dans le panier : 2');
+  // Déjà au panier : la carte montre le +/− du panier au lieu de « Ajouter ».
+  const card = page.locator(`main a[href="/products/${item.product.slug}"]`).first();
+  const group = card.getByRole('group', { name: /^Quantité de / });
+  const plus = group.getByRole('button', { name: /^Augmenter la quantité de / });
+  const minus = group.getByRole('button', { name: /^(Diminuer la quantité de|Retirer) / });
+  await expect(group).toContainText('1');
+  await plus.click();
+  await expect(group).toContainText('2');
   await expect(plus).toBeDisabled();
   await minus.click();
-  await expect(quantity).toHaveText('Quantité dans le panier : 1');
-  await expect(minus).toBeDisabled();
+  await expect(group).toContainText('1');
+  await expect(minus).toHaveAccessibleName(/^Retirer .+ du panier$/);
   await plus.evaluate(el => { for (let i = 0; i < 10; i++) (el as HTMLButtonElement).click(); });
-  await expect(quantity).toHaveText('Quantité dans le panier : 2');
+  await expect(group).toContainText('2');
   await expect(plus).toBeDisabled();
   expect((await readItems(page))[0]!.quantity).toBe(2);
-  await expect(panel).toBeVisible();
+  await expect(dialog(page)).toHaveCount(0);
 });

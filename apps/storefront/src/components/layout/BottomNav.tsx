@@ -15,6 +15,8 @@ import { useTenant } from '@/providers/TenantProvider';
 import { cartAriaLabel, formatCartBadge } from '@/lib/cart/cartBadge';
 import { useCartAddPulse, useCartNudge } from '@/lib/cart/useCartAttention';
 import { accentTextOnWhite, readableOn } from '@/lib/utils/color';
+import { shouldShowBottomNav } from '@/lib/storefront/shopChrome';
+import { useHasMounted } from '@/hooks/useHasMounted';
 
 interface Tab {
   href: string;
@@ -35,8 +37,10 @@ export function BottomNav() {
   const tenant = useTenant();
   const pulsing = useCartAddPulse();
   const nudging = useCartNudge(pathname);
+  const mounted = useHasMounted();
 
-  if (pathname === '/avis/donner' || pathname === '/checkout' || pathname.startsWith('/checkout/')) return null;
+  // Panier persisté lu après le montage : premier rendu identique au serveur.
+  if (!shouldShowBottomNav(pathname, mounted ? totalItems : 0)) return null;
 
   // Couleurs dérivées des tokens tenant, jamais fixées : icône et pastille
   // restent lisibles quel que soit le couple primary/secondary configuré.

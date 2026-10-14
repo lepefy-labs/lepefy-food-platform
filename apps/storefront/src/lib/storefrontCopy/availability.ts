@@ -4,7 +4,7 @@
  * Les quantités viennent de `lib/purchaseQuantityRules.ts`, jamais recalculées.
  */
 
-import { getMaximumValidQuantity } from '../purchaseQuantityRules';
+import { computeQuantityRuleState, getMaximumValidQuantity, repairQuantity } from '../purchaseQuantityRules';
 
 export type ProductAvailability = 'available' | 'sold_out' | 'below_minimum' | 'at_limit';
 
@@ -45,7 +45,8 @@ export type CartLineIssue =
   | { kind: 'removed'; message: string }
   | { kind: 'sold_out'; message: string }
   | { kind: 'below_minimum'; message: string }
-  | { kind: 'over_stock'; message: string; target: number };
+  | { kind: 'over_stock'; message: string; target: number }
+  | { kind: 'off_rule'; message: string; target: number };
 
 /**
  * Problème bloquant d'une ligne de panier, avec l'action à faire.
@@ -71,6 +72,14 @@ export function cartLineIssue(input: {
   }
   if (input.quantity > max) {
     return { kind: 'over_stock', target: max, message: `Il n'en reste que ${input.stock}. Passez à ${label(max)}.` };
+  }
+  // Quantité enregistrée avant un changement de minimum/pas (ou venue d'un autre appareil).
+  if (!computeQuantityRuleState(input.quantity, input.minimum, input.step).isValid) {
+    const target = repairQuantity(input.quantity, input.stock, input.minimum, input.step);
+    if (target > 0) {
+      const rule = input.step > 1 ? `par ${input.step} à partir de ${input.minimum}` : `à partir de ${input.minimum}`;
+      return { kind: 'off_rule', target, message: `Vendu ${rule}. Passez à ${label(target)}.` };
+    }
   }
   return null;
 }

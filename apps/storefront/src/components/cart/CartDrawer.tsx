@@ -1,5 +1,6 @@
 'use client';
 
+import { decrementRemovesLine } from '@/lib/purchaseQuantityRules';
 import { useEffect, useRef, useState } from 'react';
 import { useCartStore } from '@/stores/cartStore';
 import { useCartUiStore } from '@/stores/cartUiStore';
@@ -51,6 +52,7 @@ export function CartDrawer() {
   const incrementItem = useCartStore((s) => s.incrementItem);
   const decrementItem = useCartStore((s) => s.decrementItem);
   const removeItem = useCartStore((s) => s.removeItem);
+  const updateQuantity = useCartStore((s) => s.updateQuantity);
   const addItem = useCartStore((s) => s.addItem);
   const { groups: quantityGroups, loading: groupsLoading, error: groupsError } = useQuantityGroups();
 
@@ -83,7 +85,11 @@ export function CartDrawer() {
   }
 
   function handleDecrement(productId: string) {
-    decrementItem(productId);
+    const item = items.find((i) => i.product.id === productId);
+    if (!item) return;
+    // Au minimum, «−» retire la ligne : même chemin que « Retirer », avec annulation.
+    if (decrementRemovesLine(item.quantity, item.product.min_order_quantity ?? 1, item.product.order_quantity_step ?? 1)) handleRemove(productId);
+    else decrementItem(productId);
   }
 
   function handleRemove(productId: string) {
@@ -149,6 +155,7 @@ export function CartDrawer() {
                   onIncrement={handleIncrement}
                   onDecrement={handleDecrement}
                   onRemove={handleRemove}
+                  onAdjust={updateQuantity}
                 />
               ))}
             </ul>

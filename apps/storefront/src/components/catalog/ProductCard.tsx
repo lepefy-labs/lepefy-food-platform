@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useEffect, useRef } from 'react';
 import { LepefyImage } from '@/components/images/LepefyImage';
 import { IconInfoCircle, IconSnowflake, IconShoppingCart } from '@tabler/icons-react';
 import type { CatalogScope, ProductFulfillmentPolicy } from '@lepefy/types';
@@ -17,6 +18,11 @@ import { ProductPrice } from './ProductPrice';
 import { FulfillmentPolicyChip } from './FulfillmentPolicyChip';
 import { UnavailableRibbon } from './UnavailableRibbon';
 import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
+import { hasValidPromotion } from '@/lib/catalog/promotions';
+import { useCartLineQuantity } from '@/lib/cart/useCartLineQuantity';
+import { CartStepper } from '@/components/cart/CartStepper';
+import { PromoBadge } from './PromoBadge';
+import { useHasMounted } from '@/hooks/useHasMounted';
 
 /**
  * Forme minimale requise par la card — satisfaite à la fois par
@@ -91,10 +97,15 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   const merchandise = catalogScope === 'gadgets';
   const { addToCart, added, outOfStock, atLimit, availability } = useQuickAdd(product, !merchandise);
   const showConfirmation = useAddToCartUiStore(s => s.show);
+  const line = useCartLineQuantity(product.id);
+  const mounted = useHasMounted();
+  const ctaRef = useRef<HTMLButtonElement>(null);
+  const stepperRef = useRef<HTMLDivElement>(null);
+  const focusStepperAfterAdd = useRef(false);
   const tagLabel = merchandise ? product.category?.name : getTagLabel(product);
   const gridStorageLabel = getGridStorageLabel(product);
   const compactGrid = variant === 'grid' && compactMobile;
-  const hasDiscount = product.compare_at_price != null && product.compare_at_price > product.price;
+  const hasDiscount = hasValidPromotion(product);
   const savings = hasDiscount ? (product.compare_at_price as number) - product.price : 0;
   const sellingFormat = resolveSellingFormat(product);
   // Legacy: pack quantities from the explicit product name, only while the
@@ -104,9 +115,6 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
     : null;
   const cartonDetail = cartonMatch ? `${cartonMatch[1]} paquets · ${cartonMatch[2]} bâtons` : null;
   const displayName = cartonMatch ? product.name.split(/\s*[—–-]\s*carton de/i)[0] : product.name;
-  const discountPercent = hasDiscount
-    ? Math.round((1 - product.price / (product.compare_at_price as number)) * 100)
-    : null;
   const minOrderQuantity = product.min_order_quantity ?? 1;
   const hasMinRule = !merchandise && minOrderQuantity > 1;
   const unavailable = availability === 'sold_out' || availability === 'below_minimum';
@@ -128,6 +136,37 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
       ? `${product.name} : ${AVAILABILITY_COPY.atLimitHelp}`
       : hasMinRule ? `Ajouter ${minOrderQuantity} au panier` : 'Ajouter au panier';
 
+  // Une fois dans le panier, la card montre le même +/− que le panier (hors Goodies).
+  // Après le montage seulement : le HTML serveur (panier inconnu) reste identique au premier rendu.
+  const showStepper = mounted && !merchandise && line.quantity > 0 && !unavailable;
+  const stepperCaption = line.canIncrement ? 'dans le panier' : 'maximum disponible';
+
+  // Le bouton « Ajouter » disparaît au profit du +/− : le focus clavier le suit
+  // (avant que la confirmation ne l'enregistre pour le lui rendre à la fermeture).
+  useEffect(() => {
+    if (!showStepper || !focusStepperAfterAdd.current) return;
+    focusStepperAfterAdd.current = false;
+    const buttons = stepperRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])');
+    buttons?.[buttons.length - 1]?.focus({ preventScroll: true });
+  }, [showStepper]);
+
+  function handleStepperDecrement() {
+    if (line.decrement() === 'removed') requestAnimationFrame(() => ctaRef.current?.focus({ preventScroll: true }));
+  }
+
+  const stepper = (
+    <CartStepper
+      variant="card"
+      quantity={line.quantity}
+      productName={product.name}
+      removesOnDecrement={line.removesOnDecrement}
+      canIncrement={line.canIncrement && !atLimit}
+      caption={stepperCaption}
+      onIncrement={line.increment}
+      onDecrement={handleStepperDecrement}
+    />
+  );
+
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -135,6 +174,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
     // « Voir mon panier » / « Continuer mes achats » qui ne disparaissent pas.
     if (addToCart()) {
       (e.currentTarget as HTMLElement).focus({ preventScroll: true });
+      focusStepperAfterAdd.current = !merchandise;
       showConfirmation(product);
     }
   }
@@ -177,10 +217,8 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             </span>
           )}
 
-          {variant === 'grid' && discountPercent != null && !unavailable && (
-            <span className="absolute bottom-2 left-2 right-2 z-10 rounded-lg bg-red-700 px-2 py-1.5 text-center text-xs font-bold leading-tight text-white shadow-sm">
-              {cartonDetail ? `OFFRE CARTON · −${formatPrice(savings, currency)}` : `OFFRE · −${discountPercent}%`}
-            </span>
+          {hasDiscount && !unavailable && (
+            <PromoBadge product={product} size={variant === 'shelf' ? 'sm' : 'md'} className="absolute right-2 top-2 z-10" />
           )}
 
           {product.image_url ? (
@@ -234,8 +272,10 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             {!merchandise && availability === 'below_minimum' && (
               <p className="mt-2 text-xs leading-snug text-gray-700">{belowMinimumDetail(minOrderQuantity)}</p>
             )}
-            {!merchandise && (
+            {showStepper && <div ref={stepperRef} className="mt-2">{stepper}</div>}
+            {!merchandise && !showStepper && (
               <button
+                ref={ctaRef}
                 type="button"
                 onClick={handleAddToCart}
                 disabled={unavailable || atLimit}
@@ -247,16 +287,19 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
                 {ctaLabel}
               </button>
             )}
-            {!merchandise && atLimit && !unavailable && (
+            {!merchandise && atLimit && !unavailable && !showStepper && (
               <p className="mt-1.5 text-xs leading-snug text-gray-700">{AVAILABILITY_COPY.atLimitHelp}</p>
             )}
           </div>
         ) : (
           <div className="px-2 pt-1 pb-6">
             <p className="text-xs font-medium line-clamp-2 text-gray-900">{product.name}</p>
-            <p className="mt-0.5 leading-tight" aria-label={`${shelfPrice.amount} ${shelfPrice.unitPhrase}`}>
+            <p className="mt-0.5 leading-tight" aria-label={`${shelfPrice.amount} ${shelfPrice.unitPhrase}${hasDiscount ? `, au lieu de ${formatPrice(product.compare_at_price as number, currency)}` : ''}`}>
               <span aria-hidden="true" className="text-sm font-bold text-gray-950">{shelfPrice.amount}</span>{' '}
               <span aria-hidden="true" className="text-xs font-medium text-gray-700">{shelfPrice.unitPhrase}</span>
+              {hasDiscount && (
+                <span aria-hidden="true" className="ml-1 text-xs font-medium text-gray-600 line-through">{formatPrice(product.compare_at_price as number, currency)}</span>
+              )}
             </p>
             {hasMinRule && (
               <span className="mt-1 inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold leading-tight text-amber-900">
@@ -265,12 +308,14 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             )}
             {showFulfillment && <FulfillmentPolicyChip policy={fulfillmentPolicy} className="mt-1" />}
             {unavailable && <AvailabilityBadge state={availability} className="mt-1" />}
+            {showStepper && <div ref={stepperRef} className="mt-2">{stepper}</div>}
           </div>
         )}
       </div>
 
-      {variant === 'shelf' && (
+      {variant === 'shelf' && !showStepper && (
         <button
+          ref={ctaRef}
           onClick={handleAddToCart}
           aria-label={ctaAriaLabel}
           disabled={unavailable || atLimit}

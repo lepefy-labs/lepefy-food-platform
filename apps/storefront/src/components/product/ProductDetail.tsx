@@ -2,7 +2,11 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getShoppingReturn } from '@/lib/catalog/shoppingReturn';
+import { getShoppingReturn, markShoppingReturn } from '@/lib/catalog/shoppingReturn';
+import { useCartLineQuantity } from '@/lib/cart/useCartLineQuantity';
+import { CartStepper } from '@/components/cart/CartStepper';
+import { PromoBadge } from '@/components/catalog/PromoBadge';
+import { useHasMounted } from '@/hooks/useHasMounted';
 import { useLocaleStore, resolveLocale } from '@/lib/store/localeStore';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
@@ -49,7 +53,9 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const justAddedTimer = useRef<ReturnType<typeof setTimeout>>();
   const showConfirmation = useAddToCartUiStore((s) => s.show);
   const [returnToResults, setReturnToResults] = useState(false);
-  const inCartQuantity = cartItems.find((item) => item.product.id === product.id)?.quantity ?? 0;
+  const line = useCartLineQuantity(product.id);
+  const mounted = useHasMounted();
+  const inCartQuantity = line.quantity;
   const maxPurchasable = getMaximumValidQuantity(product.stock, minOrderQuantity, orderQuantityStep);
   const outOfStock = maxPurchasable === 0;
   const availability = deriveAvailability({ stock: product.stock, minimum: minOrderQuantity, step: orderQuantityStep, maxPurchasable });
@@ -79,16 +85,14 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
     setReturnToResults(new URL(getShoppingReturn(catalogHref), window.location.origin).searchParams.has('q'));
   }, [catalogHref]);
   useEffect(() => () => clearTimeout(justAddedTimer.current), []);
-  // La ligne « dans votre panier » agrandit la barre d'achat mobile : Nala
-  // (ChatWidget) lit cet attribut pour rester au-dessus, sans couplage de state.
-  const showsCartLine = inCartQuantity > 0 && !outOfStock;
-  useEffect(() => {
-    document.documentElement.toggleAttribute('data-pdp-cart-line', showsCartLine);
-    return () => document.documentElement.removeAttribute('data-pdp-cart-line');
-  }, [showsCartLine]);
+  // Déjà dans le panier : la fiche montre le même +/− que le panier (la
+  // quantité réelle du panier), au lieu d'un sélecteur qui ajouterait par-dessus.
+  // La barre d'achat mobile garde la même hauteur dans les deux états.
+  const showsCartLine = mounted && inCartQuantity > 0 && !outOfStock;
 
   function continueShopping() {
-    router.push(getShoppingReturn(catalogHref));
+    markShoppingReturn();
+    router.push(getShoppingReturn(catalogHref), { scroll: false });
   }
 
   function handleAddToCart() {
@@ -123,9 +127,20 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
     showConfirmation(cardProduct, { continueHref: getShoppingReturn(catalogHref) });
   }
 
+  const cartStepper = (
+    <CartStepper
+      variant="panel"
+      quantity={inCartQuantity}
+      productName={product.name}
+      removesOnDecrement={line.removesOnDecrement}
+      canIncrement={line.canIncrement && inCartQuantity < maxPurchasable}
+      onIncrement={line.increment}
+      onDecrement={line.decrement}
+    />
+  );
   const inCartLine = showsCartLine && (
     <p role="status" className="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-1 text-sm text-green-900">
-      <span>✓ <span className="font-bold">{formatCount(sellingFormat, inCartQuantity)}</span> dans votre panier</span>
+      <span>✓ <span className="font-bold">{formatCount(sellingFormat, inCartQuantity)}</span> dans votre panier · {formatPrice(product.price * inCartQuantity, currency)}</span>
       <Link href="/cart" className="inline-flex min-h-10 shrink-0 items-center font-bold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>Voir mon panier</Link>
     </p>
   );
@@ -168,6 +183,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
           )}
           <ProductTitle product={product} />
           <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+            <PromoBadge product={product} className="mb-2" />
             <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} size="detail" />
           </div>
 
@@ -244,37 +260,62 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
           ) : (
             <>
               <div className="hidden flex-col gap-3 md:flex">
-                {inCartLine}
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium text-gray-700">Quantité</span>
-                  <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={maxPurchasable} onChange={setQuantity} />
-
-                </div>
-                <button
-                  onClick={handleAddToCart}
-                  className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all active:scale-95 flex items-center justify-center gap-2"
-                  style={{ backgroundColor: justAdded ? '#16a34a' : 'var(--color-primary)' }}
-                >
-                  {justAdded ? '✓ Ajouté au panier' : `${explicitQuantityLabel} au panier · ${formatPrice(totalPrice, currency)}`}
-                </button>
+                {showsCartLine ? (
+                  <>
+                    {inCartLine}
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-medium text-gray-700">Quantité dans le panier</span>
+                      {cartStepper}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-medium text-gray-700">Quantité</span>
+                      <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={maxPurchasable} onChange={setQuantity} />
+                    </div>
+                    <button
+                      onClick={handleAddToCart}
+                      className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all active:scale-95 flex items-center justify-center gap-2"
+                      style={{ backgroundColor: justAdded ? '#16a34a' : 'var(--color-primary)' }}
+                    >
+                      {justAdded ? '✓ Ajouté au panier' : `${explicitQuantityLabel} au panier · ${formatPrice(totalPrice, currency)}`}
+                    </button>
+                  </>
+                )}
               </div>
 
               <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[55] border-t border-gray-200 bg-white/95 shadow-[0_-8px_24px_rgba(15,23,42,0.10)] backdrop-blur md:hidden">
-                {inCartLine && <div className="mx-auto max-w-7xl px-3 pt-2">{inCartLine}</div>}
                 <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-2.5">
-                  <div className="shrink-0">
-                    <span className="sr-only">Quantité</span>
-                    <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={maxPurchasable} onChange={setQuantity} />
-                  </div>
-                  <button
-                    onClick={handleAddToCart}
-                    aria-live="polite"
-                    className="flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-3 py-2 font-semibold text-white transition-all active:scale-[0.98]"
-                    style={{ backgroundColor: justAdded ? '#16a34a' : 'var(--color-primary)' }}
-                  >
-                    <span className="max-w-full truncate text-sm">{justAdded ? '✓ Ajouté au panier' : explicitQuantityLabel}</span>
-                    {!justAdded && <span className="text-xs font-medium opacity-90">Total : {formatPrice(totalPrice, currency)}</span>}
-                  </button>
+                  {showsCartLine ? (
+                    <>
+                      <div className="shrink-0">{cartStepper}</div>
+                      <Link
+                        href="/cart"
+                        className="flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-3 py-2 font-semibold text-white"
+                        style={{ backgroundColor: 'var(--color-primary)' }}
+                      >
+                        <span className="max-w-full truncate text-sm">Voir mon panier</span>
+                        <span className="text-xs font-medium opacity-90">{formatCount(sellingFormat, inCartQuantity)} · {formatPrice(product.price * inCartQuantity, currency)}</span>
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <div className="shrink-0">
+                        <span className="sr-only">Quantité</span>
+                        <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={maxPurchasable} onChange={setQuantity} />
+                      </div>
+                      <button
+                        onClick={handleAddToCart}
+                        aria-live="polite"
+                        className="flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-3 py-2 font-semibold text-white transition-all active:scale-[0.98]"
+                        style={{ backgroundColor: justAdded ? '#16a34a' : 'var(--color-primary)' }}
+                      >
+                        <span className="max-w-full truncate text-sm">{justAdded ? '✓ Ajouté au panier' : explicitQuantityLabel}</span>
+                        {!justAdded && <span className="text-xs font-medium opacity-90">Total : {formatPrice(totalPrice, currency)}</span>}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </>
@@ -292,7 +333,6 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
         conservationAfterOpening={product.conservation_after_opening}
         usageInstructions={product.usage_instructions}
       />
-      {showsCartLine && <div aria-hidden="true" className="h-14 md:hidden" />}
     </div>
   );
 }

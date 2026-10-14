@@ -14,6 +14,9 @@
  */
 
 import { hasPurchasableQuantity } from '../purchaseQuantityRules';
+import { hasValidPromotion } from '../catalog/promotions';
+
+export { hasValidPromotion };
 
 export const CARD_SHOWCASE_LIMIT = 2;
 
@@ -30,12 +33,6 @@ export interface CardShowcaseCandidate {
 }
 
 export type CardShowcaseReason = 'promo' | 'featured' | 'available';
-
-export function hasValidPromotion(product: Pick<CardShowcaseCandidate, 'price' | 'compare_at_price'>): boolean {
-  const compareAt = product.compare_at_price == null ? NaN : Number(product.compare_at_price);
-  const price = Number(product.price);
-  return Number.isFinite(compareAt) && Number.isFinite(price) && price > 0 && compareAt > price;
-}
 
 /** Achetable = prix positif, photo réelle et stock couvrant au moins le minimum (et son pas). */
 export function isShowcaseEligible(product: CardShowcaseCandidate): boolean {

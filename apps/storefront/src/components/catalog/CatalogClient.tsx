@@ -6,7 +6,9 @@ import { ProductGrid, ProductCardSkeleton } from '@/components/catalog/ProductGr
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { CatalogCategoryRow } from '@/components/catalog/CatalogCategoryRow';
 import { semanticMatchToProductCardProduct } from '@/lib/catalog/productCardAdapters';
-import { buildCatalogUrl } from '@/lib/catalog/catalogSearchUrl';
+import Link from 'next/link';
+import { buildCatalogUrl, CATALOG_PROMOS_HREF, type CatalogUrlOverrides } from '@/lib/catalog/catalogSearchUrl';
+import { rememberCatalogPosition, takeCatalogScrollRestore } from '@/lib/catalog/shoppingReturn';
 import { useCatalogSearchStore } from '@/stores/catalogSearchStore';
 import type { Category, ProductWithCategory, SemanticMatch } from '@lepefy/types';
 import type { CatalogSort } from '@/lib/catalog/pagination';
@@ -25,6 +27,12 @@ interface Props {
   rankingDay:      string;
   quantityGroupId?: string;
   quantityGroupName?: string;
+  /** `?promo=1` : la grille montre toutes les promotions actives. */
+  promoView?: boolean;
+  /** Promotions actives et achetables du tenant (0 = aucun accès promo affiché). */
+  promoCount?: number;
+  /** Section « Nos promos » du catalogue non filtré (vide = masquée). */
+  promoShelf?: ProductWithCategory[];
 }
 
 export function CatalogClient({
@@ -41,6 +49,9 @@ export function CatalogClient({
   rankingDay,
   quantityGroupId,
   quantityGroupName,
+  promoView = false,
+  promoCount = 0,
+  promoShelf = [],
 }: Props) {
   const pathname      = usePathname();
   const router        = useRouter();
@@ -111,7 +122,7 @@ export function CatalogClient({
   const textualIds = new Set(items.map(p => p.id));
   const semanticOnly = semanticResults.filter(p => !textualIds.has(p.id));
 
-  function buildUrl(overrides: { q?: string; category?: string | null; sort?: CatalogSort }) {
+  function buildUrl(overrides: CatalogUrlOverrides) {
     return buildCatalogUrl(pathname, searchParams.toString(), overrides);
   }
 
@@ -194,9 +205,43 @@ export function CatalogClient({
 
   useEffect(() => () => loadMoreAbortRef.current?.abort(), []);
 
+  // Retour depuis le panier ou une fiche : même URL (?page=N cumulatif) donc
+  // même liste, la position enregistrée pointe sur les mêmes produits.
+  useEffect(() => {
+    const y = takeCatalogScrollRestore(window.location);
+    if (y == null) return;
+    // Après le rendu de la liste. Jamais annulé au démontage : la position est
+    // consommée une seule fois (un double montage en développement la perdrait).
+    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+  }, []);
+
+  // URL et position du catalogue affiché, pour « Continuer mes achats » —
+  // même quand le panier est ouvert depuis la barre du bas.
+  const searchKey = searchParams.toString();
+  useEffect(() => {
+    rememberCatalogPosition(window.location, window.scrollY);
+    let pending = false;
+    function onScroll() {
+      if (pending) return;
+      pending = true;
+      setTimeout(() => {
+        pending = false;
+        rememberCatalogPosition(window.location, window.scrollY);
+      }, 250);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [searchKey, page]);
+
   function clearSearch() {
     startTransition(() => {
       router.replace(buildUrl({ q: '' }));
+    });
+  }
+
+  function togglePromoView() {
+    startTransition(() => {
+      router.push(buildUrl({ promo: !promoView }));
     });
   }
 
@@ -210,17 +255,54 @@ export function CatalogClient({
   const activeCategory = categories.find(category => category.slug === activeSlug);
   const productHeading = hasActiveSearch
     ? `Résultats pour “${initialQuery}”`
+    : promoView ? '🔥 Nos promos'
     : quantityGroupName ? `Compléter : ${quantityGroupName}` : activeCategory?.name ?? 'Tous les produits';
+  const showPromoAccess = promoCount > 0 || promoView;
   const availableLabel = `${totalCount} produit${totalCount === 1 ? '' : 's'} disponible${totalCount === 1 ? '' : 's'}`;
 
   return (
     <div className="max-w-6xl mx-auto px-4 pb-6 md:pb-8">
       {/* La recherche est le champ global juste au-dessus (layout boutique). */}
-      <h1 className="pt-4 font-display text-2xl font-bold text-gray-900 md:pt-6">Catalogue</h1>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-4 md:pt-6">
+        <h1 className="font-display text-2xl font-bold text-gray-900">Catalogue</h1>
+        {showPromoAccess && (
+          <button
+            type="button"
+            onClick={togglePromoView}
+            aria-pressed={promoView}
+            className={`inline-flex min-h-11 items-center gap-2 rounded-full border-2 px-4 text-sm font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2 motion-reduce:transition-none ${promoView ? 'border-red-700 bg-red-700 text-white' : 'border-red-700 bg-red-50 text-red-800 hover:bg-red-100'}`}
+          >
+            <span aria-hidden="true">🔥</span> Nos promos
+            {promoCount > 0 && (
+              <span className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${promoView ? 'bg-white text-red-800' : 'bg-red-700 text-white'}`}>
+                <span className="sr-only">(</span>{promoCount}<span className="sr-only"> en cours)</span>
+              </span>
+            )}
+          </button>
+        )}
+      </div>
 
       {/* Visual category navigation — hidden during textual search. */}
       {!hasActiveSearch && (
         <CatalogCategoryRow categories={categories} previewImagesByCategory={previewImagesByCategory} activeSlug={activeSlug} onSelect={handleCategorySelect} />
+      )}
+
+      {promoShelf.length > 0 && (
+        <section aria-labelledby="promo-shelf-title" className="mt-5">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 id="promo-shelf-title" className="font-display text-xl font-bold text-gray-900"><span aria-hidden="true">🔥 </span>Nos promos</h2>
+            <Link href={CATALOG_PROMOS_HREF} className="inline-flex min-h-11 items-center text-sm font-bold underline-offset-2 hover:underline" style={{ color: 'var(--color-primary)' }}>
+              Tout voir ({promoCount})
+            </Link>
+          </div>
+          <ul className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 md:gap-4">
+            {promoShelf.map(product => (
+              <li key={product.id} className="w-[44vw] max-w-[220px] shrink-0 snap-start sm:w-[30vw]">
+                <ProductCard product={product} compactMobile />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {quantityGroupId && (
@@ -237,6 +319,9 @@ export function CatalogClient({
         <div>
           <h2 className="font-display text-xl font-bold text-gray-900">{productHeading}</h2>
           {hasActiveSearch && <p className="mt-1 text-sm text-gray-500">{availableLabel}</p>}
+          {promoView && totalCount > 0 && (
+            <p className="mt-1 text-sm text-gray-600">{totalCount} produit{totalCount === 1 ? '' : 's'} en promotion</p>
+          )}
         </div>
         {hasActiveSearch && (
           <button
@@ -248,7 +333,7 @@ export function CatalogClient({
             Effacer la recherche
           </button>
         )}
-        <label className="ml-auto flex shrink-0 flex-col gap-1 text-xs font-medium text-gray-600 sm:flex-row sm:items-center sm:gap-2">
+        {!promoView && <label className="ml-auto flex shrink-0 flex-col gap-1 text-xs font-medium text-gray-600 sm:flex-row sm:items-center sm:gap-2">
           <span className="sr-only sm:not-sr-only">Trier par</span>
           <select
             value={sort}
@@ -262,11 +347,23 @@ export function CatalogClient({
             <option value="price_asc">Prix croissant</option>
             <option value="price_desc">Prix décroissant</option>
           </select>
-        </label>
+        </label>}
       </div>
 
+      {promoView && totalCount === 0 && !isPending && (
+        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-8 text-center" role="status">
+          <p className="font-semibold text-gray-900">Aucune promotion en ce moment.</p>
+          <p className="mt-1 text-sm text-gray-600">Revenez bientôt, ou parcourez tout le catalogue.</p>
+          <button type="button" onClick={togglePromoView}
+            className="mt-4 inline-flex min-h-11 items-center rounded-xl px-5 text-sm font-bold text-white"
+            style={{ backgroundColor: 'var(--color-primary)' }}>
+            Voir tout le catalogue
+          </button>
+        </div>
+      )}
+
       {/* Griglia */}
-      <ProductGrid products={items} loading={isPending} />
+      {!(promoView && totalCount === 0 && !isPending) && <ProductGrid products={items} loading={isPending} />}
 
       {/* Scroll infini — pagination server-side déclenchée par le sentinel.
           Masqué pendant une transition de filtre (isPending) : la grille va

@@ -6,6 +6,8 @@ export interface CatalogUrlOverrides {
   /** `null` retire le filtre catégorie ; `undefined` le conserve. */
   category?: string | null;
   sort?: CatalogSort;
+  /** `true` ouvre « Nos promos » (sans recherche, catégorie ni groupe) ; `false` la ferme. */
+  promo?: boolean;
 }
 
 /**
@@ -18,13 +20,20 @@ export function buildCatalogUrl(pathname: string, current: string | URLSearchPar
   const params = new URLSearchParams(current);
   if (overrides.q !== undefined) {
     const q = overrides.q.trim();
-    if (q) params.set('q', q);
+    if (q) { params.set('q', q); params.delete('promo'); }
     else params.delete('q');
   }
   if (overrides.category !== undefined) {
     if (overrides.category) params.set('category', overrides.category);
     else params.delete('category');
     params.delete('quantityGroup');
+    params.delete('promo');
+  }
+  if (overrides.promo === true) {
+    params.set('promo', '1');
+    for (const key of ['q', 'category', 'quantityGroup']) params.delete(key);
+  } else if (overrides.promo === false) {
+    params.delete('promo');
   }
   if (overrides.sort !== undefined) {
     if (overrides.sort === 'recommended') params.delete('sort');
@@ -34,6 +43,14 @@ export function buildCatalogUrl(pathname: string, current: string | URLSearchPar
   params.delete('page');
   const qs = params.toString();
   return `${pathname}${qs ? `?${qs}` : ''}`;
+}
+
+/** Accès « Nos promos » depuis n'importe quelle page (catalogue filtré sur les promotions). */
+export const CATALOG_PROMOS_HREF = '/?promo=1';
+
+/** `?promo=1` est la seule valeur reconnue. */
+export function isPromoFilter(value: string | null | undefined): boolean {
+  return value === '1';
 }
 
 /** Lien « Voir tous les résultats » depuis n'importe quelle page. */

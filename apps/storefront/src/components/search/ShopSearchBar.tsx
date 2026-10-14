@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import { IconSearch } from '@tabler/icons-react';
-import { shouldShowGlobalSearch } from '@/lib/storefront/shopChrome';
+import { shouldShowSearchBar } from '@/lib/storefront/shopChrome';
 import { CartShortcutButton } from '@/components/cart/CartShortcutButton';
 import { GlobalProductSearch } from './GlobalProductSearch';
 
@@ -27,7 +27,7 @@ export function SearchFieldPlaceholder({ variant }: { variant: 'bar' | 'header' 
  */
 export function ShopSearchBar() {
   const pathname = usePathname();
-  if (!shouldShowGlobalSearch(pathname)) return null;
+  if (!shouldShowSearchBar(pathname)) return null;
 
   return (
     <div className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur motion-reduce:backdrop-blur-none md:top-24 lg:hidden">

@@ -15,6 +15,9 @@ import { useCartUiStore } from '@/stores/cartUiStore';
 import { useTenant } from '@/providers/TenantProvider';
 import { formatPrice } from '@/lib/utils/format';
 import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
+import { useCartLineQuantity } from '@/lib/cart/useCartLineQuantity';
+import { CartStepper } from './CartStepper';
+import { PromoBadge } from '@/components/catalog/PromoBadge';
 import { describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { AVAILABILITY_COPY } from '@/lib/storefrontCopy/availability';
 
@@ -82,22 +85,16 @@ function ConfirmationPanel({ product, continueHref, onClose }: {
   const { currency } = useTenant();
   const items = useCartStore(s => s.items);
   const cartItem = items.find(item => item.product.id === product.id);
-  const quantity = cartItem?.quantity ?? 0;
+  const line = useCartLineQuantity(product.id);
   const maxStock = getMaximumValidQuantity(
     Math.min(product.stock ?? 999, cartItem?.product.stock ?? 999),
     product.min_order_quantity,
     product.order_quantity_step,
   );
 
-  function changeQuantity(delta: -1 | 1) {
-    // Read synchronously for each click, including clicks batched before React renders.
-    const cart = useCartStore.getState();
-    const current = cart.items.find(item => item.product.id === product.id);
-    if (!current) return;
-    // incrementItem/decrementItem respectent le pas de la règle de quantité
-    // du produit (ex. min=4/step=4 : 4 → 8, jamais 5).
-    if (delta === 1) cart.incrementItem(product.id);
-    else cart.decrementItem(product.id);
+  function decrement() {
+    // Au minimum, «−» retire le produit : la confirmation n'a plus d'objet.
+    if (line.decrement() === 'removed') onClose();
   }
   const [recommendations, setRecommendations] = useState<ProductCardProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,29 +176,30 @@ function ConfirmationPanel({ product, continueHref, onClose }: {
             <div className="min-w-0">
               <Link href={`/products/${product.slug}`} onClick={onClose}
                 className="line-clamp-2 rounded-sm text-sm font-semibold text-gray-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:text-base">{product.name}</Link>
-              <p className="mt-1 text-gray-900"><span className="font-bold">{price.amount}</span> <span className="text-sm font-medium text-gray-700">{price.unitPhrase}</span></p>
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-900">
+                <span><span className="font-bold">{price.amount}</span> <span className="text-sm font-medium text-gray-700">{price.unitPhrase}</span></span>
+                <PromoBadge product={product} size="sm" />
+              </p>
               {hasMinRule && (
                 <span className="mt-1 inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
                   {minOrderQuantity} minimum
                 </span>
               )}
-              <div role="group" aria-label={`Quantité de ${product.name}`}
-                className="mt-2 inline-flex h-12 w-36 items-center rounded-lg border border-gray-400 bg-white text-gray-900">
-                <button type="button" onClick={() => changeQuantity(-1)} disabled={quantity <= minOrderQuantity}
-                  aria-label={`Diminuer la quantité de ${product.name}`}
-                  className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-l-lg text-2xl font-semibold leading-none hover:bg-gray-50 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400">
-                  −
-                </button>
-                <span aria-live="polite" aria-atomic="true" data-testid="confirmation-quantity"
-                  className="flex h-12 w-12 items-center justify-center border-x border-gray-400 text-base font-semibold tabular-nums">
-                  <span className="sr-only">Quantité dans le panier : </span>{quantity}
-                </span>
-                <button type="button" onClick={() => changeQuantity(1)} disabled={!cartItem || quantity >= maxStock}
-                  aria-label={`Augmenter la quantité de ${product.name}`}
-                  className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-r-lg text-2xl font-semibold leading-none hover:bg-gray-50 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400">
-                  +
-                </button>
+              <div className="mt-2">
+                <CartStepper
+                  variant="panel"
+                  quantity={line.quantity}
+                  productName={product.name}
+                  removesOnDecrement={line.removesOnDecrement}
+                  canIncrement={line.canIncrement && line.quantity < maxStock}
+                  onIncrement={line.increment}
+                  onDecrement={decrement}
+                  valueTestId="confirmation-quantity"
+                />
               </div>
+              {hasMinRule && line.quantity === minOrderQuantity && (
+                <p role="status" className="mt-1.5 text-sm font-semibold text-gray-800">Minimum de {minOrderQuantity} ajouté.</p>
+              )}
             </div>
           </div>
           <div data-testid="confirmation-actions" className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">

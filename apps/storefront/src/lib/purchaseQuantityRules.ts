@@ -96,6 +96,50 @@ export function getPreviousValidQuantity(current: number, minimumQuantity: numbe
   return previous >= minimum ? previous : null;
 }
 
+export type QuantityDirection = 'increment' | 'decrement';
+
+/**
+ * Transizione unica di ogni controllo +/− (card, scheda prodotto, carrello,
+ * drawer, conferma): da 0 il primo «+» porta al minimo, poi si avanza di uno
+ * step; il «−» arretra di uno step e, al minimo, restituisce 0 = rimuovere la
+ * riga (mai uno stato intermedio sotto il minimo).
+ * `null` = nessun cambiamento possibile (stock esaurito, già a 0).
+ */
+export function stepPurchaseQuantity(
+  current: number,
+  minimumQuantity: number,
+  step: number,
+  stock: number,
+  direction: QuantityDirection,
+): number | null {
+  const quantity = Math.max(0, Math.trunc(current) || 0);
+  if (direction === 'increment') {
+    if (quantity === 0) {
+      const max = getMaximumValidQuantity(stock, minimumQuantity, step);
+      return max > 0 ? Math.max(1, Math.trunc(minimumQuantity) || 1) : null;
+    }
+    return getNextValidQuantity(quantity, minimumQuantity, step, stock);
+  }
+  if (quantity === 0) return null;
+  return getPreviousValidQuantity(quantity, minimumQuantity, step) ?? 0;
+}
+
+/** Vrai quand le prochain «−» retirerait la ligne (affiché comme « Retirer »). */
+export function decrementRemovesLine(current: number, minimumQuantity: number, step: number): boolean {
+  return stepPurchaseQuantity(current, minimumQuantity, step, Number.POSITIVE_INFINITY, 'decrement') === 0;
+}
+
+/**
+ * Quantité valide proposée pour réparer une ligne enregistrée hors règle
+ * (stock baissé, pas ou minimum modifié depuis l'ajout) : la plus proche
+ * inférieure ou égale, sinon le minimum s'il est disponible. 0 = à retirer.
+ */
+export function repairQuantity(current: number, stock: number, minimumQuantity: number, step: number): number {
+  const lower = normalizeQuantityForStock(current, stock, minimumQuantity, step);
+  if (lower > 0) return lower;
+  return getMaximumValidQuantity(stock, minimumQuantity, step) > 0 ? Math.max(1, Math.trunc(minimumQuantity) || 1) : 0;
+}
+
 /**
  * Normalizza a una quantità valida <= richiesta e <= stock.
  * 0 segnala che nessuna quantità valida è possibile: la UI deve marcare

@@ -5,7 +5,7 @@ import type { CartMutationInput, CartSyncStatus, PendingMutation } from '@/lib/c
 import { enqueueMutation } from '@/lib/cart/cartQueue';
 import { trackNalaAddToCart } from '@/lib/ai/nalaAttributionClient';
 import { useCartUiStore } from './cartUiStore';
-import { computeQuantityRuleState, getMaximumValidQuantity, getNextValidQuantity, getPreviousValidQuantity } from '@/lib/purchaseQuantityRules';
+import { computeQuantityRuleState, getMaximumValidQuantity, stepPurchaseQuantity } from '@/lib/purchaseQuantityRules';
 
 interface CartState {
   items: CartItem[];
@@ -36,12 +36,13 @@ interface CartState {
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   /**
-   * +/- centralisés pour les contrôles de quantité du panier (CartDrawer,
-   * CartPurchaseClient…) : contrairement à un +1/-1 littéral, respectent le pas de
-   * la règle de quantité du produit (ex. min=4/step=4 : 4 → 8, jamais 5).
+   * +/- centralisés pour tous les contrôles de quantité (card, fiche produit,
+   * panier, drawer, confirmation) via `stepPurchaseQuantity` : respectent le pas
+   * de la règle du produit (min=4/step=4 : 4 → 8, jamais 5) ; au minimum, le «−»
+   * retire la ligne (`'removed'`) au lieu de la laisser sous le minimum.
    */
   incrementItem: (productId: string) => void;
-  decrementItem: (productId: string) => void;
+  decrementItem: (productId: string) => 'decremented' | 'removed' | 'unchanged';
   clearCart: () => void;
   totalItems: () => number;
   totalPrice: () => number;
@@ -158,24 +159,30 @@ export const useCartStore = create<CartState>()(
       incrementItem(productId) {
         const item = get().items.find((i) => i.product.id === productId);
         if (!item) return;
-        const next = getNextValidQuantity(
+        const next = stepPurchaseQuantity(
           item.quantity,
           item.product.min_order_quantity ?? 1,
           item.product.order_quantity_step ?? 1,
           item.product.stock,
+          'increment',
         );
-        if (next !== null) get().updateQuantity(productId, next);
+        if (next !== null && next > item.quantity) get().updateQuantity(productId, next);
       },
 
       decrementItem(productId) {
         const item = get().items.find((i) => i.product.id === productId);
-        if (!item) return;
-        const previous = getPreviousValidQuantity(
+        if (!item) return 'unchanged';
+        const previous = stepPurchaseQuantity(
           item.quantity,
           item.product.min_order_quantity ?? 1,
           item.product.order_quantity_step ?? 1,
+          item.product.stock,
+          'decrement',
         );
-        if (previous !== null) get().updateQuantity(productId, previous);
+        if (previous === null) return 'unchanged';
+        if (previous === 0) { get().removeItem(productId); return 'removed'; }
+        get().updateQuantity(productId, previous);
+        return 'decremented';
       },
 
       clearCart() {

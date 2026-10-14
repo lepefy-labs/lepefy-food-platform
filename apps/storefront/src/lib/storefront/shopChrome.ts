@@ -17,6 +17,24 @@ export function shouldShowGlobalSearch(pathname: string): boolean {
   return !SEARCH_HIDDEN_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix));
 }
 
+/**
+ * Barre de recherche collante mobile/tablette. Absente du panier : son haut
+ * d'écran est réservé à « ← Continuer mes achats » (un seul élément collant).
+ */
+export function shouldShowSearchBar(pathname: string): boolean {
+  return shouldShowGlobalSearch(pathname) && pathname !== '/cart';
+}
+
+/**
+ * Barre de navigation du bas (mobile). Masquée au paiement et sur un panier
+ * non vide, où la barre « Livraison et paiement » est la seule zone d'action
+ * en bas d'écran ; un panier vide garde la navigation pour repartir.
+ */
+export function shouldShowBottomNav(pathname: string, cartItemCount: number): boolean {
+  if (pathname === '/avis/donner' || isCheckoutPath(pathname)) return false;
+  return !(pathname === '/cart' && cartItemCount > 0);
+}
+
 /** Le catalogue possède la recherche : le même champ y filtre la grille au lieu de proposer. */
 export function isCatalogSearchPath(pathname: string): boolean {
   return pathname === '/';

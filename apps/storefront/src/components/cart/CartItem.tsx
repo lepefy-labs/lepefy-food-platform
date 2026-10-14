@@ -4,8 +4,8 @@ import { IconChevronRight } from '@tabler/icons-react';
 import type { CartItem as CartItemType, ProductFulfillmentPolicy } from '@lepefy/types';
 import { formatPrice } from '@/lib/utils/format';
 import { deriveCartItemState } from '@/lib/cart/cartItemState';
-import { CartQuantityControl } from './CartQuantityControl';
-import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
+import { CartStepper } from './CartStepper';
+import { decrementRemovesLine, getMaximumValidQuantity, stepPurchaseQuantity } from '@/lib/purchaseQuantityRules';
 import { describePrice, formatCount, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { cartLineIssue } from '@/lib/storefrontCopy/availability';
 import { FulfillmentPolicyChip } from '@/components/catalog/FulfillmentPolicyChip';
@@ -18,6 +18,8 @@ interface CartItemProps {
   onIncrement: (productId: string) => void;
   onDecrement: (productId: string) => void;
   onRemove: (productId: string) => void;
+  /** Applique la quantité valide proposée par un problème de ligne (« Passer à 6 »). */
+  onAdjust?: (productId: string, quantity: number) => void;
   variant?: 'drawer' | 'page';
   /** Mode de réception lu frais (panier) : seul un mode imposé est affiché. */
   fulfillmentPolicy?: ProductFulfillmentPolicy;
@@ -32,6 +34,7 @@ export function CartItem({
   onIncrement,
   onDecrement,
   onRemove,
+  onAdjust,
   variant = 'drawer',
   fulfillmentPolicy,
 }: CartItemProps) {
@@ -55,6 +58,10 @@ export function CartItem({
     step: product.order_quantity_step ?? 1,
     countLabel: (count) => formatCount(sellingFormat, count),
   });
+  const minimum = product.min_order_quantity ?? 1;
+  const step = product.order_quantity_step ?? 1;
+  const canIncrement = stepPurchaseQuantity(quantity, minimum, step, product.stock, 'increment') !== null;
+  const removesOnDecrement = decrementRemovesLine(quantity, minimum, step);
   const lineTotal = product.price * quantity;
   const isPage = variant === 'page';
 
@@ -108,8 +115,17 @@ export function CartItem({
               <FulfillmentPolicyChip policy={fulfillmentPolicy} className="mt-1.5" />
             )}
             {issue && (
-              <p className={`mt-1.5 rounded-lg px-2 py-1 text-xs font-semibold leading-snug ${issue.kind === 'over_stock' ? 'bg-amber-50 text-amber-900' : 'bg-red-50 text-red-800'}`} role="status">
-                {issue.message}
+              <p className={`mt-1.5 flex flex-wrap items-center gap-x-2 rounded-lg px-2 py-1 text-xs font-semibold leading-snug ${issue.kind === 'over_stock' || issue.kind === 'off_rule' ? 'bg-amber-50 text-amber-900' : 'bg-red-50 text-red-800'}`} role="status">
+                <span>{issue.message}</span>
+                {(issue.kind === 'over_stock' || issue.kind === 'off_rule') && onAdjust && (
+                  <button
+                    type="button"
+                    onClick={() => onAdjust(product.id, issue.target)}
+                    className="pointer-events-auto relative z-20 inline-flex min-h-9 items-center font-bold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                  >
+                    Passer à {formatCount(sellingFormat, issue.target)}
+                  </button>
+                )}
               </p>
             )}
           </div>
@@ -120,14 +136,14 @@ export function CartItem({
           )}
         </div>
 
-        <div className={`${isPage ? 'mt-2.5' : 'mt-2'} flex items-center justify-between gap-3`}>
+        <div className={`${isPage ? 'mt-2.5' : 'mt-2'} flex flex-wrap items-center justify-between gap-x-3 gap-y-1`}>
           <div className="relative z-20 flex items-center gap-1.5 pointer-events-auto">
-            <CartQuantityControl
+            <CartStepper
               quantity={quantity}
-              min={product.min_order_quantity ?? 1}
-              max={maxPurchasable}
               productName={product.name}
-              disabled={blocked}
+              removesOnDecrement={removesOnDecrement}
+              canIncrement={!blocked && canIncrement && quantity < maxPurchasable}
+              disabled={state === 'unavailable'}
               onIncrement={() => onIncrement(product.id)}
               onDecrement={() => onDecrement(product.id)}
             />
