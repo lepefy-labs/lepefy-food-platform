@@ -32,6 +32,7 @@ import { ADDRESS_COPY } from '@/lib/storefrontCopy/addressCopy';
 import { missingFieldsTitle } from '@/lib/storefrontCopy/copy';
 import type { PublicTenant, TenantPaymentMethod, ShippingAddress } from '@lepefy/types';
 import { linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
+import { rememberConfirmationAccess } from '@/lib/checkout/confirmationAccess';
 
 interface SessionItem {
   productId:    string;
@@ -327,6 +328,7 @@ export function CheckoutSessionEditor({
         return { error: json.error ?? 'Une erreur est survenue.' };
       }
       setStripeClientSecret(json.clientSecret ?? null);
+      rememberConfirmationAccess(json.clientSecret, { sessionId, accessToken: accessToken ?? undefined });
       return { clientSecret: json.clientSecret, reference_id: sessionId };
     } catch {
       return { error: 'Une erreur est survenue.' };
@@ -470,8 +472,10 @@ export function CheckoutSessionEditor({
               billingCountryHint="Si un pays est demandé ci-dessous, indiquez celui associé à votre carte bancaire (facturation), pas votre position actuelle."
               createIntent={createIntent}
               onError={(msg) => setPayError(msg)}
-              onSucceeded={() => {
-                window.location.href = '/order-confirmation';
+              onSucceeded={(paymentIntentId) => {
+                window.location.href = paymentIntentId
+                  ? `/order-confirmation?payment_intent=${encodeURIComponent(paymentIntentId)}`
+                  : '/order-confirmation';
               }}
             />
           </div>

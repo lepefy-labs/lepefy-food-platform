@@ -61,6 +61,7 @@ import {
 } from '@/lib/address/addressRules';
 import { CheckoutProgressIndicator } from './CheckoutProgressIndicator';
 import { CartFulfillmentNotice } from '@/components/cart/CartFulfillmentNotice';
+import { rememberConfirmationAccess } from '@/lib/checkout/confirmationAccess';
 
 /** Codes serveur du mode de réception (lib/fulfillment/fulfillmentPolicy.ts). */
 const FULFILLMENT_ERROR_CODES = new Set(['FULFILLMENT_CONFLICT', 'FULFILLMENT_MODE_NOT_ALLOWED', 'PICKUP_NOT_ENABLED']);
@@ -569,6 +570,7 @@ export default function CheckoutFlow({
         });
         if (retryResponse.ok) {
           const retryResult = await retryResponse.json();
+          rememberConfirmationAccess(retryResult.clientSecret, { sessionId: stripeSessionIdRef.current, accessToken: stripeSessionTokenRef.current ?? undefined });
           return { clientSecret: retryResult.clientSecret, reference_id: stripeSessionIdRef.current };
         }
         // 403 (jeton absent ou périmé) : on repasse par /api/checkout, qui revalide tout.
@@ -593,6 +595,7 @@ export default function CheckoutFlow({
       stripeSessionIdRef.current = result.sessionId ?? null;
       stripeSessionTokenRef.current = result.accessToken ?? null;
       stripeSessionSnapshotRef.current = snapshot;
+      rememberConfirmationAccess(result.clientSecret, { sessionId: result.sessionId, accessToken: result.accessToken });
       return { clientSecret: result.clientSecret, reference_id: result.sessionId ?? null };
     } catch {
       return { error: ERROR_COPY.generic };
