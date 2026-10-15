@@ -283,7 +283,7 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
   if (step === 'payment' && showPaymentStep) {
     return (
       <div className="mx-auto max-w-xl rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
-        {error && <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+        {error && <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
         <StripePaymentStep
           module="rental"
           amount={total}
@@ -331,7 +331,7 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
           <PaymentOptionList options={options} />
           {selectedExternalMethod && <ExternalPaymentNote method={selectedExternalMethod} total={total} currency={tenant.currency} />}
         </div>
-        {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+        {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
         <button onClick={handleConfirmPayment} disabled={isSubmitting} className="min-h-12 w-full rounded-xl px-5 py-3 text-sm font-bold text-white disabled:opacity-50" style={{ backgroundColor: ctaColor }}>
           {isSubmitting ? 'Traitement…' : selectedExternalMethod ? `${ctaLabel} — ${formatPrice(total, tenant.currency)}` : ctaLabel}
         </button>

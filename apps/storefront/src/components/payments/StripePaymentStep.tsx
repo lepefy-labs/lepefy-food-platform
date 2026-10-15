@@ -31,6 +31,25 @@ interface StripePaymentStepProps {
   isTest?: boolean;
 }
 
+/**
+ * Le message d'erreur est rendu par le module (checkout, /card, évènements…)
+ * au-dessus du formulaire, souvent hors de l'écran sur mobile après un échec
+ * 3-D Secure. On amène dans la vue la dernière alerte (`role="alert"`) qui
+ * précède le formulaire, sinon la première qui le suit.
+ */
+function revealPaymentError(section: HTMLElement | null) {
+  if (!section) return;
+  window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+    const alerts = Array.from(document.querySelectorAll<HTMLElement>('[role="alert"]'))
+      .filter((alert) => alert.offsetParent !== null && (alert.textContent ?? '').trim().length > 0);
+    const before = alerts.filter((alert) => Boolean(alert.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING));
+    const target = before[before.length - 1] ?? alerts.find((alert) => !section.contains(alert));
+    if (!target) return;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+  }));
+}
+
 const DEFAULT_PAYMENT_WARNING = 'N’interrompez pas le paiement : après l’initialisation, ne fermez pas et n’actualisez pas cette page jusqu’à la confirmation.';
 
 function InnerPaymentStep({
@@ -75,6 +94,11 @@ function InnerPaymentStep({
     return () => window.removeEventListener('beforeunload', preventAccidentalExit);
   }, [isConfirming]);
 
+  function reportError(message: string) {
+    onError(message);
+    revealPaymentError(paymentSectionRef.current);
+  }
+
   async function handleConfirm() {
     if (!stripe || !elements) return;
     setIsConfirming(true);
@@ -82,14 +106,14 @@ function InnerPaymentStep({
     try {
       const { error: submitError } = await elements.submit();
       if (submitError) {
-        onError(submitError.message ?? 'Erreur lors du paiement.');
+        reportError(submitError.message ?? 'Erreur lors du paiement.');
         setIsConfirming(false);
         return;
       }
 
       const result = await createIntent();
       if (result.error || !result.clientSecret) {
-        onError(result.error ?? 'Erreur lors du paiement.');
+        reportError(result.error ?? 'Erreur lors du paiement.');
         logFunnelEvent({ module, event_type: 'confirm_error', reference_id: referenceIdRef.current, detail: { stage: 'create_intent', message: result.error ?? null } });
         setIsConfirming(false);
         return;
@@ -106,7 +130,7 @@ function InnerPaymentStep({
       });
 
       if (error) {
-        onError(error.message ?? 'Erreur lors du paiement.');
+        reportError(error.message ?? 'Erreur lors du paiement.');
         logFunnelEvent({
           module, event_type: 'confirm_error', reference_id: referenceIdRef.current,
           detail: { code: error.code ?? null, type: error.type ?? null },
@@ -124,7 +148,7 @@ function InnerPaymentStep({
       logFunnelEvent({ module, event_type: 'confirm_succeeded_client', reference_id: referenceIdRef.current });
       onSucceeded(paymentIntent?.id);
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Erreur lors du paiement.');
+      reportError(err instanceof Error ? err.message : 'Erreur lors du paiement.');
       logFunnelEvent({
         module, event_type: 'confirm_error', reference_id: referenceIdRef.current,
         detail: { stage: 'unexpected', message: err instanceof Error ? err.message : String(err) },
@@ -186,6 +210,12 @@ export function StripePaymentStep(props: StripePaymentStepProps) {
             colorPrimary: props.color,
             borderRadius: '12px',
             fontFamily: 'inherit',
+          },
+          // Exemples (« 1234 1234 1234 1234 », « MM / AA », « CVC ») en gris très
+          // clair : ils passaient pour des valeurs pré-remplies. Stripe ne permet
+          // pas d'en changer le texte, seulement la couleur. Tous les modules.
+          rules: {
+            '.Input::placeholder': { color: '#c3c9d2' },
           },
         },
       }}

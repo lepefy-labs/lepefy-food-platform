@@ -103,6 +103,32 @@ test.describe('Lecture Stripe en français', () => {
     expect(journeyLabel(expired)).toBe('Vérification 3-D Secure non aboutie');
   });
 
+  test('le résultat vient de la dernière tentative, dans n’importe quel ordre', () => {
+    const at = (event_type: string, minute: number, detail: Record<string, unknown> | null = null) =>
+      ({ event_type, created_at: `2026-10-15T08:${String(minute).padStart(2, '0')}:00Z`, detail });
+    const declinedThenAbandoned3ds = [
+      at('confirm_attempted', 1), at('payment_failed_server', 2, { code: 'card_declined', decline_code: 'insufficient_funds' }),
+      at('confirm_attempted', 3), at('abandoned_payment_form', 4),
+    ];
+    expect(classifyCardCart(declinedThenAbandoned3ds)).toBe('left_after_pay');
+    // La fiche passe le journal du plus récent au plus ancien.
+    expect(classifyCardCart([...declinedThenAbandoned3ds].reverse())).toBe('left_after_pay');
+
+    const declinedThen3dsFailed = [
+      at('confirm_attempted', 1), at('payment_failed_server', 2, { code: 'card_declined' }),
+      at('confirm_attempted', 3), at('payment_failed_server', 4, { code: 'payment_intent_authentication_failure' }),
+    ];
+    expect(classifyCardCart(declinedThen3dsFailed)).toBe('authentication_pending');
+
+    const threeDsThenDeclined = [
+      at('confirm_attempted', 1), at('confirm_error', 2, { code: 'payment_intent_authentication_failure' }),
+      at('confirm_attempted', 3), at('confirm_error', 4, { code: 'card_declined' }),
+    ];
+    expect(classifyCardCart(threeDsThenDeclined)).toBe('declined');
+    expect(classifyCardCart([at('confirm_attempted', 1), at('confirm_error', 2, { code: 'processing_error' })])).toBe('error');
+    expect(classifyCardCart([at('confirm_attempted', 1), at('payment_failed_server', 2, { code: 'card_declined' }), at('confirm_succeeded_client', 3)])).toBe('succeeded');
+  });
+
   test('un évènement Stripe reçu par deux webhooks n’apparaît qu’une fois', () => {
     const failure = ev('payment_failed_server', { stripe_event_id: 'evt_1', code: 'card_declined' });
     const events = [ev('confirm_attempted'), failure, { ...failure }, ev('payment_failed_server', { stripe_event_id: 'evt_2' }), ev('confirm_error')];

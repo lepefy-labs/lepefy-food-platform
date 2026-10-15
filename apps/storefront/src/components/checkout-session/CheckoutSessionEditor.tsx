@@ -457,7 +457,7 @@ export function CheckoutSessionEditor({
         {payAsStripe && (
           <div className="mb-6">
             {payError && (
-              <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3 mb-3">{payError}</p>
+              <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3 mb-3" role="alert">{payError}</p>
             )}
             <StripePaymentStep
               key={stripeClientSecret ?? 'pending'}

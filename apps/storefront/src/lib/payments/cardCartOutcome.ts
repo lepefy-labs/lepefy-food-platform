@@ -60,16 +60,34 @@ export function dedupeStripeFailures<E extends FunnelEvent>(events: readonly E[]
   });
 }
 
-/** Résumé d'un panier carte à partir de son journal (le plus parlant gagne). */
+const ATTEMPT_STARTS = new Set(['confirm_attempted', 'intent_created']);
+
+/**
+ * Résumé d'un panier carte à partir de son journal, sur la dernière tentative :
+ * une carte refusée puis un 3-D Secure abandonné avec une autre carte se lit
+ * « 3-D Secure non terminé ». Un paiement validé l'emporte toujours. Sans
+ * tentative repérable (anciens journaux), tout le journal compte. Ordre
+ * d'entrée indifférent (trié par date).
+ */
 export function classifyCardCart(events: readonly FunnelEvent[]): CardCartOutcome {
-  const types = new Set(events.map((event) => event.event_type));
-  if (types.has('confirm_succeeded_client')) return 'succeeded';
-  const failures = events.filter((event) => event.event_type === 'payment_failed_server');
-  if (failures.some((event) => !isAuthenticationFailure(stringOrNull(event.detail?.code), stringOrNull(event.detail?.decline_code)))) return 'declined';
+  const ordered = [...events].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+  if (ordered.some((event) => event.event_type === 'confirm_succeeded_client')) return 'succeeded';
+
+  let lastStart = -1;
+  ordered.forEach((event, index) => { if (ATTEMPT_STARTS.has(event.event_type)) lastStart = index; });
+  const attempt = lastStart < 0 ? ordered : ordered.slice(lastStart);
+  const types = new Set(attempt.map((event) => event.event_type));
+  const isAuth = (event: FunnelEvent) => isAuthenticationFailure(stringOrNull(event.detail?.code), stringOrNull(event.detail?.decline_code));
+
+  const failures = attempt.filter((event) => event.event_type === 'payment_failed_server');
+  if (failures.some((event) => !isAuth(event))) return 'declined';
   if (failures.length > 0 || types.has('requires_action')) return 'authentication_pending';
-  if (types.has('confirm_error')) return 'error';
+  const browserErrors = attempt.filter((event) => event.event_type === 'confirm_error');
+  if (browserErrors.some((event) => stringOrNull(event.detail?.code) === 'card_declined')) return 'declined';
+  if (browserErrors.some(isAuth)) return 'authentication_pending';
+  if (browserErrors.length > 0) return 'error';
   // Paiement différé : le PaymentIntent n'est créé qu'au clic sur « Payer ».
-  if (types.has('confirm_attempted') || types.has('intent_created')) return 'left_after_pay';
+  if (lastStart >= 0) return 'left_after_pay';
   if (types.has('abandoned_payment_form') || types.has('elements_mounted')) return 'left_form';
   return 'not_started';
 }
