@@ -353,6 +353,75 @@ test.describe('catalogue intégré au panier', () => {
   });
 });
 
+test.describe('BottomNav : couleurs, état actif, pastille du panier', () => {
+  const nav = (page: Page) => page.getByRole('navigation', { name: 'Navigation boutique' });
+  const tab = (page: Page, destination: string) => nav(page).locator(`a[data-destination="${destination}"]`);
+
+  for (const width of [320, 360, 390, 430]) {
+    test(`active destination per page at ${width}px, never by colour alone`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/');
+      await expect(tab(page, 'catalog')).toHaveAttribute('aria-current', 'page');
+      await expect(tab(page, 'cart')).not.toHaveAttribute('aria-current', 'page');
+      // Actif = libellé gras ET pastille teintée ; inactif = ni l'un ni l'autre.
+      const styles = await nav(page).locator('a').evaluateAll((links) => links.map((a) => {
+        const label = a.querySelector('span.truncate') as HTMLElement;
+        const pill = a.firstElementChild as HTMLElement;
+        const rect = a.getBoundingClientRect();
+        return { current: a.getAttribute('aria-current'), weight: Number(getComputedStyle(label).fontWeight), pill: getComputedStyle(pill).backgroundColor,
+          width: rect.width, height: rect.height, overflow: label.scrollWidth > label.clientWidth };
+      }));
+      for (const s of styles) {
+        expect(s.width).toBeGreaterThanOrEqual(width / 5 - 1);
+        expect(s.height).toBeGreaterThanOrEqual(48);
+        expect(s.overflow).toBe(false);
+        if (s.current === 'page') { expect(s.weight).toBeGreaterThanOrEqual(700); expect(s.pill).not.toBe('rgba(0, 0, 0, 0)'); }
+        else { expect(s.weight).toBeLessThan(700); expect(s.pill).toBe('rgba(0, 0, 0, 0)'); }
+      }
+      expect(styles.filter((s) => s.current === 'page')).toHaveLength(1);
+      const box = (await nav(page).boundingBox())!;
+      expect(box.height).toBeLessThanOrEqual(72);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    });
+  }
+
+  test('each destination is active on its own page; checkout has no BottomNav', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const [url, destination] of [['/accueil', 'discover'], ['/gadgets', 'goodies'], ['/compte/connexion', 'account'], ['/cart', 'cart']] as const) {
+      await page.goto(url);
+      await expect(tab(page, destination)).toHaveAttribute('aria-current', 'page');
+      await expect(nav(page).locator('a[aria-current="page"]')).toHaveCount(1);
+    }
+    // Panier non vide (sinon /checkout renvoie au panier) ; toute écriture reste interceptée.
+    await seedCart(page, 1);
+    await page.goto('/checkout');
+    await expect(page).toHaveURL(/\/checkout$/);
+    await expect(nav(page)).toHaveCount(0);
+  });
+
+  test('the cart badge counts items without making the cart active, and pops only after a real add', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    const cart = tab(page, 'cart');
+    await expect(cart.locator('span.tabular-nums')).toHaveCount(0);
+    // Pas d'animation au chargement.
+    expect(await cart.locator('.animate-cart-pop').count()).toBe(0);
+    const add = page.getByRole('button', { name: /^Ajouter( \d+)? au panier$/ }).first();
+    await add.click();
+    await page.keyboard.press('Escape');
+    const units = (await readItems(page)).reduce((sum, i) => sum + i.quantity, 0);
+    await expect(cart.locator('span.tabular-nums')).toHaveText(String(units));
+    await expect(cart).toHaveAttribute('aria-label', new RegExp(`${units} article`));
+    await expect(cart).not.toHaveAttribute('aria-current', 'page');
+    await expect(tab(page, 'catalog')).toHaveAttribute('aria-current', 'page');
+    // Pastille contenue dans la barre, sans recouvrir le libellé.
+    const badge = (await cart.locator('span.tabular-nums').boundingBox())!;
+    const label = (await cart.locator('span.truncate').boundingBox())!;
+    expect(badge.y + badge.height).toBeLessThanOrEqual(label.y + 1);
+    expect(badge.y).toBeGreaterThanOrEqual((await nav(page).boundingBox())!.y);
+  });
+});
+
 test('removing a line offers an undo in the bottom bar', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const items = await seedCart(page, 2);
