@@ -61,7 +61,8 @@ for (const width of [320, 390]) {
     const barBox = (await bar.boundingBox())!;
     const navBox = (await nav.boundingBox())!;
     expect(barBox.y + barBox.height).toBeLessThanOrEqual(navBox.y + 1);
-    const lines = page.getByRole('list').filter({ has: page.getByRole('group', { name: /^Quantité de / }) }).locator(':scope > li');
+    // Lignes du panier seulement (la grille « Tous les produits » montre aussi des +/−).
+    const lines = page.locator('section[aria-label="Articles du panier"] > ul > li');
     await expect(lines).toHaveCount(items.length);
     const lastBox = (await lines.last().boundingBox())!;
     expect(lastBox.y + lastBox.height).toBeLessThanOrEqual(barBox.y + 1);
