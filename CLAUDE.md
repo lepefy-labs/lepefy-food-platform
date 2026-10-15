@@ -61,6 +61,8 @@ Cart (Zustand, localStorage)
   → /order-confirmation
 ```
 
+`/order-confirmation?payment_intent=…` reads the order through `POST /api/checkout-sessions/[id]/order` (session access token returned by `/api/checkout`, or the logged-in owner; `pending` until the webhook creates the order; reduced view `lib/orders/confirmationView.ts`, never the address beyond postal code/city/country). The checkout keeps `{sessionId, accessToken}` in the tab's sessionStorage keyed by PaymentIntent (`lib/checkout/confirmationAccess.ts`), never in the URL; without it the page falls back to the logged-in RLS read, then a generic message. The anon client can't read `orders` for a guest (RLS `orders_select_own`).
+
 ### Purchase Quantity Rules (minimum + step, per product and per combinable group)
 
 `products.min_order_quantity` / `products.order_quantity_step` (migration `121_purchase_quantity_rules.sql`, default `1`/`1` — no behavior change until a tenant configures otherwise) express a generic rule: quantity `q` is valid iff `q >= minimum AND (q - minimum) % step == 0`. The same migration adds `purchase_quantity_groups` / `purchase_quantity_group_products` for an aggregate minimum across a combinable group of products (e.g. a "Boissons" group with minimum 12, any mix of member products counting toward the total) — group membership is explicit, never derived from `categories`.

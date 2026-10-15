@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   IconClock,
@@ -9,9 +9,13 @@ import {
   IconMapPin,
   IconCreditCard,
   IconPackage,
+  IconRefresh,
+  IconTruckDelivery,
 } from '@tabler/icons-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatPrice } from '@/lib/utils/format';
+import { readConfirmationAccess, type ConfirmationAccess } from '@/lib/checkout/confirmationAccess';
+import { orderReference, type ConfirmationOrderView, type ConfirmationResponse } from '@/lib/orders/confirmationView';
 
 interface ShippingAddress {
   full_name?:   string;
@@ -48,6 +52,20 @@ interface TenantProps {
   click_collect_address: string | null;
 }
 
+/** Ce que la page affiche, quelle que soit la source (vue serveur ou lecture connectée). */
+interface DisplayOrder {
+  reference:        string;
+  email:            string | null;
+  isPickup:         boolean;
+  isInStorePayment: boolean;
+  items:            Array<{ id: string; name: string; quantity: number; subtotal: number }>;
+  subtotal:         number;
+  shippingCost:     number;
+  total:            number;
+  addressLines:     string[];
+  trackingUrl:      string | null;
+}
+
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS  = 30000;
 
@@ -58,18 +76,109 @@ interface Props {
   isInStore?:      boolean;
 }
 
+function fromLegacyOrder(order: Order): DisplayOrder {
+  const address = order.shipping_address;
+  const addressLines = address ? [
+    address.full_name ?? '',
+    address.line1 ?? '',
+    [[address.postal_code, address.city].filter(Boolean).join(' '), address.country].filter(Boolean).join(', '),
+  ].filter(Boolean) : [];
+  return {
+    reference:        orderReference(order.id),
+    email:            order.email,
+    isPickup:         order.fulfillment_type === 'pickup',
+    isInStorePayment: order.payment_method === 'in_store',
+    items:            (order.order_items ?? []).map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, subtotal: Number(item.subtotal) })),
+    subtotal:         Number(order.subtotal),
+    shippingCost:     Number(order.shipping_cost),
+    total:            Number(order.total),
+    addressLines,
+    trackingUrl:      null,
+  };
+}
+
+function fromConfirmationView(order: ConfirmationOrderView): DisplayOrder {
+  return {
+    reference:        order.reference,
+    email:            order.email,
+    isPickup:         order.fulfillmentType === 'pickup',
+    isInStorePayment: false,
+    items:            order.items,
+    subtotal:         order.subtotal,
+    shippingCost:     order.shippingCost,
+    total:            order.total,
+    addressLines:     order.deliveryPlace ? [order.deliveryPlace] : [],
+    trackingUrl:      order.trackingUrl,
+  };
+}
+
+type Mode = 'checking' | 'session' | 'legacy';
+
 export default function OrderConfirmationClient({
   tenant,
   paymentIntentId,
   preloadedOrder,
   isInStore,
 }: Props) {
-  const [order, setOrder]       = useState<Order | null>(preloadedOrder ?? null);
-  const [timedOut, setTimedOut] = useState(false);
+  const [order, setOrder]         = useState<DisplayOrder | null>(preloadedOrder ? fromLegacyOrder(preloadedOrder) : null);
+  const [timedOut, setTimedOut]   = useState(false);
+  const [mode, setMode]           = useState<Mode>('checking');
+  const [access, setAccess]       = useState<ConfirmationAccess | null>(null);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [pollRound, setPollRound] = useState(0);
 
+  // Accès gardé par le checkout dans cet onglet (lu après le montage : sessionStorage).
   useEffect(() => {
-    // No polling needed if order is already loaded (in_store flow)
     if (preloadedOrder || !paymentIntentId) return;
+    const stored = readConfirmationAccess(paymentIntentId);
+    setAccess(stored);
+    setMode(stored ? 'session' : 'legacy');
+  }, [paymentIntentId, preloadedOrder]);
+
+  const fetchFromSession = useCallback(async (current: ConfirmationAccess): Promise<'ready' | 'pending' | 'denied'> => {
+    try {
+      const response = await fetch(`/api/checkout-sessions/${current.sessionId}/order`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
+        body: JSON.stringify({ accessToken: current.accessToken }),
+      });
+      if (response.status === 404) return 'denied';
+      if (!response.ok) return 'pending';
+      const result = await response.json() as ConfirmationResponse;
+      if (result.status === 'ready') {
+        setOrder(fromConfirmationView(result.order));
+        return 'ready';
+      }
+      setPendingEmail(result.email ?? null);
+      return 'pending';
+    } catch {
+      return 'pending';
+    }
+  }, []);
+
+  // Client avec accès de session : lecture immédiate, puis toutes les 2 s pendant 30 s.
+  useEffect(() => {
+    if (mode !== 'session' || !access || order) return;
+    let stopped = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const tick = async () => {
+      const outcome = await fetchFromSession(access);
+      if (stopped) return;
+      if (outcome === 'ready') stop();
+      if (outcome === 'denied') { stop(); setMode('legacy'); }
+    };
+    const stop = () => {
+      stopped = true;
+      if (interval) clearInterval(interval);
+    };
+    void tick();
+    interval = setInterval(() => { void tick(); }, POLL_INTERVAL_MS);
+    const timeout = setTimeout(() => { stop(); setTimedOut(true); }, POLL_TIMEOUT_MS);
+    return () => { stop(); clearTimeout(timeout); };
+  }, [mode, access, order, pollRound, fetchFromSession]);
+
+  // Sans accès de session (autre onglet, stockage indisponible) : lecture du client connecté.
+  useEffect(() => {
+    if (mode !== 'legacy' || order || !paymentIntentId) return;
 
     const supabase = createClient();
 
@@ -85,7 +194,7 @@ export default function OrderConfirmationClient({
         .maybeSingle();
 
       if (data) {
-        setOrder(data as Order);
+        setOrder(fromLegacyOrder(data as Order));
         clearInterval(interval);
       }
     }, POLL_INTERVAL_MS);
@@ -99,7 +208,12 @@ export default function OrderConfirmationClient({
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [paymentIntentId, tenant.id, preloadedOrder]);
+  }, [mode, order, paymentIntentId, tenant.id]);
+
+  function refresh() {
+    setTimedOut(false);
+    setPollRound((round) => round + 1);
+  }
 
   // ── In-store: order not found (shouldn't happen, but handle gracefully) ──
   if (isInStore && !order) {
@@ -137,7 +251,38 @@ export default function OrderConfirmationClient({
     );
   }
 
-  // ── Stripe: timeout before order appeared ────────────────────────────────
+  // ── Stripe, accès de session : paiement sûr, commande pas encore lisible ──
+  if (timedOut && !order && mode === 'session') {
+    return (
+      <div className="max-w-md mx-auto px-4 py-12 text-center">
+        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+          <IconCircleCheck size={28} className="text-green-600" />
+        </div>
+        <h1 className="text-2xl font-bold mb-2">Paiement reçu</h1>
+        <p className="text-gray-600 text-sm">
+          Votre commande est en cours d&apos;enregistrement.
+          {pendingEmail
+            ? <> Vous recevrez la confirmation à <strong className="text-gray-900 break-all">{pendingEmail}</strong>.</>
+            : ' Vous recevrez la confirmation par email.'}
+        </p>
+        <p className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm text-amber-900">
+          Ne payez pas une seconde fois. Si rien n&apos;arrive d&apos;ici quelques minutes, contactez la boutique.
+        </p>
+        <button
+          type="button"
+          onClick={refresh}
+          className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-5 text-sm font-bold text-gray-900 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"
+        >
+          <IconRefresh size={18} aria-hidden="true" /> Actualiser
+        </button>
+        <Link href="/" className="mt-4 inline-block text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
+          ← Continuer mes achats
+        </Link>
+      </div>
+    );
+  }
+
+  // ── Stripe, sans accès de session : timeout before order appeared ────────
   if (timedOut && !order) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
@@ -155,25 +300,33 @@ export default function OrderConfirmationClient({
     );
   }
 
-  // ── Stripe: polling in progress ──────────────────────────────────────────
+  // ── Stripe: en attente du webhook ────────────────────────────────────────
   if (!order) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4 animate-pulse">
-          <IconClock size={28} className="text-yellow-700" />
+      <div className="max-w-md mx-auto px-4 py-12 text-center" role="status" aria-live="polite">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--color-primary-light, #E3EFFB)' }}>
+          <span
+            className="h-7 w-7 rounded-full border-[3px] border-white/70 motion-safe:animate-spin"
+            style={{ borderTopColor: 'var(--color-primary)' }}
+            aria-hidden="true"
+          />
         </div>
-        <h1 className="text-2xl font-bold mb-2">Paiement reçu — commande en cours</h1>
+        <h1 className="text-2xl font-bold mb-2">Paiement reçu</h1>
         <p className="text-gray-600 text-sm">
-          Votre paiement a bien été effectué. Votre commande est en cours de création…
+          Nous enregistrons votre commande. Cela prend quelques secondes, restez sur cette page.
         </p>
+        <div className="mt-6 grid gap-2 rounded-2xl border border-gray-100 p-4" aria-hidden="true">
+          <span className="h-2.5 w-3/5 rounded bg-gray-100" />
+          <span className="h-2.5 w-4/5 rounded bg-gray-100" />
+          <span className="h-2.5 w-2/5 rounded bg-gray-100" />
+        </div>
+        <p className="mt-4 text-sm text-gray-600">Aucun montant ne sera débité une seconde fois.</p>
       </div>
     );
   }
 
   // ── Order found — full confirmation display ──────────────────────────────
-  const isPickup   = order.fulfillment_type === 'pickup';
-  const isInStorePayment = order.payment_method === 'in_store';
-  const address    = order.shipping_address;
+  const { isPickup, isInStorePayment } = order;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -192,8 +345,13 @@ export default function OrderConfirmationClient({
           }
         </p>
         <p className="text-xs text-gray-400 mt-1 font-mono">
-          N° {order.id.slice(0, 8).toUpperCase()}
+          N° {order.reference}
         </p>
+        {order.email && (
+          <p className="text-sm text-gray-600 mt-2">
+            Confirmation envoyée à <strong className="text-gray-900 break-all">{order.email}</strong>
+          </p>
+        )}
         {isInStorePayment && (
           <span
             className="text-xs font-semibold mt-2"
@@ -211,7 +369,7 @@ export default function OrderConfirmationClient({
       {/* Order lines */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
         <p className="text-sm font-semibold text-gray-700 mb-3">Détail de la commande</p>
-        {(order.order_items ?? []).map((item) => (
+        {order.items.map((item) => (
           <div
             key={item.id}
             className="flex justify-between text-sm py-1.5 border-b border-gray-50 last:border-0"
@@ -226,12 +384,12 @@ export default function OrderConfirmationClient({
             <span>{formatPrice(order.subtotal, tenant.currency)}</span>
           </div>
           <div className="flex justify-between text-sm text-gray-600">
-            <span>Prix de livraison</span>
+            <span>{isPickup ? 'Retrait en boutique' : 'Prix de livraison'}</span>
             <span>
-              {order.shipping_cost === 0 ? (
-                <span className="text-green-700 font-medium">Gratuite</span>
+              {order.shippingCost === 0 ? (
+                <span className="text-green-700 font-medium">{isPickup ? 'Gratuit' : 'Gratuite'}</span>
               ) : (
-                formatPrice(order.shipping_cost, tenant.currency)
+                formatPrice(order.shippingCost, tenant.currency)
               )}
             </span>
           </div>
@@ -261,26 +419,23 @@ export default function OrderConfirmationClient({
       )}
 
       {/* Delivery address */}
-      {!isPickup && address && (
+      {!isPickup && order.addressLines.length > 0 && (
         <div className="bg-gray-50 rounded-2xl p-4 mb-4">
           <p className="font-semibold text-sm text-gray-700 mb-2 flex items-center gap-1.5">
-            <IconPackage size={16} /> Adresse de livraison
+            <IconPackage size={16} /> {order.addressLines.length === 1 ? 'Livraison à' : 'Adresse de livraison'}
           </p>
-          {address.full_name   && <p className="text-sm text-gray-700">{address.full_name}</p>}
-          {address.line1       && <p className="text-sm text-gray-700">{address.line1}</p>}
-          {(address.postal_code || address.city) && (
-            <p className="text-sm text-gray-700">
-              {address.postal_code} {address.city}
-              {address.country ? `, ${address.country}` : ''}
-            </p>
-          )}
+          {order.addressLines.map((line) => <p key={line} className="text-sm text-gray-700">{line}</p>)}
         </div>
       )}
 
-      {order.email && (
-        <p className="text-xs text-gray-400 text-center mb-6">
-          Un email de confirmation a été envoyé à {order.email}.
-        </p>
+      {order.trackingUrl && (
+        <a
+          href={order.trackingUrl}
+          className="mb-4 flex min-h-12 items-center justify-center gap-2 rounded-2xl px-5 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"
+          style={{ backgroundColor: 'var(--color-primary)' }}
+        >
+          <IconTruckDelivery size={18} aria-hidden="true" /> Suivre ma commande
+        </a>
       )}
 
       <div className="text-center">
