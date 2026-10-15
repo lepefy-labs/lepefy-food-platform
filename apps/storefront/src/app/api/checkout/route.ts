@@ -11,6 +11,7 @@ import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import { upsertActiveCheckoutSession } from '@/lib/checkout/activeCheckoutSession';
+import { generateCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessionAccessToken';
 import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
 import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
@@ -326,6 +327,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,
       sessionId: active.id,
+      // Nouvelle tentative du même client non connecté (refus, 3-D Secure échoué) via create-intent.
+      accessToken: generateCheckoutSessionAccessToken(active.id, email),
       reusedCheckout: active.reused,
     });
   } catch (err) {

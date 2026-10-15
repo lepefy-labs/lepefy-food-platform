@@ -43,6 +43,23 @@ export interface FunnelEvent {
   detail?: Record<string, unknown> | null;
 }
 
+/**
+ * Un même évènement Stripe peut être enregistré deux fois (deux webhooks
+ * abonnés au même compte, ou rejeu concurrent : le contrôle d'idempotence de
+ * `recordCardPaymentFailure` n'est pas atomique). On garde la première ligne
+ * de chaque `stripe_event_id`, dans l'ordre reçu.
+ */
+export function dedupeStripeFailures<E extends FunnelEvent>(events: readonly E[]): E[] {
+  const seen = new Set<string>();
+  return events.filter((event) => {
+    const id = event.event_type === 'payment_failed_server' ? stringOrNull(event.detail?.stripe_event_id) : null;
+    if (!id) return true;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
 /** Résumé d'un panier carte à partir de son journal (le plus parlant gagne). */
 export function classifyCardCart(events: readonly FunnelEvent[]): CardCartOutcome {
   const types = new Set(events.map((event) => event.event_type));

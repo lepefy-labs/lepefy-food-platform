@@ -3,6 +3,7 @@ import {
   CARD_CART_OUTCOME_META,
   classifyCardCart,
   declineReason,
+  dedupeStripeFailures,
   describeStripeIntent,
   journeyLabel,
   paymentFailureDetail,
@@ -100,6 +101,13 @@ test.describe('Lecture Stripe en français', () => {
     const expired = ev('payment_failed_server', { code: 'payment_intent_payment_attempt_expired' });
     expect(classifyCardCart([ev('intent_created'), expired])).toBe('authentication_pending');
     expect(journeyLabel(expired)).toBe('Vérification 3-D Secure non aboutie');
+  });
+
+  test('un évènement Stripe reçu par deux webhooks n’apparaît qu’une fois', () => {
+    const failure = ev('payment_failed_server', { stripe_event_id: 'evt_1', code: 'card_declined' });
+    const events = [ev('confirm_attempted'), failure, { ...failure }, ev('payment_failed_server', { stripe_event_id: 'evt_2' }), ev('confirm_error')];
+    expect(dedupeStripeFailures(events).map((event) => event.event_type))
+      .toEqual(['confirm_attempted', 'payment_failed_server', 'payment_failed_server', 'confirm_error']);
   });
 
   test('un échec 3-D Secure du webhook n’est pas un refus de la banque', () => {
