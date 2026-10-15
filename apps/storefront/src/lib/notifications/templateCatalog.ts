@@ -2,7 +2,7 @@ import type { TenantNotificationContext } from '@/lib/notifications/getTenantNot
 import {
   adminInvitedEmail, cardQuickPaymentCustomerEmail, cardQuickPaymentEmail, eventBookingClosedReportsEmail, eventExternalPaymentAwaitingVerificationEmail,
   eventReservationConfirmedEmail, externalPaymentAwaitingVerificationEmail, orderCancelledEmail, orderCompletedEmail,
-  orderConfirmedEmail, orderReadyForPickupEmail, orderShippedEmail, paymentReminderEmail, reviewInviteEmail, subscriptionReminderEmail,
+  orderConfirmedEmail, orderReadyForPickupEmail, orderShippedEmail, paymentReminderEmail, cartComebackEmail, reviewInviteEmail, subscriptionReminderEmail,
 } from '@/lib/notifications/customerEmails';
 import {
   eventCapacityConflictEmail, marketingCampaignEmail, rentalDeliveryQuotePendingEmail, rentalReservationAdminEmail,
@@ -82,6 +82,10 @@ export function buildTemplatePreviews(context: TenantNotificationContext, now = 
   const reminder = { paymentReference: '#S1T2U3V4', fullName: customer.fullName, paymentMethodLabel: 'PayPal', amount: 64.9, resumeLink: `${base}/checkout/reprendre/exemple?token=apercu` };
   add('payment-reminder-started', 'Paiements', 'Relance paiement · paiement peut-être déjà fait', 'Client', paymentReminderEmail(context, { ...reminder, providerHandoffStarted: true }));
   add('payment-reminder-open', 'Paiements', 'Relance paiement · achat non finalisé', 'Client', paymentReminderEmail(context, { ...reminder, providerHandoffStarted: false }));
+  add('cart-comeback', 'Paiements', 'Relance panier carte expiré · Retrouver mon panier', 'Client', cartComebackEmail(context, {
+    fullName: customer.fullName, comebackLink: `${base}/panier/retrouver/exemple?token=apercu`, validDays: 14,
+    items: [{ name: 'Attiéké 1 kg', unitPrice: 6.5, quantity: 4 }, { name: 'Huile de palme 1 L', unitPrice: 9.9, quantity: 2 }, { name: 'Gari 1 kg', unitPrice: 4.5, quantity: 3 }],
+  }));
   add('external-payment', 'Paiements', 'Paiement externe à vérifier', 'Équipe du tenant', externalPaymentAwaitingVerificationEmail(context, {
     paymentReference: '#S1T2U3V4', paymentMethodLabel: 'PayPal', amount: 64.9, fulfillmentType: 'delivery', customer,
     items: [{ name: 'Attiéké 1 kg', price: 6.5, quantity: 4 }, { name: 'Huile de palme 1 L', price: 9.9, quantity: 2 }],
