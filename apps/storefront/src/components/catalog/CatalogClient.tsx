@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useState, useTransition, useEffect, useRef } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { ProductGrid, ProductCardSkeleton } from '@/components/catalog/ProductGrid';
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { CatalogCategoryRow } from '@/components/catalog/CatalogCategoryRow';
@@ -13,6 +13,7 @@ import { IconLayoutGrid } from '@tabler/icons-react';
 const SEE_ALL_FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 motion-reduce:transition-none';
 import { rememberCatalogPosition, takeCatalogScrollRestore } from '@/lib/catalog/shoppingReturn';
 import { useCatalogSearchStore } from '@/stores/catalogSearchStore';
+import { useInfiniteProducts } from '@/lib/catalog/useInfiniteProducts';
 import type { Category, ProductWithCategory, SemanticMatch } from '@lepefy/types';
 import type { CatalogSort } from '@/lib/catalog/pagination';
 
@@ -77,32 +78,8 @@ export function CatalogClient({
   const searchPending = useCatalogSearchStore((s) => s.pending);
   const isPending = isNavigating || searchPending;
 
-  // Accumulation des pages chargées par le scroll infini — remise à zéro
-  // chaque fois qu'un nouveau rendu serveur arrive (recherche/catégorie
-  // changée, ou chargement direct d'une URL ?page=N).
-  const [items, setItems]             = useState<ProductWithCategory[]>(products);
-  const [page, setPage]               = useState(currentPage);
-  const [hasMore, setHasMore]         = useState(hasNextPage);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
-  const sentinelRef    = useRef<HTMLDivElement | null>(null);
-  // Garde synchrone : l'observer peut notifier deux fois avant que
-  // setIsLoadingMore n'ait re-rendu le composant.
-  const loadingMoreRef = useRef(false);
-  const loadMoreAbortRef = useRef<AbortController | null>(null);
-
   const [semanticResults, setSemanticResults]     = useState<SemanticMatch[]>([]);
   const [isSemanticLoading, setIsSemanticLoading] = useState(false);
-
-  useEffect(() => {
-    // Une page suivante encore en vol appartient à l'ancien filtre : elle ne
-    // doit jamais être ajoutée à la nouvelle liste.
-    loadMoreAbortRef.current?.abort();
-    setItems(products);
-    setPage(currentPage);
-    setHasMore(hasNextPage);
-    setLoadMoreFailed(false);
-  }, [products, currentPage, hasNextPage]);
 
   // Cascade : la recherche sémantique ne se déclenche que si la recherche
   // textuelle existante donne peu de résultats au total — elle ne la
@@ -134,24 +111,24 @@ export function CatalogClient({
     return () => controller.abort();
   }, [initialQuery, totalCount, semanticEnabled]);
 
-  const textualIds = new Set(items.map(p => p.id));
-  const semanticOnly = semanticResults.filter(p => !textualIds.has(p.id));
-
   function buildUrl(overrides: CatalogUrlOverrides) {
     return buildCatalogUrl(pathname, searchParams.toString(), overrides);
   }
 
-  async function handleLoadMore() {
-    if (loadingMoreRef.current || !hasMore) return;
-    loadingMoreRef.current = true;
-    const controller = new AbortController();
-    loadMoreAbortRef.current = controller;
-    setIsLoadingMore(true);
-    setLoadMoreFailed(false);
-    try {
-      const nextPage = page + 1;
+  // Scroll infini (hook partagé avec le panier) : la liste repart du rendu
+  // serveur à chaque recherche/catégorie, ou sur une URL ?page=N directe.
+  const {
+    items, page, hasMore, isLoadingMore, loadMoreFailed, loadMore: handleLoadMore, sentinelRef,
+  } = useInfiniteProducts<ProductWithCategory>({
+    initialItems: products,
+    initialPage: currentPage,
+    initialHasMore: hasNextPage,
+    // En pause pendant une transition de filtre : la grille va être remplacée.
+    autoLoad: !isPending,
+    // La page suivante part ~2 écrans avant la fin de la grille.
+    rootMargin: '0px 0px 1200px 0px',
+    buildParams: () => {
       const params = new URLSearchParams();
-      params.set('page', String(nextPage));
       params.set('day', rankingDay);
       if (sort !== 'recommended') params.set('sort', sort);
       if (quantityGroupId) params.set('quantityGroup', quantityGroupId);
@@ -159,67 +136,22 @@ export function CatalogClient({
       const trimmedQuery = initialQuery.trim();
       if (trimmedQuery) params.set('q', trimmedQuery);
       else if (activeSlug) params.set('category', activeSlug);
-
-      const res = await fetch(`/api/products?${params.toString()}`, { signal: controller.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: { products?: ProductWithCategory[]; hasNextPage?: boolean } = await res.json();
-      if (controller.signal.aborted) return;
-
-      // Dédoublonnage défensif : le classement "recommandé" peut bouger entre
-      // deux pages (stock épuisé entre-temps) et renvoyer un produit déjà affiché.
-      setItems(prev => {
-        const seen = new Set(prev.map(p => p.id));
-        return [...prev, ...(data.products ?? []).filter(p => !seen.has(p.id))];
-      });
-      setPage(nextPage);
-      setHasMore(Boolean(data.hasNextPage));
-
-      // Met à jour l'URL affichée (deep-link/partage) sans passer par
-      // router.replace() : celui-ci re-exécuterait le Server Component du
-      // Catalogue et re-fetcherait tout le cumul qu'on vient de charger en
-      // léger via /api/products — on perdrait tout le bénéfice du fetch
-      // incrémental. On garde donc l'historique intact (pas de nouvelle
-      // entrée par clic) ; ?page= n'est réellement consulté par le serveur
-      // que sur une vraie navigation (lien direct, partage, retour arrière).
+      return params;
+    },
+    // Met à jour l'URL affichée (deep-link/partage) sans router.replace() :
+    // celui-ci re-exécuterait le Server Component et re-fetcherait tout le
+    // cumul déjà chargé en léger. ?page= n'est consulté par le serveur que sur
+    // une vraie navigation (lien direct, partage, retour arrière).
+    onPageLoaded: (nextPage) => {
       const urlParams = new URLSearchParams(window.location.search);
       urlParams.set('page', String(nextPage));
       urlParams.set('day', rankingDay);
       window.history.replaceState(null, '', `${window.location.pathname}?${urlParams.toString()}`);
-    } catch {
-      // Le sentinel reste visible sans nouvelle intersection : sans bouton
-      // "Réessayer", un échec réseau bloquerait le scroll infini.
-      if (!controller.signal.aborted) setLoadMoreFailed(true);
-    } finally {
-      if (loadMoreAbortRef.current === controller) {
-        loadingMoreRef.current = false;
-        loadMoreAbortRef.current = null;
-        setIsLoadingMore(false);
-      }
-    }
-  }
+    },
+  });
 
-  // Toujours la dernière version de handleLoadMore (page/filtres courants)
-  // sans ré-abonner l'observer à chaque rendu.
-  const loadMoreRef = useRef(handleLoadMore);
-  loadMoreRef.current = handleLoadMore;
-
-  // Scroll infini : la page suivante part ~2 écrans avant la fin de la grille,
-  // pour qu'elle soit en général déjà affichée quand l'utilisateur y arrive.
-  const autoLoadEnabled = hasMore && !isPending && !loadMoreFailed;
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!autoLoadEnabled || !sentinel || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(
-      entries => { if (entries.some(entry => entry.isIntersecting)) void loadMoreRef.current(); },
-      { rootMargin: '0px 0px 1200px 0px' },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-    // `items.length` ré-arme l'observer après chaque page : si le sentinel est
-    // toujours dans la zone (écran haut, page courte), on enchaîne la suivante.
-  }, [autoLoadEnabled, items.length]);
-
-  useEffect(() => () => loadMoreAbortRef.current?.abort(), []);
+  const textualIds = new Set(items.map(p => p.id));
+  const semanticOnly = semanticResults.filter(p => !textualIds.has(p.id));
 
   // Retour depuis le panier ou une fiche : même URL (?page=N cumulatif) donc
   // même liste, la position enregistrée pointe sur les mêmes produits.

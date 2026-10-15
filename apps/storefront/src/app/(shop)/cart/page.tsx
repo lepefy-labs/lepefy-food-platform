@@ -14,5 +14,7 @@ export default async function CartPage() {
   const categories = await getShopCategories(tenant.id).catch(() => []);
   const promotions = await getActivePromotions(createClient(), tenant.id, categories.map((category) => category.id))
     .catch(() => []);
-  return <CartPurchaseClient tenant={toPublicTenant(tenant)} promoCount={promotions.length} />;
+  // Filtres « Tous les produits » : catégories de la boutique du tenant (nom et slug seulement).
+  const catalogCategories = categories.map(({ id, slug, name }) => ({ id, slug, name }));
+  return <CartPurchaseClient tenant={toPublicTenant(tenant)} promoCount={promotions.length} categories={catalogCategories} />;
 }

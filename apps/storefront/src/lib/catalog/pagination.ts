@@ -1,4 +1,5 @@
 import { PRODUCT_CARD_SELECT } from './productCardSelect';
+import { MAX_EXCLUDED_IDS } from './catalogLimits';
 import type { createClient } from '@/lib/supabase/server';
 
 /** Taille de page de plateforme — pas de valeur par tenant, cf. contrainte
@@ -148,8 +149,7 @@ export async function getCatalogPage(
   return buildProductsQuery(supabase, tenantId, categories, filters).range(offset, offset + limit - 1);
 }
 
-/** Maximum de produits exclus (deux blocs de 10 cartes). */
-export const MAX_EXCLUDED_IDS = 20;
+export { MAX_EXCLUDED_IDS };
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**

@@ -13,6 +13,7 @@ import { CartCheckoutBar } from '@/components/cart/CartCheckoutBar';
 import { CartPromoReminder } from '@/components/cart/CartPromoReminder';
 import { QuantityGroupProgress } from '@/components/cart/QuantityGroupProgress';
 import { CartFulfillmentNotice } from '@/components/cart/CartFulfillmentNotice';
+import { CartCatalogSection, type CartCatalogCategory } from '@/components/cart/CartCatalogSection';
 import { cartProductPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { selectCartIsEmpty, selectCartItemCount, selectCartItems, selectCartSubtotal, selectPendingProductIds } from '@/lib/cart/cartSelectors';
 import { formatProductCount } from '@/lib/cart/formatProductCount';
@@ -30,7 +31,7 @@ const UNDO_TIMEOUT_MS = 5000;
 // Si la navigation vers /checkout n'aboutit pas (réseau), le bouton redevient actif.
 const LEAVING_RESET_MS = 8000;
 
-export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant: PublicTenant; promoCount?: number }) {
+export default function CartPurchaseClient({ tenant, promoCount = 0, categories = [] }: { tenant: PublicTenant; promoCount?: number; categories?: CartCatalogCategory[] }) {
   const router = useRouter();
   const items = useCartStore(selectCartItems);
   const itemCount = useCartStore(selectCartItemCount);
@@ -127,13 +128,26 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
       </CartPageHeader>
 
       {!hydrated ? <CartLoading /> : isEmpty ? (
-        <div className="mx-auto max-w-xl space-y-4 pt-4">
-          {undoToast('')}
-          <CartEmpty headingLevel="h2" />
-          <CartPromoReminder count={promoCount} />
-        </div>
+        <>
+          <div className="mx-auto max-w-xl space-y-4 pt-2">
+            {undoToast('')}
+            <CartEmpty headingLevel="h2" />
+            {/* Avis du panier (groupes à compléter, mode de réception) juste après les articles. */}
+            {groupsError && (
+              <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                {groupsError}
+                <button type="button" onClick={reloadGroups} className="ml-2 min-h-11 font-bold underline">{ACTION_COPY.retry}</button>
+              </div>
+            )}
+            <QuantityGroupProgress groups={quantityGroups} items={items} />
+            {!checking && <CartFulfillmentNotice eligibility={fulfillment} pickupAvailable={Boolean(tenant.click_collect_enabled)} />}
+            <CartPromoReminder count={promoCount} />
+          </div>
+          {/* Panier vide : la suite d'achat est déjà là, sous le message. */}
+          <CartCatalogSection categories={categories} wide />
+        </>
       ) : (
-        <div className="grid items-start gap-4 pt-3 md:gap-6 md:pt-0 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid items-start gap-4 pt-2 md:gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0 space-y-3 md:space-y-4">
             {/* Tablette : récapitulatif en tête (mobile : barre du bas ; desktop : colonne). */}
             <section className="hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.05)] md:block lg:hidden" aria-label="Total du panier">
@@ -147,15 +161,6 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
               <p className="mt-2 text-sm text-gray-700">Livraison : {SUMMARY_COPY.shippingNextStep}</p>
               <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} aria-hidden="true" /> Paiement sécurisé</p>
             </section>
-
-            {groupsError && (
-              <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-                {groupsError}
-                <button type="button" onClick={reloadGroups} className="ml-2 min-h-11 font-bold underline">{ACTION_COPY.retry}</button>
-              </div>
-            )}
-            <QuantityGroupProgress groups={quantityGroups} items={items} />
-            {!checking && <CartFulfillmentNotice eligibility={fulfillment} pickupAvailable={Boolean(tenant.click_collect_enabled)} />}
 
             <section aria-label="Articles du panier">
               <ul className="space-y-3">
@@ -200,6 +205,9 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
                 </button>
               </div>
             </div>
+
+            {/* Suite d'achat sous le panier ; à côté, le récapitulatif desktop reste collant. */}
+            <CartCatalogSection categories={categories} />
           </div>
 
           <aside className="hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)] lg:sticky lg:top-40 lg:block">

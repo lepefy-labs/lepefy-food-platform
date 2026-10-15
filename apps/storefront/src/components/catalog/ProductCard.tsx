@@ -74,6 +74,11 @@ interface ProductCardProps {
   /** Densité mobile réservée à la grille Catalogue ; Home conserve ses proportions. */
   compactMobile?: boolean;
   catalogScope?: CatalogScope;
+  /**
+   * Ouvre la confirmation d'ajout (défaut). Faux sur le panier : le produit
+   * apparaît déjà dans la liste et le total, le client reste où il est.
+   */
+  confirmOnAdd?: boolean;
 }
 
 const STORAGE_TAG_LABELS: Record<'dry' | 'fresh' | 'frozen', string> = {
@@ -100,7 +105,7 @@ function getGridStorageLabel(product: ProductCardProduct): 'Frais' | 'Surgelé' 
   return null;
 }
 
-export function ProductCard({ product, variant = 'grid', compactMobile = false, catalogScope = 'shop' }: ProductCardProps) {
+export function ProductCard({ product, variant = 'grid', compactMobile = false, catalogScope = 'shop', confirmOnAdd = true }: ProductCardProps) {
   const { currency } = useTenant();
   const merchandise = catalogScope === 'gadgets';
   const { addToCart, added, outOfStock, atLimit, availability } = useQuickAdd(product, !merchandise);
@@ -186,7 +191,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
     if (addToCart()) {
       (e.currentTarget as HTMLElement).focus({ preventScroll: true });
       focusStepperAfterAdd.current = !merchandise;
-      showConfirmation(product);
+      if (confirmOnAdd) showConfirmation(product);
     }
   }
 

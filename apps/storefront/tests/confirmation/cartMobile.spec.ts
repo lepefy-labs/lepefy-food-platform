@@ -221,6 +221,138 @@ test('an unavailable line offers only the remove action', async ({ page }) => {
   await expect(page.getByTestId('cart-checkout-bar').getByRole('button', { name: 'Annuler' })).toHaveCount(0);
 });
 
+test.describe('catalogue intégré au panier', () => {
+  const catalogCards = (page: Page) => page.locator('section[aria-labelledby="cart-catalog-title"] ul > li:not([aria-hidden="true"])');
+  const suggestionLinks = (page: Page) => page.locator('section[aria-labelledby="cart-suggestions-title"] a[href^="/products/"]');
+  const addButton = /^Ajouter( \d+)? au panier$/;
+  /** Attend la page stabilisée (suggestions affichées) puis descend jusqu'au catalogue. */
+  async function scrollToCatalog(page: Page) {
+    await expect(page.getByRole('heading', { name: /Complétez votre panier/ })).toBeVisible({ timeout: 20000 });
+    await page.getByRole('heading', { name: 'Tous les produits' }).scrollIntoViewIfNeeded();
+  }
+
+  test('« Continuer mes achats » is written out, then suggestions and an infinite product grid', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedCart(page, 2);
+    await page.goto('/cart');
+    const back = page.getByRole('link', { name: 'Continuer mes achats' }).first();
+    await expect(back).toBeVisible();
+    expect(await back.innerText()).toContain('Continuer mes achats');
+    await expect(page.getByRole('heading', { level: 1, name: 'Mon panier' })).toBeVisible();
+
+    await expect(page.getByRole('heading', { name: /Complétez votre panier/ })).toBeVisible({ timeout: 20000 });
+    const suggested = await suggestionLinks(page).evaluateAll((links) => links.map((a) => a.getAttribute('href')));
+    expect(suggested.length).toBeGreaterThan(0);
+    expect(suggested.length).toBeLessThanOrEqual(8);
+
+    await scrollToCatalog(page);
+    await expect(catalogCards(page)).toHaveCount(12, { timeout: 20000 });
+    // Défilement : la page suivante arrive, sans doublon ni produit déjà suggéré au-dessus.
+    for (let i = 0; i < 4 && (await catalogCards(page).count()) <= 12; i++) { await page.mouse.wheel(0, 3000); await page.waitForTimeout(800); }
+    expect(await catalogCards(page).count()).toBeGreaterThan(12);
+    const hrefs = await catalogCards(page).locator('a[href^="/products/"]').evaluateAll((links) => links.map((a) => a.getAttribute('href')));
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+    expect(hrefs.filter((href) => suggested.includes(href))).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    // Le récapitulatif reste au-dessus de la BottomNav pendant le défilement du catalogue.
+    const bar = (await page.getByTestId('cart-checkout-bar').boundingBox())!;
+    const nav = (await page.getByRole('navigation', { name: 'Navigation boutique' }).boundingBox())!;
+    expect(bar.y + bar.height).toBeLessThanOrEqual(nav.y + 1);
+  });
+
+  test('adding from the grid stays on the cart, without a dialog, the card under the finger', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const items = await seedCart(page, 1);
+    await page.goto('/cart');
+    await scrollToCatalog(page);
+    await expect(catalogCards(page).first()).toBeVisible({ timeout: 20000 });
+    // Carte fixée par sa position : après l'ajout elle n'a plus de bouton « Ajouter ».
+    const index = await catalogCards(page).evaluateAll((lis) => lis.findIndex((li) => [...li.querySelectorAll('button')].some((b) => /^Ajouter( \d+)? au panier$/.test(b.getAttribute('aria-label') ?? ''))));
+    expect(index).toBeGreaterThanOrEqual(0);
+    const card = catalogCards(page).nth(index);
+    // Carte au centre : le clic ne fait défiler ni Playwright ni la page.
+    await card.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(300);
+    const before = (await card.boundingBox())!.y;
+    const subtotal = await page.getByTestId('cart-checkout-bar').locator('[aria-live]').textContent();
+    await card.getByRole('button', { name: addButton }).click();
+    await expect(page).toHaveURL(/\/cart$/);
+    await expect.poll(async () => (await readItems(page)).length).toBe(items.length + 1);
+    await expect(page.locator('#add-confirmation-title')).toHaveCount(0);
+    expect(Math.abs((await card.boundingBox())!.y - before)).toBeLessThanOrEqual(2);
+    await expect(card.getByRole('group', { name: /^Quantité de / })).toBeVisible();
+    await expect(page.getByTestId('cart-checkout-bar').locator('[aria-live]')).not.toHaveText(subtotal!);
+    const units = (await readItems(page)).reduce((sum, i) => sum + i.quantity, 0);
+    await expect(page.getByRole('navigation', { name: 'Navigation boutique' }).getByRole('link', { name: /panier/i }))
+      .toHaveAttribute('aria-label', new RegExp(`${units} article`));
+  });
+
+  test('a failed page shows « Réessayer », and the retry continues the list', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedCart(page, 1);
+    let failed = false;
+    await page.route(/\/api\/products\?.*limit=12.*page=2/, async (route) => {
+      if (!failed) { failed = true; await route.fulfill({ status: 500, body: '{}' }); } else await route.fallback();
+    });
+    await page.goto('/cart');
+    await scrollToCatalog(page);
+    await expect(catalogCards(page)).toHaveCount(12, { timeout: 20000 });
+    const retry = page.getByRole('button', { name: 'Réessayer' });
+    for (let i = 0; i < 4 && !(await retry.isVisible()); i++) { await page.mouse.wheel(0, 3000); await page.waitForTimeout(800); }
+    await expect(retry).toBeVisible();
+    await retry.click();
+    await expect.poll(() => catalogCards(page).count(), { timeout: 20000 }).toBeGreaterThan(12);
+  });
+
+  test('a category filter reaches its last page', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/cart');
+    const chips = page.getByRole('group', { name: 'Filtrer par catégorie' }).getByRole('button');
+    await expect(chips.first()).toBeVisible();
+    test.skip((await chips.count()) < 2, 'one category only');
+    await chips.nth(1).click();
+    await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'true');
+    const end = page.getByText('Vous avez vu tous les produits.');
+    const none = page.getByText('Aucun produit dans cette catégorie.');
+    for (let i = 0; i < 12 && !(await end.isVisible()) && !(await none.isVisible()); i++) { await page.mouse.wheel(0, 3000); await page.waitForTimeout(700); }
+    expect((await end.isVisible()) || (await none.isVisible())).toBe(true);
+  });
+
+  test('empty cart: message, then the catalogue; the first add shows the cart without losing the place', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/cart');
+    await expect(page.getByRole('heading', { level: 2, name: 'Votre panier est vide' })).toBeVisible();
+    await expect(page.getByTestId('cart-checkout-bar')).toHaveCount(0);
+    await scrollToCatalog(page);
+    await expect(catalogCards(page).first()).toBeVisible({ timeout: 20000 });
+    const card = catalogCards(page).filter({ has: page.getByRole('button', { name: addButton }) }).first();
+    const href = await card.locator('a[href^="/products/"]').first().getAttribute('href');
+    await card.getByRole('button', { name: addButton }).click();
+    await expect.poll(async () => (await readItems(page)).length).toBe(1);
+    await expect(page.getByTestId('cart-checkout-bar')).toBeVisible();
+    await expect(page.locator(`section[aria-labelledby="cart-catalog-title"] a[href="${href}"]`)).toBeInViewport();
+  });
+
+  test('back from a product page restores the loaded grid and the position', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedCart(page, 1);
+    await page.goto('/cart');
+    await scrollToCatalog(page);
+    await expect(catalogCards(page)).toHaveCount(12, { timeout: 20000 });
+    const link = catalogCards(page).nth(6).locator('a[href^="/products/"]').first();
+    const href = (await link.getAttribute('href'))!;
+    await link.scrollIntoViewIfNeeded();
+    const y = await page.evaluate(() => scrollY);
+    await link.click();
+    await page.waitForURL((url) => url.pathname === href);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/cart$/);
+    await expect(page.locator(`section[aria-labelledby="cart-catalog-title"] a[href="${href}"]`)).toBeVisible({ timeout: 20000 });
+    await expect.poll(() => page.evaluate(() => scrollY), { timeout: 10000 }).toBeGreaterThan(y - 200);
+  });
+});
+
 test('removing a line offers an undo in the bottom bar', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const items = await seedCart(page, 2);
