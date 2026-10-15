@@ -15,8 +15,9 @@ import { formatProductCount } from '@/lib/cart/formatProductCount';
  * commercial (`isCartPath`) ; à partir de md il se place sous l'en-tête global
  * collant et la flèche devient « ← Continuer mes achats ».
  * `itemCount` vaut null tant que le panier (localStorage) n'est pas hydraté.
+ * `children` (la recherche du panier) reste dans le même bloc collant, sous le titre.
  */
-export function CartPageHeader({ itemCount }: { itemCount: number | null }) {
+export function CartPageHeader({ itemCount, children }: { itemCount: number | null; children?: React.ReactNode }) {
   // Lu après l'hydratation (sessionStorage) ; le catalogue par défaut sinon.
   const [href, setHref] = useState('/');
   useEffect(() => { setHref(getShoppingReturn('/')); }, []);
@@ -39,6 +40,7 @@ export function CartPageHeader({ itemCount }: { itemCount: number | null }) {
           <span className="shrink-0 pr-3 text-sm font-semibold text-gray-700">{formatProductCount(itemCount)}</span>
         )}
       </div>
+      {children && <div className="px-3 pb-2.5 sm:px-3 lg:px-3">{children}</div>}
     </div>
   );
 }

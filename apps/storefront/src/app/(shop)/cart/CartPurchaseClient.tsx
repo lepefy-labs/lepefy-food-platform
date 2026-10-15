@@ -106,24 +106,22 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
   const undoToast = (className: string) => undo && (
     <CartUndoToast productName={undo.item.product.name} onUndo={restore} className={className} />
   );
-  // Recherche dans la page sous lg ; au-dessus, l'en-tête desktop porte déjà la recherche globale.
-  const search = (
-    <div className="lg:hidden">
-      <CartProductSearch currency={tenant.currency} onDecrement={decrement} />
-    </div>
-  );
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-6 sm:px-6 md:pb-10 lg:px-8">
       {/* Le serveur ne connaît pas le panier (localStorage) : en-tête sans
           nombre et état neutre jusqu'à l'hydratation, jamais « panier vide »
           affiché puis remplacé. */}
-      <CartPageHeader itemCount={hydrated ? itemCount : null} />
+      <CartPageHeader itemCount={hydrated ? itemCount : null}>
+        {/* Recherche collante sous lg ; au-dessus, l'en-tête desktop porte déjà la recherche globale. */}
+        <div className="lg:hidden">
+          <CartProductSearch currency={tenant.currency} onDecrement={decrement} />
+        </div>
+      </CartPageHeader>
 
       {!hydrated ? <CartLoading /> : isEmpty ? (
         <div className="mx-auto max-w-xl space-y-4 pt-4">
           {undoToast('')}
-          {search}
           <CartEmpty headingLevel="h2" />
           <CartPromoReminder count={promoCount} />
         </div>
@@ -142,8 +140,6 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
               <p className="mt-2 text-sm text-gray-700">Livraison : {SUMMARY_COPY.shippingNextStep}</p>
               <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} aria-hidden="true" /> Paiement sécurisé</p>
             </section>
-
-            {search}
 
             {groupsError && (
               <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { catalogRankingDay, getCatalogPage, parseCatalogSort, parseExcludeParam, parseLimitParam, parsePageParam } from '@/lib/catalog/pagination';
 import { getActiveQuantityGroupFilter } from '@/lib/catalog/quantityGroupFilter';
 import { getShopCategories } from '@/lib/catalog/catalogCache';
+import { getSimilarProducts } from '@/lib/catalog/similarProducts';
 
 // Toujours dynamique : dépend de ?page=/?q=/?category=, jamais cacheable
 // comme une réponse unique. Explicite depuis que getTenant() n'utilise plus
@@ -18,6 +19,9 @@ export const dynamic = 'force-dynamic';
  * pages précédentes en mémoire, inutile de les re-transférer.
  * `?limit=` (≤ taille de page) sert aux propositions de la recherche globale :
  * même requête, mêmes filtres tenant/scope, seulement moins de lignes.
+ * `?similar=1` (recherche du panier) : quand la recherche exacte trouve moins
+ * de `limit` produits en page 1, `similar` complète avec des noms proches
+ * (fautes de frappe, accents), séparés des résultats exacts.
  */
 export async function GET(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -57,5 +61,17 @@ export async function GET(req: NextRequest) {
   const totalCount = count ?? 0;
   const hasNextPage = page * limit < totalCount;
 
-  return NextResponse.json({ products, hasNextPage, totalCount });
+  const wantsSimilar = req.nextUrl.searchParams.get('similar') === '1' && Boolean(q?.trim()) && !category && !groupId && page === 1;
+  const similar = wantsSimilar && products.length < limit
+    ? await getSimilarProducts(
+      supabase,
+      tenant.id,
+      categories.map((c) => c.id),
+      q ?? '',
+      (products as Array<{ id: string }>).map((p) => p.id),
+      limit - products.length,
+    ).catch(() => [])
+    : [];
+
+  return NextResponse.json({ products, hasNextPage, totalCount, ...(wantsSimilar ? { similar } : {}) });
 }

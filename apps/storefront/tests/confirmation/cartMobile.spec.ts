@@ -109,9 +109,6 @@ test('search from the cart adds the minimum without leaving the cart', async ({ 
   await page.goto('/cart');
   const search = page.getByRole('searchbox', { name: 'Rechercher un produit à ajouter au panier' });
   await search.fill(String(target!.name).slice(0, 12));
-  // Saisie en cours : la BottomNav et la barre d'action laissent la place au clavier.
-  await expect(page.getByRole('navigation', { name: 'Navigation boutique' })).toHaveCount(0);
-  await expect(page.getByTestId('cart-checkout-bar')).toBeHidden();
   const results = page.getByRole('list', { name: /^Résultats pour/ });
   const add = results.locator('li').filter({ hasText: String(target!.name) }).first().getByRole('button', { name: /^Ajouter/ });
   await expect(add).toBeVisible();
@@ -125,6 +122,36 @@ test('search from the cart adds the minimum without leaving the cart', async ({ 
   expect((await readItems(page)).find(i => i.product.id === target!.id)?.quantity)
     .toBe((target!.min_order_quantity ?? 1) + (target!.order_quantity_step ?? 1));
   await expect(page.getByRole('navigation', { name: 'Navigation boutique' })).toBeVisible();
+});
+
+test('cart search stays reachable, tolerates typos, and the bottom nav returns when the keyboard closes', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await seedCart(page, 8);
+  const { products } = await page.evaluate(() => fetch('/api/products?limit=24').then(r => r.json())) as { products: Item['product'][] };
+  // Un mot d'au moins 6 lettres d'un vrai produit, avec deux lettres inversées.
+  const word = products.flatMap(p => String(p.name).split(/[^A-Za-zÀ-ÿ]+/)).find(w => w.length >= 6 && /^[a-z]+$/i.test(w))!;
+  const typo = word.charAt(0) + word.charAt(2) + word.charAt(1) + word.slice(3);
+  await page.goto('/cart');
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  const search = page.getByRole('searchbox', { name: 'Rechercher un produit à ajouter au panier' });
+  // Collante dans l'en-tête du panier : toujours visible en haut.
+  await expect(search).toBeInViewport();
+  expect((await search.boundingBox())!.y).toBeLessThan(130);
+  await search.fill(typo.toLowerCase());
+  const panel = page.locator('section[aria-label="Ajouter un produit au panier"] [id$="-results"]');
+  await expect(panel.getByRole('list').first()).toBeVisible();
+  await expect(panel).toContainText(new RegExp(word, 'i'));
+  // Clavier simulé : la zone visible rétrécit → BottomNav et barre s'effacent ;
+  // elle revient → le champ perd le focus et la BottomNav réapparaît sans toucher l'écran.
+  await page.setViewportSize({ width: 390, height: 460 });
+  await expect(page.getByRole('navigation', { name: 'Navigation boutique' })).toHaveCount(0);
+  await expect(page.getByTestId('cart-checkout-bar')).toBeHidden();
+  const panelBox = (await panel.boundingBox())!;
+  expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(460);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('navigation', { name: 'Navigation boutique' })).toBeVisible();
+  await expect(page.getByTestId('cart-checkout-bar')).toBeVisible();
+  await expect(search).not.toBeFocused();
 });
 
 test('removing a line offers an undo in the bottom bar', async ({ page }) => {

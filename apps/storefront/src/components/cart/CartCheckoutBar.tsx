@@ -33,7 +33,7 @@ const MOBILE_QUERY = '(max-width: 767px)';
  * sans elle). Une seule rangée pour rester basse sur les petits écrans. Elle
  * réserve sa hauteur en bas de page (corps du document) pour ne jamais couvrir
  * le dernier article ; la BottomNav garde sa propre réserve (`ShopMain`).
- * Masquée pendant la saisie dans la recherche du panier (clavier ouvert).
+ * Masquée tant que le clavier de la recherche du panier est ouvert.
  */
 export function CartCheckoutBar({ subtotal, currency, itemCount, blockedMessage, checking, leaving, onCheckout, notice }: CartCheckoutBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
@@ -69,6 +69,7 @@ export function CartCheckoutBar({ subtotal, currency, itemCount, blockedMessage,
     <div
       ref={barRef}
       data-testid="cart-checkout-bar"
+      data-bottom-chrome
       className={`fixed inset-x-0 z-40 border-t border-black/10 bg-white/95 px-4 py-2 shadow-[0_-8px_24px_rgba(0,0,0,.07)] backdrop-blur motion-reduce:backdrop-blur-none md:hidden ${searching ? 'hidden' : ''}`}
       style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
     >

@@ -88,7 +88,7 @@ export function BottomNav() {
   }
 
   return (
-    <nav aria-label="Navigation boutique" className="fixed bottom-0 left-0 right-0 z-50 w-full border-t border-gray-100 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.08)] md:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <nav aria-label="Navigation boutique" data-bottom-chrome className="fixed bottom-0 left-0 right-0 z-50 w-full border-t border-gray-100 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.08)] md:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="flex h-16 items-stretch">
         {leftTabs.map(renderTab)}
         {/* Panier : voix centrale mise en avant, entièrement contenue dans la

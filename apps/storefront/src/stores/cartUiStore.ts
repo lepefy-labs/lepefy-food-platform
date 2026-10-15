@@ -14,8 +14,8 @@ interface CartUiState {
   /** Dernière consultation du panier (drawer ou page) : calme les rappels. */
   lastViewAt: number | null;
   /**
-   * Recherche du panier en cours de saisie (clavier ouvert sur mobile) : la
-   * BottomNav et la barre « Livraison et paiement » s'effacent le temps de la saisie.
+   * Clavier de la recherche du panier ouvert (mobile) : la BottomNav et la
+   * barre « Livraison et paiement » s'effacent jusqu'à sa fermeture.
    */
   cartSearchActive: boolean;
   openDrawer: () => void;
