@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { eventHref, serviceHref } from '@/lib/events/eventsHubUrl';
 import type { Metadata } from 'next';
 import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -47,16 +48,6 @@ const EDITORIAL_IMAGES = [
   '/images/hero/chloe-fresh-produce.webp',
   '/images/hero/chloe-traiteur.webp',
 ] as const;
-
-function eventHref(slug: string) {
-  const host = process.env.NEXT_PUBLIC_EVENTS_SUBDOMAIN;
-  return host ? `https://${host}/evenements/${slug}` : `/evenementiel/evenements/${slug}`;
-}
-
-function serviceHref(slug: string) {
-  const host = process.env.NEXT_PUBLIC_EVENTS_SUBDOMAIN;
-  return host ? `https://${host}/services/${slug}` : `/evenementiel/services/${slug}`;
-}
 
 function heroProducts(products: SuggestionProduct[], currency: string) {
   return products

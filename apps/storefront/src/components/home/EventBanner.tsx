@@ -2,6 +2,7 @@ import { IconCalendarEvent, IconArrowRight } from '@tabler/icons-react';
 import { createPublicClient } from '@/lib/supabase/public';
 import { formatDate } from '@/lib/utils/format';
 import type { Tenant } from '@lepefy/types';
+import { eventsHubHref } from '@/lib/events/eventsHubUrl';
 
 // Bannière cross-promo homepage → hub /evenementiel. Ne se rend QUE si
 // tenant.events_enabled === true (flag 052) — jamais de valeur hardcodée
@@ -29,8 +30,7 @@ export async function EventBanner({ tenant }: { tenant: Tenant }) {
 
   if (!nextEvent && !tenant.services_enabled) return null;
 
-  const eventsSubdomain = process.env.NEXT_PUBLIC_EVENTS_SUBDOMAIN;
-  const href = eventsSubdomain ? `https://${eventsSubdomain}` : '/evenementiel';
+  const href = eventsHubHref();
 
   return (
     <a

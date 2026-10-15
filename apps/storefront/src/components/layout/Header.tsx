@@ -16,6 +16,8 @@ import { cartAriaLabel, formatCartBadge } from '@/lib/cart/cartBadge';
 import { useCartAddPulse } from '@/lib/cart/useCartAttention';
 import { isCartPath, shouldShowGlobalSearch } from '@/lib/storefront/shopChrome';
 import { readableOn } from '@/lib/utils/color';
+// Sous-domaine événementiel quand il existe : ses liens courts (/services/…) n'existent pas sur la boutique.
+import { eventsHubHref } from '@/lib/events/eventsHubUrl';
 import {
   BrandNavigationDrawer,
   type BrandNavigationSection,
@@ -75,10 +77,10 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
       label: 'Nos services',
       items: [
         ...(tenant.events_enabled
-          ? [{ href: '/evenementiel#evenements', label: 'Événements', icon: 'event' as const, activeWhen: ['/evenementiel'] }]
+          ? [{ href: eventsHubHref('evenements'), label: 'Événements', icon: 'event' as const, activeWhen: ['/evenementiel'] }]
           : []),
         ...(tenant.services_enabled
-          ? [{ href: '/evenementiel#services', label: 'Traiteur & location', icon: 'tools' as const, activeWhen: ['/evenementiel/services'] }]
+          ? [{ href: eventsHubHref('services'), label: 'Traiteur & location', icon: 'tools' as const, activeWhen: ['/evenementiel/services'] }]
           : []),
         { href: '/card', label: 'Carte & paiement', icon: 'card', activeWhen: ['/card'] },
         ...(tenant.google_maps_url
