@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { buildCatalogUrl, CATALOG_PROMOS_HREF, isPromoFilter } from '../../src/lib/catalog/catalogSearchUrl';
-import { shouldShowBottomNav, shouldShowGlobalSearch, shouldShowSearchBar } from '../../src/lib/storefront/shopChrome';
+import { isCartPath, shouldShowBottomNav, shouldShowGlobalSearch, shouldShowSearchBar } from '../../src/lib/storefront/shopChrome';
 import {
   getShoppingReturn,
   markShoppingReturn,
@@ -11,23 +11,25 @@ import {
 } from '../../src/lib/catalog/shoppingReturn';
 
 test.describe('zones collantes du panier', () => {
-  test('panier non vide : ni BottomNav ni recherche collante, une seule zone en haut et en bas', () => {
-    expect(shouldShowBottomNav('/cart', 3)).toBe(false);
+  test('panier : BottomNav présente (vide ou non), pas de recherche collante globale', () => {
+    expect(shouldShowBottomNav('/cart')).toBe(true);
     expect(shouldShowSearchBar('/cart')).toBe(false);
-    // L'en-tête desktop garde sa recherche.
+    // L'en-tête desktop garde sa recherche ; sur mobile l'en-tête contextuel remplace l'en-tête commercial.
     expect(shouldShowGlobalSearch('/cart')).toBe(true);
+    expect(isCartPath('/cart')).toBe(true);
   });
 
-  test('panier vide : la BottomNav reste pour repartir', () => {
-    expect(shouldShowBottomNav('/cart', 0)).toBe(true);
+  test('le paiement privilégie la fin de l’achat : pas de BottomNav', () => {
+    expect(shouldShowBottomNav('/checkout')).toBe(false);
+    expect(shouldShowBottomNav('/checkout/en-attente')).toBe(false);
+    expect(shouldShowBottomNav('/avis/donner')).toBe(false);
   });
 
   test('ailleurs : inchangé', () => {
-    expect(shouldShowBottomNav('/', 3)).toBe(true);
-    expect(shouldShowBottomNav('/products/riz', 3)).toBe(true);
-    expect(shouldShowBottomNav('/checkout', 3)).toBe(false);
-    expect(shouldShowBottomNav('/checkout/en-attente', 0)).toBe(false);
-    expect(shouldShowBottomNav('/avis/donner', 0)).toBe(false);
+    expect(shouldShowBottomNav('/')).toBe(true);
+    expect(shouldShowBottomNav('/products/riz')).toBe(true);
+    expect(isCartPath('/')).toBe(false);
+    expect(isCartPath('/cart/x')).toBe(false);
     expect(shouldShowSearchBar('/')).toBe(true);
     expect(shouldShowSearchBar('/checkout')).toBe(false);
   });

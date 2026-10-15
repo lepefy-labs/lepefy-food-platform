@@ -37,7 +37,7 @@ async function seedCart(page: Page, count: number): Promise<Item[]> {
 }
 
 for (const width of [320, 390]) {
-  test(`long cart at ${width}px: one bottom action bar, never covering the last item`, async ({ page }) => {
+  test(`long cart at ${width}px: action bar above the bottom navigation, never covering the last item`, async ({ page }) => {
     await page.setViewportSize({ width, height: 740 });
     const items = await seedCart(page, 8);
     await page.goto('/cart');
@@ -48,13 +48,19 @@ for (const width of [320, 390]) {
     expect((await cta.boundingBox())!.height).toBeGreaterThanOrEqual(48);
     await expect(bar).toContainText('Sous-total');
     await expect(bar).toContainText("Livraison calculée à l'étape suivante");
-    // Une seule zone en bas : pas de BottomNav sur un panier non vide.
-    await expect(page.getByRole('navigation', { name: 'Navigation boutique' })).toHaveCount(0);
+    // La BottomNav reste (Panier actif) ; la barre se pose juste au-dessus.
+    const nav = page.getByRole('navigation', { name: 'Navigation boutique' });
+    await expect(nav).toBeVisible();
+    await expect(nav.getByRole('link', { name: /panier/i })).toHaveAttribute('aria-current', 'page');
+    // En-tête contextuel : pas de logo ni de menu commercial sur le panier mobile.
+    await expect(page.getByRole('button', { name: 'Ouvrir le menu' })).toBeHidden();
+    await expect(page.getByRole('heading', { level: 1, name: 'Mon panier' })).toBeVisible();
 
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await page.waitForTimeout(300);
     const barBox = (await bar.boundingBox())!;
-    expect(barBox.y + barBox.height).toBeLessThanOrEqual(740 + 1);
+    const navBox = (await nav.boundingBox())!;
+    expect(barBox.y + barBox.height).toBeLessThanOrEqual(navBox.y + 1);
     const lines = page.getByRole('list').filter({ has: page.getByRole('group', { name: /^Quantité de / }) }).locator(':scope > li');
     await expect(lines).toHaveCount(items.length);
     const lastBox = (await lines.last().boundingBox())!;
@@ -84,11 +90,52 @@ test('the checkout CTA navigates once, even on a double tap', async ({ page }) =
   expect(navigations.length).toBeLessThanOrEqual(1);
 });
 
-test('empty cart keeps the bottom navigation and shows no action bar', async ({ page }) => {
+test('empty cart keeps the bottom navigation and search, shows no action bar', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/cart');
   await expect(page.getByRole('navigation', { name: 'Navigation boutique' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: 'Votre panier est vide' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Voir les produits' })).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Rechercher un produit à ajouter au panier' })).toBeVisible();
   await expect(page.getByTestId('cart-checkout-bar')).toHaveCount(0);
+});
+
+test('search from the cart adds the minimum without leaving the cart', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const items = await seedCart(page, 1);
+  const { products } = await page.evaluate(() => fetch('/api/products?limit=24').then(r => r.json())) as { products: Item['product'][] };
+  const target = products.find(p => !items.some(i => i.product.id === p.id) && (p.stock ?? 0) >= (p.min_order_quantity ?? 1) + (p.order_quantity_step ?? 1));
+  test.skip(!target, 'no purchasable product to add');
+  await page.goto('/cart');
+  const search = page.getByRole('searchbox', { name: 'Rechercher un produit à ajouter au panier' });
+  await search.fill(String(target!.name).slice(0, 12));
+  // Saisie en cours : la BottomNav et la barre d'action laissent la place au clavier.
+  await expect(page.getByRole('navigation', { name: 'Navigation boutique' })).toHaveCount(0);
+  await expect(page.getByTestId('cart-checkout-bar')).toBeHidden();
+  const results = page.getByRole('list', { name: /^Résultats pour/ });
+  const add = results.locator('li').filter({ hasText: String(target!.name) }).first().getByRole('button', { name: /^Ajouter/ });
+  await expect(add).toBeVisible();
+  await search.press('Enter');
+  await add.click();
+  await expect(page).toHaveURL(/\/cart$/);
+  const added = (await readItems(page)).find(i => i.product.id === target!.id);
+  expect(added?.quantity).toBe(target!.min_order_quantity ?? 1);
+  // Le résultat montre le même +/− que les lignes ; « + » ajoute le pas de la règle.
+  await results.getByRole('button', { name: `Augmenter la quantité de ${target!.name}` }).click();
+  expect((await readItems(page)).find(i => i.product.id === target!.id)?.quantity)
+    .toBe((target!.min_order_quantity ?? 1) + (target!.order_quantity_step ?? 1));
+  await expect(page.getByRole('navigation', { name: 'Navigation boutique' })).toBeVisible();
+});
+
+test('removing a line offers an undo in the bottom bar', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const items = await seedCart(page, 2);
+  await page.goto('/cart');
+  const name = String(items[0]!.product.name);
+  await page.getByRole('button', { name: `Retirer ${name} du panier` }).first().click();
+  expect((await readItems(page)).some(i => i.product.id === items[0]!.product.id)).toBe(false);
+  await page.getByTestId('cart-checkout-bar').getByRole('button', { name: 'Annuler' }).click();
+  expect((await readItems(page)).find(i => i.product.id === items[0]!.product.id)?.quantity).toBe(items[0]!.quantity);
 });
 
 test('« Continuer mes achats » returns to the same catalogue view and position with the cart intact', async ({ page }) => {

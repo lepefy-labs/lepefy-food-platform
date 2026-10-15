@@ -7,7 +7,8 @@ import { IconArrowLeft, IconArrowRight, IconLoader2, IconLock } from '@tabler/ic
 import { CartEmpty } from '@/components/cart/CartEmpty';
 import { CartItem } from '@/components/cart/CartItem';
 import { CartUndoToast } from '@/components/cart/CartUndoToast';
-import { CartReturnBar } from '@/components/cart/CartReturnBar';
+import { CartPageHeader } from '@/components/cart/CartPageHeader';
+import { CartProductSearch } from '@/components/cart/CartProductSearch';
 import { CartCheckoutBar } from '@/components/cart/CartCheckoutBar';
 import { CartPromoReminder } from '@/components/cart/CartPromoReminder';
 import { QuantityGroupProgress } from '@/components/cart/QuantityGroupProgress';
@@ -16,6 +17,7 @@ import { cartProductPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { selectCartIsEmpty, selectCartItemCount, selectCartItems, selectCartSubtotal, selectPendingProductIds } from '@/lib/cart/cartSelectors';
 import { formatProductCount } from '@/lib/cart/formatProductCount';
 import { formatPrice } from '@/lib/utils/format';
+import { readableOn } from '@/lib/utils/color';
 import { decrementRemovesLine } from '@/lib/purchaseQuantityRules';
 import { useCartStore } from '@/stores/cartStore';
 import { useHasMounted } from '@/hooks/useHasMounted';
@@ -55,17 +57,13 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
   useEffect(() => () => clearTimeout(leavingTimer.current), []);
   useEffect(() => { setReturnHref(getShoppingReturn('/')); }, []);
 
-  // Le serveur ne connaît pas le panier (localStorage) : état neutre jusqu'à la
-  // fin de l'hydratation, jamais « panier vide » affiché puis remplacé.
-  if (!hydrated) return <CartLoading />;
-  if (isEmpty) return <div className="flex min-h-[60vh]"><CartEmpty headingLevel="h1" /></div>;
-
   function increment(productId: string) {
     incrementItem(productId);
   }
 
   function decrement(productId: string) {
-    const item = items.find((entry) => entry.product.id === productId);
+    // Relu dans le store : appelé aussi par la recherche, pour une ligne ajoutée à l'instant.
+    const item = useCartStore.getState().items.find((entry) => entry.product.id === productId);
     if (!item) return;
     // Au minimum, «−» retire la ligne : même chemin que « Retirer », avec annulation.
     if (decrementRemovesLine(item.quantity, item.product.min_order_quantity ?? 1, item.product.order_quantity_step ?? 1)) remove(productId);
@@ -73,7 +71,7 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
   }
 
   function remove(productId: string) {
-    const item = items.find((entry) => entry.product.id === productId);
+    const item = useCartStore.getState().items.find((entry) => entry.product.id === productId);
     if (!item) return;
     if (undo) clearTimeout(undo.timeoutId);
     removeItem(productId);
@@ -100,119 +98,147 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
 
   const busy = checking || leaving;
   const ctaDisabled = busy || !canProceed;
+  const onPrimary = readableOn(tenant.primary_color);
   const ctaContent = busy
     ? <><IconLoader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> {checking ? 'Vérification du panier…' : ACTION_COPY.processing}</>
     : <>{ACTION_COPY.goToShipping} <IconArrowRight size={16} aria-hidden="true" /></>;
   const staticMessage = checking ? null : blockedMessage;
+  const undoToast = (className: string) => undo && (
+    <CartUndoToast productName={undo.item.product.name} onUndo={restore} className={className} />
+  );
+  // Recherche dans la page sous lg ; au-dessus, l'en-tête desktop porte déjà la recherche globale.
+  const search = (
+    <div className="lg:hidden">
+      <CartProductSearch currency={tenant.currency} onDecrement={decrement} />
+    </div>
+  );
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-6 sm:px-6 md:pb-10 lg:px-8">
-      <CartReturnBar itemCount={itemCount} />
-      <h1 className="mb-4 font-display text-2xl font-bold text-gray-950">Mon panier</h1>
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0 space-y-4 lg:order-1">
-          {/* Tablette : récapitulatif en tête (mobile : barre du bas ; desktop : colonne). */}
-          <section className="hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.05)] md:block lg:hidden" aria-label="Total du panier">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-gray-700">{SUMMARY_COPY.productsPrice}</p>
-                <p className="mt-0.5 text-3xl font-black tracking-tight text-gray-950">{formatPrice(subtotal, tenant.currency)}</p>
-              </div>
-              <p className="pb-1 text-sm font-medium text-gray-600">{formatProductCount(itemCount)}</p>
-            </div>
-            <p className="mt-2 text-sm text-gray-700">Livraison : {SUMMARY_COPY.shippingNextStep}</p>
-            <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} aria-hidden="true" /> Paiement sécurisé</p>
-          </section>
+      {/* Le serveur ne connaît pas le panier (localStorage) : en-tête sans
+          nombre et état neutre jusqu'à l'hydratation, jamais « panier vide »
+          affiché puis remplacé. */}
+      <CartPageHeader itemCount={hydrated ? itemCount : null} />
 
-          {groupsError && (
-            <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-              {groupsError}
-              <button type="button" onClick={reloadGroups} className="ml-2 min-h-11 font-bold underline">{ACTION_COPY.retry}</button>
-            </div>
-          )}
-          <QuantityGroupProgress groups={quantityGroups} items={items} />
-          {!checking && <CartFulfillmentNotice eligibility={fulfillment} pickupAvailable={Boolean(tenant.click_collect_enabled)} />}
-
-          <section aria-label="Articles du panier">
-            <ul className="space-y-3">
-              {items.map((item) => (
-                <CartItem
-                  key={item.product.id}
-                  item={item}
-                  variant="page"
-                  currency={tenant.currency}
-                  unavailableProductIds={unavailableProductIds}
-                  pendingProductIds={pendingProductIds}
-                  fulfillmentPolicy={checking ? undefined : cartProductPolicy(fulfillment, item.product.id)}
-                  onIncrement={increment}
-                  onDecrement={decrement}
-                  onRemove={remove}
-                  onAdjust={updateQuantity}
-                />
-              ))}
-            </ul>
-            {undo && <div className="pt-3"><CartUndoToast productName={undo.item.product.name} onUndo={restore} /></div>}
-          </section>
-
+      {!hydrated ? <CartLoading /> : isEmpty ? (
+        <div className="mx-auto max-w-xl space-y-4 pt-4">
+          {undoToast('')}
+          {search}
+          <CartEmpty headingLevel="h2" />
           <CartPromoReminder count={promoCount} />
+        </div>
+      ) : (
+        <div className="grid items-start gap-4 pt-3 md:gap-6 md:pt-0 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="min-w-0 space-y-3 md:space-y-4">
+            {/* Tablette : récapitulatif en tête (mobile : barre du bas ; desktop : colonne). */}
+            <section className="hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.05)] md:block lg:hidden" aria-label="Total du panier">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-700">{SUMMARY_COPY.productsPrice}</p>
+                  <p className="mt-0.5 text-3xl font-black tracking-tight text-gray-950">{formatPrice(subtotal, tenant.currency)}</p>
+                </div>
+                <p className="pb-1 text-sm font-medium text-gray-600">{formatProductCount(itemCount)}</p>
+              </div>
+              <p className="mt-2 text-sm text-gray-700">Livraison : {SUMMARY_COPY.shippingNextStep}</p>
+              <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} aria-hidden="true" /> Paiement sécurisé</p>
+            </section>
 
-          <div className="hidden flex-col gap-2 md:flex lg:hidden">
-            {staticMessage && <p className="text-sm font-semibold text-amber-900" role="status">{staticMessage}</p>}
-            <div className="flex items-center gap-3">
-              <Link href={returnHref} scroll={false} onClick={markShoppingReturn} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 hover:bg-gray-50">
-                <IconArrowLeft size={16} aria-hidden="true" /> {ACTION_COPY.continueShopping}
-              </Link>
-              <button
-                type="button"
-                onClick={startCheckout}
-                disabled={ctaDisabled}
-                aria-disabled={ctaDisabled}
-                aria-busy={busy || undefined}
-                className="flex min-h-12 flex-[1.2] items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                style={{ backgroundColor: 'var(--color-primary)' }}
-              >
-                {ctaContent}
-              </button>
+            {search}
+
+            {groupsError && (
+              <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                {groupsError}
+                <button type="button" onClick={reloadGroups} className="ml-2 min-h-11 font-bold underline">{ACTION_COPY.retry}</button>
+              </div>
+            )}
+            <QuantityGroupProgress groups={quantityGroups} items={items} />
+            {!checking && <CartFulfillmentNotice eligibility={fulfillment} pickupAvailable={Boolean(tenant.click_collect_enabled)} />}
+
+            <section aria-label="Articles du panier">
+              <ul className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                {items.map((item) => (
+                  <CartItem
+                    key={item.product.id}
+                    item={item}
+                    variant="page"
+                    currency={tenant.currency}
+                    unavailableProductIds={unavailableProductIds}
+                    pendingProductIds={pendingProductIds}
+                    fulfillmentPolicy={checking ? undefined : cartProductPolicy(fulfillment, item.product.id)}
+                    onIncrement={increment}
+                    onDecrement={decrement}
+                    onRemove={remove}
+                    onAdjust={updateQuantity}
+                  />
+                ))}
+              </ul>
+              {/* Mobile : l'annulation vit dans la barre du bas, toujours visible. */}
+              {undo && <div className="hidden pt-3 md:block">{undoToast('')}</div>}
+            </section>
+
+            <CartPromoReminder count={promoCount} />
+
+            <div className="hidden flex-col gap-2 md:flex lg:hidden">
+              {staticMessage && <p className="text-sm font-semibold text-amber-900" role="status">{staticMessage}</p>}
+              <div className="flex items-center gap-3">
+                <Link href={returnHref} scroll={false} onClick={markShoppingReturn} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 hover:bg-gray-50">
+                  <IconArrowLeft size={16} aria-hidden="true" /> {ACTION_COPY.continueShopping}
+                </Link>
+                <button
+                  type="button"
+                  onClick={startCheckout}
+                  disabled={ctaDisabled}
+                  aria-disabled={ctaDisabled}
+                  aria-busy={busy || undefined}
+                  className="flex min-h-12 flex-[1.2] items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{ backgroundColor: 'var(--color-primary)', color: onPrimary }}
+                >
+                  {ctaContent}
+                </button>
+              </div>
             </div>
           </div>
+
+          <aside className="hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)] lg:sticky lg:top-40 lg:block">
+            <dl className="text-sm">
+              <div className="flex items-baseline justify-between gap-3 py-1">
+                <dt className="text-gray-700">{productsPriceLabel(itemCount)}</dt>
+                <dd className="text-2xl font-black tracking-tight tabular-nums text-gray-950" aria-live="polite">{formatPrice(subtotal, tenant.currency)}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3 py-1">
+                <dt className="text-gray-700">Livraison</dt>
+                <dd className="text-gray-800">{SUMMARY_COPY.shippingNextStep}</dd>
+              </div>
+            </dl>
+            {staticMessage && <p className="mt-3 text-sm font-semibold text-amber-900" role="status">{staticMessage}</p>}
+            <button
+              type="button"
+              onClick={startCheckout}
+              disabled={ctaDisabled}
+              aria-disabled={ctaDisabled}
+              aria-busy={busy || undefined}
+              className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 font-bold disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ backgroundColor: 'var(--color-primary)', color: onPrimary }}
+            >
+              {ctaContent}
+            </button>
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} aria-hidden="true" /> Paiement sécurisé</p>
+          </aside>
         </div>
+      )}
 
-        <aside className="hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)] lg:sticky lg:top-40 lg:block">
-          <dl className="text-sm">
-            <div className="flex items-baseline justify-between gap-3 py-1">
-              <dt className="text-gray-700">{productsPriceLabel(itemCount)}</dt>
-              <dd className="text-2xl font-black tracking-tight tabular-nums text-gray-950" aria-live="polite">{formatPrice(subtotal, tenant.currency)}</dd>
-            </div>
-            <div className="flex items-baseline justify-between gap-3 py-1">
-              <dt className="text-gray-700">Livraison</dt>
-              <dd className="text-gray-800">{SUMMARY_COPY.shippingNextStep}</dd>
-            </div>
-          </dl>
-          {staticMessage && <p className="mt-3 text-sm font-semibold text-amber-900" role="status">{staticMessage}</p>}
-          <button
-            type="button"
-            onClick={startCheckout}
-            disabled={ctaDisabled}
-            aria-disabled={ctaDisabled}
-            aria-busy={busy || undefined}
-            className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ backgroundColor: 'var(--color-primary)' }}
-          >
-            {ctaContent}
-          </button>
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} aria-hidden="true" /> Paiement sécurisé</p>
-        </aside>
-      </div>
-
-      <CartCheckoutBar
-        subtotal={subtotal}
-        currency={tenant.currency}
-        itemCount={itemCount}
-        blockedMessage={blockedMessage}
-        checking={checking}
-        leaving={leaving}
-        onCheckout={startCheckout}
-      />
+      {hydrated && !isEmpty && (
+        <CartCheckoutBar
+          subtotal={subtotal}
+          currency={tenant.currency}
+          itemCount={itemCount}
+          blockedMessage={blockedMessage}
+          checking={checking}
+          leaving={leaving}
+          onCheckout={startCheckout}
+          notice={undoToast('mb-2')}
+        />
+      )}
     </div>
   );
 }

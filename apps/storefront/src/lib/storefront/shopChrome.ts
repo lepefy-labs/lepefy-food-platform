@@ -18,21 +18,30 @@ export function shouldShowGlobalSearch(pathname: string): boolean {
 }
 
 /**
- * Barre de recherche collante mobile/tablette. Absente du panier : son haut
- * d'écran est réservé à « ← Continuer mes achats » (un seul élément collant).
+ * Barre de recherche collante mobile/tablette. Absente du panier : il a sa
+ * propre recherche, dans la page, qui ajoute sans quitter le panier
+ * (`CartProductSearch`), et son haut d'écran est réservé à son en-tête.
  */
 export function shouldShowSearchBar(pathname: string): boolean {
-  return shouldShowGlobalSearch(pathname) && pathname !== '/cart';
+  return shouldShowGlobalSearch(pathname) && !isCartPath(pathname);
 }
 
 /**
- * Barre de navigation du bas (mobile). Masquée au paiement et sur un panier
- * non vide, où la barre « Livraison et paiement » est la seule zone d'action
- * en bas d'écran ; un panier vide garde la navigation pour repartir.
+ * Barre de navigation du bas (mobile). Masquée au paiement, qui privilégie la
+ * fin de l'achat ; présente sur le panier (vide ou non), où la barre
+ * « Livraison et paiement » se pose juste au-dessus d'elle.
  */
-export function shouldShowBottomNav(pathname: string, cartItemCount: number): boolean {
-  if (pathname === '/avis/donner' || isCheckoutPath(pathname)) return false;
-  return !(pathname === '/cart' && cartItemCount > 0);
+export function shouldShowBottomNav(pathname: string): boolean {
+  return pathname !== '/avis/donner' && !isCheckoutPath(pathname);
+}
+
+/**
+ * Panier : sur mobile, l'en-tête commercial (logo, menu, avis) laisse la place
+ * à l'en-tête contextuel du panier (← retour, « Mon panier », nombre de
+ * produits). À partir de md, l'en-tête global reste affiché.
+ */
+export function isCartPath(pathname: string): boolean {
+  return pathname === '/cart';
 }
 
 /** Le catalogue possède la recherche : le même champ y filtre la grille au lieu de proposer. */

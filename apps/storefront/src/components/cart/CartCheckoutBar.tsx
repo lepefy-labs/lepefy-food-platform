@@ -1,7 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { IconArrowRight, IconLoader2, IconLock } from '@tabler/icons-react';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { IconArrowRight, IconLoader2 } from '@tabler/icons-react';
+import { useCartUiStore } from '@/stores/cartUiStore';
+import { useTenant } from '@/providers/TenantProvider';
+import { readableOn } from '@/lib/utils/color';
 import { formatPrice } from '@/lib/utils/format';
 import { formatProductCount } from '@/lib/cart/formatProductCount';
 import { ACTION_COPY, SUMMARY_COPY } from '@/lib/storefrontCopy/copy';
@@ -17,20 +20,25 @@ interface CartCheckoutBarProps {
   /** Navigation vers /checkout déjà lancée : un seul envoi. */
   leaving: boolean;
   onCheckout: () => void;
+  /** Message temporaire posé au-dessus du total (annulation d'un retrait). */
+  notice?: ReactNode;
 }
 
 const MOBILE_QUERY = '(max-width: 767px)';
 
 /**
- * Barre d'action du panier sur mobile, fixée en bas d'écran : sous-total en
- * direct, « Livraison et paiement », livraison annoncée pour l'étape suivante
- * (jamais un total final sans elle). La BottomNav est masquée sur le panier
- * (`shouldShowBottomNav`) : c'est la seule zone du bas. Elle réserve sa propre
- * hauteur en bas de page (corps du document) pour ne jamais couvrir le dernier
- * article ni le pied de page, et respecte la zone sûre iOS/Android.
+ * Barre d'action du panier sur mobile, fixée juste au-dessus de la BottomNav
+ * (h-16 + zone sûre iOS/Android) : sous-total en direct, « Livraison et
+ * paiement », livraison annoncée pour l'étape suivante (jamais un total final
+ * sans elle). Une seule rangée pour rester basse sur les petits écrans. Elle
+ * réserve sa hauteur en bas de page (corps du document) pour ne jamais couvrir
+ * le dernier article ; la BottomNav garde sa propre réserve (`ShopMain`).
+ * Masquée pendant la saisie dans la recherche du panier (clavier ouvert).
  */
-export function CartCheckoutBar({ subtotal, currency, itemCount, blockedMessage, checking, leaving, onCheckout }: CartCheckoutBarProps) {
+export function CartCheckoutBar({ subtotal, currency, itemCount, blockedMessage, checking, leaving, onCheckout, notice }: CartCheckoutBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
+  const searching = useCartUiStore((s) => s.cartSearchActive);
+  const onPrimary = readableOn(useTenant().primary_color);
 
   useEffect(() => {
     const bar = barRef.current;
@@ -61,41 +69,39 @@ export function CartCheckoutBar({ subtotal, currency, itemCount, blockedMessage,
     <div
       ref={barRef}
       data-testid="cart-checkout-bar"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/95 px-4 pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur motion-reduce:backdrop-blur-none md:hidden"
-      style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+      className={`fixed inset-x-0 z-40 border-t border-black/10 bg-white/95 px-4 py-2 shadow-[0_-8px_24px_rgba(0,0,0,.07)] backdrop-blur motion-reduce:backdrop-blur-none md:hidden ${searching ? 'hidden' : ''}`}
+      style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
     >
       <div className="mx-auto max-w-xl">
+        {notice}
         {visibleMessage && (
-          <p id="cart-checkout-blocked" role="status" className="mb-2 rounded-xl bg-amber-50 px-3 py-2 text-center text-sm font-semibold leading-snug text-amber-900">
+          <p id="cart-checkout-blocked" role="status" className="mb-2 rounded-xl bg-amber-50 px-3 py-1.5 text-center text-sm font-semibold leading-snug text-amber-900">
             {visibleMessage}
           </p>
         )}
-        <div className="mb-2 flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-gray-700">Sous-total · {formatProductCount(itemCount)}</p>
-            <p className="text-2xl font-black leading-tight tracking-tight tabular-nums text-gray-950" aria-live="polite" aria-atomic="true">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-gray-700">Sous-total<span className="sr-only"> · {formatProductCount(itemCount)}</span></p>
+            <p className="text-xl font-black leading-tight tracking-tight tabular-nums text-gray-950" aria-live="polite" aria-atomic="true">
               {formatPrice(subtotal, currency)}
             </p>
           </div>
-          <p className="max-w-[46%] text-right text-xs leading-snug text-gray-700">
-            Livraison {SUMMARY_COPY.shippingNextStep}
-            <span className="mt-0.5 flex items-center justify-end gap-1 font-semibold text-green-800"><IconLock size={12} aria-hidden="true" /> Paiement sécurisé</span>
-          </p>
+          <button
+            type="button"
+            onClick={onCheckout}
+            disabled={disabled}
+            aria-disabled={disabled}
+            aria-busy={busy || undefined}
+            aria-describedby={visibleMessage ? 'cart-checkout-blocked cart-checkout-shipping' : 'cart-checkout-shipping'}
+            className="flex min-h-12 max-w-[64%] shrink-0 items-center justify-center gap-1.5 rounded-2xl px-3 py-2 text-center text-sm font-bold min-[360px]:px-4 min-[360px]:text-[15px] leading-tight transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
+            style={{ backgroundColor: 'var(--color-primary)', color: onPrimary }}
+          >
+            {busy
+              ? <><IconLoader2 size={18} className="shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" /> {checking ? 'Vérification…' : ACTION_COPY.processing}</>
+              : <>{ACTION_COPY.goToShipping} <IconArrowRight size={18} className="shrink-0 max-[359px]:hidden" aria-hidden="true" /></>}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onCheckout}
-          disabled={disabled}
-          aria-disabled={disabled}
-          aria-busy={busy || undefined}
-          aria-describedby={visibleMessage ? 'cart-checkout-blocked' : undefined}
-          className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-base font-bold text-white transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
-          style={{ backgroundColor: 'var(--color-primary)' }}
-        >
-          {busy
-            ? <><IconLoader2 size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> {checking ? 'Vérification du panier…' : ACTION_COPY.processing}</>
-            : <>{ACTION_COPY.goToShipping} <IconArrowRight size={18} aria-hidden="true" /></>}
-        </button>
+        <p id="cart-checkout-shipping" className="mt-1 text-xs leading-snug text-gray-600">Livraison {SUMMARY_COPY.shippingNextStep}</p>
       </div>
     </div>
   );

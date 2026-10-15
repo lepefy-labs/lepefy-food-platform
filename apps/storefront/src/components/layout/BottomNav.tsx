@@ -15,7 +15,8 @@ import { useTenant } from '@/providers/TenantProvider';
 import { cartAriaLabel, formatCartBadge } from '@/lib/cart/cartBadge';
 import { useCartAddPulse, useCartNudge } from '@/lib/cart/useCartAttention';
 import { accentTextOnWhite, readableOn } from '@/lib/utils/color';
-import { shouldShowBottomNav } from '@/lib/storefront/shopChrome';
+import { isCartPath, shouldShowBottomNav } from '@/lib/storefront/shopChrome';
+import { useCartUiStore } from '@/stores/cartUiStore';
 
 interface Tab {
   href: string;
@@ -37,7 +38,10 @@ export function BottomNav() {
   const tenant = useTenant();
   const pulsing = useCartAddPulse();
   const nudging = useCartNudge(pathname);
-  if (!shouldShowBottomNav(pathname, totalItems)) return null;
+  // Saisie dans la recherche du panier : le clavier occupe le bas de l'écran.
+  const cartSearchActive = useCartUiStore((s) => s.cartSearchActive);
+  if (!shouldShowBottomNav(pathname)) return null;
+  if (cartSearchActive && isCartPath(pathname)) return null;
 
   // Couleurs dérivées des tokens tenant, jamais fixées : icône et pastille
   // restent lisibles quel que soit le couple primary/secondary configuré.

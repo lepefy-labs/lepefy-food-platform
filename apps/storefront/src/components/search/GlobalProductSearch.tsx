@@ -16,32 +16,9 @@ import { isCatalogSearchPath } from '@/lib/storefront/shopChrome';
 import { deriveAvailability } from '@/lib/storefrontCopy/availability';
 import { describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { useCatalogSearchStore } from '@/stores/catalogSearchStore';
+import { useProductSuggestions } from './useProductSuggestions';
 
-const MIN_QUERY_LENGTH = 2;
-const SUGGESTION_LIMIT = 5;
-const SUGGEST_DEBOUNCE_MS = 250;
 const CATALOG_DEBOUNCE_MS = 300;
-const CACHE_SIZE = 20;
-
-type Suggestions = { products: ProductCardProduct[]; total: number };
-type Status = 'idle' | 'loading' | 'ready' | 'error';
-
-// Partagé par les instances (barre mobile, header desktop) pendant la visite :
-// effacer une lettre ou revenir sur un mot déjà tapé ne relance pas la requête.
-const suggestionCache = new Map<string, Suggestions>();
-
-function cacheKey(query: string): string {
-  return query.trim().toLowerCase();
-}
-
-function remember(key: string, value: Suggestions) {
-  suggestionCache.delete(key);
-  suggestionCache.set(key, value);
-  if (suggestionCache.size > CACHE_SIZE) {
-    const oldest = suggestionCache.keys().next().value;
-    if (oldest !== undefined) suggestionCache.delete(oldest);
-  }
-}
 
 interface Props {
   /** `bar` = barre sous l'header (mobile/tablette) ; `header` = champ intégré à l'header desktop. */
@@ -95,13 +72,10 @@ export function GlobalProductSearch({ variant }: Props) {
 
   // ── Mode propositions ─────────────────────────────────────────────────────
   const [open, setOpen] = useState(false);
-  const [debounced, setDebounced] = useState('');
-  const [status, setStatus] = useState<Status>('idle');
-  const [result, setResult] = useState<Suggestions>({ products: [], total: 0 });
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [attempt, setAttempt] = useState(0);
+  const suggestions = useProductSuggestions(query, !catalogMode);
+  const { searchable, showResults, products } = suggestions;
   const trimmed = query.trim();
-  const searchable = trimmed.length >= MIN_QUERY_LENGTH;
 
   // Changement de page : on repart d'un champ vide (hors Catalogue) et fermé.
   useEffect(() => {
@@ -109,50 +83,13 @@ export function GlobalProductSearch({ variant }: Props) {
     setActiveIndex(-1);
     if (!isCatalogSearchPath(pathname)) {
       setQuery('');
-      setDebounced('');
       // Au retour sur le Catalogue, le champ reprend la recherche de l'URL.
       lastSentRef.current = null;
     }
   }, [pathname]);
 
-  useEffect(() => {
-    if (catalogMode) return;
-    const timer = setTimeout(() => setDebounced(trimmed), SUGGEST_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [catalogMode, trimmed]);
-
-  useEffect(() => {
-    if (catalogMode) return;
-    if (debounced.length < MIN_QUERY_LENGTH) {
-      setStatus('idle');
-      setResult({ products: [], total: 0 });
-      return;
-    }
-    const key = cacheKey(debounced);
-    const cached = suggestionCache.get(key);
-    if (cached) {
-      setResult(cached);
-      setStatus('ready');
-      return;
-    }
-    const controller = new AbortController();
-    setStatus('loading');
-    const params = new URLSearchParams({ q: debounced, limit: String(SUGGESTION_LIMIT) });
-    fetch(`/api/products?${params.toString()}`, { signal: controller.signal })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json() as { products?: ProductCardProduct[]; totalCount?: number };
-        const value = { products: (data.products ?? []).slice(0, SUGGESTION_LIMIT), total: data.totalCount ?? 0 };
-        remember(key, value);
-        setResult(value);
-        setStatus('ready');
-        setActiveIndex(-1);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setStatus('error');
-      });
-    return () => controller.abort();
-  }, [catalogMode, debounced, attempt]);
+  // Nouvelles propositions : aucune n'est présélectionnée.
+  useEffect(() => { setActiveIndex(-1); }, [products]);
 
   useEffect(() => {
     if (!open) return;
@@ -165,12 +102,8 @@ export function GlobalProductSearch({ variant }: Props) {
 
   useEffect(() => () => { if (catalogTimer.current) clearTimeout(catalogTimer.current); }, []);
 
-  // Les propositions affichées correspondent toujours au texte du champ.
-  const settled = debounced === trimmed;
-  const showResults = searchable && settled && status === 'ready';
-  const products = showResults ? result.products : [];
   const optionCount = showResults ? products.length + 1 : 0; // + « Voir tous les résultats »
-  const loading = catalogMode ? isPending : searchable && (!settled || status === 'loading');
+  const loading = catalogMode ? isPending : suggestions.loading;
   const panelOpen = !catalogMode && open;
 
   function handleChange(value: string) {
@@ -190,7 +123,6 @@ export function GlobalProductSearch({ variant }: Props) {
       sendCatalogQuery('');
     } else {
       setQuery('');
-      setDebounced('');
       setOpen(true);
     }
     inputRef.current?.focus();
@@ -254,7 +186,7 @@ export function GlobalProductSearch({ variant }: Props) {
     ? ''
     : loading
       ? 'Recherche en cours…'
-      : status === 'error'
+      : suggestions.error
         ? 'La recherche ne répond pas.'
         : products.length === 0
           ? 'Aucun produit trouvé'
@@ -314,11 +246,11 @@ export function GlobalProductSearch({ variant }: Props) {
             <p className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700">
               <IconLoader2 size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />Recherche en cours…
             </p>
-          ) : status === 'error' ? (
+          ) : suggestions.error ? (
             <div className="px-4 py-3">
               <p className="text-sm font-bold text-gray-900">La recherche ne répond pas.</p>
               <p className="mt-0.5 text-sm text-gray-600">Vérifiez votre connexion.</p>
-              <button type="button" onClick={() => setAttempt((n) => n + 1)}
+              <button type="button" onClick={suggestions.retry}
                 className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-bold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>
                 <IconRefresh size={16} aria-hidden="true" />Réessayer
               </button>
@@ -354,7 +286,7 @@ export function GlobalProductSearch({ variant }: Props) {
                 ) : (
                   <Link href={catalogSearchHref(trimmed)} onClick={closePanel} tabIndex={-1}
                     className="flex min-h-12 items-center justify-between px-4 text-sm font-bold" style={{ color: 'var(--color-primary)' }}>
-                    {result.total > products.length ? `Voir tous les résultats (${result.total})` : 'Voir tous les résultats'}
+                    {suggestions.total > products.length ? `Voir tous les résultats (${suggestions.total})` : 'Voir tous les résultats'}
                     <IconArrowRight size={18} aria-hidden="true" />
                   </Link>
                 )}

@@ -14,7 +14,7 @@ import { GlobalProductSearch } from '@/components/search/GlobalProductSearch';
 import { SearchFieldPlaceholder } from '@/components/search/ShopSearchBar';
 import { cartAriaLabel, formatCartBadge } from '@/lib/cart/cartBadge';
 import { useCartAddPulse } from '@/lib/cart/useCartAttention';
-import { shouldShowGlobalSearch } from '@/lib/storefront/shopChrome';
+import { isCartPath, shouldShowGlobalSearch } from '@/lib/storefront/shopChrome';
 import { readableOn } from '@/lib/utils/color';
 import {
   BrandNavigationDrawer,
@@ -155,8 +155,9 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
   return (
     <>
       {/* Mobile : l'header défile avec la page, seule la recherche reste fixée
-          (ShopSearchBar) et la BottomNav porte panier et destinations. */}
-      <header className="relative z-40 border-b border-gray-200 bg-white md:sticky md:top-0">
+          (ShopSearchBar) et la BottomNav porte panier et destinations. Sur le
+          panier mobile, l'en-tête contextuel de la page (CartPageHeader) le remplace. */}
+      <header className={`relative z-40 border-b border-gray-200 bg-white md:sticky md:top-0 ${isCartPath(pathname) ? 'max-md:hidden' : ''}`}>
         <div className="relative mx-auto flex h-24 max-w-7xl items-center gap-3 px-4 lg:gap-6">
           <button
             type="button"
