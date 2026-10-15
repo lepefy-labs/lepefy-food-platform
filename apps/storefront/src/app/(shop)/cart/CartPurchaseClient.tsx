@@ -18,7 +18,7 @@ import { selectCartIsEmpty, selectCartItemCount, selectCartItems, selectCartSubt
 import { formatProductCount } from '@/lib/cart/formatProductCount';
 import { formatPrice } from '@/lib/utils/format';
 import { readableOn } from '@/lib/utils/color';
-import { decrementRemovesLine } from '@/lib/purchaseQuantityRules';
+import { decrementRemovesLine, getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import { useCartStore } from '@/stores/cartStore';
 import { useHasMounted } from '@/hooks/useHasMounted';
 import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
@@ -75,6 +75,11 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
     if (!item) return;
     if (undo) clearTimeout(undo.timeoutId);
     removeItem(productId);
+    // Un produit qui ne peut plus être rajouté (retiré du catalogue, stock
+    // insuffisant pour le minimum) n'offre pas d'« Annuler » qui n'aboutirait pas.
+    const restorable = !useCartStore.getState().unavailableProductIds.includes(productId)
+      && getMaximumValidQuantity(item.product.stock, item.product.min_order_quantity ?? 1, item.product.order_quantity_step ?? 1) > 0;
+    if (!restorable) { setUndo(null); return; }
     setUndo({ item, timeoutId: setTimeout(() => setUndo(null), UNDO_TIMEOUT_MS) });
   }
 
@@ -108,6 +113,8 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
   );
 
   return (
+    // Fond légèrement teinté par la couleur du tenant : les cards blanches s'en détachent.
+    <div className="min-h-full bg-[color-mix(in_srgb,var(--color-primary)_4%,#f8fafc)]">
     <div className="mx-auto w-full max-w-5xl px-4 pb-6 sm:px-6 md:pb-10 lg:px-8">
       {/* Le serveur ne connaît pas le panier (localStorage) : en-tête sans
           nombre et état neutre jusqu'à l'hydratation, jamais « panier vide »
@@ -151,7 +158,7 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
             {!checking && <CartFulfillmentNotice eligibility={fulfillment} pickupAvailable={Boolean(tenant.click_collect_enabled)} />}
 
             <section aria-label="Articles du panier">
-              <ul className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+              <ul className="space-y-3">
                 {items.map((item) => (
                   <CartItem
                     key={item.product.id}
@@ -235,6 +242,7 @@ export default function CartPurchaseClient({ tenant, promoCount = 0 }: { tenant:
           notice={undoToast('mb-2')}
         />
       )}
+    </div>
     </div>
   );
 }

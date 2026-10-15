@@ -154,6 +154,73 @@ test('cart search stays reachable, tolerates typos, and the bottom nav returns w
   await expect(search).not.toBeFocused();
 });
 
+test('cart lines are independent cards with a single remove action and a readable total', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  const items = await seedCart(page, 6);
+  await page.goto('/cart');
+  const cards = page.locator('section[aria-label="Articles du panier"] > ul > li');
+  await expect(cards).toHaveCount(items.length);
+  const boxes = await cards.evaluateAll((lis) => lis.map((li) => {
+    const style = getComputedStyle(li);
+    const rect = li.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom, right: rect.right, radius: parseFloat(style.borderTopLeftRadius), border: parseFloat(style.borderTopWidth),
+      removes: li.querySelectorAll('button[aria-label^="Retirer"]').length, minus: li.querySelectorAll('button[aria-label^="Diminuer"]').length,
+      overflow: [...li.querySelectorAll('*')].some((el) => el.getBoundingClientRect().right > rect.right + 0.5) };
+  }));
+  for (const [i, box] of boxes.entries()) {
+    expect(box.radius).toBeGreaterThanOrEqual(16);
+    expect(box.border).toBeGreaterThan(0);
+    // Une seule action sur la quantité basse : «−» ou corbeille, jamais une seconde croix.
+    expect(box.removes + box.minus).toBe(1);
+    expect(box.overflow).toBe(false);
+    if (i > 0) expect(box.top - boxes[i - 1]!.bottom).toBeGreaterThanOrEqual(8);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+  // + puis − suivent la règle (minimum, pas) ; au minimum le «−» devient une corbeille.
+  const first = items[0]!;
+  const card = cards.first();
+  const minimum = first.product.min_order_quantity ?? 1;
+  const step = first.product.order_quantity_step ?? 1;
+  await expect(card.getByRole('button', { name: `Retirer ${first.product.name} du panier` })).toBeVisible();
+  const total = card.getByText('Total').locator('..');
+  const before = await total.textContent();
+  const plus = card.getByRole('button', { name: `Augmenter la quantité de ${first.product.name}` });
+  if (await plus.isEnabled()) {
+    await plus.click();
+    expect((await readItems(page))[0]!.quantity).toBe(minimum + step);
+    await expect(total).not.toHaveText(before!);
+    const minus = card.getByRole('button', { name: `Diminuer la quantité de ${first.product.name}` });
+    const minusBox = (await minus.boundingBox())!;
+    await minus.click();
+    expect((await readItems(page))[0]!.quantity).toBe(minimum);
+    const trashBox = (await card.getByRole('button', { name: `Retirer ${first.product.name} du panier` }).boundingBox())!;
+    // Le «−» devenu corbeille garde sa place et sa taille.
+    expect(Math.abs(trashBox.x - minusBox.x)).toBeLessThanOrEqual(1);
+    expect(trashBox.width).toBeGreaterThanOrEqual(44);
+  }
+  // Le nom mène à la fiche produit.
+  await expect(card.getByRole('link', { name: String(first.product.name) })).toHaveAttribute('href', `/products/${first.product.slug}`);
+});
+
+test('an unavailable line offers only the remove action', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const items = await seedCart(page, 2);
+  await page.evaluate(() => {
+    const raw = JSON.parse(localStorage.getItem('lepefy-cart')!);
+    raw.state.items[0].product.stock = 0;
+    localStorage.setItem('lepefy-cart', JSON.stringify(raw));
+  });
+  await page.goto('/cart');
+  const card = page.locator('section[aria-label="Articles du panier"] > ul > li').first();
+  await expect(card.getByRole('button', { name: /^Augmenter/ })).toBeDisabled();
+  await expect(card.getByRole('button', { name: /^Diminuer/ })).toHaveCount(0);
+  await card.getByRole('button', { name: `Retirer ${items[0]!.product.name} du panier` }).click();
+  expect((await readItems(page)).some((i) => i.product.id === items[0]!.product.id)).toBe(false);
+  // Un produit qui ne peut plus revenir n'offre pas d'« Annuler » trompeur.
+  await expect(page.getByTestId('cart-checkout-bar').getByRole('button', { name: 'Annuler' })).toHaveCount(0);
+});
+
 test('removing a line offers an undo in the bottom bar', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const items = await seedCart(page, 2);

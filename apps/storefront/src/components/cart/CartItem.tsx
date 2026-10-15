@@ -1,6 +1,6 @@
 import { LepefyImage } from '@/components/images/LepefyImage';
 import Link from 'next/link';
-import { IconPhoto, IconX } from '@tabler/icons-react';
+import { IconPhoto } from '@tabler/icons-react';
 import type { CartItem as CartItemType, ProductFulfillmentPolicy } from '@lepefy/types';
 import { formatPrice } from '@/lib/utils/format';
 import { deriveCartItemState } from '@/lib/cart/cartItemState';
@@ -96,55 +96,62 @@ export function CartItem({
   );
 
   if (variant === 'page') {
-    // Ligne compacte du panier : image et nom mènent à la fiche, détail
-    // « 3 sachets de 150 g · 1,00 € le sachet », +/− et total de ligne sur la
-    // même rangée, retrait explicite (✕) distinct du «−».
+    // Card autonome du panier : zone produit (image et nom → fiche, détail
+    // « 4 sachets de 500 g · 4,00 € le sachet », disponibilité, mode de
+    // réception) puis zone d'actions séparée (+/− et total de ligne). Une
+    // seule action de retrait : le «−» devient corbeille au minimum, et une
+    // ligne bloquée (retirée du catalogue, plus de stock) ne propose que lui.
     const href = `/products/${product.slug}`;
+    const removeOnly = blocked;
     return (
-      <li className="flex gap-3 px-3 py-3 max-[359px]:gap-2.5 max-[359px]:px-2.5 sm:gap-4 sm:px-4">
-        <Link href={href} tabIndex={-1} aria-hidden="true"
-          className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-gray-50 ring-1 ring-black/5 max-[359px]:h-16 max-[359px]:w-16 sm:h-20 sm:w-20">
-          {product.image_url ? (
-            <LepefyImage
-              src={product.image_url}
-              variant="thumbnail"
-              alt=""
-              fill
-              sizes="(min-width: 640px) 80px, 72px"
-              className={`object-cover ${blocked ? 'opacity-50 grayscale' : ''}`}
-            />
-          ) : (
-            <IconPhoto size={26} stroke={1.5} aria-hidden="true" className="absolute inset-0 m-auto text-gray-300" />
-          )}
-        </Link>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-1">
+      <li className="rounded-2xl border border-gray-200 bg-white p-3 shadow-[0_1px_3px_rgba(15,23,42,0.06)] sm:p-4">
+        <div className="flex gap-3 sm:gap-4">
+          <Link href={href} tabIndex={-1} aria-hidden="true"
+            className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-gray-50 ring-1 ring-black/5 sm:h-20 sm:w-20">
+            {product.image_url ? (
+              <LepefyImage
+                src={product.image_url}
+                variant="thumbnail"
+                alt=""
+                fill
+                sizes="(min-width: 640px) 80px, 72px"
+                className={`object-cover ${blocked ? 'opacity-50 grayscale' : ''}`}
+              />
+            ) : (
+              <IconPhoto size={26} stroke={1.5} aria-hidden="true" className="absolute inset-0 m-auto text-gray-300" />
+            )}
+          </Link>
+          <div className="min-w-0 flex-1">
             <Link href={href}
-              className="line-clamp-2 min-w-0 flex-1 text-[15px] font-bold leading-snug text-gray-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:text-base">
+              className="block break-words text-[15px] font-bold leading-snug text-gray-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:text-base">
               {product.name}
             </Link>
-            <button
-              type="button"
-              onClick={() => onRemove(product.id)}
-              aria-label={`Retirer ${product.name} du panier`}
-              title="Retirer du panier"
-              className="-mr-2 -mt-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 motion-reduce:transition-none"
-            >
-              <IconX size={18} aria-hidden="true" />
-            </button>
+            <p className="mt-0.5 text-sm leading-snug text-gray-700">{orderLineDetail(product.price, quantity, sellingFormat, currency)}</p>
+            {fulfillmentPolicy && fulfillmentPolicy !== 'delivery_or_pickup' && (
+              <FulfillmentPolicyChip policy={fulfillmentPolicy} className="mt-1.5" />
+            )}
+            {issueNotice}
           </div>
-          <p className="text-sm leading-snug text-gray-700">{orderLineDetail(product.price, quantity, sellingFormat, currency)}</p>
-          {fulfillmentPolicy && fulfillmentPolicy !== 'delivery_or_pickup' && (
-            <FulfillmentPolicyChip policy={fulfillmentPolicy} className="mt-1" />
-          )}
-          {issueNotice}
-          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-            {stepper}
-            <p className="ml-auto text-base font-extrabold tabular-nums text-gray-950">
-              <span className="sr-only">Total de la ligne : </span>{formatPrice(lineTotal, currency)}
-            </p>
+        </div>
+        <div className="mt-2.5 flex items-center justify-between gap-3 border-t border-gray-100 pt-2.5">
+          <div className="flex items-center gap-1.5">
+            <CartStepper
+              variant="cart"
+              quantity={quantity}
+              productName={product.name}
+              removesOnDecrement={removeOnly || removesOnDecrement}
+              canIncrement={!blocked && canIncrement && quantity < maxPurchasable}
+              onIncrement={() => onIncrement(product.id)}
+              onDecrement={() => (removeOnly ? onRemove(product.id) : onDecrement(product.id))}
+            />
+            {state === 'pending' && (
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-300 motion-reduce:animate-none" aria-hidden="true" />
+            )}
           </div>
+          <p className="text-right leading-tight">
+            <span className="block text-xs font-medium text-gray-600">Total</span>
+            <span className="text-lg font-extrabold tabular-nums text-gray-950">{formatPrice(lineTotal, currency)}</span>
+          </p>
         </div>
       </li>
     );

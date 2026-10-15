@@ -2,6 +2,8 @@
 
 import type { MouseEvent } from 'react';
 import { IconMinus, IconPlus, IconTrash } from '@tabler/icons-react';
+import { useTenant } from '@/providers/TenantProvider';
+import { readableOn } from '@/lib/utils/color';
 
 interface CartStepperProps {
   quantity: number;
@@ -14,9 +16,10 @@ interface CartStepperProps {
   disabled?: boolean;
   /**
    * `card` = pleine largeur sous une carte produit ; `line` = boutons ronds
-   * d'une ligne de panier ; `panel` = bloc encadré (fiche produit, confirmation).
+   * d'une ligne du drawer ; `panel` = bloc encadré (fiche produit, confirmation) ;
+   * `cart` = card de la page panier.
    */
-  variant?: 'card' | 'line' | 'panel';
+  variant?: 'card' | 'line' | 'panel' | 'cart';
   /** Texte visible sous le nombre (variant `card`), ex. « dans le panier ». */
   caption?: string;
   /** Préfixe lu par les lecteurs d'écran avant le nombre. */
@@ -48,6 +51,7 @@ export function CartStepper({
   const decrementLabel = removesOnDecrement ? `Retirer ${productName} du panier` : `Diminuer la quantité de ${productName}`;
   const incrementLabel = `Augmenter la quantité de ${productName}`;
   const plusDisabled = disabled || !canIncrement;
+  const onPrimary = readableOn(useTenant().primary_color);
 
   function handle(event: MouseEvent<HTMLButtonElement>, action: () => void) {
     event.preventDefault();
@@ -79,6 +83,26 @@ export function CartStepper({
         <button type="button" onClick={(e) => handle(e, onIncrement)} disabled={plusDisabled} aria-label={incrementLabel}
           className={`flex h-11 w-11 items-center justify-center hover:bg-gray-50 active:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30 ${focusRing}`}>
           <IconPlus size={20} aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
+
+  if (variant === 'cart') {
+    // Panier : «−» neutre, corbeille rouge au minimum (même taille : aucun
+    // décalage), «+» dans la couleur du tenant avec un texte lisible dessus.
+    return (
+      <div role="group" aria-label={`Quantité de ${productName}`} className="inline-flex items-center gap-1 rounded-full bg-gray-100 p-0.5">
+        <button type="button" onClick={(e) => handle(e, onDecrement)} disabled={disabled} aria-label={decrementLabel}
+          title={removesOnDecrement ? 'Retirer du panier' : undefined}
+          className={`flex h-11 w-11 items-center justify-center rounded-full bg-white ring-1 transition-[background-color,transform] active:scale-95 disabled:opacity-40 motion-reduce:transition-none motion-reduce:active:scale-100 ${removesOnDecrement ? 'text-red-700 ring-red-200 hover:bg-red-50' : 'text-gray-800 ring-gray-300 hover:bg-gray-50'} ${focusRing}`}>
+          {removesOnDecrement ? <IconTrash size={19} aria-hidden="true" /> : <IconMinus size={19} aria-hidden="true" />}
+        </button>
+        <span className="min-w-9 px-0.5 text-center text-base font-bold text-gray-950">{value}</span>
+        <button type="button" onClick={(e) => handle(e, onIncrement)} disabled={plusDisabled} aria-label={incrementLabel}
+          className={`flex h-11 w-11 items-center justify-center rounded-full transition-[filter,transform] hover:brightness-95 active:scale-95 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 motion-reduce:transition-none motion-reduce:active:scale-100 ${focusRing}`}
+          style={plusDisabled ? undefined : { backgroundColor: 'var(--color-primary)', color: onPrimary }}>
+          <IconPlus size={19} aria-hidden="true" />
         </button>
       </div>
     );

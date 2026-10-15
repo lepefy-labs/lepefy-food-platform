@@ -15,6 +15,7 @@ import { cartLineIssue } from '../../src/lib/storefrontCopy/availability';
 
 const SEQUENCES: Array<{ minimum: number; step: number; expected: number[] }> = [
   { minimum: 4, step: 1, expected: [4, 5, 6] },
+  { minimum: 4, step: 2, expected: [4, 6, 8] },
   { minimum: 2, step: 1, expected: [2, 3, 4] },
   { minimum: 6, step: 6, expected: [6, 12, 18] },
   { minimum: 12, step: 6, expected: [12, 18, 24] },
