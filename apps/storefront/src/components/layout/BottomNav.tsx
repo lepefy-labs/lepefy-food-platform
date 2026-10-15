@@ -38,7 +38,8 @@ interface Tab {
  * la couleur reconnaît la destination (`bottomNavTheme.ts`, le panier prend
  * la couleur du tenant), l'état actif oriente (pastille teintée, trait plus
  * épais, libellé gras et coloré, `aria-current`), la pastille du panier dit
- * son contenu. Le panier n'est actif que sur /cart ; son « pop » ne suit
+ * son contenu. Le panier, toujours repérable (disque plus grand dans la
+ * couleur du tenant), n'est actif que sur /cart ; son « pop » ne suit
  * qu'un ajout réel (`useCartAddPulse`, jamais au montage ni à l'hydratation).
  */
 export function BottomNav() {
@@ -58,6 +59,7 @@ export function BottomNav() {
 
   const onSecondary = readableOn(tenant.secondary_color, 4.5);
   const palette = resolveBottomNavPalette(tenant.primary_color);
+  const onCartAccent = readableOn(palette.cart);
   const tabs: Tab[] = [
     { destination: 'discover', href: '/accueil', label: 'Découvrir', icon: IconSmartHome, active: pathname === '/accueil' },
     {
@@ -78,7 +80,7 @@ export function BottomNav() {
   function renderTab({ destination, href, label, icon: TabIcon, active }: Tab) {
     const accent = palette[destination];
     const isCart = destination === 'cart';
-    const animation = isCart ? (pulsing ? 'animate-cart-pop' : nudging ? 'animate-cart-nudge' : '') : '';
+    const animation = pulsing ? 'animate-cart-pop' : nudging ? 'animate-cart-nudge' : '';
     return (
       <Link
         key={href}
@@ -86,27 +88,47 @@ export function BottomNav() {
         aria-current={active ? 'page' : undefined}
         aria-label={isCart ? cartAriaLabel(totalItems) : undefined}
         data-destination={destination}
-        className="group flex min-w-0 flex-1 flex-col items-center justify-center gap-1 focus-visible:outline-none"
+        // Libellés alignés en bas : le disque du panier dépasse vers le haut, jamais hors de la barre.
+        className="group flex min-w-0 flex-1 flex-col items-center justify-end gap-0.5 pb-1.5 focus-visible:outline-none"
       >
-        {/* Pastille de même taille dans tous les états : aucun décalage quand elle se teinte. */}
-        <span
-          className="relative flex h-8 w-14 items-center justify-center rounded-full transition-colors group-focus-visible:ring-2 group-focus-visible:ring-offset-1 motion-reduce:transition-none"
-          style={{ backgroundColor: active ? bottomNavTint(accent) : 'transparent', color: accent, ['--tw-ring-color' as string]: accent }}
-        >
-          <span className={`relative flex motion-reduce:animate-none ${animation}`}>
-            <TabIcon size={24} stroke={active ? 2.25 : 1.75} aria-hidden="true" />
-            {isCart && totalItems > 0 && (
-              <span aria-hidden="true"
-                className="absolute -right-3 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-xs font-extrabold tabular-nums ring-2 ring-white"
-                style={{ background: 'var(--color-secondary)', color: onSecondary }}>
-                {formatCartBadge(totalItems)}
-              </span>
-            )}
-            {destination === 'account' && customer && (
-              <span aria-hidden="true" className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full ring-2 ring-white" style={{ backgroundColor: accent }} />
-            )}
+        {isCart ? (
+          // Panier toujours repérable : disque de 44 px dans la couleur du tenant, plus haut
+          // que les autres pastilles mais contenu dans la barre (rien sur la barre d'achat
+          // d'une fiche produit). Teinté hors du panier, plein sur le panier (état actif).
+          <span
+            className="relative flex h-11 w-11 items-center justify-center rounded-full transition-colors group-focus-visible:ring-2 group-focus-visible:ring-offset-2 motion-reduce:transition-none"
+            style={{
+              ['--tw-ring-color' as string]: accent,
+              ...(active
+                ? { backgroundColor: accent, color: onCartAccent, boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${accent}` }
+                : { backgroundColor: bottomNavTint(accent), color: accent, boxShadow: `inset 0 0 0 1.5px ${accent}, 0 3px 8px color-mix(in srgb, ${accent} 28%, transparent)` }),
+            }}
+          >
+            <span className={`relative flex motion-reduce:animate-none ${animation}`}>
+              <TabIcon size={26} stroke={active ? 2.25 : 2} aria-hidden="true" />
+              {totalItems > 0 && (
+                <span aria-hidden="true"
+                  className="absolute -right-3.5 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-xs font-extrabold tabular-nums ring-2 ring-white"
+                  style={{ background: 'var(--color-secondary)', color: onSecondary }}>
+                  {formatCartBadge(totalItems)}
+                </span>
+              )}
+            </span>
           </span>
-        </span>
+        ) : (
+          /* Pastille de même taille dans tous les états : aucun décalage quand elle se teinte. */
+          <span
+            className="relative flex h-8 w-14 items-center justify-center rounded-full transition-colors group-focus-visible:ring-2 group-focus-visible:ring-offset-1 motion-reduce:transition-none"
+            style={{ backgroundColor: active ? bottomNavTint(accent) : 'transparent', color: accent, ['--tw-ring-color' as string]: accent }}
+          >
+            <span className="relative flex">
+              <TabIcon size={24} stroke={active ? 2.25 : 1.75} aria-hidden="true" />
+              {destination === 'account' && customer && (
+                <span aria-hidden="true" className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full ring-2 ring-white" style={{ backgroundColor: accent }} />
+              )}
+            </span>
+          </span>
+        )}
         <span
           className={`max-w-full truncate text-xs leading-none ${active ? 'font-bold' : 'font-medium'}`}
           style={{ color: active ? accent : BOTTOM_NAV_INACTIVE_LABEL }}

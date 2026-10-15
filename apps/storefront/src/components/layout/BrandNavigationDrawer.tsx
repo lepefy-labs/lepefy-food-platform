@@ -27,6 +27,7 @@ import {
 import type { PublicTenant, TenantSocialLink } from '@lepefy/types';
 import { SOCIAL_PLATFORM_REGISTRY } from '@lepefy/types';
 import { TenantLogo } from '@/components/branding/TenantLogo';
+import { bottomNavTint, resolveNavigationPalette, type NavigationColorRole } from '@/lib/storefront/bottomNavTheme';
 
 const SOCIAL_ICONS = {
   IconBrandInstagram,
@@ -53,6 +54,26 @@ const ITEM_ICONS = {
 };
 
 export type BrandNavigationIcon = keyof typeof ITEM_ICONS;
+
+/**
+ * Couleur de chaque icône du menu, même palette que la BottomNav
+ * (`resolveNavigationPalette`) : une destination a la même couleur partout ;
+ * achats (commandes, carte et paiement) dans la couleur du tenant comme le panier.
+ */
+const ICON_ROLES: Record<BrandNavigationIcon, NavigationColorRole> = {
+  home: 'discover',
+  gallery: 'discover',
+  category: 'catalog',
+  goodies: 'goodies',
+  shop: 'goodies',
+  account: 'account',
+  orders: 'cart',
+  card: 'cart',
+  event: 'services',
+  tools: 'services',
+  map: 'contact',
+  message: 'contact',
+};
 
 export interface BrandNavigationItem {
   href: string;
@@ -103,6 +124,7 @@ export function BrandNavigationDrawer({
   side = 'responsive',
 }: BrandNavigationDrawerProps) {
   const pathname = usePathname();
+  const palette = resolveNavigationPalette(tenant.primary_color);
 
   useEffect(() => {
     if (!open) return;
@@ -200,22 +222,29 @@ export function BrandNavigationDrawer({
                 {section.items.map((item) => {
                   const Icon = ITEM_ICONS[item.icon];
                   const active = isItemActive(item);
-                  const classes = `group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
-                    active ? 'bg-[var(--color-primary-light)] text-[var(--color-primary)]' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-950'
+                  const accent = palette[ICON_ROLES[item.icon]];
+                  // Actif : ligne teintée, libellé gras et coloré, trait plus épais, aria-current (jamais la couleur seule).
+                  const classes = `group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none ${
+                    active ? 'font-bold' : 'font-semibold text-gray-700 hover:bg-gray-50 hover:text-gray-950'
                   }`;
+                  const style = {
+                    ['--tw-ring-color' as string]: accent,
+                    ...(active ? { backgroundColor: bottomNavTint(accent), color: accent } : {}),
+                  } as React.CSSProperties;
                   const content = (
                     <>
-                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/80' : 'bg-gray-100 text-gray-600 group-hover:bg-white'}`}>
-                        <Icon size={19} />
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                        style={{ color: accent, backgroundColor: active ? 'rgba(255,255,255,0.85)' : `color-mix(in srgb, ${accent} 9%, white)` }}>
+                        <Icon size={20} stroke={active ? 2.25 : 1.75} aria-hidden="true" />
                       </span>
                       <span className="min-w-0 flex-1">{item.label}</span>
-                      <IconChevronRight size={17} className="shrink-0 text-gray-400" />
+                      <IconChevronRight size={17} className="shrink-0" style={{ color: active ? accent : '#9ca3af' }} aria-hidden="true" />
                     </>
                   );
 
                   if (item.external) {
                     return (
-                      <a key={`${section.id}-${item.label}`} href={item.href} target="_blank" rel="noopener noreferrer" onClick={onClose} className={classes}>
+                      <a key={`${section.id}-${item.label}`} href={item.href} target="_blank" rel="noopener noreferrer" onClick={onClose} className={classes} style={style}>
                         {content}
                       </a>
                     );
@@ -227,6 +256,7 @@ export function BrandNavigationDrawer({
                       href={item.href}
                       onClick={onClose}
                       className={classes}
+                      style={style}
                       aria-current={active ? 'page' : undefined}
                     >
                       {content}

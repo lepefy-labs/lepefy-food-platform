@@ -1,12 +1,17 @@
 import { contrastRatio, mixWithBlack } from '@/lib/utils/color';
 
 /**
- * Couleurs de la BottomNav : une couleur par destination pour la reconnaître
+ * Couleurs de navigation (BottomNav et menu) : une couleur par destination pour la reconnaître
  * d'un coup d'œil (jamais la seule marque de l'état actif). Plateforme, pas
  * tenant — sauf le panier, qui prend la couleur principale de la boutique.
  * Toutes lisibles en texte sur blanc (≥ 4.5:1) : icônes et libellé actif.
  */
 export type BottomNavDestination = 'discover' | 'catalog' | 'cart' | 'goodies' | 'account';
+/**
+ * Rôles de couleur du menu (hamburger) : les destinations de la BottomNav,
+ * plus les services (événements, traiteur) et le contact (adresse, message).
+ */
+export type NavigationColorRole = BottomNavDestination | 'services' | 'contact';
 
 export const BOTTOM_NAV_SEMANTIC_COLORS: Record<Exclude<BottomNavDestination, 'cart'>, string> = {
   /** Vert pétrole. */
@@ -61,11 +66,14 @@ export function bottomNavAccent(destination: BottomNavDestination, tenantPrimary
  * les destinations déjà colorées (tenant bleu → Catalogue ne reste pas bleu à
  * côté d'un panier bleu).
  */
-const CANDIDATES: Record<Exclude<BottomNavDestination, 'cart'>, string[]> = {
+const CANDIDATES: Record<Exclude<NavigationColorRole, 'cart'>, string[]> = {
   discover: [BOTTOM_NAV_SEMANTIC_COLORS.discover, '#4d7c0f', '#0e7490'],
   catalog: [BOTTOM_NAV_SEMANTIC_COLORS.catalog, '#be185d', '#0e7490', '#4d7c0f'],
   goodies: [BOTTOM_NAV_SEMANTIC_COLORS.goodies, '#a21caf', '#4d7c0f', '#be185d'],
   account: [BOTTOM_NAV_SEMANTIC_COLORS.account, '#475569', '#9f1239', '#0e7490', '#4d7c0f'],
+  // Menu seulement ; la pierre (#57534e, quasi neutre) reste le dernier recours.
+  services: ['#c2410c', '#7e22ce', '#15803d', '#be123c', '#57534e'],
+  contact: ['#0369a1', '#15803d', '#a16207', '#7e22ce', '#57534e'],
 };
 /** Écart de teinte minimal (degrés) entre une destination et le panier. */
 export const MIN_HUE_DISTANCE = 30;
@@ -103,15 +111,17 @@ function collides(a: string, b: string): boolean {
 }
 
 /**
- * Palette complète de la barre pour un tenant : le panier dans la couleur de
- * la boutique (rendue lisible), chaque autre destination dans sa couleur
- * sémantique, ou la première alternative qui reste distincte.
+ * Palette de navigation d'un tenant (BottomNav et menu) : le panier dans la
+ * couleur de la boutique (rendue lisible), chaque autre rôle dans sa couleur
+ * sémantique, ou la première alternative qui reste distincte du panier et des
+ * rôles déjà colorés. Ordre fixe : les destinations de la barre d'abord, pour
+ * qu'elles gardent les mêmes couleurs avec ou sans le menu.
  */
-export function resolveBottomNavPalette(tenantPrimary: string | null | undefined): Record<BottomNavDestination, string> {
+export function resolveNavigationPalette(tenantPrimary: string | null | undefined): Record<NavigationColorRole, string> {
   const cart = ensureContrastOnWhite(tenantPrimary);
   const taken = [cart];
-  const pick = (destination: Exclude<BottomNavDestination, 'cart'>) => {
-    const candidates = CANDIDATES[destination];
+  const pick = (role: Exclude<NavigationColorRole, 'cart'>) => {
+    const candidates = CANDIDATES[role];
     const color = candidates.find((candidate) => !taken.includes(candidate) && taken.every((used) => !collides(candidate, used)))
       ?? candidates.find((candidate) => !taken.includes(candidate))
       ?? candidates[0]!;
@@ -122,6 +132,14 @@ export function resolveBottomNavPalette(tenantPrimary: string | null | undefined
   const catalog = pick('catalog');
   const goodies = pick('goodies');
   const account = pick('account');
+  const services = pick('services');
+  const contact = pick('contact');
+  return { discover, catalog, cart, goodies, account, services, contact };
+}
+
+/** Palette de la BottomNav (mêmes couleurs que le menu pour les mêmes destinations). */
+export function resolveBottomNavPalette(tenantPrimary: string | null | undefined): Record<BottomNavDestination, string> {
+  const { discover, catalog, cart, goodies, account } = resolveNavigationPalette(tenantPrimary);
   return { discover, catalog, cart, goodies, account };
 }
 

@@ -9,6 +9,7 @@ import {
   hueDistance,
   MIN_HUE_DISTANCE,
   resolveBottomNavPalette,
+  resolveNavigationPalette,
 } from '../../src/lib/storefront/bottomNavTheme';
 import { contrastRatio } from '../../src/lib/utils/color';
 
@@ -85,5 +86,22 @@ test.describe('couleurs de la BottomNav', () => {
     const palette = resolveBottomNavPalette('#222222');
     expect(palette.catalog).toBe(BOTTOM_NAV_SEMANTIC_COLORS.catalog);
     expect(palette.account).toBe(BOTTOM_NAV_SEMANTIC_COLORS.account);
+  });
+
+  test('menu : sept rôles lisibles et distincts pour toute teinte de tenant, mêmes couleurs que la barre', () => {
+    const neutrals = ['#475569', '#57534e', '#111827'];
+    for (let hue = 0; hue < 360; hue += 15) {
+      const f = (n: number) => { const k = (n + hue / 30) % 12; return Math.round(255 * (0.4 - 0.28 * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); };
+      const tenant = '#' + [f(0), f(8), f(4)].map((c) => c.toString(16).padStart(2, '0')).join('');
+      const menu = resolveNavigationPalette(tenant);
+      const bar = resolveBottomNavPalette(tenant);
+      for (const key of Object.keys(bar) as Array<keyof typeof bar>) expect(menu[key], tenant + ' ' + key).toBe(bar[key]);
+      const entries = Object.entries(menu);
+      for (const [role, color] of entries) expect(contrastRatio(color, '#ffffff'), tenant + ' ' + role).toBeGreaterThanOrEqual(4.5);
+      const saturated = entries.filter(([, c]) => !neutrals.includes(c));
+      for (const [i, [ra, a]] of saturated.entries()) {
+        for (const [rb, b] of saturated.slice(i + 1)) expect(hueDistance(a, b), tenant + ' ' + ra + '/' + rb).toBeGreaterThanOrEqual(MIN_HUE_DISTANCE);
+      }
+    }
   });
 });

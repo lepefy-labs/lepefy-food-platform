@@ -368,7 +368,7 @@ test.describe('BottomNav : couleurs, état actif, pastille du panier', () => {
         const label = a.querySelector('span.truncate') as HTMLElement;
         const pill = a.firstElementChild as HTMLElement;
         const rect = a.getBoundingClientRect();
-        return { current: a.getAttribute('aria-current'), weight: Number(getComputedStyle(label).fontWeight), pill: getComputedStyle(pill).backgroundColor,
+        return { destination: a.getAttribute('data-destination'), current: a.getAttribute('aria-current'), weight: Number(getComputedStyle(label).fontWeight), pill: getComputedStyle(pill).backgroundColor,
           width: rect.width, height: rect.height, overflow: label.scrollWidth > label.clientWidth };
       }));
       for (const s of styles) {
@@ -376,7 +376,11 @@ test.describe('BottomNav : couleurs, état actif, pastille du panier', () => {
         expect(s.height).toBeGreaterThanOrEqual(48);
         expect(s.overflow).toBe(false);
         if (s.current === 'page') { expect(s.weight).toBeGreaterThanOrEqual(700); expect(s.pill).not.toBe('rgba(0, 0, 0, 0)'); }
-        else { expect(s.weight).toBeLessThan(700); expect(s.pill).toBe('rgba(0, 0, 0, 0)'); }
+        else {
+          expect(s.weight).toBeLessThan(700);
+          // Le panier garde un disque teinté pour rester repérable ; les autres n'ont pas de fond.
+          if (s.destination !== 'cart') expect(s.pill).toBe('rgba(0, 0, 0, 0)');
+        }
       }
       expect(styles.filter((s) => s.current === 'page')).toHaveLength(1);
       const box = (await nav(page).boundingBox())!;
@@ -399,6 +403,51 @@ test.describe('BottomNav : couleurs, état actif, pastille du panier', () => {
     await expect(nav(page)).toHaveCount(0);
   });
 
+  test('the cart stays easy to spot: a larger disc inside the bar, solid only on the cart page', async ({ page }) => {
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 800 });
+      for (const url of ['/', '/cart']) {
+        await page.goto(url);
+        const disc = tab(page, 'cart').locator(':scope > span').first();
+        const box = (await disc.boundingBox())!;
+        const bar = (await nav(page).boundingBox())!;
+        const otherIcon = (await tab(page, 'catalog').locator('svg').boundingBox())!;
+        const cartIcon = (await tab(page, 'cart').locator('svg').boundingBox())!;
+        expect(box.width).toBeGreaterThanOrEqual(44);
+        expect(cartIcon.width).toBeGreaterThan(otherIcon.width);
+        // Contenu dans la barre : rien ne déborde sur la page (barre d'achat d'une fiche produit).
+        expect(box.y).toBeGreaterThanOrEqual(bar.y);
+        const bg = await disc.evaluate((el) => getComputedStyle(el).backgroundColor);
+        expect(bg).not.toBe('rgba(0, 0, 0, 0)');
+        if (url === '/cart') await expect(tab(page, 'cart')).toHaveAttribute('aria-current', 'page');
+        else await expect(tab(page, 'cart')).not.toHaveAttribute('aria-current', 'page');
+      }
+    }
+  });
+
+  test('the hamburger menu uses the same colours, one per destination, and marks the current page', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
+    const menu = page.getByRole('dialog', { name: 'Menu de navigation' });
+    await expect(menu).toBeVisible();
+    const iconColor = (name: string) => menu.getByRole('link', { name, exact: true }).locator('span').first().evaluate((el) => getComputedStyle(el).color);
+    const navColor = (destination: string) => tab(page, destination).locator('svg').evaluate((el) => getComputedStyle(el).color);
+    // Même couleur qu'en bas d'écran pour la même destination.
+    expect(await iconColor('Catalogue')).toBe(await navColor('catalog'));
+    expect(await iconColor('Découvrir')).toBe(await navColor('discover'));
+    expect(await iconColor('Goodies')).toBe(await navColor('goodies'));
+    expect(new Set([await iconColor('Catalogue'), await iconColor('Découvrir'), await iconColor('Goodies'), await iconColor('Mes commandes')]).size).toBe(4);
+    // Page courante : aria-current, libellé gras, ligne teintée.
+    const current = menu.getByRole('link', { name: 'Catalogue', exact: true });
+    await expect(current).toHaveAttribute('aria-current', 'page');
+    expect(Number(await current.evaluate((el) => getComputedStyle(el).fontWeight))).toBeGreaterThanOrEqual(700);
+    expect(await current.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+    const other = menu.getByRole('link', { name: 'Découvrir', exact: true });
+    await expect(other).not.toHaveAttribute('aria-current', 'page');
+    expect(Number(await other.evaluate((el) => getComputedStyle(el).fontWeight))).toBeLessThan(700);
+  });
+
   test('the cart badge counts items without making the cart active, and pops only after a real add', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
@@ -414,7 +463,8 @@ test.describe('BottomNav : couleurs, état actif, pastille du panier', () => {
     await expect(cart).toHaveAttribute('aria-label', new RegExp(`${units} article`));
     await expect(cart).not.toHaveAttribute('aria-current', 'page');
     await expect(tab(page, 'catalog')).toHaveAttribute('aria-current', 'page');
-    // Pastille contenue dans la barre, sans recouvrir le libellé.
+    // Pastille contenue dans la barre, sans recouvrir le libellé (mesurée après le « pop »).
+    await page.waitForTimeout(700);
     const badge = (await cart.locator('span.tabular-nums').boundingBox())!;
     const label = (await cart.locator('span.truncate').boundingBox())!;
     expect(badge.y + badge.height).toBeLessThanOrEqual(label.y + 1);
