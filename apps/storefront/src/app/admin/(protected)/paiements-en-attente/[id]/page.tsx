@@ -12,7 +12,7 @@ import PaymentRecoveryDetails from './PaymentRecoveryDetails';
 import StripePaymentPanel from './StripePaymentPanel';
 import Badge from '../../../_components/ui/Badge';
 import { cartRecoveryMode, generateCartComebackToken } from '@/lib/checkout/cartComeback';
-import { classifyCardCart, journeyLabel, type FunnelEvent } from '@/lib/payments/cardCartOutcome';
+import { classifyCardCart, dedupeStripeFailures, journeyLabel, type FunnelEvent } from '@/lib/payments/cardCartOutcome';
 import { CARD_CART_STATUS_META, statusMeta } from '@/lib/admin/statusRegistry';
 
 export const dynamic = 'force-dynamic';
@@ -139,7 +139,7 @@ export default async function PendingPaymentManagementPage({ params }: { params:
     .eq('reference_id', session.id)
     .order('created_at', { ascending: false })
     .limit(100);
-  const sessionEvents = (rawLogs ?? []) as FunnelEvent[];
+  const sessionEvents = dedupeStripeFailures((rawLogs ?? []) as FunnelEvent[]);
 
   const reminders = (sessionEvents.filter((log) => log.event_type === 'checkout_reused') as ReminderLog[])
     .filter((log) => log.detail?.kind === 'payment_reminder_sent');

@@ -208,6 +208,9 @@ export default function CheckoutFlow({
   const recalcDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stripeSessionIdRef = useRef<string | null>(null);
   const stripeSessionSnapshotRef = useRef<string | null>(null);
+  // Jeton d'accès de la session (client non connecté) : sans lui, une nouvelle
+  // tentative après un refus ou un 3-D Secure échoué est refusée (403).
+  const stripeSessionTokenRef = useRef<string | null>(null);
   const prefilledForCustomerRef = useRef<string | null>(null);
   const addressRef = useRef(address);
   addressRef.current = address;
@@ -561,13 +564,15 @@ export default function CheckoutFlow({
 
       if (stripeSessionIdRef.current) {
         const retryResponse = await fetch(`/api/checkout-sessions/${stripeSessionIdRef.current}/create-intent`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken: stripeSessionTokenRef.current ?? undefined }),
         });
         if (retryResponse.ok) {
           const retryResult = await retryResponse.json();
           return { clientSecret: retryResult.clientSecret, reference_id: stripeSessionIdRef.current };
         }
-        if (retryResponse.status !== 404) {
+        // 403 (jeton absent ou périmé) : on repasse par /api/checkout, qui revalide tout.
+        if (retryResponse.status !== 404 && retryResponse.status !== 403) {
           const retryResult = await retryResponse.json().catch(() => ({}));
           if (!handleFulfillmentRejection(retryResult)) handleShippingRequote(retryResult);
           return { error: retryResult.error ?? ERROR_COPY.generic };
@@ -586,6 +591,7 @@ export default function CheckoutFlow({
         return { error: result.error ?? ERROR_COPY.generic };
       }
       stripeSessionIdRef.current = result.sessionId ?? null;
+      stripeSessionTokenRef.current = result.accessToken ?? null;
       stripeSessionSnapshotRef.current = snapshot;
       return { clientSecret: result.clientSecret, reference_id: result.sessionId ?? null };
     } catch {
