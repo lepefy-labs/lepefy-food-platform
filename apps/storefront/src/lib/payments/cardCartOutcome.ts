@@ -122,7 +122,7 @@ const DECLINE_REASONS: Record<string, string> = {
   payment_intent_authentication_failure: 'Vérification 3-D Secure abandonnée ou échouée',
   authentication_not_handled: 'Vérification 3-D Secure non effectuée',
   payment_intent_payment_attempt_failed: 'Tentative de paiement échouée',
-  payment_intent_payment_attempt_expired: 'Tentative de paiement expirée',
+  payment_intent_payment_attempt_expired: 'Vérification bancaire non terminée à temps',
   payment_method_provider_decline: 'Refusé par la banque',
   processing_error: 'Erreur technique de la banque',
   issuer_not_available: 'Banque injoignable, à réessayer',
@@ -141,7 +141,8 @@ const DECLINE_REASONS: Record<string, string> = {
   card_declined: 'Refusé par la banque',
 };
 
-const AUTHENTICATION_CODES = new Set(['payment_intent_authentication_failure', 'authentication_not_handled', 'authentication_required']);
+const ATTEMPT_EXPIRED_CODE = 'payment_intent_payment_attempt_expired';
+const AUTHENTICATION_CODES = new Set(['payment_intent_authentication_failure', 'authentication_not_handled', 'authentication_required', ATTEMPT_EXPIRED_CODE]);
 
 /** Échec de la vérification 3-D Secure (le paiement n'a pas atteint l'autorisation bancaire). */
 export function isAuthenticationFailure(code: string | null, declineCode: string | null): boolean {
@@ -248,6 +249,9 @@ export function describeStripeIntent(intent: StripeIntentLike): StripeIntentView
       return { ...base, statusLabel: 'Annulé', tone: 'neutral', explanation: 'Ce paiement a été annulé chez Stripe. Aucun montant n’a été débité.' };
     default: {
       // requires_payment_method / requires_confirmation
+      if (failedBeforeBank && (error?.code === ATTEMPT_EXPIRED_CODE || error?.decline_code === ATTEMPT_EXPIRED_CODE)) {
+        return { ...base, statusLabel: 'Paiement non abouti', tone: 'warning', explanation: 'Le client n’a pas terminé la vérification demandée par sa banque (3-D Secure ou validation dans l’app bancaire) : Stripe a fait expirer la tentative. Aucun montant n’a été débité ; le client peut réessayer.' };
+      }
       if (failedBeforeBank && authentication) {
         return { ...base, statusLabel: 'Paiement non abouti', tone: 'warning', explanation: 'La vérification 3-D Secure n’a pas abouti : le client l’a fermée ou sa banque ne l’a pas validée. Le paiement n’a pas atteint la banque, aucun montant n’a été débité ; le client peut réessayer.' };
       }
