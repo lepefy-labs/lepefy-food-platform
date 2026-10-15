@@ -92,6 +92,16 @@ test.describe('Lecture Stripe en français', () => {
     expect(unknown.lastAttempt).toEqual({ at: null, result: 'Non aboutie', reason: null });
   });
 
+  test('tentative expirée (cas réel du 11/10) : vérification bancaire non terminée', () => {
+    const view = describeStripeIntent({ ...base, status: 'requires_payment_method', last_payment_error: { code: 'payment_intent_payment_attempt_expired', type: 'invalid_request_error' } });
+    expect(view.statusLabel).toBe('Paiement non abouti');
+    expect(view.explanation).toContain('n’a pas terminé la vérification demandée par sa banque');
+    expect(view.lastAttempt).toEqual({ at: null, result: 'Non aboutie', reason: 'Vérification bancaire non terminée à temps' });
+    const expired = ev('payment_failed_server', { code: 'payment_intent_payment_attempt_expired' });
+    expect(classifyCardCart([ev('intent_created'), expired])).toBe('authentication_pending');
+    expect(journeyLabel(expired)).toBe('Vérification 3-D Secure non aboutie');
+  });
+
   test('un échec 3-D Secure du webhook n’est pas un refus de la banque', () => {
     const authFailure = ev('payment_failed_server', { code: 'payment_intent_authentication_failure' });
     expect(classifyCardCart([ev('intent_created'), authFailure])).toBe('authentication_pending');
