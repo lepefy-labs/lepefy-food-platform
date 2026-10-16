@@ -58,7 +58,8 @@ export function CartDrawer() {
   const removeItem = useCartStore((s) => s.removeItem);
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const addItem = useCartStore((s) => s.addItem);
-  const { groups: quantityGroups, loading: groupsLoading, error: groupsError } = useQuantityGroups();
+  // Monté sur toutes les pages : les règles ne sont demandées qu'à l'ouverture d'un panier non vide.
+  const { groups: quantityGroups, loading: groupsLoading, error: groupsError } = useQuantityGroups({ enabled: isOpen && !isEmpty });
 
   const panelRef = useRef<HTMLDivElement>(null);
   const [undo, setUndo] = useState<{ item: CartItemType; timeoutId: ReturnType<typeof setTimeout> } | null>(null);

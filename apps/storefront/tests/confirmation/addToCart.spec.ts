@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 const suggestion = (id: string, stock = 3) => ({
   id, name: 'Suggestion ' + id, slug: 'suggestion-' + id, price: 5,

@@ -28,6 +28,7 @@ import type { PublicTenant, TenantSocialLink } from '@lepefy/types';
 import { SOCIAL_PLATFORM_REGISTRY } from '@lepefy/types';
 import { TenantLogo } from '@/components/branding/TenantLogo';
 import { bottomNavTint, resolveNavigationPalette, type NavigationColorRole } from '@/lib/storefront/bottomNavTheme';
+import { shopLinkPrefetch } from '@/lib/storefront/linkPrefetch';
 
 const SOCIAL_ICONS = {
   IconBrandInstagram,
@@ -254,6 +255,7 @@ export function BrandNavigationDrawer({
                     <Link
                       key={`${section.id}-${item.label}`}
                       href={item.href}
+                      prefetch={shopLinkPrefetch(item.href)}
                       onClick={onClose}
                       className={classes}
                       style={style}

@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 // Panier mobile, retour au catalogue, contrôle +/− des cartes et « Nos promos ».
 // Contextes invités isolés : aucune mutation de compte, de commande ni de

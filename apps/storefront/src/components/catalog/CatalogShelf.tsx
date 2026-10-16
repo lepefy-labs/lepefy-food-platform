@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { shopLinkPrefetch } from '@/lib/storefront/linkPrefetch';
 import { ProductCard, type ProductCardProduct } from './ProductCard';
 
 const TONES = {
@@ -43,6 +44,7 @@ export function CatalogShelf({ id, title, icon, tone, href, count = 0, allLabel,
         <h2 id={`${id}-title`} className="font-display text-xl font-bold text-gray-900"><span aria-hidden="true">{icon} </span>{title}</h2>
         {href && <Link
           href={href}
+          prefetch={shopLinkPrefetch(href)}
           aria-label={`${allLabel} (${count})`}
           className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border-2 px-4 text-sm font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 motion-reduce:transition-none ${colors.button}`}
         >

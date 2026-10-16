@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createPublicClient } from '@/lib/supabase/public';
+import { QUANTITY_GROUPS_CACHE_CONTROL, QUANTITY_GROUPS_ERROR_CACHE_CONTROL } from '@/lib/cart/quantityGroupsHttp';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,9 +43,10 @@ export async function GET() {
       productIds: group.purchase_quantity_group_products.map((row) => row.product_id),
     }));
 
-    return NextResponse.json({ groups }, { headers: { 'Cache-Control': 'no-store' } });
+    // Public tenant configuration, cached by the CDN (cf. quantityGroupsHttp.ts).
+    return NextResponse.json({ groups }, { headers: { 'Cache-Control': QUANTITY_GROUPS_CACHE_CONTROL } });
   } catch {
     // Optionnel : l'absence de groupes ne doit jamais bloquer l'affichage du panier.
-    return NextResponse.json({ groups: [] }, { status: 503 });
+    return NextResponse.json({ groups: [] }, { status: 503, headers: { 'Cache-Control': QUANTITY_GROUPS_ERROR_CACHE_CONTROL } });
   }
 }

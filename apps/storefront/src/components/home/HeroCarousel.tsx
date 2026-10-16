@@ -7,6 +7,7 @@ import { IconPlayerPause, IconPlayerPlay } from '@tabler/icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ShopTag } from '@/components/ui/ShopTag';
 import { safeSlideHref } from '@/lib/home/heroSlideRules';
+import { shopLinkPrefetch } from '@/lib/storefront/linkPrefetch';
 import type { TenantHeroSlide } from '@lepefy/types';
 
 export type HeroSlideKind = 'editorial' | 'offers' | 'new-arrivals' | 'event' | 'service';
@@ -190,12 +191,12 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                   {slide.meta && <p className="mt-3 text-xs font-bold uppercase tracking-[.12em] text-[var(--color-secondary)]">{slide.meta}</p>}
                   <div className="mt-6 flex flex-wrap gap-2.5">
                     {slide.cta_primary_label && safeSlideHref(slide.cta_primary_url) && (
-                      <Link href={safeSlideHref(slide.cta_primary_url)!} className="inline-flex min-h-11 items-center rounded-full bg-white px-5 py-3 text-sm font-bold text-[var(--color-primary-dark)] transition-transform hover:-translate-y-0.5">
+                      <Link href={safeSlideHref(slide.cta_primary_url)!} prefetch={shopLinkPrefetch(safeSlideHref(slide.cta_primary_url)!)} className="inline-flex min-h-11 items-center rounded-full bg-white px-5 py-3 text-sm font-bold text-[var(--color-primary-dark)] transition-transform hover:-translate-y-0.5">
                         {slide.cta_primary_label}
                       </Link>
                     )}
                     {slide.cta_secondary_label && safeSlideHref(slide.cta_secondary_url) && (
-                      <Link href={safeSlideHref(slide.cta_secondary_url)!} className="inline-flex min-h-11 items-center rounded-full border border-white/60 bg-white/5 px-5 py-3 text-sm font-semibold text-white backdrop-blur-sm hover:bg-white/10">
+                      <Link href={safeSlideHref(slide.cta_secondary_url)!} prefetch={shopLinkPrefetch(safeSlideHref(slide.cta_secondary_url)!)} className="inline-flex min-h-11 items-center rounded-full border border-white/60 bg-white/5 px-5 py-3 text-sm font-semibold text-white backdrop-blur-sm hover:bg-white/10">
                         {slide.cta_secondary_label}
                       </Link>
                     )}

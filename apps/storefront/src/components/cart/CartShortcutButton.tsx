@@ -33,6 +33,8 @@ export function CartShortcutButton({ className = '' }: { className?: string }) {
   return (
     <Link
       href="/cart"
+      // Visible sur toutes les pages mobiles et ouvre le panier latéral : pas de prefetch de /cart (dynamique).
+      prefetch={false}
       onClick={handleClick}
       aria-haspopup={onCartPage ? undefined : 'dialog'}
       aria-current={onCartPage ? 'page' : undefined}

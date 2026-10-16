@@ -142,18 +142,19 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const inCartLine = showsCartLine && (
     <p role="status" className="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-1 text-sm text-green-900">
       <span>✓ <span className="font-bold">{formatCount(sellingFormat, inCartQuantity)}</span> dans votre panier · {formatPrice(product.price * inCartQuantity, currency)}</span>
-      <Link href="/cart" className="inline-flex min-h-10 shrink-0 items-center font-bold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>Voir mon panier</Link>
+      <Link href="/cart" prefetch={false} className="inline-flex min-h-10 shrink-0 items-center font-bold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>Voir mon panier</Link>
     </p>
   );
 
   return (
     <div>
+      {/* Fiche servie par l'ISR : ses liens vers le catalogue (dynamique) ne déclenchent pas de prefetch. */}
       <nav className="flex items-center gap-2 text-sm text-gray-400 mb-6" aria-label="Fil d'Ariane">
-        <Link href={catalogHref} className="hover:text-gray-600 transition-colors">{catalogHref === '/gadgets' ? 'Goodies' : 'Catalogue'}</Link>
+        <Link href={catalogHref} prefetch={false} className="hover:text-gray-600 transition-colors">{catalogHref === '/gadgets' ? 'Goodies' : 'Catalogue'}</Link>
         {product.category && (
           <>
             <span>/</span>
-            <Link href={`${catalogHref}?category=${encodeURIComponent(product.category.slug)}`} className="hover:text-gray-600 transition-colors">
+            <Link href={`${catalogHref}?category=${encodeURIComponent(product.category.slug)}`} prefetch={false} className="hover:text-gray-600 transition-colors">
               {product.category.name}
             </Link>
           </>
@@ -225,7 +226,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                   {groupProgress.done ? groupProgress.title : `${groupProgress.title}. ${groupProgress.detail}`}
                 </p>
               )}
-              <Link href={`/?quantityGroup=${encodeURIComponent(group.id)}`} className="mt-1 inline-flex min-h-11 items-center font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>Voir les produits à mélanger</Link>
+              <Link href={`/?quantityGroup=${encodeURIComponent(group.id)}`} prefetch={false} className="mt-1 inline-flex min-h-11 items-center font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>Voir les produits à mélanger</Link>
             </section>
           )}
           {groupsError && (

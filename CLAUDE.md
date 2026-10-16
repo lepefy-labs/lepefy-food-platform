@@ -27,6 +27,7 @@ Unit tests (Playwright test runner used for pure/isolated logic, not browser E2E
 cd apps/storefront && pnpm test:unit
 ```
 A separate browser E2E suite exists in `apps/storefront/tests/e2e/` (`pnpm test:e2e`); it targets `https://chloefood.com` by default and needs `E2E_TEST_SECRET` to flag orders as `is_test` — do not run it without that secret configured, or it exercises live Stripe/order creation.
+The responsive storefront confirmation suite (`apps/storefront/tests/confirmation/`, `pnpm test:confirmation`) targets a local `next start` on 127.0.0.1:3100 by default (run `pnpm build` first): provider keys emptied, non-GET `/api` calls intercepted, synthetic user agent/header. Production gets only `CONFIRMATION_SUITE=smoke PLAYWRIGHT_BASE_URL=https://shop.chloefood.com` (4 read-only checks); the full suite against a remote URL needs `CONFIRMATION_ALLOW_REMOTE_FULL=1` (manual `workflow_dispatch` only). Do not run the full suite against production after a push.
 
 Database migrations (requires Supabase CLI):
 ```bash
@@ -117,6 +118,7 @@ The shipping logic is the most complex part of the codebase:
 - `getTenant()` (60 s), shop categories / category previews / catalogue ranking IDs (`src/lib/catalog/catalogCache.ts`, 60–300 s) and the shop-layout display data (`getShopShellData`, 300 s) live in the Next.js Data Cache, tagged via `src/lib/cache/storefrontCache.ts`. Product rows (price, stock) are always read fresh — the cache only decides the order.
 - `(shop)/layout.tsx` must never read cookies/session: that would make every shop page dynamic again and disable ISR on `/products/[slug]`, `/accueil` and `/avis`. Per-customer UI (e.g. `ActiveCheckoutRecovery` → `GET /api/checkout-sessions/active`) is resolved client-side.
 - Any admin route that writes tenant, catalogue, social links, review moderation or review/feature settings wraps its handlers with `withStorefrontInvalidation([...scopes], handler)` so changes appear immediately; the TTLs only bound staleness for writers that forget.
+- Navigation `<Link>`s use `shopLinkPrefetch(href)` (`src/lib/storefront/linkPrefetch.ts`): default prefetch only towards ISR/static pages, `prefetch={false}` towards dynamic/personal ones (catalogue `/` and its `?query` views, cart, account, orders) — on a dynamic route every viewport prefetch is a Vercel Function invocation. `GET /api/quantity-groups` is CDN-cached (`s-maxage=60`) and read through one shared client store (`lib/cart/quantityGroupsStore.ts`); never add a globally mounted component that fetches on mount without dedupe and an `enabled` condition.
 - `public/sw.js` is network-only (no `fetch` handler): it must not proxy or cache HTML, RSC payloads or Next.js chunks.
 
 ### Assisted orders (WhatsApp / phone / Instagram / in-store) — `docs/ASSISTED_ORDERS.md`

@@ -23,11 +23,12 @@ const MARKDOWN_COMPONENTS: Components = {
   strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
 };
 
-// Le contenu dépend de la dernière version publiée dans tenant_legal_documents
-// (peut changer sans redéploiement) — force-dynamic seul ne suffit pas sur
-// Next.js 14.2.x, fetchCache doit être désactivé aussi (cf. CLAUDE.md).
-export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
+// ISR : dernière version publiée dans tenant_legal_documents (filtrée par
+// tenant, aucune donnée personnelle), relue au plus toutes les 5 minutes —
+// même fraîcheur que /politique-confidentialite. Le lien du pied de page est
+// préchargé sur chaque page : en dynamique, chaque vue coûtait une fonction.
+// Le consentement à l'inscription relit toujours la version courante côté serveur.
+export const revalidate = 300;
 
 export async function generateMetadata(): Promise<Metadata> {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -41,7 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ConditionsGeneralesVentePage() {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
-  const terms = await getLatestLegalDocument(tenant.id, 'terms');
+  const terms = await getLatestLegalDocument(tenant.id, 'terms', { cached: true });
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">

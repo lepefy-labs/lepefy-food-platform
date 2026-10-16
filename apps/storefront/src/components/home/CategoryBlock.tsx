@@ -95,6 +95,8 @@ export function CategoryBlock({
   return (
     <Link
       href={`/?category=${slug}`}
+      // Vue catalogue filtrée = rendu dynamique : pas de prefetch spéculatif depuis /accueil.
+      prefetch={false}
       aria-hidden={hiddenFromA11y || undefined}
       tabIndex={hiddenFromA11y ? -1 : undefined}
       className={`relative flex-[0_0_78%] md:flex-[0_0_300px] snap-start rounded-[20px] overflow-hidden p-4 flex flex-col ${

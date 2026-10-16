@@ -65,8 +65,9 @@ function currentDeviceType(): 'mobile' | 'tablet' | 'desktop' {
 export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, whatsappNumber, raiseForProductPurchaseBar = false }: ChatWidgetProps) {
   const storeLocale = useLocaleStore((state) => state.locale);
   const storefrontLocale = resolveLocale(storeLocale, tenantLocales) || tenantLocale || 'fr';
-  const { groups: quantityGroups } = useQuantityGroups();
   const [open, setOpen] = useState(false);
+  // Règles de quantité : utiles seulement aux propositions affichées dans la conversation ouverte.
+  const { groups: quantityGroups } = useQuantityGroups({ enabled: open });
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);

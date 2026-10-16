@@ -1,8 +1,27 @@
-name: Storefront confirmation smoke
+name: Storefront confirmation
+
+# Three levels (docs/VERCEL_CPU_OPTIMIZATION_2026-10.md):
+# - production-smoke: after each storefront deploy, 4 read-only checks on the
+#   production shop (the only automatic traffic sent to Vercel).
+# - local-full: the complete suite against `next start` on the runner — no
+#   Vercel invocation. Needs the NEXT_PUBLIC_SUPABASE_ANON_KEY secret; skipped
+#   with a notice until it exists.
+# - manual: workflow_dispatch, suite smoke|full, target production|local. The
+#   full suite reaches production only from here.
 
 on:
-  # Manual run from Actions (branch main): re-checks the current production deploy.
   workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Suite'
+        type: choice
+        options: [smoke, full]
+        default: smoke
+      target:
+        description: 'Target (production = shop deployed on Vercel, local = next start on the runner)'
+        type: choice
+        options: [production, local]
+        default: production
   push:
     branches: [main]
     paths:
@@ -24,12 +43,15 @@ permissions:
   contents: read
   statuses: read
 
+# Close pushes collapse into one run: a newer push cancels the older one,
+# including while it is still waiting for its Vercel deployment.
 concurrency:
   group: storefront-confirmation-main
   cancel-in-progress: true
 
 jobs:
-  browser:
+  production-smoke:
+    if: ${{ github.event_name == 'push' || inputs.target == 'production' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -66,14 +88,73 @@ jobs:
               await new Promise(resolve => setTimeout(resolve, 15000));
             }
             throw new Error('Matching Vercel deployment did not become ready');
-      - name: Responsive guest confirmation checks
+      - name: Production checks (smoke on push, chosen suite when manual)
         env:
           PLAYWRIGHT_BASE_URL: ${{ vars.STOREFRONT_SMOKE_URL || 'https://shop.chloefood.com' }}
+          CONFIRMATION_SUITE: ${{ github.event_name == 'workflow_dispatch' && inputs.suite || 'smoke' }}
+          CONFIRMATION_ALLOW_REMOTE_FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.suite == 'full' && '1' || '' }}
         run: pnpm --filter @lepefy/storefront exec playwright test --config=tests/confirmation/playwright.config.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: storefront-confirmation-report
+          name: storefront-confirmation-production
+          path: |
+            apps/storefront/confirmation-report
+            apps/storefront/test-results
+          retention-days: 7
+
+  local-full:
+    if: ${{ github.event_name == 'push' || inputs.target == 'local' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Read-only catalogue data of the production tenant; every provider key
+      # (Stripe, Packlink, e-mail, WhatsApp, AI…) is emptied by the Playwright
+      # config before `next start`, and the specs intercept every non-GET /api call.
+      NEXT_PUBLIC_TENANT_SLUG: chloefood
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: Check the local environment is configured
+        id: configured
+        run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::notice title=Local confirmation suite skipped::Add the NEXT_PUBLIC_SUPABASE_ANON_KEY repository secret to run the full suite on the runner (docs/VERCEL_CPU_OPTIMIZATION_2026-10.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.configured.outputs.ready == 'true'
+        uses: actions/checkout@v4
+      - if: steps.configured.outputs.ready == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.0
+          run_install: false
+      - if: steps.configured.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.configured.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.configured.outputs.ready == 'true'
+        run: pnpm --filter @lepefy/storefront exec playwright install --with-deps chromium
+      - if: steps.configured.outputs.ready == 'true'
+        name: Build the storefront
+        run: pnpm --filter @lepefy/storefront build
+      - if: steps.configured.outputs.ready == 'true'
+        name: Full confirmation suite on the local server
+        env:
+          CONFIRMATION_SUITE: ${{ github.event_name == 'workflow_dispatch' && inputs.suite || 'full' }}
+        run: pnpm --filter @lepefy/storefront exec playwright test --config=tests/confirmation/playwright.config.ts
+      - if: always() && steps.configured.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: storefront-confirmation-local
           path: |
             apps/storefront/confirmation-report
             apps/storefront/test-results

@@ -408,6 +408,7 @@ export default async function HomePage() {
             </h2>
             <Link
               href="/"
+              prefetch={false}
               className="text-2xs font-medium"
               style={{ color: 'var(--color-primary)' }}
             >

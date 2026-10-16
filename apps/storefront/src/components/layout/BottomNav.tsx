@@ -17,6 +17,7 @@ import { cartAriaLabel, formatCartBadge } from '@/lib/cart/cartBadge';
 import { useCartAddPulse, useCartNudge } from '@/lib/cart/useCartAttention';
 import { readableOn } from '@/lib/utils/color';
 import { isCartPath, shouldShowBottomNav } from '@/lib/storefront/shopChrome';
+import { shopLinkPrefetch } from '@/lib/storefront/linkPrefetch';
 import {
   BOTTOM_NAV_INACTIVE_LABEL,
   bottomNavTint,
@@ -85,6 +86,7 @@ export function BottomNav() {
       <Link
         key={href}
         href={href}
+        prefetch={shopLinkPrefetch(href)}
         aria-current={active ? 'page' : undefined}
         aria-label={isCart ? cartAriaLabel(totalItems) : undefined}
         data-destination={destination}

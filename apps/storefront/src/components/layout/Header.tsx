@@ -18,6 +18,7 @@ import { isCartPath, shouldShowGlobalSearch } from '@/lib/storefront/shopChrome'
 import { readableOn } from '@/lib/utils/color';
 // Sous-domaine événementiel quand il existe : ses liens courts (/services/…) n'existent pas sur la boutique.
 import { eventsHubHref } from '@/lib/events/eventsHubUrl';
+import { shopLinkPrefetch } from '@/lib/storefront/linkPrefetch';
 import {
   BrandNavigationDrawer,
   type BrandNavigationSection,
@@ -120,10 +121,10 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
     return (
       <header className="border-b border-slate-200 bg-white" style={{ fontFamily: 'var(--font-inter), system-ui, sans-serif' }}>
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between gap-3 px-4 sm:h-[72px] sm:px-6">
-          <Link href="/" aria-label={tenant.name}>
+          <Link href="/" prefetch={false} aria-label={tenant.name}>
             <TenantLogo variant="compact" priority className="h-11 w-20 max-w-[30vw] sm:w-[120px]" />
           </Link>
-          <Link href="/" className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-1 text-xs font-medium text-slate-600 hover:text-slate-950 sm:text-sm">
+          <Link href="/" prefetch={false} className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-1 text-xs font-medium text-slate-600 hover:text-slate-950 sm:text-sm">
             <IconArrowLeft size={16} aria-hidden="true" /> Retour à la boutique
           </Link>
         </div>
@@ -135,10 +136,10 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
     return (
       <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/95 backdrop-blur">
         <div className="relative mx-auto flex h-[72px] max-w-2xl items-center justify-between px-4 sm:px-6">
-          <Link href="/cart" aria-label="Retour au panier" className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">
+          <Link href="/cart" prefetch={false} aria-label="Retour au panier" className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">
             <IconArrowLeft size={22} />
           </Link>
-          <Link href="/" className="absolute left-1/2 -translate-x-1/2" aria-label={tenant.name}>
+          <Link href="/" prefetch={false} className="absolute left-1/2 -translate-x-1/2" aria-label={tenant.name}>
             <TenantLogo variant="compact" priority className="h-11 w-[140px] max-w-[38vw]" />
           </Link>
           <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-gray-500">
@@ -172,7 +173,7 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
             <IconMenu2 size={24} />
           </button>
 
-          <Link href="/" className="absolute left-[46%] -translate-x-1/2 md:static md:shrink-0 md:translate-x-0" aria-label={tenant.name}>
+          <Link href="/" prefetch={false} className="absolute left-[46%] -translate-x-1/2 md:static md:shrink-0 md:translate-x-0" aria-label={tenant.name}>
             <TenantLogo variant="header" priority className="!max-w-[40vw] md:!max-w-none" />
           </Link>
 
@@ -193,16 +194,18 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
               </Link>
             )}
 
+            {/* Catalogue, panier, compte : pages dynamiques, sans prefetch spéculatif (lib/storefront/linkPrefetch.ts). */}
             <nav className="hidden items-center gap-4 md:flex lg:gap-6" aria-label="Navigation principale">
-              <Link href="/" aria-current={isActive('/') ? 'page' : undefined} className={`text-sm font-medium transition-colors ${isActive('/') ? 'text-[var(--color-primary)]' : 'text-gray-700 hover:text-gray-900'}`}>Catalogue</Link>
+              <Link href="/" prefetch={false} aria-current={isActive('/') ? 'page' : undefined} className={`text-sm font-medium transition-colors ${isActive('/') ? 'text-[var(--color-primary)]' : 'text-gray-700 hover:text-gray-900'}`}>Catalogue</Link>
               <Link href="/accueil" aria-current={isActive('/accueil') ? 'page' : undefined} className={`text-sm font-medium transition-colors ${isActive('/accueil') ? 'text-[var(--color-primary)]' : 'text-gray-700 hover:text-gray-900'}`}>Découvrir</Link>
               {reviewsAvailable && <Link href="/avis" aria-current={pathname === '/avis' ? 'page' : undefined} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"><IconStar size={19} stroke={2} className="text-amber-500" aria-hidden="true" />Avis</Link>}
-              <Link href={accountHref} aria-current={isActive('/compte') ? 'page' : undefined} className={`relative text-sm font-medium transition-colors ${isActive('/compte') ? 'text-[var(--color-primary)]' : 'text-gray-700 hover:text-gray-900'}`}>
+              <Link href={accountHref} prefetch={shopLinkPrefetch(accountHref)} aria-current={isActive('/compte') ? 'page' : undefined} className={`relative text-sm font-medium transition-colors ${isActive('/compte') ? 'text-[var(--color-primary)]' : 'text-gray-700 hover:text-gray-900'}`}>
                 Compte
                 {customer && <span className="absolute -right-2.5 -top-1 h-2 w-2 rounded-full" style={{ backgroundColor: 'var(--color-primary)' }} />}
               </Link>
               <Link
                 href="/cart"
+                prefetch={false}
                 onClick={handleCartClick}
                 aria-haspopup="dialog"
                 aria-label={cartAriaLabel(totalItems, 'Ouvrir le panier')}
