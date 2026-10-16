@@ -178,15 +178,19 @@ Normalizzazione (per confrontare giorni con traffico diverso):
 - **CPU per run di smoke**: CPU del giorno ÷ (run + traffico reale stimato) solo come indicazione;
 - confrontare almeno un giorno senza push con un giorno con push.
 
-| Metrica | Baseline | 24 h | 72 h |
-|---|---:|---:|---:|
-| CPU chloefood / giorno | 22–26 min (10–15/10) | DA MISURARE | DA MISURARE |
-| Invocazioni chloefood / giorno | 11–17k | DA MISURARE | DA MISURARE |
-| Invocazioni per caricamento | ≈ 15 | DA MISURARE | DA MISURARE |
-| quantity-groups per caricamento | ≈ 2,2 | DA MISURARE | DA MISURARE |
-| Richieste HeadlessChrome / 24 h | ≈ 35,9k | DA MISURARE | DA MISURARE |
-| Run in produzione / giorno (suite completa) | fino a 9 | 0 attesi (solo smoke) | DA MISURARE |
-| Error rate | 0 % | DA MISURARE | DA MISURARE |
+| Metrica | Baseline | 1 h dopo il deploy (09:28–10:28 UTC, 16/10) | 24 h | 72 h |
+|---|---:|---:|---:|---:|
+| CPU chloefood / giorno | 22–26 min (10–15/10) | NON DISPONIBILE (Usage aggiorna per giorno) | DA MISURARE | DA MISURARE |
+| Invocazioni chloefood | 11–17k / giorno; 7,6K / 12 h | 411 / 1 h | DA MISURARE | DA MISURARE |
+| Active CPU P75 | 200 ms | 153–165 ms | DA MISURARE | DA MISURARE |
+| Prefetch dinamici (`/cart`, `/gadgets`, `/compte/connexion`, `/orders`, `/supprimer-compte`) | 387–522 ciascuno / 12 h | **0** (route assenti) | DA MISURARE | DA MISURARE |
+| quantity-groups ÷ `/api/auth/session` | ≈ 2,2 | 2 ÷ 4 = 0,5 (campione piccolo) | DA MISURARE | DA MISURARE |
+| Invocazioni per caricamento (totale ÷ session) | ≈ 15 | non significativo (vedi nota) | DA MISURARE | DA MISURARE |
+| Richieste HeadlessChrome | ≈ 35,9k / 24 h | 0 tra i primi user-agent; 693 richieste totali, tutte da browser reali | DA MISURARE | DA MISURARE |
+| Run in produzione (suite completa) | fino a 9 / giorno | 0 (1 run di sola smoke) | DA MISURARE | DA MISURARE |
+| Error rate | 0 % | 0 % | DA MISURARE | DA MISURARE |
+
+Nota sull'ora post-deploy: con solo 4 caricamenti completi, il rapporto invocazioni ÷ session è dominato da invocazioni indipendenti dai caricamenti (admin aperto: `/api/admin/orders/poll` 39, `/admin` 31, ~30 pagine admin; tick n8n ~31; `/api/geocode/search` 26 di un checkout reale; ~150 schede prodotto con 1–3 invocazioni ciascuna). Diventa confrontabile solo sulle 24 h.
 
 ---
 
@@ -225,14 +229,37 @@ Verifiche funzionali delle quantità (unitarie + suite locale):
 - **Primo clic più lento** verso destinazioni dinamiche (nessun prefetch): mitigato dallo shell `loading.tsx`; da osservare su mobile reale.
 - **Header sintetico**: si applica solo alle richieste same-origin del browser; i fetch server-to-server non lo portano (non servono).
 - `/livraison` e `/` restano dinamiche (fuori perimetro).
+- **Rigenerazioni ISR dei prodotti** (osservato nella prima ora): ~150 schede prodotto con 1–3 invocazioni ciascuna (~0,1–0,9 s CPU). Ipotesi: le card del catalogo precaricano `/products/[slug]` (corretto, è ISR) e un prefetch su una pagina scaduta da più di 300 s ne avvia la rigenerazione in background; con lo scroll infinito, ogni sessione di navigazione rigenera i prodotti visibili. DA VERIFICARE sulle 24 h, è il tema del prossimo ciclo (ISR prodotti).
+- **Prefetch delle pagine admin**: con una sessione admin aperta, ~15 pagine admin hanno 2 invocazioni ciascuna in un'ora senza visita (link della barra laterale verso pagine dinamiche). Fuori perimetro storefront; da trattare con la stessa regola.
 
 ---
 
 ## 9. Prossimo ciclo (raccomandazioni)
 
 1. **Catalogo `/` cacheabile**: servire la variante senza parametri da ISR breve (60 s) con l'invalidazione catalogo esistente, oppure spostare filtri/paginazione sul client sopra `/api/products`. È la route più costosa (≈ 57 s CPU / 12 h). Prerequisiti: scroll restoration, `?page=N` diretti, SEO.
-2. **ISR prodotti**: `revalidate` 900–3600 s, invalidazione mirata dopo decremento di stock al checkout; misurare le rivalidazioni (885 / 12 h).
+2. **ISR prodotti**: `revalidate` 900–3600 s, invalidazione mirata dopo decremento di stock al checkout; misurare le rivalidazioni (885 / 12 h) e verificare se il prefetch delle card su pagine scadute le provoca (§8).
+2b. **Navigazione admin**: applicare una regola di prefetch analoga ai link della barra laterale/command palette admin (`lib/admin/navigation.ts`).
 3. **Supabase di test con seed** per rendere deterministico il Livello A e attivarlo in CI.
 4. **Tick n8n** con pre-controllo su Supabase (chiamare Vercel solo se c'è lavoro).
 5. **Modello multi-tenant**: decidere tra progetto unico multi-dominio e deploy selettivi prima di 10 tenant (limite di 100 deploy/giorno su Hobby, build ripetute).
 6. **Piano**: la decisione Pro resta valida indipendentemente da questo ciclo (uso commerciale, 6h58m su 4h).
+
+---
+
+## 10. Git, CI e Vercel
+
+| Voce | Esito |
+|---|---|
+| Commit | `f502e55c` su `main`, unico commit sopra la base `57b48295` |
+| CI (typecheck, lint, unit, SQL) | **success** |
+| `Vercel – chloefood` | **success** (deployment di produzione del commit) |
+| `Vercel – lepefy-food-test` | **success** (build automatica ancora attiva su questo progetto) |
+| `Storefront confirmation` → `production-smoke` | **success**: 4/4 in 11,2 s contro `shop.chloefood.com` |
+| `Storefront confirmation` → `local-full` | terminato con avviso: secret `NEXT_PUBLIC_SUPABASE_ANON_KEY` assente |
+
+Metriche disponibili subito dopo il deploy (16/10, ~09:20 UTC):
+
+- `GET /api/quantity-groups` in produzione: 1ª richiesta `X-Vercel-Cache: MISS`, 2ª e 3ª `HIT` (`Age` 2 s, 4 s); al browser arriva `Cache-Control: public` (Vercel rimuove `s-maxage`).
+- `/conditions-generales-vente`: `X-Vercel-Cache: HIT` (servita dal CDN, nessuna funzione).
+- Active CPU, invocazioni per route e quota HeadlessChrome: **DA MISURARE** a 24 h e 72 h (§6). La finestra di 12 h dell'Observability contiene ancora il traffico precedente al deploy.
+- Prima ora interamente post-deploy (Observability *Last hour* e Firewall *Past Hour*, 10:28 UTC): 411 invocazioni, P75 153–165 ms, 0 errori; nessuna invocazione di `/cart`, `/gadgets`, `/compte/connexion`, `/orders`, `/supprimer-compte`; `/api/quantity-groups` 2; un ordine reale completato nel frattempo (checkout, webhook Stripe, `order-confirmation`) senza errori.
