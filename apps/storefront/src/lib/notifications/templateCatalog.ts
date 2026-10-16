@@ -182,6 +182,7 @@ export interface WhatsappTemplatePreview {
   text: string;
   length: number;
   maxLength: number;
+  priority: 'normal' | 'high' | 'urgent';
 }
 
 /**
@@ -191,6 +192,6 @@ export interface WhatsappTemplatePreview {
 export function buildWhatsappTemplatePreviews(context: TenantNotificationContext): WhatsappTemplatePreview[] {
   return buildStaffAlertSamples().map((sample) => {
     const text = renderStaffWhatsapp(sample.alert, { tenantName: context.tenantName, storefrontUrl: context.storefrontUrl, test: sample.test === true });
-    return { id: sample.id, group: sample.group, label: sample.label, text, length: text.length, maxLength: WHATSAPP_MESSAGE_MAX_LENGTH };
+    return { id: sample.id, group: sample.group, label: sample.label, text, length: text.length, maxLength: WHATSAPP_MESSAGE_MAX_LENGTH, priority: sample.alert.priority };
   });
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
-import { IconBrandWhatsapp, IconDeviceDesktop, IconDeviceMobile, IconMail, IconSend } from '@tabler/icons-react';
+import { IconBrandWhatsapp, IconDeviceDesktop, IconDeviceMobile, IconMail, IconSend, IconSearch, IconCopy } from '@tabler/icons-react';
 import type { TemplatePreview, WhatsappTemplatePreview } from '@/lib/notifications/templateCatalog';
 
 const AUDIENCE_CLS: Record<TemplatePreview['audience'], string> = {
@@ -47,22 +47,39 @@ function useGroups<T extends { group: string }>(items: T[]): Array<[string, T[]]
 }
 
 function TemplateList<T extends { id: string; label: string }>({ groups, selectedId, onSelect }: { groups: Array<[string, T[]]>; selectedId: string; onSelect: (id: string) => void }) {
+  const [query, setQuery] = useState('');
+  const [closed, setClosed] = useState<string[]>([]);
+  const filtered = groups.map(([group, items]) => [group, items.filter((item) => item.label.toLocaleLowerCase('fr').includes(query.toLocaleLowerCase('fr')))] as [string, T[]])
+    .filter(([, items]) => items.length > 0);
   return (
-    <>
+    <div className="min-w-0 space-y-3">
+      <label className="flex min-h-10 items-center gap-2 rounded-lg border border-a-field bg-a-surface px-3 text-a-text-3">
+        <IconSearch size={18} aria-hidden="true" />
+        <span className="sr-only">Rechercher un modèle</span>
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un modèle…" type="search"
+          className="min-w-0 flex-1 bg-transparent text-sm text-a-text outline-none placeholder:text-a-text-3" />
+      </label>
+      <p className="text-xs text-a-text-3">{filtered.reduce((sum, [, items]) => sum + items.length, 0)} modèles affichés</p>
       <div className="lg:hidden">
-        <select value={selectedId} onChange={(e) => onSelect(e.target.value)} className="h-10 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm" aria-label="Modèle">
-          {groups.map(([group, items]) => (
-            <optgroup key={group} label={group}>
-              {items.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-            </optgroup>
-          ))}
+        <select value={filtered.some(([, items]) => items.some((item) => item.id === selectedId)) ? selectedId : ''}
+          onChange={(e) => onSelect(e.target.value)} className="h-10 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm" aria-label="Modèle">
+          <option value="" disabled>Choisir un modèle</option>
+          {filtered.map(([group, items]) => <optgroup key={group} label={group}>
+            {items.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </optgroup>)}
         </select>
       </div>
-      <nav className="hidden max-h-[760px] overflow-y-auto rounded-xl border border-a-border lg:block" aria-label="Modèles">
-        {groups.map(([group, items]) => (
-          <div key={group}>
-            <p className="sticky top-0 border-b border-a-border bg-a-surface-2 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-a-text-3">{group}</p>
-            {items.map((item) => (
+      <nav className="hidden overflow-hidden rounded-xl border border-a-border lg:block" aria-label="Modèles">
+        {filtered.length === 0 && <p className="p-4 text-sm text-a-text-3">Aucun modèle trouvé.</p>}
+        {filtered.map(([group, items]) => {
+          const isClosed = !query && closed.includes(group);
+          return <div key={group}>
+            <button type="button" aria-expanded={!isClosed}
+              onClick={() => setClosed((current) => current.includes(group) ? current.filter((g) => g !== group) : [...current, group])}
+              className="flex w-full items-center justify-between border-b border-a-border bg-a-surface-2 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-a-text-2">
+              <span>{group}</span><span className="font-normal">{items.length} {isClosed ? '▸' : '▾'}</span>
+            </button>
+            {!isClosed && items.map((item) => (
               <button key={item.id} type="button" onClick={() => onSelect(item.id)} aria-current={item.id === selectedId ? 'true' : undefined}
                 className={`block w-full border-b border-a-border px-3 py-2.5 text-left text-sm transition last:border-b-0 ${item.id === selectedId
                   ? 'bg-a-brand-soft font-semibold text-a-brand-fg shadow-[inset_3px_0_0_var(--admin-primary)]'
@@ -70,10 +87,10 @@ function TemplateList<T extends { id: string; label: string }>({ groups, selecte
                 {item.label}
               </button>
             ))}
-          </div>
-        ))}
+          </div>;
+        })}
       </nav>
-    </>
+    </div>
   );
 }
 
@@ -112,6 +129,7 @@ function WhatsappBubble({ preview, tenantName }: { preview: WhatsappTemplatePrev
 
 function WhatsappBrowser({ previews, tenantName, onChannel }: { previews: WhatsappTemplatePreview[]; tenantName: string; onChannel: (value: Channel) => void }) {
   const [selectedId, setSelectedId] = useState(previews[0]?.id ?? '');
+  const [view, setView] = useState<'preview' | 'raw'>('preview');
   const selected = previews.find((preview) => preview.id === selectedId) ?? previews[0];
   const groups = useGroups(previews);
   if (!selected) return null;
@@ -136,11 +154,24 @@ function WhatsappBrowser({ previews, tenantName, onChannel }: { previews: Whatsa
             </div>
             <p className="text-xs text-a-text-3">{selected.length} / {selected.maxLength} caractères</p>
           </div>
-          <div className="rounded-xl bg-a-hover p-4"><WhatsappBubble preview={selected} tenantName={tenantName} /></div>
-          <details className="rounded-xl border border-a-border p-4 text-sm">
-            <summary className="cursor-pointer font-semibold text-a-text">Texte brut envoyé</summary>
-            <pre className="mt-3 whitespace-pre-wrap break-words font-mono text-xs text-a-text-2">{selected.text}</pre>
-          </details>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex rounded-lg border border-a-border p-0.5" role="group" aria-label="Mode d’aperçu">
+              {(['preview', 'raw'] as const).map((mode) => <button key={mode} type="button" onClick={() => setView(mode)} aria-pressed={view === mode}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === mode ? 'bg-a-inverse text-a-on-inverse' : 'text-a-text-2'}`}>
+                {mode === 'preview' ? 'Aperçu WhatsApp' : 'Texte brut'}
+              </button>)}
+            </div>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${selected.priority === 'urgent' ? 'bg-tone-danger-bg text-tone-danger-fg' : selected.priority === 'high' ? 'bg-tone-urgent-bg text-tone-urgent-fg' : 'bg-tone-info-bg text-tone-info-fg'}`}>
+              {selected.priority === 'urgent' ? 'Urgent' : selected.priority === 'high' ? 'Prioritaire' : 'Information'}
+            </span>
+          </div>
+          {view === 'preview'
+            ? <div className="rounded-xl bg-a-hover p-4"><WhatsappBubble preview={selected} tenantName={tenantName} /></div>
+            : <div className="rounded-xl border border-a-border bg-a-surface-2 p-4"><pre className="whitespace-pre-wrap break-words font-mono text-xs text-a-text-2">{selected.text}</pre></div>}
+          <button type="button" onClick={() => navigator.clipboard.writeText(selected.text)}
+            className="inline-flex items-center gap-2 rounded-lg border border-a-border px-3 py-2 text-sm font-medium text-a-text-2 hover:bg-a-hover">
+            <IconCopy size={16} /> Copier le texte
+          </button>
         </div>
       </div>
     </section>

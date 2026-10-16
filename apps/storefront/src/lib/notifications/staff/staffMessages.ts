@@ -115,7 +115,9 @@ export function orderCreatedAlert(order: OrderFacts, priority: StaffPriority): S
     kind: 'order_created', priority,
     title: `Nouvelle commande ${order.orderNumber}`,
     indicators: orderIndicators(order),
-    details: [...orderDetails(order), ...shipmentDetails(order.shipment)],
+    // Ordinary order notifications focus on preparation. Shipping references belong
+    // to shipment incident alerts, not the initial order notification.
+    details: orderDetails(order),
     action: order.international === true && order.fulfillment === 'delivery'
       ? `${action} Vérifier les conditions d’expédition vers ${countryLabel(order.destinationCountry) ?? 'l’étranger'}.`
       : action,
@@ -296,16 +298,24 @@ export function staffAlertUrl(storefrontUrl: string | null | undefined, path: st
 export function renderStaffWhatsapp(alert: StaffAlert, input: { tenantName: string; storefrontUrl: string | null; test?: boolean }): string {
   const blocks: string[] = [];
   blocks.push(`*Lepefy · ${input.tenantName}*${input.test ? '\n🧪 [TEST] Message de test' : ''}`);
-  const head = [`*${alert.title}*`];
   const priority = PRIORITY_LABEL[alert.priority];
+  const icon = alert.priority === 'urgent' ? '🔴' : alert.priority === 'high' ? '🟠' : '🛍️';
+  blocks.push(`${icon} *${alert.title}*`);
   const flags = [...(priority ? [priority] : []), ...alert.indicators];
-  blocks.push(head.join('\n'));
   if (flags.length) blocks.push(flags.join('\n'));
-  if (alert.details.length) blocks.push(alert.details.map(([label, value]) => `${label} : ${value}`).join('\n'));
+  if (alert.details.length) {
+    const rows = alert.details.map(([label, value]) => {
+      if (label === 'Montant' || label === 'Montant total') return `💶 *${value}* · ${label}`;
+      if (label === 'Articles') return `📦 ${value} articles`;
+      if (label === 'Client') return `👤 ${value}`;
+      return `${label} : ${value}`;
+    });
+    blocks.push(rows.join('\n'));
+  }
   if (alert.note) blocks.push(alert.note);
-  if (alert.action) blocks.push(`À faire : ${alert.action}`);
+  if (alert.action) blocks.push(`📋 *À FAIRE*\n${alert.action}`);
   const url = staffAlertUrl(input.storefrontUrl, alert.link?.path);
-  if (url && alert.link) blocks.push(`${alert.link.label} :\n${url}`);
+  if (url && alert.link) blocks.push(`👉 *${alert.link.label}*\n${url}`);
   return blocks.join('\n\n').slice(0, 3900);
 }
 
