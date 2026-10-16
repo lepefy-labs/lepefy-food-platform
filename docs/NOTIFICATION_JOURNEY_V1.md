@@ -29,7 +29,7 @@ All customer-facing order events receive the tenant notification context:
 
 `pickup.*` must come from tenant Click & Collect configuration, not from the legal address.
 
-Email is the outbound channel in v1. WhatsApp is exposed as a support/contact action, not as an automatic outbound status channel.
+Email is the outbound channel to **customers** in v1. WhatsApp is exposed to customers as a support/contact action, not as an automatic outbound status channel. Internal **staff** notifications (migration 158) can also go to the recipients' own WhatsApp numbers from the central Lepefy number (Green API): never to customers, see `docs/NOTIFICATION_SUBSCRIPTIONS.md`.
 
 Internal tenant notifications use `tenant_notification_recipients`; recipient addresses must never be hardcoded in application code or n8n workflows. Since migration 143 subscriptions live in `tenant_notification_subscriptions` (type keys = the `notify_*` flags below without the prefix); see `docs/NOTIFICATION_SUBSCRIPTIONS.md`.
 
@@ -87,10 +87,11 @@ Platform emails without a tenant (admin invitation) are not recorded in the hist
 
 Platform owner only (`app/admin/(protected)/platform/layout.tsx` + `requirePlatformOwner` on the APIs); menu entries come from `app/admin/_components/platformNavConfig.ts`.
 
-- **Historique** (`/historique`): delivery log with status/keyword/date filters, detail row (transport, Brevo message id, raw error) and CSV export.
+- **Historique** (`/historique`): server-rendered delivery log (URL state: status, channel, tenant, period, keyword; pagination), detail row (transport, Brevo or Green API message id, observed WhatsApp status, readable error, linked resource), « Réessayer » (confirmation required for `unknown`) and CSV export of the same filter.
 - **Modèles** (`/modeles`): every email rendered by `lib/notifications/templateCatalog.ts` with the production builders, the tenant branding and fictitious data; preview in a sandboxed iframe (desktop/mobile width). Nothing is sent. Add every new template to the catalog.
 - **Tests** (`/tests`): real test sends through the active transport.
-- **Transport & santé** (`/sante`, `lib/notifications/notificationHealth.ts`): active transport and presence of keys/secrets (never their values), Brevo account check (`GET /v3/account`: key validity, plan credits), deliveries by status over 24 h / 7 days, retries overdue by more than 10 minutes and stuck sends (signal that the n8n "Notification retry scheduler" is not calling Lepefy), last daily digest run, and opted-in internal recipients per flag.
+- **Rattrapage** (`/rattrapage`): manual catch-up of existing open orders that never got the staff « Nouvelle commande » notification (preview with exact per-channel counts, explicit confirmation, never automatic; `docs/NOTIFICATION_SUBSCRIPTIONS.md`).
+- **Transport & santé** (`/sante`, `lib/notifications/notificationHealth.ts`): « Service WhatsApp Lepefy » block (flag, credentials present, Green API instance state, queue, uncertain results, recent errors) and active transport and presence of keys/secrets (never their values), Brevo account check (`GET /v3/account`: key validity, plan credits), deliveries by status over 24 h / 7 days, retries overdue by more than 10 minutes and stuck sends (signal that the n8n "Notification retry scheduler" is not calling Lepefy), last daily digest run, and opted-in internal recipients per flag.
 
 ## Delivery ledger and retries (migration `136`)
 
@@ -104,7 +105,9 @@ Platform owner only (`app/admin/(protected)/platform/layout.tsx` + `requirePlatf
 - without migration 136 every call falls back to a single direct send, as before;
 - tenant admins see the status of the two automatic `/card` emails (`card-quick-payment-customer:<pi>`, `card-quick-payment:<pi>`) in Admin → Paiements carte. The page reads them with one batched, tenant-scoped query per page and never calls n8n or Brevo. A missing row (payment older than the 90-day purge or than the ledger) is shown as «Aucune trace d’envoi», never as a failure; only `failed`/`dead` raise a warning in the list.
 
-Covered: order lifecycle (confirmed, shipped, ready for pickup, completed, cancelled, stock conflict), payment reminder, card quick payment, event reservation confirmation/resend, and every `send-email` notification except marketing. Not covered on purpose because they keep their own ledger or claim: daily digest (`tenant_daily_digest_runs`), external payment alerts (session claim), review invites, event close reports, tester invites and marketing (`marketing_campaign_recipients`). A retry after a timeout can still duplicate an email for workflows without n8n-side idempotency (the legacy per-template workflows); `send-email`, `order-stock-conflict` and the digest deduplicate on the key.
+Since migration 158 the ledger is the outbox of every channel: `channel` (`email` | `whatsapp`), `event_id` (→ `tenant_notification_events`), `recipient_id`, `provider_status`, `delivered_at`; statuses `delivered`, `skipped` and `unknown` (may have reached the provider: never retried automatically). The scheduler routes WhatsApp rows to Green API (`lib/notifications/deliveryRouter.ts`) and follows them up; a WhatsApp send interrupted while `processing` is never re-claimed. Staff notifications of the dispatcher use one row per recipient and channel (`notif:<event>:<recipient>:<channel>`).
+
+Covered: order lifecycle (confirmed, shipped, ready for pickup, completed, cancelled, stock conflict), every staff notification of the dispatcher, payment reminder, card quick payment, event reservation confirmation/resend, and every `send-email` notification except marketing. Not covered on purpose because they keep their own ledger or claim: daily digest (`tenant_daily_digest_runs`), external payment alerts (session claim), review invites, event close reports, tester invites and marketing (`marketing_campaign_recipients`). A retry after a timeout can still duplicate an email for workflows without n8n-side idempotency (the legacy per-template workflows); `send-email`, `order-stock-conflict` and the digest deduplicate on the key.
 
 ## Customer journey
 
@@ -438,6 +441,6 @@ Not part of v1:
 - loyalty/reorder message;
 - consent-aware automated abandoned checkout lifecycle messaging;
 - automatic customer payment-recovery reminders;
-- outbound WhatsApp/SMS status notifications.
+- outbound WhatsApp/SMS status notifications **to customers** (staff WhatsApp notifications exist since migration 158).
 
 Each future automatic outbound channel or marketing lifecycle requires explicit tenant configuration, consent and timing rules before activation.

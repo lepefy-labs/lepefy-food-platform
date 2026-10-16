@@ -6,6 +6,9 @@ import { sendTenantEmail } from '@/lib/notifications/sendEmail';
 import {
   rentalDeliveryQuotePendingEmail, rentalReservationAdminEmail, rentalReservationCustomerEmail, rentalStockConflictEmail,
 } from '@/lib/notifications/operationalEmails';
+import { dispatchTenantNotification } from '@/lib/notifications/staff/dispatcher';
+import { rentalReservationAlert } from '@/lib/notifications/staff/staffMessages';
+import { customerShortName } from '@/lib/notifications/staff/orderSignals';
 
 const stripe = getStripeClient('rental');
 
@@ -215,6 +218,16 @@ export async function createRentalReservationFromRequest(
       }),
     });
   }
+
+  // WhatsApp de l'équipe : un message par réservation (l'email ci-dessus reste inchangé).
+  await dispatchTenantNotification({
+    tenantId, eventType: 'rental_reservations', entityType: 'rental_reservation', entityId: reservation.id, occurrenceId: 'created',
+    channels: ['whatsapp'],
+    alert: rentalReservationAlert({
+      reservationId: reservation.id, serviceTitle: serviceTitle ?? 'Location', customer: customerShortName(customerName),
+      deliveryQuotePending: deliveryFeeStatus === 'pending_quote',
+    }),
+  });
 
   return { reservationId: reservation.id };
 }

@@ -92,3 +92,25 @@ export function statusMeta(registry: Record<string, AdminStatusMeta>, status: st
   if (!status) return { label: '—', tone: 'neutral' };
   return registry[status] ?? { label: status, tone: 'neutral' };
 }
+
+/** Notification delivery ledger (migrations 136/158), platform console. */
+export const NOTIFICATION_DELIVERY_STATUS_META: Record<string, AdminStatusMeta> = {
+  pending: { label: 'En file', tone: 'info' },
+  processing: { label: 'Envoi en cours', tone: 'info' },
+  accepted: { label: 'Accepté', tone: 'success' },
+  delivered: { label: 'Délivré', tone: 'success' },
+  failed: { label: 'Nouvel essai prévu', tone: 'warning' },
+  dead: { label: 'Échec définitif', tone: 'danger' },
+  skipped: { label: 'Non envoyé', tone: 'neutral' },
+  unknown: { label: 'Résultat incertain', tone: 'urgent' },
+};
+
+/** Catch-up classification of an open order (notification state, not the order state). */
+export const NOTIFICATION_BACKFILL_STATE_META: Record<string, AdminStatusMeta> = {
+  not_notified: { label: 'Aucune notification Lepefy enregistrée', tone: 'warning' },
+  failed: { label: 'Notification en échec', tone: 'danger' },
+  pending: { label: 'Notification en cours', tone: 'info' },
+  partial: { label: 'Notifiée en partie', tone: 'warning' },
+  notified: { label: 'Déjà notifiée', tone: 'success' },
+  no_target: { label: 'Aucun destinataire', tone: 'neutral' },
+};

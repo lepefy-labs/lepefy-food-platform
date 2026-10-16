@@ -73,6 +73,30 @@ export default async function PlatformNotificationHealthPage() {
           )}
         </Card>
 
+        <Card title="Service WhatsApp Lepefy (Green API)">
+          <ul className="space-y-2.5 text-sm">
+            <li className="flex items-center gap-3"><Dot ok={health.whatsapp.flagEnabled} /><span className="flex-1 text-a-text-2">Activé pour ce tenant</span><span className="text-a-text">{health.whatsapp.flagEnabled ? 'Oui' : 'Non (Paramètres → Fonctionnalités)'}</span></li>
+            <li className="flex items-center gap-3"><Dot ok={health.whatsapp.configured} /><span className="flex-1 text-a-text-2">Identifiants</span><span className="text-a-text">{health.whatsapp.configured ? (health.whatsapp.configSource === 'dedicated' ? 'Instance dédiée (GREEN_API_NOTIFY_*)' : 'Instance partagée (GREEN_API_*)') : health.whatsapp.configDetail}</span></li>
+            <li className="flex items-center gap-3"><Dot ok={health.whatsapp.instance?.ok === true} /><span className="flex-1 text-a-text-2">Instance</span><span className="text-a-text">{!health.whatsapp.instance ? '—' : health.whatsapp.instance.state === 'authorized' ? 'Autorisée' : health.whatsapp.instance.state === 'unknown' ? `Injoignable${health.whatsapp.instance.error ? ` (${health.whatsapp.instance.error})` : ''}` : `${health.whatsapp.instance.state} — action requise`}</span></li>
+            <li className="flex items-center gap-3"><span className="inline-block h-2.5 w-2.5" /><span className="flex-1 text-a-text-2">Dernier contrôle</span><span className="text-a-text">{dateFmt.format(new Date(health.whatsapp.checkedAt))}</span></li>
+            <li className="flex items-center gap-3"><Dot ok={health.whatsapp.queued === 0 && health.whatsapp.retriesDue === 0} /><span className="flex-1 text-a-text-2">En file · nouveaux essais dus</span><span className="text-a-text">{health.whatsapp.queued} · {health.whatsapp.retriesDue}</span></li>
+            <li className="flex items-center gap-3"><Dot ok={health.whatsapp.unknown === 0} /><span className="flex-1 text-a-text-2">Résultats incertains (7 j)</span><span className="text-a-text">{health.whatsapp.unknown}</span></li>
+            <li className="flex items-center gap-3"><Dot ok={(health.whatsapp.last24h.dead ?? 0) === 0 && (health.whatsapp.last24h.failed ?? 0) === 0} /><span className="flex-1 text-a-text-2">24 h : acceptés · délivrés · échecs</span><span className="text-a-text">{health.whatsapp.last24h.accepted ?? 0} · {health.whatsapp.last24h.delivered ?? 0} · {(health.whatsapp.last24h.failed ?? 0) + (health.whatsapp.last24h.dead ?? 0)}</span></li>
+          </ul>
+          {health.whatsapp.recentErrors.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-semibold text-a-text-2">Erreurs récentes</p>
+              <ul className="mt-1 space-y-1 text-xs">
+                {health.whatsapp.recentErrors.map((item) => (
+                  <li key={`${item.at}-${item.error}`} className="text-a-text-2"><span className="text-a-text-3">{dateFmt.format(new Date(item.at))}</span> · {item.label ?? <span className="font-mono">{item.error}</span>}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <p className="mt-4 text-xs text-a-text-3">« Accepté » = pris en charge par Green API ; « Délivré » = remis au téléphone selon le journal Green API. La lecture n’est jamais supposée. Forfait Developer : 3 conversations par mois et par instance.</p>
+          <Link href="/admin/platform/notifications/historique?channel=whatsapp" className="mt-3 inline-flex text-sm font-semibold text-a-brand-fg hover:underline">Envois WhatsApp →</Link>
+        </Card>
+
         <Card title="Envois" action={<Link href="/admin/platform/notifications/historique" className="text-sm font-semibold text-a-brand-fg hover:underline">Historique →</Link>}>
           {!ledger.available ? <p className="text-sm text-a-text-3">Historique indisponible (migration 136).</p> : (
             <>
@@ -126,7 +150,7 @@ export default async function PlatformNotificationHealthPage() {
               <li key={item.type} className="flex items-center gap-3">
                 <span className={`inline-block h-2.5 w-2.5 rounded-full ${item.count > 0 ? 'bg-tone-success-solid' : 'bg-a-border-strong'}`} aria-hidden />
                 <span className="flex-1 text-a-text-2">{item.label}</span>
-                <span className="font-semibold">{item.count}</span>
+                <span className="font-semibold tabular-nums" title="Email · WhatsApp confirmé">{item.count}{item.whatsapp !== null && <span className="font-normal text-a-text-3"> · WA {item.whatsapp}</span>}</span>
               </li>
             ))}
           </ul>

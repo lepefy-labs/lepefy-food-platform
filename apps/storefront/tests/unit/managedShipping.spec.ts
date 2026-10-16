@@ -255,14 +255,14 @@ test('parcel in transit before preparation is recorded: snapshot kept, flagged, 
   const db = fakeService(initialOrder({ ...managed, packing_completed_at: null, packing_parcel_count: null, shipping_provider_status: 'READY_TO_PRINT' }));
   db.rows.order_items = [{ order_id: 'order-a', tenant_id: 'tenant-a', storage_type: 'frozen', picked_at: null, cold_chain_checked_at: null }];
   const adapter = () => ({ ...packlinkAdapter, async resolveShipment() { return snapshot('IN_TRANSIT'); } });
-  await expect(syncOrderShipment(db.service, 'tenant-a', 'order-a', undefined, adapter)).rejects.toBeInstanceOf(PreparationIncompleteError);
+  await expect(syncOrderShipment(db.service, 'tenant-a', 'order-a', undefined, adapter, null)).rejects.toBeInstanceOf(PreparationIncompleteError);
   expect(db.order().status).toBe('preparing');
   expect(db.order().shipped_at).toBeNull();
   expect(db.order().shipping_provider_status).toBe('IN_TRANSIT');
   expect(db.order().tracking_code).toBe('179196133702310');
   expect(db.order().shipping_sync_error).toBe('preparation_incomplete');
   expect(db.order().shipping_provider_synced_at).toBeTruthy();
-  expect(await runShippingSyncBatch(db.service, (service, tenantId, orderId) => syncOrderShipment(service, tenantId, orderId, undefined, adapter)))
+  expect(await runShippingSyncBatch(db.service, (service, tenantId, orderId) => syncOrderShipment(service, tenantId, orderId, undefined, adapter, null)))
     .toEqual({ processed: 1, succeeded: 0, failed: 0, blocked: 1 });
   // Preparation recorded by the operator: the next tick ships the order and clears the flag.
   db.rows.order_items = [{ order_id: 'order-a', tenant_id: 'tenant-a', storage_type: 'frozen', picked_at: 'yes', cold_chain_checked_at: 'yes' }];

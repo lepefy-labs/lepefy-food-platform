@@ -59,6 +59,13 @@ export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
     description: 'Donne à l’équipe de la boutique l’accès au journal des actions, des automatisations et des accès (/admin/activite). Activation réservée à Lepefy.',
     platformOnly: true,
   },
+  {
+    // Notifications internes WhatsApp (migration 158, docs/NOTIFICATION_SUBSCRIPTIONS.md).
+    key: 'staff_whatsapp_notifications',
+    label: 'Notifications WhatsApp de l’équipe',
+    description: 'Envoie les notifications internes choisies (nouvelle commande, paiement à vérifier, conflit de stock, expéditions…) sur le WhatsApp des destinataires confirmés, depuis le numéro Lepefy. Activation réservée à Lepefy.',
+    platformOnly: true,
+  },
 ];
 
 export function featureFlagDefinition(key: string): FeatureFlagDefinition | undefined {

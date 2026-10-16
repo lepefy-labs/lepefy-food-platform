@@ -29,27 +29,31 @@ test.describe('notification type registry', () => {
     const legacy = ['notify_card_payment', 'notify_external_payment_pending', 'notify_order_stock_conflict',
       'notify_event_booking_closed_reports', 'notify_daily_digest', 'notify_service_inquiries', 'notify_rental_reservations'];
     // Types added after 143 have no legacy column.
-    const later = new Set(['subscription_billing']);
+    const later = new Set(['subscription_billing', 'order_created', 'order_international', 'order_fresh_products', 'order_attention_required',
+      'shipment_creation_failed', 'shipment_action_required', 'shipment_delayed', 'event_reservation_created']);
     expect(legacy.map((flag) => flag.slice('notify_'.length)).sort()).toEqual(NOTIFICATION_TYPES.map((t) => t.key).filter((key) => !later.has(key)).sort());
   });
 
   test('event types are hidden when the events module is off; empty groups dropped', () => {
     expect(withEvents).toHaveLength(NOTIFICATION_TYPES.length);
-    expect(shopOnly.map((t) => t.key)).toEqual(['card_payment', 'external_payment_pending', 'order_stock_conflict', 'daily_digest', 'subscription_billing']);
-    expect(groupNotificationTypes(shopOnly).map((g) => g.key)).toEqual(['orders', 'reports', 'account']);
-    expect(groupNotificationTypes(withEvents).map((g) => g.key)).toEqual(['orders', 'events', 'reports', 'account']);
+    expect(shopOnly.map((t) => t.key)).toEqual(['order_created', 'order_international', 'order_fresh_products', 'card_payment', 'external_payment_pending',
+      'order_stock_conflict', 'order_attention_required', 'shipment_creation_failed', 'shipment_action_required', 'shipment_delayed', 'daily_digest', 'subscription_billing']);
+    expect(groupNotificationTypes(shopOnly).map((g) => g.key)).toEqual(['orders', 'shipping', 'reports', 'account']);
+    expect(groupNotificationTypes(withEvents).map((g) => g.key)).toEqual(['orders', 'shipping', 'events', 'reports', 'account']);
   });
 
   test('defaults keep the historical behaviour of the add form', () => {
-    expect(defaultNotificationTypeKeys(withEvents)).toEqual(['card_payment', 'external_payment_pending', 'event_booking_closed_reports', 'subscription_billing']);
-    expect(defaultNotificationTypeKeys(shopOnly)).toEqual(['card_payment', 'external_payment_pending', 'subscription_billing']);
+    // order_created (migration 158) is the only new type checked by default for a NEW recipient.
+    expect(defaultNotificationTypeKeys(withEvents)).toEqual(['order_created', 'card_payment', 'external_payment_pending', 'event_booking_closed_reports', 'subscription_billing']);
+    expect(defaultNotificationTypeKeys(shopOnly)).toEqual(['order_created', 'card_payment', 'external_payment_pending', 'subscription_billing']);
   });
 
   test('presets resolve on available types and are recognised back', () => {
     const manager = NOTIFICATION_PRESETS.find((p) => p.key === 'manager')!;
     const operations = NOTIFICATION_PRESETS.find((p) => p.key === 'operations')!;
     expect(presetTypeKeys(manager, shopOnly)).toEqual(shopOnly.map((t) => t.key));
-    expect(presetTypeKeys(operations, shopOnly)).toEqual(['order_stock_conflict', 'daily_digest']);
+    expect(presetTypeKeys(operations, shopOnly)).toEqual(['order_created', 'order_international', 'order_fresh_products', 'order_stock_conflict',
+      'order_attention_required', 'shipment_creation_failed', 'shipment_action_required', 'shipment_delayed', 'daily_digest']);
     expect(matchingPreset(presetTypeKeys(operations, withEvents), withEvents)?.key).toBe('operations');
     // Hidden subscriptions don't prevent matching on the visible ones.
     expect(matchingPreset(['card_payment', 'external_payment_pending', 'daily_digest', 'subscription_billing', 'rental_reservations'], shopOnly)?.key).toBe('accounting');

@@ -335,6 +335,10 @@ Checklist produzione prima del punto 12:
 - **Tenant di test**: nessun invio verso numeri fuori `WHATSAPP_TEST_RECIPIENTS` (anche le conferme di lettura).
 - **Webhook**: firma HMAC obbligatoria, confronto a tempo costante, corpo ≤ 1 MB, `phone_number_id` sconosciuto ignorato (200, loggato).
 
+## 15 bis. Distinto: notifiche interne dello staff via Green API (migration 158)
+
+Le notifiche operative al **personale** del tenant (nuova commande, pagamento da verificare, conflitto stock, spedizioni…) partono dal numero centrale Lepefy tramite **Green API**, non dalla WhatsApp Cloud API di questo documento, e non toccano `tenant_whatsapp_channels`, l'inbox, Nala né il webhook Meta. Non scrivono mai ai clienti e non aprono conversazioni commerciali. Destinatari = `tenant_notification_recipients.whatsapp_phone` confermati da un messaggio di test; flag `staff_whatsapp_notifications` (distinto da `whatsapp_business`). Il solo punto in comune è la lista `WHATSAPP_TEST_RECIPIENTS`, riusata per i tenant di test (`lib/whatsapp/config.ts` `testRecipientAllowList`, sola lettura). Documentazione: `docs/NOTIFICATION_SUBSCRIPTIONS.md`, runbook `docs/STAFF_NOTIFICATIONS_RUNBOOK.md`.
+
 ## 16. Non ancora attivato / evoluzioni
 
 - Stato: migration 147 applicata; flag attivo solo su `lepefy-test`; un solo canale (numero di test Meta); token permanente System User; modalità `inline`; workflow n8n non importati (nessuno sweep di manutenzione attivo).

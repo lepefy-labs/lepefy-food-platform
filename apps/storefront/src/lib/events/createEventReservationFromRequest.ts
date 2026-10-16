@@ -10,6 +10,9 @@ import { resolveOrCreateCustomer } from '@/lib/customers/resolveOrCreateCustomer
 import { recordCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 import { sendTenantEmail } from '@/lib/notifications/sendEmail';
 import { eventCapacityConflictEmail } from '@/lib/notifications/operationalEmails';
+import { dispatchTenantNotification } from '@/lib/notifications/staff/dispatcher';
+import { eventReservationAlert } from '@/lib/notifications/staff/staffMessages';
+import { customerShortName } from '@/lib/notifications/staff/orderSignals';
 
 export interface CreateEventReservationInput {
   eventId: string;
@@ -198,6 +201,17 @@ export async function createEventReservationFromRequest(
     })),
     ticketUrl: getTicketUrl(qrToken),
   });
+
+  // Notification interne « Nouvelle réservation » (email et/ou WhatsApp de l'équipe, opt-in).
+  if (!input.isTest) {
+    await dispatchTenantNotification({
+      tenantId, eventType: 'event_reservation_created', entityType: 'event_reservation', entityId: reservationId, occurrenceId: 'created',
+      alert: eventReservationAlert({
+        reservationId, eventTitle: eventDetails.eventTitle ?? 'Événement', customer: customerShortName(customerName),
+        seats: totalQuantity, amount: amountPaid, eventDate: eventDetails.eventDateStart ?? null,
+      }),
+    });
+  }
 
   return { reservationId };
 }

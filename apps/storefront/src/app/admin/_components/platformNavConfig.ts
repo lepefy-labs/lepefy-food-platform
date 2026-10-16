@@ -42,6 +42,7 @@ export const PLATFORM_NAV: PlatformNavGroup[] = [
       { label: 'Historique', href: '/admin/platform/notifications/historique' },
       { label: 'Modèles', href: '/admin/platform/notifications/modeles' },
       { label: 'Tests', href: '/admin/platform/notifications/tests' },
+      { label: 'Rattrapage', href: '/admin/platform/notifications/rattrapage' },
       { label: 'Transport & santé', href: '/admin/platform/notifications/sante' },
     ],
   },

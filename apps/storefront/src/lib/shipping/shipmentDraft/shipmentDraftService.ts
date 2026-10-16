@@ -6,7 +6,8 @@ import {
 } from '@/lib/shipping/providers/types';
 import { buildShipmentDraftInput, type DraftCartonProfile, type DraftItemRow, type DraftPackagingRow } from './buildDraftInput';
 import { readShippingAutomationSettings, type ShippingAutomationSettings } from './settings';
-import { shipmentDraftErrorCode } from './shipmentDraftPresentation';
+import { shipmentDraftErrorCode, shipmentDraftErrorMessage } from './shipmentDraftPresentation';
+import { notifyShipmentIssue } from '@/lib/notifications/staff/orderEvents';
 
 /**
  * Provider shipment draft provisioning (docs/SHIPPING_INTELLIGENCE.md §19).
@@ -49,12 +50,18 @@ export interface ShipmentDraftDependencies {
   adapterLookup: (key: string | null | undefined) => ShippingProviderAdapter | null;
   readSettings: (service: OrderService, tenantId: string) => Promise<ShippingAutomationSettings>;
   now: () => Date;
+  /**
+   * Staff notification of an automatic creation that will not succeed on its
+   * own (definitive failure, uncertain result). Never throws.
+   */
+  notifyIssue?: (tenantId: string, orderId: string, kind: 'shipment_creation_failed' | 'shipment_action_required', issue: string, occurrenceId: string) => Promise<unknown>;
 }
 
 export const defaultShipmentDraftDependencies: ShipmentDraftDependencies = {
   adapterLookup: getShippingProvider,
   readSettings: (service, tenantId) => readShippingAutomationSettings(service, tenantId),
   now: () => new Date(),
+  notifyIssue: (tenantId, orderId, kind, issue, occurrenceId) => notifyShipmentIssue(tenantId, orderId, kind, issue, occurrenceId),
 };
 
 type LogEvent = 'queued' | 'started' | 'created' | 'failed' | 'skipped_existing' | 'ambiguous' | 'linked' | 'released';
@@ -226,6 +233,15 @@ export async function createShipmentDraftForOrder(service: OrderService, tenantI
       shipping_creation_updated_at: deps.now().toISOString(),
     });
     log(status === 'ambiguous' ? 'ambiguous' : 'failed', order, provider, code);
+    // Automatic run only (a manual click already shows the error), and only
+    // when nothing will fix it by itself: retryable errors are retried first.
+    const attempts = claim.shipping_creation_attempts ?? 1;
+    const willRetry = status === 'failed' && RETRYABLE_DRAFT_ERRORS.includes(code) && attempts < MAX_AUTOMATIC_ATTEMPTS;
+    if (options.mode === 'automatic' && !willRetry) {
+      const issue = shipmentDraftErrorMessage(detail ? `${code}:${detail}` : code) ?? 'Création impossible.';
+      await deps.notifyIssue?.(order.tenant_id, order.id, status === 'ambiguous' ? 'shipment_action_required' : 'shipment_creation_failed',
+        issue, `draft_${status}:${attempts}`);
+    }
     return { outcome: 'failed', status, code };
   };
 
@@ -265,6 +281,10 @@ export async function createShipmentDraftForOrder(service: OrderService, tenantI
       shipping_creation_updated_at: deps.now().toISOString(),
     }).eq('id', order.id).eq('tenant_id', order.tenant_id).is('shipping_provider_reference', null);
     console.warn(`[shipping/draft] ambiguous — tenant_id: ${order.tenant_id} — order_id: ${order.id} — provider: ${adapter!.key} — code: not_persisted — reference: ${result.providerReference}`);
+    if (options.mode === 'automatic') {
+      await deps.notifyIssue?.(order.tenant_id, order.id, 'shipment_action_required',
+        `Brouillon créé chez le transporteur (réf. ${result.providerReference}) mais non enregistré dans Lepefy.`, `draft_not_persisted:${claim.shipping_creation_attempts ?? 1}`);
+    }
     return { outcome: 'failed', status: 'ambiguous', code: 'ambiguous_creation' };
   }
   log('created', order, adapter!.key);
@@ -385,7 +405,10 @@ export async function runShipmentDraftBatch(service: OrderService,
       shipping_creation_updated_at: now.toISOString(),
     }).eq('id', row.id).eq('tenant_id', row.tenant_id).eq('shipping_creation_status', 'creating')
       .is('shipping_provider_reference', null).lt('shipping_creation_updated_at', staleBefore).select('id');
-    if ((data ?? []).length) { ambiguous++; log('ambiguous', row, null, 'interrupted'); }
+    if ((data ?? []).length) {
+      ambiguous++; log('ambiguous', row, null, 'interrupted');
+      await deps.notifyIssue?.(row.tenant_id, row.id, 'shipment_action_required', shipmentDraftErrorMessage('ambiguous_creation:interrompu') ?? 'Création interrompue.', `draft_interrupted:${now.toISOString().slice(0, 16)}`);
+    }
   }
 
   const queue = [...(pending.data ?? []), ...(failed.data ?? [])].slice(0, limit) as { id: string; tenant_id: string }[];

@@ -18,6 +18,7 @@ import { verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
 import { normalizeShippingAddress, type NormalizedShippingAddress } from '@/lib/address/addressRules';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
+import { notifyOrderAttention, notifyOrderCreated } from '@/lib/notifications/staff/orderEvents';
 
 interface CartItemPayload {
   productId: string;
@@ -213,6 +214,11 @@ export async function POST(req: NextRequest) {
       // Brouillon d'expédition (trigger « order_created ») : mise en file, jamais bloquante.
       if (fulfillmentType === 'delivery' && !itemsError) {
         await requestShipmentDraft(supabase, tenant.id, order.id, 'order_created');
+      }
+      // Notification interne « Nouvelle commande » (paiement à encaisser en boutique).
+      if (!isTestRequest) {
+        if (itemsError) await notifyOrderAttention(tenant.id, order.id, 'Lignes de commande non enregistrées : contenu à vérifier', 'order_items_missing');
+        else await notifyOrderCreated(tenant.id, order.id);
       }
 
       if (customerId) {

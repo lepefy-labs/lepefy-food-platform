@@ -23,6 +23,7 @@ import type { EventCheckoutItemInput, RentalCheckoutItemInput } from '@lepefy/ty
 import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
 import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
+import { notifyOrderAttention, notifyOrderCreated, notifyOrderStockConflict } from '@/lib/notifications/staff/orderEvents';
 import { convertCheckoutSessionToOrder } from '@/lib/orders/convertCheckoutSessionToOrder';
 import { recordAssistedOrderEvent } from '@/lib/orders/assisted/assistedOrderEvents';
 import { computePreorderTotals, toCents } from '@/lib/orders/assisted/assistedOrderPolicy';
@@ -517,6 +518,8 @@ export async function POST(req: NextRequest) {
           adminOrderLink:       `${storefrontUrl}/admin/orders/${order.id}`,
         }), { tenantId: resolvedTenantId, idempotencyKey: `order-stock-conflict:${order.id}`, notificationType: 'order_stock_conflict' });
       }
+      // WhatsApp de l'équipe (l'email ci-dessus reste l'expéditeur historique).
+      await notifyOrderStockConflict(resolvedTenantId, order.id, refundSucceeded ? 'refunded' : 'refund_failed');
 
       return NextResponse.json({ received: true });
     }
@@ -526,6 +529,16 @@ export async function POST(req: NextRequest) {
     // ni d'exception ici : la commande payée est déjà créée.
     if (checkoutSession.fulfillment_type === 'delivery' && !itemsError) {
       await requestShipmentDraft(supabase, resolvedTenantId, order.id, 'order_created');
+    }
+
+    // ── Notification interne « Nouvelle commande » (email/WhatsApp équipe) ──
+    // Clé d'événement unique par commande : un webhook rejoué ne renvoie rien.
+    if (!isE2EEvent) {
+      if (itemsError) {
+        await notifyOrderAttention(resolvedTenantId, order.id, 'Lignes de commande non enregistrées : contenu à vérifier', 'order_items_missing');
+      } else {
+        await notifyOrderCreated(resolvedTenantId, order.id);
+      }
     }
 
     // ── Notify n8n ───────────────────────────────────────────────────────────

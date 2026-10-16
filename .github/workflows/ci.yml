@@ -308,6 +308,19 @@ jobs:
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/143_notification_subscriptions.sql
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/143_notification_subscriptions.test.sql
 
+      - name: Staff notifications WhatsApp channel, events, outbox claim and catch-up runs
+        if: ${{ !cancelled() }}
+        env:
+          PGPASSWORD: test
+        run: |
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/143_notification_subscriptions.fixture.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/143_notification_subscriptions.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/136_notification_deliveries.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/137_notification_delivery_transport.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/158_staff_notifications_whatsapp.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/158_staff_notifications_whatsapp.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/158_staff_notifications_whatsapp.test.sql
+
       - name: Tenant subscription lifecycle (renewal rule, ledger, suspension)
         if: ${{ !cancelled() }}
         env:

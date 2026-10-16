@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 
 // One endpoint for every subscription edit: a single checkbox, a whole group,
 // a column across recipients or a profile — all expressed as
-// { changes: [{ recipientId, typeKey, subscribed }] }.
+// { changes: [{ recipientId, typeKey, subscribed, channel? }] } (channel defaults to email).
 // Returns the canonical subscriptions of the recipients touched.
 export async function POST(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -20,14 +20,14 @@ export async function POST(req: NextRequest) {
 
   const changes = parseSubscriptionChanges(await req.json().catch(() => null));
   if (!changes) {
-    return NextResponse.json({ error: `Modifications invalides (1 à ${MAX_SUBSCRIPTION_CHANGES}, types connus uniquement).` }, { status: 400 });
+    return NextResponse.json({ error: `Modifications invalides (1 à ${MAX_SUBSCRIPTION_CHANGES}, types et canaux connus uniquement).` }, { status: 400 });
   }
 
   try {
     const recipients = await applyNotificationSubscriptionChanges(createServiceClient(), tenant.id, changes);
     if (!recipients) return NextResponse.json({ error: 'Destinataire introuvable.' }, { status: 404 });
     revalidatePath('/admin/parametres');
-    return NextResponse.json({ recipients: recipients.map((r) => ({ id: r.id, subscriptions: r.subscriptions })) });
+    return NextResponse.json({ recipients: recipients.map((r) => ({ id: r.id, subscriptions: r.subscriptions, whatsapp_subscriptions: r.whatsapp_subscriptions })) });
   } catch (error) {
     console.error('[notification-subscriptions] apply failed', error);
     return NextResponse.json({ error: 'Erreur lors de l’enregistrement.' }, { status: 500 });

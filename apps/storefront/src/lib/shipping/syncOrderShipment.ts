@@ -3,6 +3,12 @@ import { assertPreparationComplete, loadWorkflowOrder, OrderWorkflowError, Prepa
 import { getShippingProvider } from './providers/registry';
 import { SHIPPING_SYNC_PREPARATION_INCOMPLETE } from './shipmentPresentation';
 import { ShippingProviderError, type ProviderShipmentSnapshot, type ShippingProviderAdapter } from './providers/types';
+import { notifyShipmentIssue } from '@/lib/notifications/staff/orderEvents';
+import { shipmentIssuesFor } from '@/lib/notifications/staff/shipmentSignals';
+
+/** Staff notification of a shipment incident; never throws (lib/notifications/staff). */
+export type ShipmentIssueNotifier = (tenantId: string, orderId: string, kind: 'shipment_action_required' | 'shipment_delayed', issue: string, occurrenceId: string) => Promise<unknown>;
+const defaultShipmentNotifier: ShipmentIssueNotifier = (tenantId, orderId, kind, issue, occurrenceId) => notifyShipmentIssue(tenantId, orderId, kind, issue, occurrenceId);
 
 export function shipmentOrderTarget(current: OrderStatus, snapshot: ProviderShipmentSnapshot): OrderStatus {
   if (snapshot.normalizedStatus === 'delivered' && (current === 'preparing' || current === 'shipped')) return 'delivered';
@@ -33,7 +39,8 @@ export async function applyShipmentSnapshot(service: OrderService, order: Order,
 
 /** Tenant is always resolved from the scoped order, never a deployment-default tenant. */
 export async function syncOrderShipment(service: OrderService, tenantId: string, orderId: string,
-  attachReference?: string, adapterLookup: (key: string | null | undefined) => ShippingProviderAdapter | null = getShippingProvider): Promise<Order> {
+  attachReference?: string, adapterLookup: (key: string | null | undefined) => ShippingProviderAdapter | null = getShippingProvider,
+  notify: ShipmentIssueNotifier | null = defaultShipmentNotifier): Promise<Order> {
   const order = await loadWorkflowOrder(service, tenantId, orderId);
   if (order.fulfillment_type !== 'delivery' || !['preparing', 'shipped'].includes(order.status)) {
     throw new OrderWorkflowError('Cette commande ne peut pas être synchronisée.');
@@ -63,7 +70,13 @@ export async function syncOrderShipment(service: OrderService, tenantId: string,
     snapshot = await adapter.resolveShipment({ tenantId: order.tenant_id, tenant },
       attaching ? attachReference : order.shipping_provider_reference!);
     if (snapshot.provider !== adapter.key) throw new ShippingProviderError('shipment_provider_mismatch');
-    return await applyShipmentSnapshot(service, order, snapshot);
+    const updated = await applyShipmentSnapshot(service, order, snapshot);
+    if (notify && !attaching) {
+      for (const issue of shipmentIssuesFor({ normalizedStatus: order.shipping_normalized_status }, snapshot)) {
+        await notify(order.tenant_id, order.id, issue.kind, issue.issue, issue.occurrenceId);
+      }
+    }
+    return updated;
   } catch (failure) {
     // Invalid initial references must never create an association or mutate an order.
     if (!attaching && failure instanceof ShippingProviderError) {
@@ -78,6 +91,8 @@ export async function syncOrderShipment(service: OrderService, tenantId: string,
       await updateWorkflowOrder({ service, order, source: 'provider',
         patch: { ...shipmentSnapshotPatch(snapshot), shipping_sync_error: SHIPPING_SYNC_PREPARATION_INCOMPLETE } })
         .catch(() => undefined);
+      await notify?.(order.tenant_id, order.id, 'shipment_action_required',
+        'Colis déjà pris en charge par le transporteur mais préparation non enregistrée', `preparation_incomplete:${snapshot.providerReference}`);
     }
     throw failure;
   }

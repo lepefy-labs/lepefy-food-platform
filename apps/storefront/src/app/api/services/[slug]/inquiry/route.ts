@@ -4,6 +4,9 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { sendTenantEmail } from '@/lib/notifications/sendEmail';
 import { serviceInquiryEmail } from '@/lib/notifications/operationalEmails';
 import { guardModule } from '@/lib/billing/tenantServiceState';
+import { dispatchTenantNotification } from '@/lib/notifications/staff/dispatcher';
+import { serviceInquiryAlert } from '@/lib/notifications/staff/staffMessages';
+import { customerShortName } from '@/lib/notifications/staff/orderSignals';
 
 interface InquiryBody {
   customer_name:   string;
@@ -82,6 +85,16 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         dateSouhaitee: date_souhaitee || null,
         nombreInvites: nombre_invites ?? null,
         message:       message?.trim() || null,
+      }),
+    });
+
+    // WhatsApp de l'équipe (l'email ci-dessus reste l'expéditeur historique).
+    await dispatchTenantNotification({
+      tenantId: tenant.id, eventType: 'service_inquiries', entityType: 'service_inquiry', entityId: inquiry.id, occurrenceId: 'created',
+      channels: ['whatsapp'],
+      alert: serviceInquiryAlert({
+        inquiryId: inquiry.id, serviceTitle: offering.title, customer: customerShortName(customer_name),
+        eventDate: date_souhaitee || null, guests: nombre_invites ?? null,
       }),
     });
 

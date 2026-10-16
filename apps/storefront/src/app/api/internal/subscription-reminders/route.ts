@@ -8,6 +8,8 @@ import { PLATFORM_EMAIL_CONTEXT, subscriptionReminderEmail } from '@/lib/notific
 import { reminderDates, runSubscriptionReminders, type ReminderTenant } from '@/lib/billing/subscriptionReminders';
 import { isMissingLifecycleSchema, type SubscriptionRow } from '@/lib/billing/subscriptionRules';
 import { revalidateServiceState } from '@/lib/billing/tenantServiceState';
+import { dispatchTenantNotification } from '@/lib/notifications/staff/dispatcher';
+import { subscriptionBillingAlert } from '@/lib/notifications/staff/staffMessages';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,6 +56,15 @@ export async function POST(request: NextRequest) {
     const tenant = await getTenantNotificationContext(tenantId);
     const dates = reminderDates(decision, row);
     const billingUrl = tenant?.storefrontUrl ? `${tenant.storefrontUrl.replace(/\/$/, '')}/admin/billing` : null;
+    // WhatsApp de l'équipe (opt-in, numéro confirmé) : même clé que l'email, donc une seule fois.
+    const when = decision.daysLeft <= 0 ? 'aujourd’hui' : decision.daysLeft === 1 ? 'demain' : `dans ${decision.daysLeft} jours`;
+    await dispatchTenantNotification({
+      tenantId, eventType: 'subscription_billing', entityType: 'tenant_subscription', entityId: tenantId,
+      occurrenceId: decision.idempotencyKey.slice(0, 120), channels: ['whatsapp'],
+      alert: subscriptionBillingAlert(decision.kind === 'suspended'
+        ? { title: 'Abonnement Lepefy suspendu', text: 'La boutique est hors ligne : régler l’abonnement pour rétablir le service.', urgent: true }
+        : { title: `Abonnement Lepefy : suspension ${when} (${dates.suspendOn})`, text: 'Régler l’abonnement pour éviter la suspension de la boutique.', urgent: decision.daysLeft <= 1 }),
+    });
     return deliverEmail({ ...PLATFORM_EMAIL_CONTEXT, tenantId }, {
       ...subscriptionReminderEmail({
         tenantName: tenant?.tenantName ?? 'votre établissement',

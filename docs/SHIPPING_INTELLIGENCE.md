@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@4d4391467f03d0ab5f6b2b01e9bc65f8be6f377a`
-> **Ultima verifica:** 11 ottobre 2026
+> **Base codice verificata:** `main@a64a565e`
+> **Ultima verifica:** 16 ottobre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale) + `151_shipping_shipment_creation.sql` + `152_shipping_automation_content.sql` (brouillons d'expédition, §2.4)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
@@ -129,6 +129,8 @@ Colonne: `shipping_creation_status`, `shipping_creation_attempts`, `shipping_cre
 **Idempotenza.** (1) Nessuna creazione se `shipping_provider_reference` è valorizzato (eleggibilità + filtro `is(reference, null)` in ogni update). (2) Claim compare-and-set su stato **e** numero di tentativi letti (`pending|failed|null → creating`): doppio clic, due worker, tick + clic → una sola chiamata provider. (3) Il salvataggio finale è CAS su `creating`; se fallisce (stato cambiato nel frattempo) l'ordine passa `ambiguous` e la reference viene solo loggata. (4) `orders_tenant_shipping_reference_idx` (111) impedisce la stessa reference su due ordini. Il frontend non è il controllo.
 
 **Timeout ambiguo.** Packlink non offre lookup per `shipment_custom_reference` (il connettore ufficiale documenta solo `GET shipments/{reference}`; la lista `GET /v1/shipments` non è documentata né filtrabile, §Diagnostic). Quindi nessun retry cieco: timeout, errore di rete, 500/502/504, 2xx senza reference e claim interrotto diventano `ambiguous` e non vengono mai ritentati automaticamente. Riconciliazione manuale nella scheda ordine: «Associer la référence» (verificata con `resolveShipment`) oppure «Aucun brouillon trouvé ? → recréer» con conferma esplicita (`confirmNoExistingDraft`).
+
+**Notifiche all'équipe (migration 158).** In modalità automatica, quando una creazione non si risolverà da sola il servizio chiama `deps.notifyIssue` (default `notifyShipmentIssue`, `lib/notifications/staff/orderEvents.ts`, mai bloccante): `failed` definitivo o ritentabile esaurito (≥ `MAX_AUTOMATIC_ATTEMPTS`) → `shipment_creation_failed`; `ambiguous` (timeout, risposta inattesa, claim interrotto, bozza creata ma non registrata) → `shipment_action_required`. Occorrenza `draft_<stato>:<tentativo>`: una notifica per tentativo, mai per i fallimenti che verranno ritentati, mai per un clic manuale. Il messaggio porta riferimento Packlink PRO, `LEPEFY-<8>` e il motivo leggibile (`shipmentDraftErrorMessage`). Anche `syncOrderShipment` (parametro `notify`, `null` nei test) segnala, da soli dati del provider (`lib/notifications/staff/shipmentSignals.ts`): passaggio a `exception`/`returned` → `shipment_action_required`; data stimata del vettore superata di 24 h senza consegna → `shipment_delayed` (una volta per data); colis in transito senza preparazione registrata → `shipment_action_required`. Nessuna transizione di stato è aggiunta.
 
 **Esecuzione asincrona.** Gli eventi fanno solo un update CAS `→ pending` e non lanciano mai eccezioni (migration assente, lettura fallita: log `queue_unavailable`): errore provider ≠ errore di creazione ordine ≠ errore di preparazione. La creazione avviene nel tick esistente `POST /api/internal/shipping-sync` (n8n ogni 15 min, §23) dopo la sync tracking (`runShipmentDraftBatch`: claim interrotti → `ambiguous`, poi ≤ 3 ordini `pending`/`failed` ritentabili; nessuna nuova creazione dopo 35 s per restare in `maxDuration = 60`). Timeout adapter: magazzini 8 s, bozza 12 s. Nessuna nuova infrastruttura.
 

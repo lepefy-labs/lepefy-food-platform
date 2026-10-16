@@ -16,6 +16,7 @@ import { permissionsForAdminPath } from '../../src/lib/auth/adminRoutePermission
 
 const MIGRATION = readFileSync(resolve(__dirname, '../../../../supabase/migrations/153_admin_activity_audit.sql'), 'utf8');
 const CAMPAIGN_MIGRATION = readFileSync(resolve(__dirname, '../../../../supabase/migrations/157_catalog_campaigns.sql'), 'utf8');
+const STAFF_NOTIFICATIONS_MIGRATION = readFileSync(resolve(__dirname, '../../../../supabase/migrations/158_staff_notifications_whatsapp.sql'), 'utf8');
 const TENANT_A = '11111111-1111-4111-8111-111111111111';
 const TENANT_B = '22222222-2222-4222-8222-222222222222';
 
@@ -25,10 +26,12 @@ const NO_FLAGS = { business_management: false, whatsapp_business: false };
 
 // ─── Catalogue: TS ↔ SQL ────────────────────────────────────────────────────
 
-test('the TS catalogue matches the audit_event_types seeds of migrations 153 and 157 exactly', () => {
+test('the TS catalogue matches the audit_event_types seeds of migrations 153, 157 and 158 exactly', () => {
   const block = MIGRATION.slice(MIGRATION.indexOf('insert into public.audit_event_types'), MIGRATION.indexOf('on conflict (key) do update set\n  module = excluded.module,\n  category'))
     + CAMPAIGN_MIGRATION.slice(CAMPAIGN_MIGRATION.indexOf('insert into public.audit_event_types'),
-      CAMPAIGN_MIGRATION.indexOf('on conflict(key) do nothing;'));
+      CAMPAIGN_MIGRATION.indexOf('on conflict(key) do nothing;'))
+    + STAFF_NOTIFICATIONS_MIGRATION.slice(STAFF_NOTIFICATIONS_MIGRATION.indexOf('insert into public.audit_event_types'),
+      STAFF_NOTIFICATIONS_MIGRATION.indexOf('on conflict (key) do nothing;'));
   const rows = [...block.matchAll(/\('([a-z_.]+)',\s*'([a-z_]+)',\s*'([a-z]+)',\s*'([a-z]+)',\s*'([a-z]+)'\)/g)]
     .map(([, key, module, category, severity, retention]) => ({ key, module, category, severity, retention }));
   expect(rows.length).toBeGreaterThan(30);

@@ -1,5 +1,7 @@
 import type { TenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import type { RenderedEmail } from '@/lib/notifications/sendEmail';
+import { staffAlertUrl, staffEmailSubject, type StaffAlert } from '@/lib/notifications/staff/staffMessages';
+import { PRIORITY_LABEL } from '@/lib/notifications/staff/orderSignals';
 
 // Emails delivered through the generic `send-email` n8n workflow. Every value
 // coming from customers or admins is escaped; links must be absolute http(s).
@@ -215,6 +217,32 @@ export function marketingCampaignEmail(context: TenantNotificationContext, input
       intro: paragraphs || '',
       cta: { label: 'Visiter la boutique →', url: context.storefrontUrl },
       footerNote: optOut,
+    }),
+  };
+}
+
+/**
+ * Internal staff alert (dispatcher, migration 158): the same StaffAlert as the
+ * WhatsApp text, rendered with the operational layout. Values are escaped by
+ * the layout; the admin link comes from the tenant's storefront URL.
+ */
+export function staffAlertEmail(context: TenantNotificationContext, alert: StaffAlert, test = false): RenderedEmail {
+  const priority = PRIORITY_LABEL[alert.priority];
+  const indicators = [...(priority ? [priority] : []), ...alert.indicators];
+  const intro = [
+    test ? '<strong>[TEST] Message de test — aucune action requise.</strong>' : '',
+    indicators.map((line) => escapeHtml(line)).join('<br>'),
+  ].filter(Boolean).join('<br><br>') || escapeHtml(alert.title);
+  return {
+    subject: staffEmailSubject(alert, context.tenantName, test),
+    html: layout(context, {
+      title: alert.title,
+      intro,
+      rows: alert.details,
+      callout: alert.action ? { text: alert.action, tone: alert.priority === 'urgent' ? 'alert' : 'info' } : undefined,
+      closing: alert.note ? escapeHtml(alert.note).replace(/\n/g, '<br>') : undefined,
+      cta: alert.link ? { label: `${alert.link.label} →`, url: staffAlertUrl(context.storefrontUrl, alert.link.path) } : undefined,
+      footerNote: 'Notification interne Lepefy · réglages : Paramètres → Communication → Notifications.',
     }),
   };
 }

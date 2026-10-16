@@ -4,6 +4,9 @@ import { deliverEmail } from '@/lib/notifications/sendEmail';
 import { externalPaymentAwaitingVerificationEmail } from '@/lib/notifications/customerEmails';
 import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
+import { dispatchTenantNotification } from '@/lib/notifications/staff/dispatcher';
+import { externalPaymentAlert } from '@/lib/notifications/staff/staffMessages';
+import { customerShortName } from '@/lib/notifications/staff/orderSignals';
 
 interface ExternalPaymentItem {
   name: string;
@@ -24,6 +27,26 @@ interface ExternalPaymentSession {
   external_payment_type: string | null;
   external_payment_label: string | null;
   created_at: string;
+}
+
+function sessionAmount(session: ExternalPaymentSession): number {
+  const subtotal = (session.items ?? []).reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
+  return Number((subtotal + Number(session.shipping_total ?? 0) - Number(session.ambassador_discount_amount ?? 0)).toFixed(2));
+}
+
+async function notifyExternalPaymentStaffWhatsapp(tenantId: string, session: ExternalPaymentSession) {
+  await dispatchTenantNotification({
+    tenantId, eventType: 'external_payment_pending', entityType: 'checkout_session', entityId: session.id, occurrenceId: 'awaiting_verification',
+    channels: ['whatsapp'],
+    alert: externalPaymentAlert({
+      sessionId: session.id,
+      reference: `#${session.id.slice(0, 8).toUpperCase()}`,
+      customer: customerShortName(session.full_name),
+      amount: sessionAmount(session),
+      paymentLabel: session.external_payment_label ?? session.external_payment_type ?? 'Paiement externe',
+      fulfillment: session.fulfillment_type,
+    }),
+  });
 }
 
 async function releaseClaim(
@@ -84,6 +107,9 @@ export async function notifyExternalPaymentAwaitingVerification({
     if (!rawSession) return false;
 
     const session = rawSession as ExternalPaymentSession;
+    // WhatsApp de l'équipe : événement unique par session (dédoublonné même si
+    // le claim email ci-dessous est relâché puis repris).
+    await notifyExternalPaymentStaffWhatsapp(tenantId, session);
     const recipients = await getNotificationRecipients(
       supabase,
       tenantId,

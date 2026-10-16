@@ -39,12 +39,19 @@ function health(partial: Partial<NotificationHealth>): NotificationHealth {
   return {
     transport: 'brevo', config: [{ label: 'x', ok: true, detail: '' }], brevo: { ok: true, plans: [] },
     ledger: { available: true, last24h: {}, last7d: {}, overdueRetries: 0, stuckProcessing: 0, lastAcceptedAt: null },
-    digest: { enabled: true, timezone: 'Europe/Rome', lastRun: null }, recipients: [], ...partial,
+    digest: { enabled: true, timezone: 'Europe/Rome', lastRun: null }, recipients: [],
+    whatsapp: { flagEnabled: false, configured: false, configSource: null, configDetail: null, instance: null, checkedAt: '', queued: 0, retriesDue: 0, unknown: 0, last24h: {}, recentErrors: [] },
+    ...partial,
   };
 }
 
 test('overall health escalates on configuration errors and stalled retries', () => {
   expect(overallHealth(health({}))).toBe('ok');
+  const wa = health({}).whatsapp;
+  // WhatsApp only matters once the tenant flag is on.
+  expect(overallHealth(health({ whatsapp: { ...wa, flagEnabled: true } }))).toBe('error');
+  expect(overallHealth(health({ whatsapp: { ...wa, flagEnabled: true, configured: true, instance: { state: 'notAuthorized', ok: false } } }))).toBe('error');
+  expect(overallHealth(health({ whatsapp: { ...wa, flagEnabled: true, configured: true, instance: { state: 'authorized', ok: true }, unknown: 1 } }))).toBe('warning');
   expect(overallHealth(health({ brevo: { ok: false, error: 'brevo_http_401' } }))).toBe('error');
   expect(overallHealth(health({ config: [{ label: 'Clé API Brevo', ok: false, detail: 'Absente' }] }))).toBe('error');
   expect(overallHealth(health({ ledger: { available: true, last24h: {}, last7d: {}, overdueRetries: 2, stuckProcessing: 0, lastAcceptedAt: null } }))).toBe('warning');

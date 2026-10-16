@@ -15,6 +15,8 @@ import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents'
 import { recordAssistedOrderEvent } from '@/lib/orders/assisted/assistedOrderEvents';
 import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
 import type { OrderService } from '@/lib/orders/orderTransitionService';
+import { notifyOrderCreated, notifyOrderStockConflict } from '@/lib/notifications/staff/orderEvents';
+import type { RefundState } from '@/lib/notifications/staff/staffMessages';
 
 /**
  * Service central de conversion « checkout_session payée → commande ».
@@ -137,7 +139,17 @@ export interface ConversionSideEffectDependencies {
   requestShipmentDraft?: (supabase: SupabaseClient, tenantId: string, orderId: string) => Promise<unknown>;
   /** Defaults to the products selling-format lookup; never throws. */
   loadOrderEmailItems?: typeof loadOrderEmailItems;
+  /** Defaults to the staff dispatcher (lib/notifications/staff/orderEvents.ts); never throws. */
+  notifyStaff?: {
+    orderCreated: (tenantId: string, orderId: string) => Promise<unknown>;
+    stockConflict: (tenantId: string, orderId: string, refund: RefundState) => Promise<unknown>;
+  };
 }
+
+const defaultStaffNotifications = {
+  orderCreated: (tenantId: string, orderId: string) => notifyOrderCreated(tenantId, orderId),
+  stockConflict: (tenantId: string, orderId: string, refund: RefundState) => notifyOrderStockConflict(tenantId, orderId, refund),
+};
 
 const defaultDependencies: ConversionSideEffectDependencies = {
   notifyN8n,
@@ -271,6 +283,8 @@ export async function convertCheckoutSessionToOrder(
         adminOrderLink: `${storefrontUrl}/admin/orders/${order.id}`,
       }), { tenantId: input.tenantId, idempotencyKey: `order-stock-conflict:${order.id}`, notificationType: 'order_stock_conflict' });
     }
+    await (deps.notifyStaff ?? defaultStaffNotifications).stockConflict(input.tenantId, order.id,
+      !isStripe ? 'manual' : refundSucceeded ? 'refunded' : 'refund_failed');
 
     return {
       ok: true, order, created: true, stockConflict: true, refundSucceeded,
@@ -302,6 +316,9 @@ export async function convertCheckoutSessionToOrder(
       ?? ((db, tenantId, orderId) => requestShipmentDraft(db as unknown as OrderService, tenantId, orderId, 'order_created')))(
       supabase, input.tenantId, order.id);
   }
+
+  // Notification interne « Nouvelle commande » : même règle que la boutique (une fois, par la conversion gagnante).
+  await (deps.notifyStaff ?? defaultStaffNotifications).orderCreated(input.tenantId, order.id);
 
   const wantsNotification = input.notifyCustomer ?? (isAssisted ? session?.notify_customer !== false : true);
   let customerNotification: CustomerNotificationOutcome;

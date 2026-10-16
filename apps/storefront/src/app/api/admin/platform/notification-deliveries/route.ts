@@ -1,49 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { getTenant } from '@/lib/tenant/getTenant';
 import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
+import { DELIVERY_LIST, DELIVERY_TYPE_LABELS, loadDeliveryExport, loadDeliveryHistory } from '@/lib/notifications/deliveryHistory';
+import { resolvePlatformTenantId } from '@/lib/notifications/platformTenant';
+import { NOTIFICATION_DELIVERY_STATUS_META, statusMeta } from '@/lib/admin/statusRegistry';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const STATUSES = ['pending', 'processing', 'accepted', 'failed', 'dead'] as const;
+function csvCell(value: unknown) {
+  const text = value == null ? '' : String(value);
+  // Neutralise spreadsheet formulas.
+  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  return /[",;\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+}
 
 /**
- * Latest notification deliveries of the deployment tenant, platform owner only:
- * transport, provider message ids and raw errors are support data and are
- * never exposed to tenants. Payloads are never returned.
+ * Notification deliveries of a tenant, platform owner only: transport,
+ * provider message ids and raw errors are support data and are never exposed
+ * to tenants. Payloads are never returned. Same URL filters as the
+ * « Historique » page; `format=csv` exports up to 2 000 rows.
  */
 export async function GET(req: NextRequest) {
   const denied = await requirePlatformOwner();
   if (denied) return denied;
-  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(slug);
-
-  const params = req.nextUrl.searchParams;
-  const status = params.get('status');
-  const day = /^\d{4}-\d{2}-\d{2}$/;
-  const from = params.get('from');
-  const to = params.get('to');
-  const limit = Math.min(Math.max(Number(params.get('limit')) || 100, 1), 500);
-  const load = (columns: string) => {
-    let query = createServiceClient().from('notification_deliveries').select(columns)
-      .eq('tenant_id', tenant.id).order('created_at', { ascending: false }).limit(limit);
-    if (status && (STATUSES as readonly string[]).includes(status)) query = query.eq('status', status);
-    // Calendar days in Europe/Rome would need a timezone-aware bound; UTC days are close enough for support.
-    if (from && day.test(from)) query = query.gte('created_at', `${from}T00:00:00Z`);
-    if (to && day.test(to)) query = query.lt('created_at', new Date(Date.parse(`${to}T00:00:00Z`) + 86_400_000).toISOString());
-    return query;
-  };
-  const base = 'id, notification_type, subject, recipients, status, attempts, max_attempts, next_attempt_at, last_error, created_at, accepted_at, retryable:payload';
-  let { data, error } = await load(`${base}, transport, provider_message_id`);
-  // Migration 137 not applied yet: same history without transport metadata.
-  if (error?.code === '42703') ({ data, error } = await load(base));
-  if (error) {
-    // Migration 136 not applied yet: the history is simply unavailable.
-    if (error.code === '42P01' || error.code === 'PGRST205') return NextResponse.json({ available: false, deliveries: [] });
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  const values = DELIVERY_LIST.parse(req.nextUrl.searchParams);
+  const tenantId = await resolvePlatformTenantId(values.tenant);
+  if (!tenantId) return NextResponse.json({ error: 'Boutique introuvable.' }, { status: 404 });
+  const db = createServiceClient();
+  try {
+    if (req.nextUrl.searchParams.get('format') === 'csv') {
+      const rows = await loadDeliveryExport(db, tenantId, values);
+      const header = ['date', 'statut', 'canal', 'type', 'objet', 'destinataires', 'essais', 'transport', 'id_message', 'statut_fournisseur', 'erreur'];
+      const lines = rows.map((row) => [
+        row.created_at, statusMeta(NOTIFICATION_DELIVERY_STATUS_META, row.status).label, row.channel, DELIVERY_TYPE_LABELS[row.notification_type] ?? row.notification_type,
+        row.subject, row.recipients.join(' '), `${row.attempts}/${row.max_attempts}`, row.transport, row.provider_message_id, row.provider_status, row.last_error,
+      ].map(csvCell).join(';'));
+      return new NextResponse(`﻿${[header.join(';'), ...lines].join('\n')}`, {
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="envois-${new Date().toISOString().slice(0, 10)}.csv"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+    const { rows, window } = await loadDeliveryHistory(db, tenantId, values);
+    return NextResponse.json({ available: true, deliveries: rows, total: window.total, page: window.page, pageSize: window.pageSize });
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+    // Migration 136/158 not applied yet: the history is simply unavailable.
+    if (code === '42P01' || code === 'PGRST205' || code === '42703' || code === 'PGRST200') return NextResponse.json({ available: false, deliveries: [] });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Erreur' }, { status: 500 });
   }
-  const rows = (data ?? []) as unknown as Array<Record<string, unknown> & { retryable: unknown }>;
-  const deliveries = rows.map(({ retryable, ...row }) => ({ ...row, retryable: retryable != null }));
-  return NextResponse.json({ available: true, deliveries });
 }

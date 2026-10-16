@@ -46,6 +46,7 @@ export const AUDIT_EVENT_TYPES = {
   'catalog.product.quantity_rule_changed': { label: 'Règle de vente modifiée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'catalog.product.stock_adjusted': { label: 'Stock ajusté', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'catalog.product.updated': { label: 'Fiche produit modifiée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
+  'notifications.backfill.confirmed': { label: 'Rattrapage de notifications confirmé', module: 'notifications', category: 'activity', severity: 'notice', retention: 'business' },
   'catalog.campaign.created': { label: 'Campagne créée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'catalog.campaign.updated': { label: 'Campagne modifiée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'catalog.campaign.products_changed': { label: 'Produits de campagne modifiés', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
