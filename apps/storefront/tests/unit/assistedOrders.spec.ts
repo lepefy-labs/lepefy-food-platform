@@ -81,6 +81,7 @@ function effects() {
   const refunds: string[] = [];
   const crm: Array<Record<string, unknown>> = [];
   const nala: string[] = [];
+  const staff: string[] = [];
   const deps: ConversionSideEffectDependencies = {
     notifyN8n: async (path, payload) => { messages.push({ path, payload }); return true; },
     getTenantNotificationContext: async () => ({ tenantId: TENANT, tenantName: 'Chloé', storefrontUrl: 'https://shop.example' } as TenantNotificationContext),
@@ -89,8 +90,12 @@ function effects() {
     recordOrderCustomerEvents: async (input) => { crm.push(input as unknown as Record<string, unknown>); },
     recordNalaPurchaseAttribution: async ({ orderId }) => { nala.push(orderId); },
     refundPaymentIntent: async (id) => { refunds.push(id); return { id: `re_${id}` }; },
+    notifyStaff: {
+      orderCreated: async (_tenantId, orderId) => { staff.push(`created:${orderId}`); },
+      stockConflict: async (_tenantId, orderId, refund) => { staff.push(`conflict:${orderId}:${refund}`); },
+    },
   };
-  return { deps, messages, refunds, crm, nala };
+  return { deps, messages, refunds, crm, nala, staff };
 }
 
 const ORDER_ID = '99999999-8888-4777-8666-555555555555';
@@ -258,6 +263,7 @@ test('duplicate Stripe webhook: no second order, no side effect', async () => {
   expect(result.ok && !result.created && result.customerNotification).toBe('not_applicable');
   expect(fx.messages).toEqual([]);
   expect(fx.crm).toEqual([]);
+  expect(fx.staff).toEqual([]);
   expect(fake.inserts).toEqual([]);
 });
 
@@ -275,6 +281,8 @@ test('two simultaneous admin confirmations create a single order and a single no
   expect(createdCount).toBe(1);
   expect(fx.messages.filter((m) => m.payload.notificationType === 'order_confirmed')).toHaveLength(1);
   expect(fx.crm).toHaveLength(1);
+  // Staff « Nouvelle commande »: once, from the winning conversion only.
+  expect(fx.staff).toEqual([`created:${ORDER_ID}`]);
 });
 
 test('declared bank transfer verified by an admin is traced as admin_verified', async () => {

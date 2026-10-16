@@ -86,6 +86,8 @@ Email: Nouvelle commande, Paiement externe à vérifier, Conflit de stock. Whats
 
 ## Console piattaforma
 
+Modèles (`/admin/platform/notifications/modeles`): selettore **Emails / WhatsApp**. Ogni notifica dello staff ha un campione unico (`lib/notifications/staff/staffAlertSamples.ts`, dati fittizi) reso con i builder di produzione: email (`staffAlertEmail`, gruppi « … (équipe) » del catalogo email) e messaggio WhatsApp (`buildWhatsappTemplatePreviews` → `renderStaffWhatsapp`, il testo esatto inviato a Green API, con anteprima a bolla, conteggio caratteri e testo grezzo). Nessun invio. Un nuovo `StaffAlert` va aggiunto ai campioni.
+
 Historique (`/admin/platform/notifications/historique`): Server Component con filtri URL (stato, canale, tenant, periodo, ricerca), paginazione, dettaglio (trasporto, id provider, stato osservato WhatsApp, errore leggibile, risorsa), « Réessayer », export CSV dello stesso filtro (`GET /api/admin/platform/notification-deliveries?format=csv`). Transport & santé: blocco « Service WhatsApp Lepefy » (flag, credenziali presenti — mai i valori —, `getStateInstance`, ultimo controllo, in coda, retry dovuti, incerti, esiti 24 h, errori recenti) e destinatari per tipo con il conteggio WhatsApp confermato.
 
 ## Aggiungere un tipo di notifica

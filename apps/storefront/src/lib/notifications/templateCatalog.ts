@@ -11,6 +11,10 @@ import {
 import { buildOrderStockConflictNotification } from '@/lib/notifications/orderStockConflictEmail';
 import { buildTesterFeedbackInviteEmail } from '@/lib/notifications/testerFeedbackInviteEmail';
 import { renderDigestHtml, type DigestItem } from '@/lib/notifications/dailyOrderDigest';
+import { staffAlertEmail } from '@/lib/notifications/operationalEmails';
+import { buildStaffAlertSamples } from '@/lib/notifications/staff/staffAlertSamples';
+import { renderStaffWhatsapp } from '@/lib/notifications/staff/staffMessages';
+import { WHATSAPP_MESSAGE_MAX_LENGTH } from '@/lib/notifications/providers/greenApiOutbound';
 
 export interface TemplatePreview {
   id: string;
@@ -163,5 +167,30 @@ export function buildTemplatePreviews(context: TenantNotificationContext, now = 
     subject: 'Nouveautés de la semaine', campaignName: 'Octobre',
     content: `Bonjour,\n\nDécouvrez nos nouveaux produits de la semaine et profitez de la livraison offerte dès 60 €.\n\nÀ très vite chez ${context.tenantName} !`,
   }));
+  // Notifications équipe du dispatcher (migration 158): same samples as the WhatsApp previews.
+  for (const sample of buildStaffAlertSamples()) {
+    add(sample.id, sample.group, sample.label, 'Équipe du tenant', staffAlertEmail(context, sample.alert, sample.test === true));
+  }
   return previews;
+}
+
+export interface WhatsappTemplatePreview {
+  id: string;
+  group: string;
+  label: string;
+  /** Exact text sent through Green API (WhatsApp formatting: *bold*). */
+  text: string;
+  length: number;
+  maxLength: number;
+}
+
+/**
+ * Every staff WhatsApp message, rendered with renderStaffWhatsapp (the exact
+ * text the dispatcher sends) on fictitious data. Nothing is sent.
+ */
+export function buildWhatsappTemplatePreviews(context: TenantNotificationContext): WhatsappTemplatePreview[] {
+  return buildStaffAlertSamples().map((sample) => {
+    const text = renderStaffWhatsapp(sample.alert, { tenantName: context.tenantName, storefrontUrl: context.storefrontUrl, test: sample.test === true });
+    return { id: sample.id, group: sample.group, label: sample.label, text, length: text.length, maxLength: WHATSAPP_MESSAGE_MAX_LENGTH };
+  });
 }

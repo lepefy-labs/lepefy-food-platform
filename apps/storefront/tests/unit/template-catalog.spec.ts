@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { TenantNotificationContext } from '../../src/lib/notifications/getTenantNotificationContext';
-import { buildTemplatePreviews } from '../../src/lib/notifications/templateCatalog';
+import { buildTemplatePreviews, buildWhatsappTemplatePreviews } from '../../src/lib/notifications/templateCatalog';
 import { overallHealth, type NotificationHealth } from '../../src/lib/notifications/notificationHealth';
 import { checkBrevoAccount } from '../../src/lib/notifications/emailTransport';
 
@@ -68,4 +68,25 @@ test('Brevo account check reports plans without exposing the key', async () => {
   } finally {
     if (saved === undefined) delete process.env.BREVO_API_KEY; else process.env.BREVO_API_KEY = saved;
   }
+});
+
+test('every staff notification has an email and a WhatsApp model, same samples, within limits', () => {
+  const whatsapp = buildWhatsappTemplatePreviews(context);
+  const emails = buildTemplatePreviews(context);
+  expect(whatsapp.length).toBeGreaterThanOrEqual(15);
+  expect(new Set(whatsapp.map((preview) => preview.id)).size).toBe(whatsapp.length);
+  for (const preview of whatsapp) {
+    expect(emails.some((email) => email.id === preview.id && email.audience === 'Équipe du tenant'), preview.id).toBe(true);
+    expect(preview.text, preview.id).toContain('*Lepefy · Chloé Food*');
+    expect(preview.text, preview.id).not.toMatch(/undefined|null|\[object Object\]/);
+    expect(preview.length, preview.id).toBeLessThanOrEqual(preview.maxLength);
+    // Links only from the tenant's canonical storefront URL.
+    for (const url of preview.text.match(/https?:\/\/\S+/g) ?? []) {
+      expect(url.startsWith('https://shop.example/admin') || url.startsWith('https://tracking.example/'), `${preview.id}: ${url}`).toBe(true);
+    }
+  }
+  const order = whatsapp.find((preview) => preview.id === 'staff-order-created-priority')!;
+  expect(order.text).toContain('🟠 PRIORITAIRE');
+  expect(order.text).toContain('Packlink PRO : réf. IT2026PRO0012345');
+  expect(whatsapp.find((preview) => preview.id === 'staff-test')!.text).toContain('[TEST]');
 });

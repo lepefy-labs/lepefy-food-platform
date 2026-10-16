@@ -1,6 +1,6 @@
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
-import { buildTemplatePreviews } from '@/lib/notifications/templateCatalog';
+import { buildTemplatePreviews, buildWhatsappTemplatePreviews } from '@/lib/notifications/templateCatalog';
 import TemplatePreviewBrowser from './TemplatePreviewBrowser';
 
 export const dynamic = 'force-dynamic';
@@ -12,5 +12,5 @@ export default async function PlatformNotificationTemplatesPage() {
   if (!context) {
     return <p className="rounded-xl border border-tone-danger-border bg-tone-danger-bg p-4 text-sm text-tone-danger-fg">Contexte de notification du tenant indisponible.</p>;
   }
-  return <TemplatePreviewBrowser previews={buildTemplatePreviews(context)} tenantName={context.tenantName} />;
+  return <TemplatePreviewBrowser previews={buildTemplatePreviews(context)} whatsappPreviews={buildWhatsappTemplatePreviews(context)} tenantName={context.tenantName} />;
 }

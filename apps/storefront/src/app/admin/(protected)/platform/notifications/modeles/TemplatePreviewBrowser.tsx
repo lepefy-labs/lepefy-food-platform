@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { IconDeviceDesktop, IconDeviceMobile, IconSend } from '@tabler/icons-react';
-import type { TemplatePreview } from '@/lib/notifications/templateCatalog';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { IconBrandWhatsapp, IconDeviceDesktop, IconDeviceMobile, IconMail, IconSend } from '@tabler/icons-react';
+import type { TemplatePreview, WhatsappTemplatePreview } from '@/lib/notifications/templateCatalog';
 
 const AUDIENCE_CLS: Record<TemplatePreview['audience'], string> = {
   Client: 'bg-tone-info-bg text-tone-info-fg ring-tone-info-border',
@@ -11,15 +11,147 @@ const AUDIENCE_CLS: Record<TemplatePreview['audience'], string> = {
   Plateforme: 'bg-a-brand-soft text-a-brand-fg ring-a-border',
 };
 
-export default function TemplatePreviewBrowser({ previews, tenantName }: { previews: TemplatePreview[]; tenantName: string }) {
+type Channel = 'email' | 'whatsapp';
+
+export default function TemplatePreviewBrowser({ previews, whatsappPreviews, tenantName }: {
+  previews: TemplatePreview[];
+  whatsappPreviews: WhatsappTemplatePreview[];
+  tenantName: string;
+}) {
+  const [channel, setChannel] = useState<Channel>('email');
+  return channel === 'whatsapp'
+    ? <WhatsappBrowser previews={whatsappPreviews} tenantName={tenantName} onChannel={setChannel} />
+    : <EmailBrowser previews={previews} tenantName={tenantName} onChannel={setChannel} />;
+}
+
+function ChannelSwitch({ value, onChange }: { value: Channel; onChange: (value: Channel) => void }) {
+  return (
+    <div className="flex shrink-0 rounded-lg border border-a-border p-0.5" role="group" aria-label="Canal">
+      {(['email', 'whatsapp'] as const).map((item) => (
+        <button key={item} type="button" onClick={() => onChange(item)} aria-pressed={value === item}
+          className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium ${value === item ? 'bg-a-inverse text-a-on-inverse' : 'text-a-text-2'}`}>
+          {item === 'email' ? <IconMail size={16} aria-hidden="true" /> : <IconBrandWhatsapp size={16} aria-hidden="true" />}
+          {item === 'email' ? 'Emails' : 'WhatsApp'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function useGroups<T extends { group: string }>(items: T[]): Array<[string, T[]]> {
+  return useMemo(() => {
+    const map = new Map<string, T[]>();
+    for (const item of items) map.set(item.group, [...(map.get(item.group) ?? []), item]);
+    return [...map.entries()];
+  }, [items]);
+}
+
+function TemplateList<T extends { id: string; label: string }>({ groups, selectedId, onSelect }: { groups: Array<[string, T[]]>; selectedId: string; onSelect: (id: string) => void }) {
+  return (
+    <>
+      <div className="lg:hidden">
+        <select value={selectedId} onChange={(e) => onSelect(e.target.value)} className="h-10 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm" aria-label="Modèle">
+          {groups.map(([group, items]) => (
+            <optgroup key={group} label={group}>
+              {items.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </optgroup>
+          ))}
+        </select>
+      </div>
+      <nav className="hidden max-h-[760px] overflow-y-auto rounded-xl border border-a-border lg:block" aria-label="Modèles">
+        {groups.map(([group, items]) => (
+          <div key={group}>
+            <p className="sticky top-0 border-b border-a-border bg-a-surface-2 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-a-text-3">{group}</p>
+            {items.map((item) => (
+              <button key={item.id} type="button" onClick={() => onSelect(item.id)} aria-current={item.id === selectedId ? 'true' : undefined}
+                className={`block w-full border-b border-a-border px-3 py-2.5 text-left text-sm transition last:border-b-0 ${item.id === selectedId
+                  ? 'bg-a-brand-soft font-semibold text-a-brand-fg shadow-[inset_3px_0_0_var(--admin-primary)]'
+                  : 'text-a-text-2 hover:bg-a-surface-2'}`}>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ))}
+      </nav>
+    </>
+  );
+}
+
+/** WhatsApp rendering of the exact text: *bold*, line breaks, links. */
+const INLINE = /(\*[^*\n]+\*|https?:\/\/\S+)/g;
+
+function whatsappInline(line: string): ReactNode[] {
+  return line.split(INLINE).filter(Boolean).map((part, index) => {
+    if (/^\*[^*]+\*$/.test(part)) return <strong key={index}>{part.slice(1, -1)}</strong>;
+    if (/^https?:\/\//.test(part)) return <span key={index} className="break-all text-tone-info-fg underline">{part}</span>;
+    return <Fragment key={index}>{part}</Fragment>;
+  });
+}
+
+function WhatsappBubble({ preview, tenantName }: { preview: WhatsappTemplatePreview; tenantName: string }) {
+  return (
+    <div className="mx-auto w-full max-w-[400px] overflow-hidden rounded-2xl border border-a-border shadow-sm">
+      <div className="flex items-center gap-2 bg-a-inverse px-4 py-3 text-a-on-inverse">
+        <IconBrandWhatsapp size={20} aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">Lepefy</p>
+          <p className="text-xs opacity-80">Notifications · {tenantName}</p>
+        </div>
+      </div>
+      <div className="bg-a-surface-2 px-3 py-4">
+        <div className="max-w-[92%] rounded-xl rounded-tl-sm bg-a-surface px-3 py-2 text-sm leading-6 text-a-text shadow-sm">
+          {preview.text.split('\n').map((line, index) => (
+            <p key={index} className={line ? 'whitespace-pre-wrap break-words' : 'h-3'}>{whatsappInline(line)}</p>
+          ))}
+          <p className="mt-1 text-right text-xs text-a-text-3">10:42</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WhatsappBrowser({ previews, tenantName, onChannel }: { previews: WhatsappTemplatePreview[]; tenantName: string; onChannel: (value: Channel) => void }) {
+  const [selectedId, setSelectedId] = useState(previews[0]?.id ?? '');
+  const selected = previews.find((preview) => preview.id === selectedId) ?? previews[0];
+  const groups = useGroups(previews);
+  if (!selected) return null;
+  return (
+    <section className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-a-text">Modèles WhatsApp</h2>
+          <p className="mt-1 text-sm text-a-text-3">
+            {previews.length} messages internes envoyés depuis le numéro Lepefy aux destinataires confirmés de {tenantName}, rendus avec les modèles de production sur des données fictives. Aucun envoi.
+          </p>
+        </div>
+        <ChannelSwitch value="whatsapp" onChange={onChannel} />
+      </div>
+      <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <TemplateList groups={groups} selectedId={selected.id} onSelect={setSelectedId} />
+        <div className="min-w-0 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-a-border p-4">
+            <div>
+              <p className="font-semibold text-a-text">{selected.label}</p>
+              <span className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${AUDIENCE_CLS['Équipe du tenant']}`}>Destinataire : Équipe du tenant</span>
+            </div>
+            <p className="text-xs text-a-text-3">{selected.length} / {selected.maxLength} caractères</p>
+          </div>
+          <div className="rounded-xl bg-a-hover p-4"><WhatsappBubble preview={selected} tenantName={tenantName} /></div>
+          <details className="rounded-xl border border-a-border p-4 text-sm">
+            <summary className="cursor-pointer font-semibold text-a-text">Texte brut envoyé</summary>
+            <pre className="mt-3 whitespace-pre-wrap break-words font-mono text-xs text-a-text-2">{selected.text}</pre>
+          </details>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function EmailBrowser({ previews, tenantName, onChannel }: { previews: TemplatePreview[]; tenantName: string; onChannel: (value: Channel) => void }) {
   const [selectedId, setSelectedId] = useState(previews[0]?.id ?? '');
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
   const selected = previews.find((preview) => preview.id === selectedId) ?? previews[0];
-  const groups = useMemo(() => {
-    const map = new Map<string, TemplatePreview[]>();
-    for (const preview of previews) map.set(preview.group, [...(map.get(preview.group) ?? []), preview]);
-    return [...map.entries()];
-  }, [previews]);
+  const groups = useGroups(previews);
 
   if (!selected) return null;
 
@@ -32,42 +164,16 @@ export default function TemplatePreviewBrowser({ previews, tenantName }: { previ
             {previews.length} emails rendus avec les modèles de production et l’identité de {tenantName}, sur des données fictives. Aucun envoi.
           </p>
         </div>
-        <Link href="/admin/platform/notifications/tests" className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-a-brand-fg hover:opacity-80">
-          <IconSend size={17} />Envoyer un test réel
-        </Link>
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
+          <ChannelSwitch value="email" onChange={onChannel} />
+          <Link href="/admin/platform/notifications/tests" className="inline-flex items-center gap-1.5 text-sm font-semibold text-a-brand-fg hover:opacity-80">
+            <IconSend size={17} />Envoyer un test réel
+          </Link>
+        </div>
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <div className="lg:hidden">
-          <select value={selected.id} onChange={(e) => setSelectedId(e.target.value)} className="h-10 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm" aria-label="Modèle">
-            {groups.map(([group, items]) => (
-              <optgroup key={group} label={group}>
-                {items.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-
-        <nav className="hidden max-h-[760px] overflow-y-auto rounded-xl border border-a-border lg:block" aria-label="Modèles">
-          {groups.map(([group, items]) => (
-            <div key={group}>
-              <p className="sticky top-0 border-b border-a-border bg-a-surface-2 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-a-text-3">{group}</p>
-              {items.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedId(item.id)}
-                  aria-current={item.id === selected.id ? 'true' : undefined}
-                  className={`block w-full border-b border-a-border px-3 py-2.5 text-left text-sm transition last:border-b-0 ${item.id === selected.id
-                    ? 'bg-a-brand-soft font-semibold text-a-brand-fg shadow-[inset_3px_0_0_var(--admin-primary)]'
-                    : 'text-a-text-2 hover:bg-a-surface-2'}`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          ))}
-        </nav>
+        <TemplateList groups={groups} selectedId={selected.id} onSelect={setSelectedId} />
 
         <div className="min-w-0">
           <div className="flex flex-col gap-3 rounded-xl border border-a-border p-4 sm:flex-row sm:items-start sm:justify-between">
