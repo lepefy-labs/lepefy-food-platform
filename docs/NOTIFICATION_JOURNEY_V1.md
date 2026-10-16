@@ -444,3 +444,10 @@ Not part of v1:
 - outbound WhatsApp/SMS status notifications **to customers** (staff WhatsApp notifications exist since migration 158).
 
 Each future automatic outbound channel or marketing lifecycle requires explicit tenant configuration, consent and timing rules before activation.
+
+
+## Email visual hierarchy V2 (16 October 2026)
+
+Operational emails generated through `operationalEmails.ts:layout` now share a table-based, responsive-compatible shell with a Lepefy/tenant header, readable detail rows, semantic action callout and single prominent CTA. All values from business data are escaped; URLs are validated; the source event and delivery behavior remain unchanged. WhatsApp notifications retain their own plain-text renderer. Customer emails keep their existing tenant-branded design and copy; mobile spacing, item-table wrapping and full-width CTA have been improved without changing payment or order state.
+
+The Platform Owner template catalogue continues to render production HTML for both types. Test in Gmail, Outlook and Apple Mail before further visual changes, with particular attention to Outlook's limited CSS support.

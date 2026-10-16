@@ -44,22 +44,39 @@ const CALLOUT = { alert: '#fef3f2', ok: '#ecfdf3', info: '#eff8ff' } as const;
 function layout(context: TenantNotificationContext, content: Layout) {
   const tenant = escapeHtml(context.tenantName);
   const logo = safeUrl(context.branding?.logoUrl);
-  const color = /^#[0-9a-f]{3,8}$/i.test(context.branding?.primaryColor ?? '') ? context.branding.primaryColor : '#25222b';
+  const color = /^#[0-9a-f]{3,8}$/i.test(context.branding?.primaryColor ?? '') ? context.branding.primaryColor : '#29304a';
   const cta = content.cta ? safeUrl(content.cta.url) : null;
   const rows = (content.rows ?? []).filter(([, value]) => value != null && value !== '');
   const storefront = safeUrl(context.storefrontUrl);
-  return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#25222b;line-height:1.6">
-    ${logo ? `<img src="${logo}" alt="${tenant}" style="display:block;max-width:140px;max-height:72px;margin-bottom:20px">` : ''}
-    <h1 style="font-size:22px;color:${color}">${escapeHtml(content.title)}</h1>
-    <p>${content.intro}</p>
-    ${rows.length ? `<table style="border-collapse:collapse;margin:16px 0">${rows.map(([label, value]) =>
-      `<tr><td style="padding:4px 12px 4px 0;color:#6b6475;vertical-align:top">${escapeHtml(label)}</td><td>${escapeHtml(String(value))}</td></tr>`).join('')}</table>` : ''}
-    ${content.callout ? `<p style="padding:12px;border-radius:8px;background:${CALLOUT[content.callout.tone]}"><strong>${escapeHtml(content.callout.text)}</strong></p>` : ''}
-    ${content.closing ? `<p>${content.closing}</p>` : ''}
-    ${cta && content.cta ? `<p><a href="${cta}" style="display:inline-block;padding:10px 18px;border-radius:8px;background:${color};color:#fff;text-decoration:none">${escapeHtml(content.cta.label)}</a></p>` : ''}
-    <hr style="border:none;border-top:1px solid #eee;margin:28px 0 12px">
-    <p style="font-size:12px;color:#6b6475">${tenant}${storefront ? ` · <a href="${storefront}" style="color:#6b6475">${storefront}</a>` : ''}${content.footerNote ? `<br>${content.footerNote}` : ''}</p>
-  </div>`;
+  const toneColor = content.callout?.tone === 'alert' ? '#b42318' : content.callout?.tone === 'ok' ? '#067647' : '#175cd3';
+  const rowsHtml = rows.map(([label, value]) => {
+    const prominent = /^(Montant|Montant total|Articles|Places)$/i.test(label);
+    return `<tr><td style="padding:10px 12px 10px 0;color:#566176;font-size:13px;border-bottom:1px solid #e9edf3;vertical-align:top">${escapeHtml(label)}</td><td style="padding:10px 0;border-bottom:1px solid #e9edf3;color:#182338;font-size:${prominent ? '17' : '14'}px;font-weight:${prominent ? '700' : '600'};word-break:break-word">${escapeHtml(String(value))}</td></tr>`;
+  }).join('');
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+  <body style="margin:0;padding:0;background:#f3f5f9;font-family:Arial,Helvetica,sans-serif;color:#182338">
+  <div style="display:none;font-size:1px;color:#f3f5f9;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">${escapeHtml(content.title)}</div>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f3f5f9"><tr><td align="center" style="padding:24px 12px">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;background:#ffffff;border:1px solid #e4e8f0;border-radius:12px">
+      <tr><td style="padding:22px 26px;background:#182338;border-radius:12px 12px 0 0;color:#ffffff">
+        ${logo ? `<img src="${logo}" alt="${tenant}" style="display:block;max-width:120px;max-height:48px;margin-bottom:12px">` : ''}
+        <div style="font-size:17px;font-weight:700;line-height:1.4">Lepefy · ${tenant}</div>
+        <div style="font-size:12px;color:#d0d8e7;margin-top:4px">NOTIFICATION OPÉRATIONNELLE</div>
+      </td></tr>
+      <tr><td style="padding:28px 26px 14px">
+        <h1 style="margin:0 0 14px;font-size:24px;line-height:1.3;color:#182338">${escapeHtml(content.title)}</h1>
+        <div style="font-size:15px;line-height:1.65;color:#485367">${content.intro}</div>
+        ${rows.length ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:22px 0 16px">${rowsHtml}</table>` : ''}
+        ${content.callout ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:${CALLOUT[content.callout.tone]};border-left:4px solid ${toneColor};border-radius:8px"><tr><td style="padding:15px 16px"><div style="font-size:12px;font-weight:700;color:${toneColor};margin-bottom:6px">ACTION ${content.callout.tone === 'alert' ? 'URGENTE' : 'À EFFECTUER'}</div><div style="font-size:15px;line-height:1.6;color:#182338;font-weight:600">${escapeHtml(content.callout.text)}</div></td></tr></table>` : ''}
+        ${content.closing ? `<div style="font-size:14px;color:#485367;line-height:1.6;margin:18px 0">${content.closing}</div>` : ''}
+        ${cta && content.cta ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0 16px"><tr><td bgcolor="${color}" style="border-radius:8px"><a href="${cta}" style="display:inline-block;padding:14px 22px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">${escapeHtml(content.cta.label)}</a></td></tr></table>` : ''}
+      </td></tr>
+      <tr><td style="border-top:1px solid #e4e8f0;padding:18px 26px 24px;font-size:12px;line-height:1.7;color:#657086">
+        ${tenant}${storefront ? ` · <a href="${storefront}" style="color:#43546b">${storefront}</a>` : ''}
+        ${content.footerNote ? `<div style="margin-top:6px">${escapeHtml(content.footerNote)}</div>` : ''}
+      </td></tr>
+    </table>
+  </td></tr></table></body></html>`;
 }
 
 function refundLine(refundSucceeded: boolean | null, manualRefundRequired: boolean) {

@@ -56,7 +56,7 @@ function page(context: TenantNotificationContext, shell: Shell) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 body{font-family:Arial,Helvetica,sans-serif;background:#f5f6f8;margin:0;padding:0;color:#252525}
-.container{max-width:600px;margin:30px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07)}
+.container{width:100%;max-width:600px;margin:30px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07)}
 .test-banner{background:#fff4cc;color:#6b5200;padding:10px 18px;text-align:center;font-size:12px;font-weight:700;border-bottom:1px solid #f2d76b}
 .header{background:${primary};padding:30px 24px 32px;text-align:center}
 .logo{display:block;width:auto;height:auto;max-width:170px;max-height:82px;margin:0 auto 20px}
@@ -77,8 +77,8 @@ body{font-family:Arial,Helvetica,sans-serif;background:#f5f6f8;margin:0;padding:
 .item{padding:8px 0;border-top:1px solid #f0f2f4;font-size:14px;line-height:1.5}
 .item:first-of-type{border-top:none}
 .muted{color:#777777}
-.lines{width:100%;border-collapse:collapse;font-size:14px;line-height:1.5}
-.lines td{padding:9px 0;border-top:1px solid #f0f2f4;vertical-align:top}
+.lines{width:100%;border-collapse:collapse;font-size:14px;line-height:1.5;table-layout:fixed}
+.lines td{padding:9px 0;border-top:1px solid #f0f2f4;vertical-align:top;overflow-wrap:anywhere}
 .lines tr:first-child td{border-top:none}
 .lines .amount{text-align:right;white-space:nowrap;padding-left:12px;font-weight:700}
 .lines .sum td{border-top:none;padding:3px 0}
@@ -96,7 +96,7 @@ body{font-family:Arial,Helvetica,sans-serif;background:#f5f6f8;margin:0;padding:
 .footer{background:#f0f2f4;padding:24px 22px;text-align:center;font-size:12px;color:#777777;line-height:1.7}
 .footer strong{color:#555555}
 .footer a{color:${primary};text-decoration:none;font-weight:600}
-@media only screen and (max-width:620px){.container{margin:0;border-radius:0}.body{padding:26px 20px}.header{padding:26px 20px 28px}.logo{max-width:155px;max-height:76px}}
+@media only screen and (max-width:620px){.container{margin:0;border-radius:0}.body{padding:24px 16px}.header{padding:24px 16px 26px}.header h1{font-size:21px}.logo{max-width:150px;max-height:72px}.info-box{padding:15px;margin:18px 0}.items-box{padding:13px 12px}.lines .amount{padding-left:8px}.cta{display:block;text-align:center;padding:15px 12px}.cta-wrap{margin:22px 0}.support-box{padding:15px}}
 </style>
 </head>
 <body>
