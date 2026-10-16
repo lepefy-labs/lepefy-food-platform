@@ -87,6 +87,7 @@ test('every staff notification has an email and a WhatsApp model, same samples, 
   }
   const order = whatsapp.find((preview) => preview.id === 'staff-order-created-priority')!;
   expect(order.text).toContain('🟠 PRIORITAIRE');
-  expect(order.text).toContain('Packlink PRO : réf. IT2026PRO0012345');
+  expect(order.text).not.toContain('Packlink PRO :');
+  expect(order.text).toContain('📋 *À FAIRE*');
   expect(whatsapp.find((preview) => preview.id === 'staff-test')!.text).toContain('[TEST]');
 });

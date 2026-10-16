@@ -106,15 +106,15 @@ test.describe('order signals', () => {
 });
 
 test.describe('templates', () => {
-  test('one WhatsApp message per order with indicators, Packlink refs and the canonical admin link', () => {
+  test('one concise WhatsApp message per order with action and canonical admin link', () => {
     const text = renderStaffWhatsapp(orderCreatedAlert(facts(), 'high'), { tenantName: 'Chloe Food', storefrontUrl: 'https://shop.chloefood.com' });
     expect(text).toContain('*Nouvelle commande #A82F19C4*');
     expect(text).toContain('🟠 PRIORITAIRE');
     expect(text).toContain('🌍 Livraison internationale : Belgique');
     expect(text).toContain('❄️ Produits frais');
-    expect(text).toContain('Montant : 86,50 €');
-    expect(text).toContain('Packlink PRO : réf. IT2026PRO0012345');
-    expect(text).toContain('Réf. Lepefy : LEPEFY-A82F19C4');
+    expect(text).toContain('💶 *86,50 €* · Montant');
+    expect(text).not.toContain('Packlink PRO :');
+    expect(text).toContain('📋 *À FAIRE*');
     expect(text).toContain('https://shop.chloefood.com/admin/orders/a82f19c4-1111-4111-8111-111111111111');
     expect(text).not.toMatch(/@|Téléphone|IBAN/);
     expect(text.length).toBeLessThan(1500);
