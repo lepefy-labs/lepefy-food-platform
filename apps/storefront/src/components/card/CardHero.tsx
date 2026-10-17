@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { IconChevronRight, IconCreditCard, IconShoppingBag } from '@tabler/icons-react';
+import { IconChevronRight, IconShoppingBag } from '@tabler/icons-react';
 import { TenantLogo } from '@/components/branding/TenantLogo';
 import type { CardHeroImage } from '@/lib/card/cardHero';
-import { CARD_PAY_COLOR, darkenHex } from '@/lib/card/cardTheme';
+import { darkenHex, readableForeground } from '@/lib/card/cardTheme';
+import { PaymentBrandMark } from './CardPaymentBrands';
+import type { CardPaymentBrandStrip } from '@/lib/card/cardPaymentBrands';
 import { hexToRgba } from '@/lib/card/methodColor';
 
 type Lang = 'fr' | 'it';
@@ -13,17 +15,18 @@ type Lang = 'fr' | 'it';
 const HERO_SIZES = '(min-width: 1024px) 600px, (min-width: 540px) 50vw, 100vw';
 
 const COPY = {
-  fr: { title: 'Payez ici, simplement.', subtitle: 'Réglez votre achat en quelques instants.', pay: 'Payer maintenant', shop: 'Commander sur la boutique', language: 'Langue' },
-  it: { title: 'Paga qui, in modo semplice.', subtitle: 'Salda il tuo acquisto in pochi istanti.', pay: 'Paga ora', shop: 'Ordina sul negozio online', language: 'Lingua' },
+  fr: { title: 'Payer ici en quelques secondes.', pay: 'Payer maintenant', shop: 'Commander sur la boutique', language: 'Langue', bank_transfer: 'Virement', cash: 'Espèces' },
+  it: { title: 'Paga qui in pochi secondi.', pay: 'Paga ora', shop: 'Ordina sul negozio online', language: 'Lingua', bank_transfer: 'Bonifico', cash: 'Contanti' },
 } as const;
 
 interface CardHeroProps {
   lang: Lang;
   onLangChange: (lang: Lang) => void;
-  tenant: { name: string; tagline: string | null; logo_url: string | null; primary_color: string };
+  tenant: { name: string; tagline: string | null; logo_url: string | null; primary_color: string; secondary_color: string };
   image: CardHeroImage | null;
   /** Absent : aucun moyen de paiement visible, la hero devient une simple présentation. */
   onPay?: () => void;
+  paymentBrands: CardPaymentBrandStrip;
   showShop: boolean;
 }
 
@@ -36,7 +39,7 @@ interface CardHeroProps {
  * dimensions ne dépendent jamais d'elle (pas de CLS) et les boutons sont
  * utilisables avant son chargement.
  */
-export function CardHero({ lang, onLangChange, tenant, image: configuredImage, onPay, showShop }: CardHeroProps) {
+export function CardHero({ lang, onLangChange, tenant, image: configuredImage, onPay, paymentBrands, showShop }: CardHeroProps) {
   const t = COPY[lang];
   // Photo introuvable ou refusée : la hero se replie sur le dégradé compact, jamais une icône d'image cassée.
   const [imageFailed, setImageFailed] = useState(false);
@@ -116,24 +119,33 @@ export function CardHero({ lang, onLangChange, tenant, image: configuredImage, o
         <h1 className="text-[2rem] font-extrabold leading-[1.05] min-[390px]:text-[2.25rem] md:text-5xl lg:text-[3.5rem]" style={{ fontFamily: 'var(--font-card-heading)' }}>
           {onPay ? t.title : tenant.name}
         </h1>
-        {(onPay || tenant.tagline) && <p className="max-w-md text-base leading-snug text-white/95 lg:text-xl">{onPay ? t.subtitle : tenant.tagline}</p>}
+        {!onPay && tenant.tagline && <p className="max-w-md text-base leading-snug text-white/95 lg:text-xl">{tenant.tagline}</p>}
         <div className="mt-1.5 flex flex-col gap-2.5">
           {onPay && (
             <button
               type="button"
               onClick={onPay}
-              className="flex min-h-14 w-full items-center gap-2.5 rounded-2xl px-4 text-left md:gap-3 md:px-5 text-lg font-extrabold text-white shadow-[0_10px_28px_rgba(0,0,0,0.35)] ring-1 ring-white/30 transition-transform focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white active:scale-[0.99] motion-reduce:transition-none lg:min-h-[60px] lg:max-w-md"
-              style={{ backgroundColor: CARD_PAY_COLOR, fontFamily: 'var(--font-card-heading)' }}
+              aria-label={t.pay}
+              className="group flex min-h-14 w-full flex-wrap items-center justify-center gap-2 rounded-2xl border-2 border-white/80 bg-white px-3 py-3 text-gray-900 shadow-[0_8px_0_rgba(0,0,0,0.16),0_16px_28px_rgba(0,0,0,0.22)] transition-[transform,box-shadow] hover:shadow-[0_5px_0_rgba(0,0,0,0.16),0_10px_20px_rgba(0,0,0,0.2)] active:translate-y-1 active:shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white motion-reduce:transition-none lg:max-w-md"
             >
-              <IconCreditCard size={26} aria-hidden="true" className="shrink-0" />
-              <span className="flex-1">{t.pay}</span>
-              <IconChevronRight size={22} aria-hidden="true" className="shrink-0" />
+              {paymentBrands.brands.map((brand) => (
+                <span key={brand} aria-hidden="true" className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-2.5 shadow-sm transition-colors group-hover:bg-white">
+                  <PaymentBrandMark brand={brand} size="sm" />
+                </span>
+              ))}
+              {paymentBrands.chips.map((chip) => (
+                <span key={chip} aria-hidden="true" className="flex min-h-11 items-center rounded-xl border border-gray-200 bg-gray-50 px-2.5 text-sm font-bold shadow-sm transition-colors group-hover:bg-white">
+                  {t[chip]}
+                </span>
+              ))}
+              <IconChevronRight size={20} aria-hidden="true" className="shrink-0 text-gray-500" />
             </button>
           )}
           {showShop && (
             <Link
               href="/"
-              className="flex min-h-[52px] w-full items-center gap-2.5 rounded-2xl bg-white px-4 text-base font-bold md:gap-3 md:px-5 text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/70 lg:min-h-14 lg:max-w-md"
+              className="flex min-h-[52px] w-full items-center gap-2.5 rounded-2xl px-4 text-base font-bold shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/70 md:gap-3 md:px-5 lg:min-h-14 lg:max-w-md"
+              style={{ backgroundColor: tenant.secondary_color, color: readableForeground(tenant.secondary_color) }}
             >
               <IconShoppingBag size={24} aria-hidden="true" className="shrink-0" />
               <span className="flex-1">{t.shop}</span>

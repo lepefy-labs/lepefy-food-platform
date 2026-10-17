@@ -5,7 +5,6 @@ import { IconUserPlus } from '@tabler/icons-react';
 import type { TenantSocialLink, TenantPaymentMethod } from '@lepefy/types';
 import { AddToHomeScreen } from './AddToHomeScreen';
 import { CardHero } from './CardHero';
-import { CardPaymentBrands } from './CardPaymentBrands';
 import { CardShowcase, CardShowcaseProvider } from './CardShowcase';
 import { CardStoreInfo } from './CardStoreInfo';
 import { PaymentMethodsAccordion } from './PaymentMethodsAccordion';
@@ -123,11 +122,11 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
               tenant={tenant}
               image={heroImage}
               onPay={paymentMethods.length > 0 ? openPayment : undefined}
+              paymentBrands={cardPaymentBrandStrip(paymentMethods)}
               showShop={tenant.storefront_ready}
             />
             <div className="mt-3 grid gap-4 px-4 sm:gap-5 lg:mt-6 lg:grid-cols-12 lg:items-start lg:gap-6 lg:px-0">
-              <CardPaymentBrands strip={cardPaymentBrandStrip(paymentMethods)} lang={lang} className="lg:col-span-5 lg:col-start-1 lg:row-start-1" />
-              <div className="lg:col-span-7 lg:col-start-6 lg:row-span-2 lg:row-start-1">
+              <div className="lg:col-span-7 lg:col-start-6 lg:row-start-1">
                 <CardShowcase
                   lang={lang}
                   products={showcaseProducts}
@@ -137,7 +136,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
                   primaryColor={tenant.primary_color}
                 />
               </div>
-              <div className="flex flex-col gap-4 sm:gap-5 lg:col-span-5 lg:col-start-1 lg:row-start-2">
+              <div className="flex flex-col gap-4 sm:gap-5 lg:col-span-5 lg:col-start-1 lg:row-start-1">
                 <CardStoreInfo lang={lang} tenant={tenant} socialLinks={socialLinks} reviewsEnabled={reviewsEnabled} openingHours={openingHours} />
               </div>
             </div>
