@@ -15,8 +15,8 @@ type Lang = 'fr' | 'it';
 const HERO_SIZES = '(min-width: 1024px) 600px, (min-width: 540px) 50vw, 100vw';
 
 const COPY = {
-  fr: { title: 'Payer ici en quelques secondes.', pay: 'Payer maintenant', shop: 'Commander sur la boutique', language: 'Langue', bank_transfer: 'Virement', cash: 'Espèces' },
-  it: { title: 'Paga qui in pochi secondi.', pay: 'Paga ora', shop: 'Ordina sul negozio online', language: 'Lingua', bank_transfer: 'Bonifico', cash: 'Contanti' },
+  fr: { title: 'Payez en quelques secondes.', pay: 'Payer maintenant', shop: 'Commander sur la boutique', language: 'Langue', others: 'Autres' },
+  it: { title: 'Paga in pochi secondi.', pay: 'Paga ora', shop: 'Ordina sul negozio online', language: 'Lingua', others: 'Altri' },
 } as const;
 
 interface CardHeroProps {
@@ -52,6 +52,7 @@ export function CardHero({ lang, onLangChange, tenant, image: configuredImage, o
   }, []);
   const background = darkenHex(tenant.primary_color, 0.8);
   const fade = (alpha: number) => hexToRgba(background, alpha);
+  const onlineBrands = paymentBrands.brands.slice(0, 4);
 
   // Photo présente : bande basse au cadrage centré sur le geste de paiement
   // (mobile), puis texte et photo côte à côte dès 540 px. Sans photo : une
@@ -116,7 +117,7 @@ export function CardHero({ lang, onLangChange, tenant, image: configuredImage, o
 
       <div className={`relative z-10 flex flex-col gap-2.5 px-5 pb-5 ${split ? '-mt-3 min-[540px]:order-1 min-[540px]:mt-0 min-[540px]:justify-end min-[540px]:px-6 min-[540px]:pb-7 min-[540px]:pt-24 lg:gap-3 lg:px-14 lg:pb-12' : 'lg:px-14 lg:pb-12'}`}>
         {onPay && <p className="hidden text-sm font-bold uppercase tracking-[0.08em] text-white/90 min-[540px]:block">{tenant.name}</p>}
-        <h1 className="text-[2rem] font-extrabold leading-[1.05] min-[390px]:text-[2.25rem] md:text-5xl lg:text-[3.5rem]" style={{ fontFamily: 'var(--font-card-heading)' }}>
+        <h1 className={onPay ? "whitespace-nowrap text-[clamp(1rem,4.7vw,1.65rem)] font-extrabold leading-tight min-[540px]:text-[clamp(1rem,2.5vw,1.8rem)]" : "text-[2rem] font-extrabold leading-[1.05] min-[390px]:text-[2.25rem] md:text-5xl lg:text-[3.5rem]"} style={{ fontFamily: 'var(--font-card-heading)' }}>
           {onPay ? t.title : tenant.name}
         </h1>
         {!onPay && tenant.tagline && <p className="max-w-md text-base leading-snug text-white/95 lg:text-xl">{tenant.tagline}</p>}
@@ -126,19 +127,14 @@ export function CardHero({ lang, onLangChange, tenant, image: configuredImage, o
               type="button"
               onClick={onPay}
               aria-label={t.pay}
-              className="group flex min-h-14 w-full flex-wrap items-center justify-center gap-2 rounded-2xl border-2 border-white/80 bg-white px-3 py-3 text-gray-900 shadow-[0_8px_0_rgba(0,0,0,0.16),0_16px_28px_rgba(0,0,0,0.22)] transition-[transform,box-shadow] hover:shadow-[0_5px_0_rgba(0,0,0,0.16),0_10px_20px_rgba(0,0,0,0.2)] active:translate-y-1 active:shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white motion-reduce:transition-none lg:max-w-md"
+              className="group flex min-h-14 w-full flex-nowrap items-center justify-center gap-1.5 rounded-2xl border-2 border-white/80 bg-white px-3 py-3 text-gray-900 shadow-[0_8px_0_rgba(0,0,0,0.16),0_16px_28px_rgba(0,0,0,0.22)] transition-[transform,box-shadow] hover:shadow-[0_5px_0_rgba(0,0,0,0.16),0_10px_20px_rgba(0,0,0,0.2)] active:translate-y-1 active:shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white motion-reduce:transition-none lg:max-w-md"
             >
-              {paymentBrands.brands.map((brand) => (
-                <span key={brand} aria-hidden="true" className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-2.5 shadow-sm transition-colors group-hover:bg-white">
+              {onlineBrands.map((brand, index) => (
+                <span key={brand} aria-hidden="true" className={`${index === 3 ? "hidden min-[390px]:flex" : "flex"} min-h-10 min-w-0 flex-1 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-1 shadow-sm transition-colors group-hover:bg-white`}>
                   <PaymentBrandMark brand={brand} size="sm" />
                 </span>
               ))}
-              {paymentBrands.chips.map((chip) => (
-                <span key={chip} aria-hidden="true" className="flex min-h-11 items-center rounded-xl border border-gray-200 bg-gray-50 px-2.5 text-sm font-bold shadow-sm transition-colors group-hover:bg-white">
-                  {t[chip]}
-                </span>
-              ))}
-              <IconChevronRight size={20} aria-hidden="true" className="shrink-0 text-gray-500" />
+              <span aria-hidden="true" className="flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-2 text-xs font-bold shadow-sm transition-colors group-hover:bg-white">{t.others}</span>
             </button>
           )}
           {showShop && (
