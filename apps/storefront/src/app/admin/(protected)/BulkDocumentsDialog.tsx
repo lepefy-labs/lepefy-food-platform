@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { IconFileTypePdf } from '@tabler/icons-react';
-import { FormatRadios, type OrderDocumentsDefaults } from '../orders/[id]/OrderDocumentsCard';
+import { FormatSelect, type OrderDocumentsDefaults } from '../orders/[id]/OrderDocumentsCard';
 import { MAX_BULK_ORDER_DOCUMENTS as MAX_BULK_DOCUMENTS, type OrderDocumentFormat } from '@/lib/orders/documents/formats';
 import { cn } from '@/lib/utils/cn';
 import Button, { ButtonAnchor } from '../_components/ui/Button';
@@ -61,10 +61,7 @@ export default function BulkDocumentsDialog({ orderIds, defaults, onClose }: { o
             })}
           </div>
         </fieldset>
-        <div>
-          <p className="mb-2 text-sm font-semibold text-a-text" aria-hidden="true">Format</p>
-          <FormatRadios name="bulk-document-format" value={format} onChange={setFormat} legend="Format" />
-        </div>
+        <FormatSelect value={format} onChange={setFormat} label="Format" />
         <p className="text-xs leading-5 text-a-text-3">Un seul PDF, une commande par nouvelle page, dans l’ordre de la liste. {MAX_BULK_DOCUMENTS} commandes au maximum ; les commandes annulées sont ignorées.</p>
         {tooMany && <InlineAlert tone="warning">Sélectionnez {MAX_BULK_DOCUMENTS} commandes au maximum.</InlineAlert>}
       </div>

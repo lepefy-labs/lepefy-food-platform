@@ -3,7 +3,8 @@
 import { useId, useState } from 'react';
 import Link from 'next/link';
 import { IconDownload, IconFileTypePdf } from '@tabler/icons-react';
-import { ORDER_DOCUMENT_FORMAT_IDS, orderDocumentFormatOptionLabel, type OrderDocumentFormat } from '@/lib/orders/documents/formats';
+import { ORDER_DOCUMENT_FORMATS, ORDER_DOCUMENT_FORMAT_IDS, isOrderDocumentFormat, orderDocumentFormatOptionLabel, type OrderDocumentFormat } from '@/lib/orders/documents/formats';
+import { Select } from '../../_components/ui/Form';
 
 export interface OrderDocumentsDefaults {
   pickingFormat: OrderDocumentFormat;
@@ -13,28 +14,29 @@ export interface OrderDocumentsDefaults {
   packingSlipQrUnavailable: boolean;
 }
 
-/** Sélecteur de format natif (radios), présélectionné sur le défaut du tenant. */
-export function FormatRadios({ name, value, onChange, legend }: { name: string; value: OrderDocumentFormat; onChange: (format: OrderDocumentFormat) => void; legend: string }) {
+/**
+ * Menu déroulant du format, présélectionné sur le défaut du tenant (A5 par
+ * défaut). Les dimensions viennent du registre : jamais de libellé en dur.
+ */
+export function FormatSelect({ value, onChange, label }: { value: OrderDocumentFormat; onChange: (format: OrderDocumentFormat) => void; label: string }) {
+  const id = useId();
   return (
-    <fieldset className="min-w-0">
-      <legend className="sr-only">{legend}</legend>
-      <div className="inline-flex overflow-hidden rounded-lg border border-a-border">
+    <div className="min-w-0">
+      <label htmlFor={id} className="mb-1 block text-xs font-semibold text-a-text-2">{label}</label>
+      <Select id={id} value={value} onChange={(e) => { if (isOrderDocumentFormat(e.target.value)) onChange(e.target.value); }} className="w-full max-w-xs text-sm">
         {ORDER_DOCUMENT_FORMAT_IDS.map((format) => (
-          <label key={format} className="relative cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--admin-primary)]">
-            <input type="radio" name={name} value={format} checked={value === format} onChange={() => onChange(format)} className="peer sr-only" />
-            <span className="flex min-h-11 items-center px-3 text-xs font-semibold text-a-text-2 peer-checked:bg-a-inverse peer-checked:text-white">
-              {orderDocumentFormatOptionLabel(format)}
-            </span>
-          </label>
+          <option key={format} value={format}>
+            {orderDocumentFormatOptionLabel(format)} · {ORDER_DOCUMENT_FORMATS[format].widthMm} × {ORDER_DOCUMENT_FORMATS[format].heightMm} mm
+          </option>
         ))}
-      </div>
-    </fieldset>
+      </Select>
+    </div>
   );
 }
 
 const openCls = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-a-focus';
 
-function DocumentRow({ title, hint, href, initial, name }: { title: string; hint: string; href: string; initial: OrderDocumentFormat; name: string }) {
+function DocumentRow({ title, hint, href, initial }: { title: string; hint: string; href: string; initial: OrderDocumentFormat }) {
   const [format, setFormat] = useState<OrderDocumentFormat>(initial);
   const titleId = useId();
   const url = `${href}?format=${format}`;
@@ -44,7 +46,7 @@ function DocumentRow({ title, hint, href, initial, name }: { title: string; hint
         <p id={titleId} className="text-sm font-semibold text-a-text">{title}</p>
         <p className="text-xs text-a-text-3">{hint}</p>
       </div>
-      <FormatRadios name={name} value={format} onChange={setFormat} legend={`Format — ${title}`} />
+      <FormatSelect value={format} onChange={setFormat} label={`Format — ${title}`} />
       <div className="flex flex-wrap items-center gap-2">
         {/* Navigation HTTP directe vers le PDF serveur : fiable aussi en PWA. */}
         <a href={url} target="_blank" rel="noopener noreferrer" className={`${openCls} bg-a-inverse text-a-on-inverse hover:bg-a-inverse`}>
@@ -63,10 +65,10 @@ export default function OrderDocumentsCard({ orderId, cancelled, defaults }: { o
   const base = `/api/admin/orders/${orderId}/documents`;
   return (
     <div className="space-y-3">
-      <DocumentRow name={`picking-format-${orderId}`} title="Liste de préparation" hint="Interne · articles, emplacements, emballage." href={`${base}/picking-list`} initial={defaults.pickingFormat} />
+      <DocumentRow title="Liste de préparation" hint="Interne · articles, emplacements, emballage." href={`${base}/picking-list`} initial={defaults.pickingFormat} />
       {defaults.packingSlipEnabled ? (
         <div className="space-y-2 border-t border-a-border pt-3">
-          <DocumentRow name={`packing-format-${orderId}`} title="Bon de colis" hint="À glisser dans le colis · récapitulatif client et QR de suivi." href={`${base}/packing-slip`} initial={defaults.packingSlipFormat} />
+          <DocumentRow title="Bon de colis" hint="À glisser dans le colis · récapitulatif client et QR de suivi." href={`${base}/packing-slip`} initial={defaults.packingSlipFormat} />
           {defaults.packingSlipQrUnavailable && <p className="text-xs text-tone-warning-fg">QR indisponible tant que la migration 145 n’est pas appliquée : le bon est généré sans QR.</p>}
         </div>
       ) : (
