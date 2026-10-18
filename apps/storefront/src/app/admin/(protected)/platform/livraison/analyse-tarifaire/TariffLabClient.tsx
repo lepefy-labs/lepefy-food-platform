@@ -319,7 +319,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
       {drafts.length > 0 && (
         <section className="bg-a-surface rounded-xl border border-a-border p-5">
           <h2 className="text-sm font-semibold mb-1">Brouillons existants</h2>
-          <p className="text-xs text-a-text-3 mb-3">Cliquer un brouillon relance son rétrotest et le recopie dans le formulaire pour tester une variante. Pour figer un brouillon et le comparer aux commandes réelles sans le facturer : <Link href="/admin/livraison/forfait-shadow" className="underline text-a-brand-fg">créer une version shadow</Link>.</p>
+          <p className="text-xs text-a-text-3 mb-3">Cliquer un brouillon relance son rétrotest et le recopie dans le formulaire pour tester une variante. Pour figer un brouillon et le comparer aux commandes réelles sans le facturer : <Link href="/admin/platform/livraison/forfait-laboratoire" className="underline text-a-brand-fg">créer une version shadow</Link>.</p>
           <div className="flex flex-wrap gap-2">
             {drafts.map((d) => (
               <button key={d.id} onClick={() => loadDraft(d)} className={`text-xs px-3 py-1.5 rounded-lg border ${selectedId === d.id ? 'border-a-brand text-a-brand-fg' : 'border-a-border text-a-text-3'}`}>

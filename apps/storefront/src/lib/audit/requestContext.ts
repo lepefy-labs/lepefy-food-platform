@@ -101,7 +101,7 @@ export function routeRef(path: string | null | undefined): string | null {
 const AUDITED_WRITE_RPCS = new Set([
   'convert_checkout_session_to_order', 'replace_admin_role_permissions', 'external_catalog_apply_item',
   'record_supplier_receipt', 'reverse_supplier_receipt', 'adjust_inventory', 'adjust_event_capacity',
-  'delete_customer_account_data', 'select_shipping_tariff_shadow_version', 'activate_shipping_tariff_version',
+  'delete_customer_account_data', 'select_shipping_tariff_shadow_version', 'activate_shipping_tariff_version', 'publish_shipping_tariff_version',
   'rollback_shipping_tariff_to_provider_cost', 'retire_shipping_tariff_country', 'process_manual_purchase_points_atomic',
   'record_audit_event', 'apply_product_promotion_schedule',
   'catalog_campaign_select_products', 'catalog_campaign_remove_products', 'catalog_campaign_override_price',

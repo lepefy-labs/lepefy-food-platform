@@ -161,7 +161,7 @@ function VersionDetails({ version, vatRate }: { version: ShippingTariffVersionRo
   );
 }
 
-export function ForfaitShadowClient({
+export function ForfaitLabClient({
   data,
   initialPeriod,
   initialReport,
@@ -435,7 +435,7 @@ export function ForfaitShadowClient({
       <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-dashed border-a-border-strong p-4">
           <p className="text-sm font-semibold">Brouillon</p>
-          <p className="text-xs text-a-text-3 mt-1">Modifiable, rétrotesté dans <Link href="/admin/livraison/analyse-tarifaire" className="underline">Analyse tarifaire</Link>. Jamais lu par le checkout.</p>
+          <p className="text-xs text-a-text-3 mt-1">Modifiable, rétrotesté dans <Link href="/admin/platform/livraison/analyse-tarifaire" className="underline">Analyse tarifaire</Link>. Jamais lu par le checkout.</p>
           <p className="text-xs text-a-text-3 mt-2">{data.drafts.length} brouillon(s)</p>
         </div>
         <div className="rounded-xl border border-a-brand bg-a-brand-soft p-4">
@@ -628,7 +628,7 @@ export function ForfaitShadowClient({
         <h2 className="text-sm font-semibold mb-1">Créer une version shadow depuis un brouillon</h2>
         <p className="text-xs text-a-text-3 mb-4">La version créée est figée : une correction crée une nouvelle version. Seul le prix sur le poids total est pris en charge.</p>
         {data.drafts.length === 0 ? (
-          <p className="text-sm text-a-text-3">Aucun brouillon. Créez-en un dans <Link href="/admin/livraison/analyse-tarifaire" className="underline">Analyse tarifaire</Link>.</p>
+          <p className="text-sm text-a-text-3">Aucun brouillon. Créez-en un dans <Link href="/admin/platform/livraison/analyse-tarifaire" className="underline">Analyse tarifaire</Link>.</p>
         ) : (
           <div className="space-y-4">
             <div>

@@ -41,7 +41,8 @@ test('technical shipping APIs are absent from the tenant capability map', () => 
   }
   // Tenant shipping pages keep their capabilities.
   expect(permissionForAdminApi('/api/admin/shipping-advisor', 'GET')).toBe('shipping.view');
-  expect(permissionForAdminApi('/api/admin/shipping-tariff-drafts', 'POST')).toBe('shipping.manage');
+  // Forfait laboratory (drafts, rétrotest) is platform-owner only too: see shippingTariffEdit.spec.ts.
+  expect(permissionForAdminApi('/api/admin/shipping-tariff-drafts', 'POST')).toBeNull();
   expect(permissionForAdminApi('/api/admin/shipping-packaging-profiles', 'GET')).toBe('shipping.view');
 });
 
@@ -51,6 +52,8 @@ test('platform navigation exposes the technical shipping tools', () => {
   expect(group.children!.map((item) => item.href)).toEqual([
     '/admin/platform/livraison/laboratoire',
     '/admin/platform/livraison/diagnostic-packlink',
+    '/admin/platform/livraison/analyse-tarifaire',
+    '/admin/platform/livraison/forfait-laboratoire',
   ]);
   expect(PLATFORM_NAV.findIndex((g) => g.id === 'shipping')).toBeLessThan(PLATFORM_NAV.findIndex((g) => g.id === 'development'));
 });
@@ -59,6 +62,7 @@ test('tenant Livraison tabs no longer link to the moved tools and old URLs redir
   const tabs = readFileSync(join(SRC, 'app/admin/(protected)/livraison/LivraisonTabs.tsx'), 'utf8');
   expect(tabs).not.toContain('laboratoire');
   expect(tabs).not.toContain('diagnostic-packlink');
+  expect(tabs).not.toContain('analyse-tarifaire');
   for (const [page, target] of [
     ['livraison/laboratoire/page.tsx', '/admin/platform/livraison/laboratoire'],
     ['livraison/laboratoire/[id]/page.tsx', '/admin/platform/livraison/laboratoire/'],

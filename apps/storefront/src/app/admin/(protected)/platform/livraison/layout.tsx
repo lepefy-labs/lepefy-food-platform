@@ -10,7 +10,7 @@ export default async function PlatformLivraisonLayout({ children }: { children: 
       <header>
         <h1 className="text-2xl font-semibold text-a-text">Livraison technique</h1>
         <p className="mt-1 text-sm text-a-text-3">
-          Simulations Packlink et diagnostics du provider. Tenant interrogé : <span className="font-semibold text-a-text-2">{tenant.name}</span>.
+          Simulations Packlink, diagnostics du provider et laboratoire tarifaire. Tenant interrogé : <span className="font-semibold text-a-text-2">{tenant.name}</span>.
         </p>
         <PlatformSectionTabs groupId="shipping" />
       </header>

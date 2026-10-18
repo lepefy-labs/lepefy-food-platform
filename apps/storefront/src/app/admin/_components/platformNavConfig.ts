@@ -52,6 +52,8 @@ export const PLATFORM_NAV: PlatformNavGroup[] = [
     id: 'shipping', label: 'Livraison technique', icon: IconTruck, children: [
       { label: 'Laboratoire', href: '/admin/platform/livraison/laboratoire' },
       { label: 'Diagnostic Packlink', href: '/admin/platform/livraison/diagnostic-packlink' },
+      { label: 'Analyse tarifaire', href: '/admin/platform/livraison/analyse-tarifaire' },
+      { label: 'Laboratoire forfait', href: '/admin/platform/livraison/forfait-laboratoire' },
     ],
   },
   {

@@ -105,6 +105,12 @@ The shipping logic is the most complex part of the codebase:
 - `shippingTotal = packlink_base_price + vat + (surcharge_amount × num_parcels)`
 - Selects the cheapest eligible service; detailed breakdown is hidden from the customer UI
 
+### Flat-rate shipping tariffs (forfait) — `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §12–14
+
+- `shipping_tariff_versions` rows are immutable (trigger 124); `tenants.shipping_pricing_mode = 'tariff'` charges only the `active` version of a country, verified on every payment path (token V2, `checkoutShipping.ts`). A changed version invalidates open quotes with 409 `SHIPPING_REQUOTE_REQUIRED`.
+- Tenant page `/admin/livraison/forfait` (`shipping.view`/`shipping.manage`): country cards, quick price editor → `POST /api/admin/shipping-tariff-versions/publish` → RPC `publish_shipping_tariff_version` (migration 159: locks the active base, copies every structural field in SQL, retires the base and activates version `max+1` in one transaction; stale base → 409 `TARIFF_BASE_CHANGED`). Pure helpers in `lib/shipping/tariff/tariffEdit.ts` (French amount parsing, price-only rebuild, diff, country views, history) — never a second pricing engine (`priceFromTariff` stays the only one).
+- The forfait laboratory (drafts + rétrotest, version creation from a draft, shadow selection/collection, real-order report) is platform-owner only: pages under `/admin/platform/livraison/{analyse-tarifaire,forfait-laboratoire}`, APIs guarded by `requirePlatformOwner()` and absent from `adminApiPermissions.ts`.
+
 ### Shipment drafts (provider-neutral, Packlink first) — `docs/SHIPPING_INTELLIGENCE.md` §2.4
 
 - Lepefy only creates an unpurchased provider **draft** (Packlink `POST /v1/shipments`, no `service_id`); purchase stays in Packlink PRO. Never touches customer shipping price, never sets `shipped`, never emails.

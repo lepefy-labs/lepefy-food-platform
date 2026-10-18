@@ -1,11 +1,11 @@
 /**
  * GET /api/admin/shipping-shadow-report?from=YYYY-MM-DD&to=YYYY-MM-DD&versionId=
- * Rapport shadow sur les commandes réelles du tenant (shipping.view).
+ * Rapport shadow sur les commandes réelles du tenant (laboratoire forfait : platform_owner uniquement).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { loadShadowReport, reportPeriod } from '@/lib/shipping/tariff/shadowReport';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
-  const denied = await requireAdmin(tenant.id);
+  const denied = await requirePlatformOwner();
   if (denied) return denied;
 
   const params = req.nextUrl.searchParams;

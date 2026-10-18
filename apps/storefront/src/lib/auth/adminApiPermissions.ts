@@ -72,16 +72,17 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path.startsWith('/api/admin/shipping-zones')) return read ? 'shipping.view' : 'shipping.manage';
   if (path.startsWith('/api/admin/shipping-observations')) return 'shipping.view';
   if (path === '/api/admin/shipping-advisor') return 'shipping.view';
-  if (/^\/api\/admin\/shipping-tariff-drafts\/[^/]+\/simulate$/.test(path)) return method.toUpperCase() === 'POST' ? 'shipping.view' : null;
-  if (path.startsWith('/api/admin/shipping-tariff-drafts')) return read ? 'shipping.view' : 'shipping.manage';
-  if (/^\/api\/admin\/shipping-tariff-versions\/[^/]+\/select$/.test(path)) return method.toUpperCase() === 'POST' ? 'shipping.manage' : null;
+  // Forfait laboratory (drafts + rétrotest, version creation from a draft, shadow
+  // selection, shadow report: shipping-tariff-drafts/**, POST shipping-tariff-versions,
+  // shipping-tariff-versions/:id/select, shipping-shadow-report) is platform-owner only
+  // via requirePlatformOwner() and deliberately absent from this map.
   if (/^\/api\/admin\/shipping-tariff-versions\/[^/]+\/activate$/.test(path)) return method.toUpperCase() === 'POST' ? 'shipping.manage' : null;
   if (path === '/api/admin/shipping-tariff-versions/retire') return method.toUpperCase() === 'POST' ? 'shipping.manage' : null;
-  if (path === '/api/admin/shipping-tariff-versions') return read ? 'shipping.view' : 'shipping.manage';
+  if (path === '/api/admin/shipping-tariff-versions/publish') return method.toUpperCase() === 'POST' ? 'shipping.manage' : null;
+  if (path === '/api/admin/shipping-tariff-versions') return read ? 'shipping.view' : null;
   if (path === '/api/admin/shipping-pricing-mode') return read ? 'shipping.view' : 'shipping.manage';
   // Création des brouillons d'expédition (migration 151) : réglage transport, pas un réglage boutique.
   if (path === '/api/admin/shipping-automation') return read ? 'shipping.view' : 'shipping.manage';
-  if (path === '/api/admin/shipping-shadow-report') return read ? 'shipping.view' : null;
   if (path === '/api/admin/tenant') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/daily-digest') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/order-documents/settings') return read ? 'tenant_settings.view' : 'tenant_settings.manage';

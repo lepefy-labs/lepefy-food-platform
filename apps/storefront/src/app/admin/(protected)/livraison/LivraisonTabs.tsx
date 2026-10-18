@@ -1,7 +1,7 @@
 import AdminTabs from '../../_components/ui/Tabs';
 
 type LivraisonTab =
-  | 'rules' | 'packaging' | 'expeditions' | 'assistant' | 'historique' | 'tarif-analyse' | 'forfait-shadow';
+  | 'rules' | 'packaging' | 'expeditions' | 'assistant' | 'historique' | 'forfait';
 
 const TABS: Array<{ key: LivraisonTab; href: string; label: string }> = [
   { key: 'rules', href: '/admin/livraison', label: 'Tarification' },
@@ -9,8 +9,7 @@ const TABS: Array<{ key: LivraisonTab; href: string; label: string }> = [
   { key: 'expeditions', href: '/admin/livraison/expeditions', label: 'Expéditions' },
   { key: 'assistant', href: '/admin/livraison/assistant', label: 'Assistant expédition' },
   { key: 'historique', href: '/admin/livraison/historique', label: 'Historique des coûts' },
-  { key: 'tarif-analyse', href: '/admin/livraison/analyse-tarifaire', label: 'Analyse tarifaire' },
-  { key: 'forfait-shadow', href: '/admin/livraison/forfait-shadow', label: 'Forfait' },
+  { key: 'forfait', href: '/admin/livraison/forfait', label: 'Forfait' },
 ];
 
 export function LivraisonTabs({ active }: { active: LivraisonTab }) {

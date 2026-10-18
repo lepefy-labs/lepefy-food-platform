@@ -1,8 +1,9 @@
 /**
  * GET   /api/admin/shipping-pricing-mode → mode de tarification + repli (shipping.view)
  * PATCH /api/admin/shipping-pricing-mode (shipping.manage)
- *   { mode: 'shadow' }         → active la collecte shadow (refusé si un tarif est actif) ;
- *   { mode: 'provider_cost' }  → désactive la collecte, ou, en mode `tariff`, retire
+ *   { mode: 'shadow' }         → active la collecte shadow (refusé si un tarif est actif) —
+ *                                laboratoire : platform_owner uniquement ;
+ *   { mode: 'provider_cost' }  → désactive la collecte (platform_owner uniquement), ou, en mode `tariff`, retire
  *                                TOUS les tarifs actifs et revient au calcul provider
  *                                (RPC atomique, commandes passées inchangées) ;
  *   { fallback: 'unavailable' | 'provider_cost' } → repli quand le forfait ne s'applique pas ;
@@ -15,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { getAdminId } from '@/lib/auth/getAdminId';
 import { loadPricingMode, loadTariffFallback } from '@/lib/shipping/tariff/adminData';
 import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
@@ -72,6 +74,12 @@ async function handlePATCH(req: NextRequest) {
   const current = await loadPricingMode(supabase, tenant.id);
   if (current === null) {
     return NextResponse.json({ error: 'Migration 124 non appliquée : collecte shadow indisponible.' }, { status: 409 });
+  }
+
+  // Collecte shadow (activer / désactiver hors tarification active) = laboratoire.
+  if (current !== 'tariff') {
+    const notOwner = await requirePlatformOwner();
+    if (notOwner) return notOwner;
   }
 
   if (current === 'tariff') {

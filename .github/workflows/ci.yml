@@ -463,3 +463,15 @@ jobs:
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/156_product_promotions_novelties.sql
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/157_catalog_campaigns.sql
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/157_catalog_campaigns.test.sql
+
+      - name: Shipping tariff publish — atomic price-only version, stale base, privileges (159)
+        if: ${{ !cancelled() }}
+        env:
+          PGPASSWORD: test
+        run: |
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/159_shipping_tariff_publish.fixture.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/124_shipping_tariff_versions.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/125_shipping_tariff_activation.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/159_shipping_tariff_publish.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/159_shipping_tariff_publish.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/159_shipping_tariff_publish.test.sql

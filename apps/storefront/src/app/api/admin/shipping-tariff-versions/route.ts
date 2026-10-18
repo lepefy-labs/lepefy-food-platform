@@ -1,15 +1,17 @@
 /**
  * GET  /api/admin/shipping-tariff-versions  → versions tarifaires du tenant (shipping.view)
  * POST /api/admin/shipping-tariff-versions  → crée une version immuable depuis un brouillon,
- *      puis la sélectionne comme version shadow si `select: true` (shipping.manage).
+ *      puis la sélectionne comme version shadow si `select: true`. Laboratoire
+ *      forfait : platform_owner uniquement (requirePlatformOwner). Le tenant modifie
+ *      ses prix via POST …/publish.
  *
- * Aucune action ne rend un prix facturable : le statut `active` n'est jamais
- * écrit en V1F. Voir docs/SHIPPING_FLAT_RATE_CHECKOUT.md.
+ * La création n'écrit jamais le statut `active`. Voir docs/SHIPPING_FLAT_RATE_CHECKOUT.md.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { getAdminId } from '@/lib/auth/getAdminId';
 import type { ShippingTariffDraftRow } from '@lepefy/types';
 import { buildVersionFromDraft, TARIFF_ERROR_LABELS } from '@/lib/shipping/tariff/tariffVersion';
@@ -47,7 +49,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
-  const denied = await requireAdmin(tenant.id);
+  const denied = await requirePlatformOwner();
   if (denied) return denied;
 
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;

@@ -2,9 +2,9 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@a64a565e`
-> **Ultima verifica:** 16 ottobre 2026
-> **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale) + `151_shipping_shipment_creation.sql` + `152_shipping_automation_content.sql` (brouillons d'expédition, §2.4)
+> **Base codice verificata:** `main@1cf926d1`
+> **Ultima verifica:** 18 ottobre 2026
+> **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale) + `151_shipping_shipment_creation.sql` + `152_shipping_automation_content.sql` (brouillons d'expédition, §2.4) + `159_shipping_tariff_publish.sql` (pubblicazione atomica dei prezzi forfait, §18.6)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
 >
@@ -253,7 +253,7 @@ Il QR del bon de colis punta a `<storefront_url del tenant>/o/<token>` (base da 
 
 La pagina mostra solo: marca, réf. courte, data, stage cliente (`getCustomerOrderPresentation`), modalità, articoli (nome + quantità); per la consegna transporteur / stato normalizzato / ETA `shipping_estimated_delivery_at` / ultimo aggiornamento dallo **snapshot persistito**, link transporteur solo se `safeShipmentTrackingUrl(shipping_tracking_url)` è valido; per il ritiro l'indirizzo pubblico del punto di ritiro. Nessun nome, e-mail, telefono, indirizzo di consegna, prezzo o pagamento. CTA: prima della consegna suivi (se URL valido) + aiuto; dopo la consegna «Commander à nouveau» → «Donner mon avis» (solo con invito d'avis utilizzabile) → aiuto. Dettagli: `docs/ORDER_DOCUMENTS.md`.
 
-`Admin → Livraison` (tenant, `shipping.view` / `shipping.manage`) contiene sette superfici di business:
+`Admin → Livraison` (tenant, `shipping.view` / `shipping.manage`) contiene sei superfici di business:
 
 | Tab | Route | Responsabilità |
 |---|---|---|
@@ -262,8 +262,7 @@ La pagina mostra solo: marca, réf. courte, data, stage cliente (`getCustomerOrd
 | Expéditions | `/admin/livraison/expeditions` | creazione dei brouillons d'expédition: attivazione e momento (§2.4) |
 | Assistant expédition | `/admin/livraison/assistant` | stima deterministica dallo storico |
 | Historique des coûts | `/admin/livraison/historique` | aggregati delle osservazioni |
-| Analyse tarifaire | `/admin/livraison/analyse-tarifaire` | bozze e retrotest forfait |
-| Forfait | `/admin/livraison/forfait-shadow` | versioni immutabili, collecte shadow, attivazione commerciale e rollback, fallback, qualità pesi, rapporto ordini reali (§18.5) |
+| Forfait | `/admin/livraison/forfait` | tarifs actuels par pays (Actif / Simulation / Non configuré), éditeur rapide « Modifier les tarifs » → « Vérifier et publier », alertes poids, historique et « Rétablir », paramètres avancés (repli, page publique, retrait) (§18.6) |
 
 Source:
 `apps/storefront/src/app/admin/(protected)/livraison/LivraisonTabs.tsx`.
@@ -284,8 +283,10 @@ Gli strumenti tecnici sono nella console piattaforma, gruppo **Platform → Livr
 |---|---|---|
 | Laboratoire | `/admin/platform/livraison/laboratoire` (+ `/:id`) | test rapido Packlink, campagne, indice CAP |
 | Diagnostic Packlink | `/admin/platform/livraison/diagnostic-packlink` | elenco «Expéditions Packlink PRO» (sola lettura, paginato) + diagnostica per riferimento |
+| Analyse tarifaire | `/admin/platform/livraison/analyse-tarifaire` | bozze di griglia e rétrotest (§18) |
+| Laboratoire forfait | `/admin/platform/livraison/forfait-laboratoire` | tutte le versioni, creazione da bozza, collecte shadow, simulazione, attivazione con checklist completa, rapporto ordini reali (§18.5) |
 
-Il layout `platform/livraison/layout.tsx` mostra il tenant interrogato (quello del deploy, `NEXT_PUBLIC_TENANT_SLUG`). I vecchi URL `/admin/livraison/laboratoire`, `/admin/livraison/laboratoire/:id`, `/admin/livraison/diagnostic-packlink` e `/admin/livraison/simulateur` reindirizzano ai nuovi; un `tenant_admin` viene poi rimandato a `/admin` dal layout piattaforma. I dati prodotti dal Laboratoire (osservazioni) continuano ad alimentare Assistant, Historique, Analyse tarifaire e Forfait del tenant.
+Il layout `platform/livraison/layout.tsx` mostra il tenant interrogato (quello del deploy, `NEXT_PUBLIC_TENANT_SLUG`). I vecchi URL `/admin/livraison/laboratoire`, `/admin/livraison/laboratoire/:id`, `/admin/livraison/diagnostic-packlink`, `/admin/livraison/simulateur` e `/admin/livraison/analyse-tarifaire` reindirizzano ai nuovi (`/admin/livraison/forfait-shadow` → `/admin/livraison/forfait`); un `tenant_admin` viene poi rimandato a `/admin` dal layout piattaforma. I dati prodotti dal Laboratoire (osservazioni) continuano ad alimentare Assistant e Historique del tenant, Analyse tarifaire e Laboratoire forfait.
 
 ### Diagnostic Packlink: elenco «Expéditions Packlink PRO»
 
@@ -1008,9 +1009,11 @@ Il meta della pagina mostra `N scénarios mesurés · M offres provider enregist
 
 ## 18. Analyse tarifaire
 
-Route:
+Route (platform_owner, console Platform → Livraison technique):
 
-`/admin/livraison/analyse-tarifaire`
+`/admin/platform/livraison/analyse-tarifaire`
+
+API `shipping-tariff-drafts/**` (incluso `…/:id/simulate`): `requirePlatformOwner()`, assenti dalla mappa `adminApiPermissions.ts`.
 
 Serve a valutare un forfait prima di qualsiasi integrazione checkout.
 
@@ -1099,9 +1102,24 @@ Le tariffe restano bozze: nessuna attivazione nel checkout. Per confrontarle con
 
 ### 18.5 Forfait shadow (V1F) e tariffazione commerciale (V1G)
 
-Route `/admin/livraison/forfait-shadow` (lettura `shipping.view`, scritture `shipping.manage`). Una bozza (solo strategia «prezzo sul peso totale») diventa una versione immutabile con collo max, blocchi, zone non consegnabili e limite logistico; la versione `shadow` selezionata è calcolata a ogni checkout con consegna quando `shipping_pricing_mode = shadow`, con il motore puro `lib/shipping/tariff/priceFromTariff.ts`, e registrata in `orders.shipping_details.shadow_tariff` senza cambiare importo, token, PaymentIntent o dati Packlink. Peso = `products.weight_grams` server-side (nessun fallback 400 g: prodotto senza peso → simulazione incompleta). Il rapporto lavora solo sugli ordini reali (mai sugli scenari sintetici), conta solo le simulazioni `complete` e separa «forfait − addebitato» (due prezzi cliente) da «écart avant emballage» (forfait − preventivo Packlink TTC verificato contro il totale firmato). Il rétrotest delle bozze (`applyTariffDraft`) resta un motore distinto. Dettaglio e runbook: `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §10–11.
+Route `/admin/platform/livraison/forfait-laboratoire` (**solo platform_owner**: layout piattaforma + `requirePlatformOwner()` nella pagina; componente `ForfaitLabClient.tsx`, l'ex onglet tenant «Forfait shadow»). Una bozza (solo strategia «prezzo sul peso totale») diventa una versione immutabile con collo max, blocchi, zone non consegnabili e limite logistico; la versione `shadow` selezionata è calcolata a ogni checkout con consegna quando `shipping_pricing_mode = shadow`, con il motore puro `lib/shipping/tariff/priceFromTariff.ts`, e registrata in `orders.shipping_details.shadow_tariff` senza cambiare importo, token, PaymentIntent o dati Packlink. Peso = `products.weight_grams` server-side (nessun fallback 400 g: prodotto senza peso → simulazione incompleta). Il rapporto lavora solo sugli ordini reali (mai sugli scenari sintetici), conta solo le simulazioni `complete` e separa «forfait − addebitato» (due prezzi cliente) da «écart avant emballage» (forfait − preventivo Packlink TTC verificato contro il totale firmato). Il rétrotest delle bozze (`applyTariffDraft`) resta un motore distinto. Dettaglio e runbook: `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §10–11.
 
-**V1G.** Dalla stessa route («Forfait») una versione si attiva per i clienti con conferma e checklist (maggiorazioni `per_order` da confermare esplicitamente, zona extra-doganale, pesi mancanti, cartoni, limite logistico, costo imballaggi). In modalità `tariff` `/api/shipping/quote` calcola il prezzo sul server (versione `active`, peso da `products.weight_grams`, zona tenant, regole paese), verifica la disponibilità logistica con il piano colli della preparazione e firma un token V2 (tenant, importo, paese/CAP, peso, impronta del carrello, versione); ogni percorso di pagamento ricalcola e confronta (`checkoutShipping.ts`). Un CAP fuori da ogni zona tenant non è coperto dal forfait e segue il fallback del tenant (`zone_not_covered`): la copertura geografica del forfait si governa dalle zone (es. Francia continentale senza Corsica, oltremare e Monaco). Le osservazioni dei preventivi live sono salvate come `real_quote` e riusate. Il rapporto separa gli ordini al forfait (forfait pagato vs preventivo Packlink) dalle simulazioni shadow. Dettaglio e runbook: `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §12–13.
+**V1G.** Dal laboratorio una versione si attiva per i clienti con conferma e checklist (maggiorazioni `per_order` da confermare esplicitamente, zona extra-doganale, pesi mancanti, cartoni, limite logistico, costo imballaggi). In modalità `tariff` `/api/shipping/quote` calcola il prezzo sul server (versione `active`, peso da `products.weight_grams`, zona tenant, regole paese), verifica la disponibilità logistica con il piano colli della preparazione e firma un token V2 (tenant, importo, paese/CAP, peso, impronta del carrello, versione); ogni percorso di pagamento ricalcola e confronta (`checkoutShipping.ts`). Un CAP fuori da ogni zona tenant non è coperto dal forfait e segue il fallback del tenant (`zone_not_covered`): la copertura geografica del forfait si governa dalle zone (es. Francia continentale senza Corsica, oltremare e Monaco). Le osservazioni dei preventivi live sono salvate come `real_quote` e riusate. Il rapporto separa gli ordini al forfait (forfait pagato vs preventivo Packlink) dalle simulazioni shadow. Dettaglio e runbook: `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §12–13.
+
+API del laboratorio, tutte `requirePlatformOwner()` e assenti da `adminApiPermissions.ts`: `POST /api/admin/shipping-tariff-versions` (creazione da bozza), `POST …/:id/select`, `GET /api/admin/shipping-shadow-report`, `shipping-tariff-drafts/**`, e in `PATCH /api/admin/shipping-pricing-mode` il cambio di modalità quando il tenant non è in `tariff` (attivare/disattivare la collecte shadow). Restano tenant (`shipping.view` / `shipping.manage`): `GET shipping-tariff-versions`, `…/publish`, `…/:id/activate`, `…/retire`, `PATCH shipping-pricing-mode` per repli, page publique e ritorno da `tariff` a `provider_cost`.
+
+### 18.6 Pagina commerciale « Forfait » e modifica rapida dei prezzi (migration 159)
+
+Route `/admin/livraison/forfait` (lettura `shipping.view`, scritture `shipping.manage`; senza `manage` badge « Lecture seule » e nessuna azione, le API restano il controllo). Server Component (`page.tsx`) + `ForfaitClient.tsx` + `TariffEditorDrawer.tsx`, sul kit Admin V2.
+
+1. **Tarifs de livraison actuels** — una carta per paese da `buildCountryTariffViews` (`lib/shipping/tariff/tariffEdit.ts`): `Actif` = versione `active` (mai sostituita da una shadow dello stesso paese), `Simulation` = solo versione `shadow` (prezzi attenuati, « jamais facturée »), `Non configuré` = paese noto dalle zone attive o dalle regole paese esplicite senza versione. Tranche, blocco (« Par 30 kg en plus »), maggiorazioni (etichette `zoneLabel`), zone non servite, TTC/HT, versione e data di attivazione, regola paese che modifica il prezzo. Nome e bandiera da `countryLabel` (`Intl.DisplayNames` fr) / `countryFlag`.
+2. **Alerte** prodotti attivi senza peso (conseguenza secondo modo e repli, link all'editor).
+3. **Historique des modifications** — `buildTariffHistory`: solo versioni effettivamente fatturate (`activated_at`), più recenti prima, scarto « avant → après » rispetto alla versione precedentemente in vigore del paese (`diffVersions`; griglia ristrutturata = nessun falso scarto), autore; « Rétablir cette version » = `POST …/:id/activate` esistente con conferma.
+4. **Paramètres avancés** (repliés): repli, pagina pubblica `/livraison`, ritiro di un paese, ritorno al devis transporteur per tutti i paesi (`ConfirmDialog` distruttivo).
+
+**Editor** (« Modifier les tarifs », solo paesi `Actif`): `Drawer` (pieno schermo su telefono) precaricato dalla versione attiva; sono modificabili **solo gli importi** (tranche, prezzo del blocco, maggiorazioni). Saisie francese `parseEuroAmount` (« 8,9 », « 8,90 », « 8.90 », max 2 decimali, ≤ 10 000 €, centesimi interi), campo modificato evidenziato con « avant … » e ↺, « Tout rétablir », importi non validi bloccanti, guardia modifiche non pubblicate (`useConfirm` alla chiusura + `useUnsavedChangesGuard`). « Vérifier et publier » → tabella « Ancien prix / Nouveau prix » delle sole modifiche (`diffTariffPrices`), perimetro (nuove consegne del paese, ordini pagati invariati, pagamenti in corso ricalcolati, versione precedente nello storico), casella di conferma obbligatoria → « Publier les nouveaux tarifs ».
+
+**API** `POST /api/admin/shipping-tariff-versions/publish` (`shipping.manage`; `{ baseVersionId, bandPricesCents, blockPriceCents, surchargesCents, confirm: true }`): la base deve essere `active` del tenant; `buildEditedVersion` ricostruisce la versione dalla base (stesso numero di tranche, stessi pesi, stesse zone e modalità, blocco solo se la base ne ha uno) e ripassa `validateTariffFields`; nessuna modifica → 409 `NO_CHANGE`; checklist bloccante di `activationChecklist.ts`; poi RPC **`publish_shipping_tariff_version`** (migration 159, `security definer`, solo service role, in `AUDITED_WRITE_RPCS`): blocca la base `FOR UPDATE`, rifiuta una base non più attiva (`tariff_base_not_active` → 409 `TARIFF_BASE_CHANGED`, nessuna scrittura), ricopia **in SQL** tutti i parametri strutturali dalla base (difesa in profondità), rifiuta struttura diversa / importo non valido / prezzi identici, ritira la base e inserisce la versione `max + 1` già `active` (`created_by` = `activated_by` = admin) nella stessa transazione. Due admin partiti dalla stessa versione: il secondo riceve 409 e ricarica. RPC assente (migration non applicata) → 503 `MIGRATION_MISSING`, nessun cambiamento. Il checkout non cambia: il token V2 contiene id e numero di versione, quindi un preventivo fatto sulla base riceve 409 `SHIPPING_REQUOTE_REQUIRED` e il cliente riconferma il nuovo importo; gli ordini pagati conservano lo snapshot.
 
 ---
 
@@ -1113,7 +1131,8 @@ Regole obbligatorie:
 - i costi provider interni non devono diventare pubblici;
 - API admin passano dal sistema admin/capability esistente;
 - letture operative del tenant usano `shipping.view`;
-- mutazioni del tenant (tariffe, imballaggi, zone, forfait) usano `shipping.manage`;
+- mutazioni del tenant (tariffe, imballaggi, zone, prezzi forfait: publish, activate/Rétablir, retire, repli, page publique) usano `shipping.manage`;
+- laboratorio forfait (bozze, rétrotest, creazione di versioni da bozza, selezione shadow, collecte shadow, rapporto ordini reali) riservato al `platform_owner` (`requirePlatformOwner()`), verificato da `tests/unit/shippingTariffEdit.spec.ts`;
 - Laboratoire, campagne, test rapido, import CAP e diagnostica Packlink sono riservati al `platform_owner` (`requirePlatformOwner()`), non figurano nella mappa `adminApiPermissions.ts` e sono verificati da `tests/unit/shippingPlatformTools.spec.ts`;
 - il worker interno usa service-role bearer;
 - unico lettore pubblico: `GET /api/address/postal-lookup` (§7.5), solo l'indice GeoNames (città, provincia, CAP), mai tabelle con costi, zone o osservazioni;
@@ -1162,7 +1181,7 @@ Fallback manuale obbligatorio quando il lookup non è disponibile, ambiguo o inc
 Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decisione architetturale approvata:
 
 1. Shipping Intelligence non modifica il checkout implicitamente.
-2. `shipping_tariff_drafts` non è letto dal checkout; `shipping_tariff_versions` è letto solo in shadow mode e mai addebitato in V1F.
+2. `shipping_tariff_drafts` non è letto dal checkout; di `shipping_tariff_versions` il checkout addebita solo la versione `active` del paese (modalità `tariff`), una `shadow` è solo calcolata e mai addebitata.
 3. Una stima storica non viene presentata come prezzo provider garantito; un preventivo non viene presentato come fattura.
 4. Una spedizione reale deve continuare a usare un dato provider corrente quando richiesto.
 5. Nessun secret/provider raw payload viene persistito nel dataset intelligence.
@@ -1185,7 +1204,7 @@ Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decision
 22. Una versione tariffaria non cambia mai i propri parametri economici: una correzione crea una nuova versione.
 23. Lo shadow mode non modifica mai importo, token HMAC, PaymentIntent o dati Packlink; un suo errore non blocca il checkout; uno `shadow_tariff` inviato dal browser è sempre scartato.
 24. Il peso di fascia è calcolato dal server da `products.weight_grams`, mai dal browser e mai con un peso di fallback.
-25. La tariffazione commerciale (`tariff`/`active`) si attiva solo con l'azione esplicita «Activer cette tarification pour les clients» (conferma + checklist); nessuna attivazione automatica.
+25. La tariffazione commerciale (`tariff`/`active`) si attiva solo con un'azione esplicita confermata: «Activer cette tarification pour les clients» (laboratorio, checklist), «Publier les nouveaux tarifs» (editor, casella di conferma) o «Rétablir cette version»; nessuna attivazione automatica, nessuna pubblicazione al semplice cambio di un campo.
 26. In modalità `tariff` un ordine non arriva mai al pagamento con un importo di spedizione diverso da quello ricalcolato dal server e confermato dal cliente (token V2 + ricalcolo in ogni percorso; differenza → nuovo preventivo).
 27. La disponibilità logistica non è mai dedotta dalla sola formula: preventivo identico recente, chiamata provider limitata nel tempo, o evidenza recente dello stesso CAP (mai oltre il limite logistico verificato). I territori extra-doganali restano non consegnabili anche con `flat_rate_override`.
 28. La liste de préparation (interna) e il bon de colis (cliente) restano renderer distinti; il bon de colis non riceve mai la riga `orders` né item grezzi e non può mostrare emplacements, carton, note, e-mail, telefono o UUID.
@@ -1197,6 +1216,8 @@ Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decision
 34. Un esito che può seguire una bozza creata (timeout, rete, 5xx ≠ 503, 2xx senza reference, claim interrotto) è `ambiguous` e non viene mai ritentato automaticamente; si riconcilia a mano.
 35. La state machine ordini dipende solo dall'interfaccia provider (`capabilities.createDraft`), mai da Packlink; la migration e l'assenza di riga lasciano la funzione disattivata.
 36. Lepefy non elimina né annulla mai una bozza presso il provider; stacca una reference solo dopo che il provider conferma l'assenza (404) o l'annullamento della bozza.
+37. La modifica rapida cambia solo importi: pesi delle tranche, blocchi, zone, modalità delle maggiorazioni, colli, IVA e limite logistico sono sempre ricopiati dalla versione di base, sia nel codice (`buildEditedVersion`) sia in SQL (`publish_shipping_tariff_version`); una pubblicazione da una base non più attiva non scrive nulla.
+38. Simulatore, shadow, rétrotest, bozze e rapporto sugli ordini reali restano riservati al `platform_owner` lato server (`requirePlatformOwner()`); la pagina tenant non li importa né li chiama.
 
 ---
 
@@ -1213,9 +1234,12 @@ apps/storefront/src/app/admin/(protected)/livraison/       (tenant: shipping.vie
   expeditions/                (page.tsx + ShipmentCreationSection.tsx: réglage brouillons, §2.4)
   assistant/
   historique/
-  analyse-tarifaire/
-  forfait-shadow/
-  laboratoire/page.tsx, laboratoire/[id]/page.tsx,
+  forfait/
+    page.tsx                         carte per paese, storico, permessi (canAdmin shipping.manage)
+    ForfaitClient.tsx                tarifs actuels, alertes, historique/Rétablir, paramètres avancés
+    TariffEditorDrawer.tsx           « Modifier les tarifs » → « Vérifier et publier »
+  forfait-shadow/page.tsx            redirect → /admin/livraison/forfait
+  analyse-tarifaire/page.tsx, laboratoire/page.tsx, laboratoire/[id]/page.tsx,
   diagnostic-packlink/page.tsx, simulateur/page.tsx      solo redirect verso /admin/platform/livraison/…
 
 apps/storefront/src/app/admin/(protected)/platform/livraison/   (solo platform_owner)
@@ -1236,6 +1260,10 @@ apps/storefront/src/app/admin/(protected)/platform/livraison/   (solo platform_o
     PacklinkWorkspace.tsx            elenco + diagnostico (richiesta di diagnostico dall'elenco)
     PacklinkShipmentList.tsx         Expéditions Packlink PRO (tabella/schede, filtri, pannello, diagnostic technique)
     PacklinkDiagnostic.tsx           diagnostico per riferimento (shipment/track/labels)
+  analyse-tarifaire/
+    page.tsx, TariffLabClient.tsx    bozze + rétrotest (§18)
+  forfait-laboratoire/
+    page.tsx, ForfaitLabClient.tsx   versioni, shadow, simulazione, attivazione, rapporto (§18.5)
 
 apps/storefront/src/app/admin/_components/platformNavConfig.ts   gruppo «Livraison technique» (id shipping)
 ```
@@ -1261,12 +1289,13 @@ apps/storefront/src/app/api/admin/
   shipping-postal-code-import/     (platform_owner)
   shipping-observations/summary/
   shipping-advisor/
-  shipping-tariff-drafts/
-  shipping-tariff-versions/        GET lista / POST da bozza (+ select) · [id]/select POST
-  shipping-pricing-mode/           GET / PATCH (solo provider_cost | shadow)
-  shipping-shadow-report/          GET rapporto ordini reali (+ ordini al forfait)
-  shipping-tariff-versions/[id]/activate/  POST attivazione commerciale (conferma + checklist)
-  shipping-tariff-versions/retire/         POST ritiro della tariffa di un paese
+  shipping-tariff-drafts/          (platform_owner) bozze + [id]/simulate rétrotest
+  shipping-tariff-versions/        GET lista (shipping.view) / POST da bozza (+ select) (platform_owner) · [id]/select POST (platform_owner)
+  shipping-tariff-versions/publish/        POST modifica rapida dei prezzi → RPC 159 (shipping.manage)
+  shipping-pricing-mode/           GET / PATCH (repli, page publique, ritorno da tariff: shipping.manage; collecte shadow: platform_owner)
+  shipping-shadow-report/          GET rapporto ordini reali (+ ordini al forfait) (platform_owner)
+  shipping-tariff-versions/[id]/activate/  POST attivazione / ripristino (conferma + checklist) (shipping.manage)
+  shipping-tariff-versions/retire/         POST ritiro della tariffa di un paese (shipping.manage)
   packlink-shipments/route.ts      GET elenco spedizioni Packlink del tenant (sola lettura, platform_owner)
   packlink-inspector/route.ts      POST diagnostico per riferimento (shipment/track/labels, platform_owner)
 ```
@@ -1306,6 +1335,7 @@ apps/storefront/src/lib/shipping/tariff/          (V1F)
   checkoutShipping.ts       (V1G) verifica in ogni percorso di pagamento, 409 SHIPPING_REQUOTE_REQUIRED
   activationChecklist.ts    (V1G) checklist di attivazione
   publicGrid.ts             (V1G) griglia pubblica /livraison (nascosta di default)
+  tariffEdit.ts             modifica rapida: saisie FR, versione base + prezzi, diff, carte paese, storico (puro, client-safe)
   resolveZone.ts
   schedulerAuth.ts
   unzip.ts
@@ -1325,6 +1355,8 @@ apps/storefront/tests/unit/shadowReport.spec.ts
 apps/storefront/tests/unit/tariffCheckout.spec.ts
 apps/storefront/tests/unit/packlinkShipmentList.spec.ts     (elenco Packlink: mock fetch, nessuna chiamata reale)
 apps/storefront/tests/unit/shippingPlatformTools.spec.ts    (API tecniche solo requirePlatformOwner, navigazione, redirect)
+apps/storefront/tests/unit/shippingTariffEdit.spec.ts       (saisie, versione modificata, carte paese, storico, separazione tenant/platform owner)
+supabase/tests/159_shipping_tariff_publish.{fixture,test}.sql (RPC: privilegi, rifiuti, pubblicazione, base superata, rollback)
 apps/storefront/tests/unit/shipmentDraft.spec.ts           (brouillons: trigger, idempotenza, errori, ambiguous, retry, isolamento; Packlink mock)
 ```
 
@@ -1521,7 +1553,15 @@ Passare alla Couverture initiale o lanciare le parti della suddivisione una per 
 
 ### Forfait shadow: simulazioni incomplete, onglet «migration non appliquée», collecte
 
-Vedere `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §11.6. Stop immediato: «Désactiver la collecte» (`shipping_pricing_mode = provider_cost`).
+Vedere `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §11.6. Stop immediato (platform owner, Laboratoire forfait): «Désactiver la collecte» (`shipping_pricing_mode = provider_cost`).
+
+### « Vérifier et publier » rifiutato
+
+- « Mise à jour indisponible : la migration 159… » (503 `MIGRATION_MISSING`): applicare `159_shipping_tariff_publish.sql`; nessun prezzo è cambiato.
+- « Les tarifs de ce pays ont été modifiés entre-temps… » (409 `TARIFF_BASE_CHANGED`): un altro admin ha pubblicato, ripristinato o ritirato il paese; « Recharger les tarifs » e rifare la modifica.
+- « La grille a changé de structure » (409): la versione attiva è stata sostituita dal laboratorio con tranche/zone diverse; ricaricare.
+- Pulsante « Modifier les tarifs » assente: paese non `Actif`, permesso `shipping.manage` mancante o migration 125 assente.
+- Un tenant_admin non vede più « Analyse tarifaire » né il laboratorio: voluto, strumenti platform owner (§18, §18.5).
 
 ### Costo storico diverso dal live Packlink
 

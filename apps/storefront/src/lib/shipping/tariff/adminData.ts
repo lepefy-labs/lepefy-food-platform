@@ -27,6 +27,8 @@ export interface ForfaitShadowAdminData {
   missingWeightProducts: MissingWeightProduct[];
   activeProducts: number;
   zoneCodes: string[];
+  /** Pays connus du tenant (zones actives, règles pays explicites) : cartes « Non configuré ». */
+  knownCountries: string[];
   vatRates: Array<{ countries: string[]; vat_rate: number }>;
   countryRules: ShippingCountryRule[];
   profiles: ShippingPackagingProfileRow[];
@@ -71,7 +73,7 @@ export async function loadForfaitShadowAdminData(supabase: ServiceClient, tenant
     supabase.from('products').select('id, name, stock, weight_grams').eq('tenant_id', tenantId).eq('active', true)
       .or('weight_grams.is.null,weight_grams.lte.0').order('name', { ascending: true }).limit(1000),
     supabase.from('products').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('active', true),
-    supabase.from('shipping_zones').select('code').eq('tenant_id', tenantId).eq('active', true).order('position', { ascending: true }),
+    supabase.from('shipping_zones').select('code, country').eq('tenant_id', tenantId).eq('active', true).order('position', { ascending: true }),
     supabase.from('shipping_vat_rates').select('countries, vat_rate').eq('tenant_id', tenantId).eq('active', true),
     supabase.from('shipping_country_rules')
       .select('countries, free_shipping_above, flat_rate_override, discount_type, discount_value')
@@ -104,6 +106,10 @@ export async function loadForfaitShadowAdminData(supabase: ServiceClient, tenant
     missingWeightProducts: (missingResult.data ?? []) as MissingWeightProduct[],
     activeProducts: activeCount.count ?? 0,
     zoneCodes: [...new Set(((zonesResult.data ?? []) as Array<{ code: string }>).map((z) => z.code))],
+    knownCountries: [...new Set([
+      ...((zonesResult.data ?? []) as Array<{ country: string | null }>).map((z) => z.country ?? ''),
+      ...((rulesResult.data ?? []) as ShippingCountryRule[]).flatMap((r) => r.countries ?? []),
+    ].map((c) => c.toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c)))].sort(),
     vatRates: (vatResult.data ?? []) as ForfaitShadowAdminData['vatRates'],
     countryRules: (rulesResult.data ?? []) as ShippingCountryRule[],
     profiles: (profilesResult.data ?? []) as ShippingPackagingProfileRow[],

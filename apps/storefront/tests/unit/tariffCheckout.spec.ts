@@ -17,6 +17,7 @@ import {
 } from '../../src/lib/shipping/tariff/checkoutShipping';
 import { buildActivationChecklist, perOrderSurchargeZones } from '../../src/lib/shipping/tariff/activationChecklist';
 import { buildPublicGrid } from '../../src/lib/shipping/tariff/publicGrid';
+import { buildEditedVersion, editsFromVersion } from '../../src/lib/shipping/tariff/tariffEdit';
 import { summarizeShadowOrders } from '../../src/lib/shipping/tariff/shadowReport';
 
 const SECRET = 'test-secret';
@@ -267,6 +268,29 @@ test.describe('verifyCheckoutShipping', () => {
     rows.find((r) => r.id === 'ver-it-3')!.status = 'retired';
     rows.push(version({ id: 'ver-it-4', version: 4, bands: [{ min_g_exclusive: 0, max_g_inclusive: 30000, price_cents: 990 }] }) as never);
     expect(await checkout(db, token, qty)).toMatchObject({ ok: false, status: 409, body: { code: SHIPPING_REQUOTE_REQUIRED } });
+  });
+
+  test('prix modifiés depuis l’éditeur : ancien devis refusé, nouveau devis au nouveau prix accepté', async () => {
+    const db = makeDb();
+    const qty = kgOfRiz(4500);
+    const before = await priced(db, qty);
+    expect(before.finalCents).toBe(840);
+    const oldToken = v2For(before, qty);
+    // Même opération que la RPC publish_shipping_tariff_version : base retirée, version N+1 active, seuls les prix changent.
+    const rows = db.tables.shipping_tariff_versions!;
+    const base = rows.find((r) => r.id === 'ver-it-3') as unknown as ShippingTariffVersionRow;
+    const edits = editsFromVersion(base);
+    edits.bandPricesCents[0] = 890;
+    const built = buildEditedVersion(base, edits);
+    if (!built.ok) throw new Error(built.errors.join());
+    (base as { status: string }).status = 'retired';
+    rows.push({ ...built.fields, id: 'ver-it-4', version: 4, status: 'active' } as never);
+
+    expect(await checkout(db, oldToken, qty)).toMatchObject({ ok: false, status: 409, body: { code: SHIPPING_REQUOTE_REQUIRED } });
+    const after = await priced(db, qty);
+    expect(after.finalCents).toBe(890);
+    expect(after.version.id).toBe('ver-it-4');
+    expect(await checkout(db, v2For(after, qty), qty)).toMatchObject({ ok: true });
   });
 
   test('code postal hors zones (ex. Corse) : repli provider si configuré, sinon indisponible', async () => {

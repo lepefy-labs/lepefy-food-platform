@@ -1,7 +1,8 @@
 # Forfait di spedizione nel checkout — dossier di implementazione
 
 > **Stato:** **V1G implementata: tariffazione commerciale** (base `main@200abcc`, 24/09/2026), sopra la V1F
-> (foundation + shadow, §10–11). Il codice addebita una versione tariffaria attiva con preventivo e
+> (foundation + shadow, §10–11). **Modifica rapida dei prezzi** (pagina commerciale `/admin/livraison/forfait`,
+> laboratorio platform owner, migration `159`, §14, base `main@1cf926d1`, 18/10/2026). Il codice addebita una versione tariffaria attiva con preventivo e
 > pagamento verificati server-side (§12–13), solo dopo l'attivazione esplicita in admin. Migration `124`
 > e `125` applicate. **ChloeFood: forfait attivo per IT, FR, BE, DE** (§13.6). Pagina pubblica
 > `/livraison` presente ma **nascosta**.
@@ -490,18 +491,18 @@ Shadow          : prodotti validati + products.weight_grams → resolveZoneCode 
   `country_mismatch`) | `error` (`invalid_tariff_config`, `timeout`, `unexpected_exception`).
   Solo `complete` entra nelle statistiche.
 
-### 10.4 Admin → Livraison → Forfait shadow (`/admin/livraison/forfait-shadow`)
+### 10.4 Laboratoire forfait (`/admin/platform/livraison/forfait-laboratoire`, ex `/admin/livraison/forfait-shadow`)
 
-Lettura con `shipping.view`; creazione/selezione di versione e collecte con `shipping.manage`.
+Dal 18/10/2026 **solo platform_owner** (pagina e API, vedi §14.4); l'URL storico reindirizza alla pagina commerciale del tenant.
 Stati espliciti Brouillon / Version shadow / Tarification active (bloccata). Creazione di una versione
 da una bozza (paese, TTC/HT, collo max, blocco, zone non consegnabili, limite logistico) con anteprima e
 simulazione d'esempio calcolata dallo stesso motore; riselezione di una versione precedente (rollback);
 attivazione/disattivazione della sola collecte; qualità dei pesi prodotto (link all'editor);
 rapporto sugli ordini reali filtrabile per periodo e versione (affidabilità: < 30 insufficiente, < 100 limitata).
 
-API: `GET/POST /api/admin/shipping-tariff-versions`, `POST …/:id/select`,
-`GET/PATCH /api/admin/shipping-pricing-mode` (solo `provider_cost`/`shadow`),
-`GET /api/admin/shipping-shadow-report`.
+API: `GET /api/admin/shipping-tariff-versions` (tenant), `POST /api/admin/shipping-tariff-versions` e `POST …/:id/select`
+(platform owner), `PATCH /api/admin/shipping-pricing-mode` per la collecte (platform owner),
+`GET /api/admin/shipping-shadow-report` (platform owner).
 
 ---
 
@@ -517,7 +518,7 @@ API: `GET/POST /api/admin/shipping-tariff-versions`, `POST …/:id/select`,
 
 ### 11.2 Configurazione della tariffa ChloeFood
 
-Onglet **Forfait shadow** → «Créer une version shadow depuis un brouillon»: bozza «Grille ChloeFood
+Platform → Livraison technique → **Laboratoire forfait** → «Créer une version shadow depuis un brouillon»: bozza «Grille ChloeFood
 23/09», paese `IT`, prezzi TTC, collo max 15 kg, blocco 30 kg = 19,80 €, zona non consegnabile
 `IT_EXTRA_CUSTOMS`, logistica verificata fino a 50 kg, «Sélectionner comme version shadow».
 Controllare la simulazione d'esempio (valori §10.2).
@@ -662,7 +663,7 @@ pagato il preventivo provider; il rétrotest delle bozze esclude quindi questi o
 `pricingMode: 'provider_cost_fallback'` + dettagli Packlink + `tariffFallback.reason`. I dati shadow
 V1F restano negli ordini storici.
 
-### 12.7 Admin (`/admin/livraison/forfait-shadow`, onglet «Forfait»)
+### 12.7 Laboratoire forfait (oggi `/admin/platform/livraison/forfait-laboratoire`, platform owner)
 
 - Stati: Brouillon / Version shadow / Tarification active (paese, dal, autore) / Version retirée.
 - «Activer cette tarification pour les clients» su una versione shadow, validata o ritirata →
@@ -714,14 +715,15 @@ e uno verso una zona maggiorata (es. Palermo 90121); controllare in `orders.ship
 
 ### 13.3 Monitoraggio
 
-Rapporto dell'onglet (blocco commandes au forfait): forfait pagato vs preventivo Packlink TTC e casi
-negativi; confrontare con le fatture Packlink reali. Nessuna modifica automatica dei prezzi: una nuova
-griglia = nuova bozza → nuova versione → nuova attivazione.
+Rapporto del Laboratoire forfait (blocco commandes au forfait, platform owner): forfait pagato vs preventivo
+Packlink TTC e casi negativi; confrontare con le fatture Packlink reali. Nessuna modifica automatica dei prezzi.
+Cambiare **solo gli importi** di una griglia attiva: pagina commerciale « Modifier les tarifs » (§14). Cambiare
+tranche, zone, blocchi o colli: nuova bozza → nuova versione → attivazione dal laboratorio.
 
 ### 13.4 Rollback
 
-- **Un paese:** «Retirer ce tarif» (o riattivare la versione precedente).
-- **Tutto:** «Revenir au calcul actuel (tous pays)»; oppure SQL
+- **Un paese:** «Retirer le forfait · <pays>» (Paramètres avancés) oppure « Rétablir cette version » nello storico della pagina Forfait (riattiva la versione precedente).
+- **Tutto:** «Revenir au devis transporteur (tous pays)» (Paramètres avancés); oppure SQL
   `select rollback_shipping_tariff_to_provider_cost('<tenant>', null);`.
 - Effetto sui nuovi preventivi immediato; gli ordini pagati conservano il loro snapshot; i checkout
   aperti al forfait devono rifare il preventivo (409 gestito dal client).
@@ -757,3 +759,61 @@ francese) non sono serviti da Packlink.
 | «Impossible de confirmer la livraison…» | Packlink in errore senza evidenza recente del CAP, oppure oltre il limite logistico |
 | 409 `SHIPPING_REQUOTE_REQUIRED` frequenti | Tariffa cambiata, carrello o indirizzo modificati dopo il preventivo: comportamento voluto |
 | `/livraison` in 404 | Pagina non attivata (default) o nessuna tariffa attiva |
+| « Vérifier et publier » → « migration 159 » | RPC `publish_shipping_tariff_version` assente: applicare la migration; nessun prezzo cambiato |
+| « Les tarifs de ce pays ont été modifiés entre-temps » | Base non più attiva (altro admin, Rétablir, ritiro): ricaricare e rifare la modifica |
+
+---
+
+## 14. Pagina commerciale « Forfait » e modifica rapida dei prezzi (18/10/2026)
+
+### 14.1 Percorso del tenant
+
+`/admin/livraison/forfait` (`shipping.view`; azioni `shipping.manage`): carte per paese **Actif** (versione
+`active`, importi in evidenza) / **Simulation** (versione `shadow`, prezzi attenuati, « jamais facturée ») / **Non
+configuré** (paese noto da zone o regole senza versione; mai prezzi simulati presentati come reali). Su un paese
+attivo « Modifier les tarifs » apre un drawer precaricato dalla versione attiva: si modificano **solo** prezzi delle
+tranche, prezzo del blocco e importi delle maggiorazioni. Pesi, blocchi, zone, modalità per collo/ordine, collo
+max, IVA, limite logistico e zone non servite sono mostrati come « inchangés » e non sono inviati. « Vérifier et
+publier » mostra « Ancien prix / Nouveau prix » delle sole righe cambiate e il perimetro; la pubblicazione
+richiede la casella di conferma. Sotto: alert pesi, « Historique des modifications » (versioni fatturate, scarti,
+autore, « Rétablir cette version »), « Paramètres avancés » (repli, pagina pubblica, ritiri). File:
+`app/admin/(protected)/livraison/forfait/{page,ForfaitClient,TariffEditorDrawer}.tsx`, logica pura
+`lib/shipping/tariff/tariffEdit.ts`.
+
+### 14.2 Pubblicazione (migration `159_shipping_tariff_publish.sql`)
+
+`POST /api/admin/shipping-tariff-versions/publish` → validazione (`buildEditedVersion`, `validateTariffFields`,
+checklist bloccante) → RPC `publish_shipping_tariff_version(tenant, base, bands, surcharges, block, name, actor)`:
+lock della base, base ancora `active` (altrimenti 409 `TARIFF_BASE_CHANGED`, nulla scritto), parametri strutturali
+ricopiati in SQL, rifiuto di struttura diversa / importo non valido / nessuna modifica, ritiro della base e nuova
+versione `max + 1` già `active` in **una** transazione, modalità `tariff` mantenuta. Doppio clic o due admin: la
+seconda richiesta trova la base ritirata → 409. Migration solo funzione (nessuna tabella), idempotente, rollback =
+`DROP FUNCTION`. Senza migration: 503 `MIGRATION_MISSING`, nessun effetto. Test SQL:
+`supabase/tests/159_shipping_tariff_publish.{fixture,test}.sql` (CI).
+
+### 14.3 Effetti su checkout e ordini
+
+Nessun codice di checkout modificato. I nuovi preventivi usano la nuova versione `active`; un token V2 firmato
+sulla base (id e numero di versione) produce 409 `SHIPPING_REQUOTE_REQUIRED` al pagamento e il cliente riconferma
+il nuovo importo (test `tariffCheckout.spec.ts` « prix modifiés depuis l'éditeur »). Gli ordini già confermati
+conservano `shipping_details.tariff`. La versione precedente resta immutabile nello storico.
+
+### 14.4 Separazione tenant / platform owner
+
+| Strumento | Chi | Controllo server |
+|---|---|---|
+| Pagina Forfait, publish, activate (Rétablir), retire, repli, pagina pubblica, ritorno da `tariff` | `shipping.view` / `shipping.manage` | `requireAdmin` (mappa `adminApiPermissions.ts`) |
+| Laboratoire forfait (versioni da bozza, selezione shadow, collecte shadow, simulazione, rapporto ordini reali) | platform owner | layout piattaforma + `requirePlatformOwner()` |
+| Analyse tarifaire (bozze, rétrotest) | platform owner | idem, `shipping-tariff-drafts/**` |
+
+Il ruolo `platform_owner` non è cambiato. La pagina tenant mostra un link « Laboratoire forfait » solo al platform owner.
+
+### 14.5 Runbook
+
+1. Applicare `159_shipping_tariff_publish.sql` in Supabase (SQL editor). Verifica:
+   `select proname from pg_proc where proname = 'publish_shipping_tariff_version';`
+2. Non provare la pubblicazione sui tariffari reali di un tenant in produzione: la RPC è coperta dai test SQL.
+3. Dopo una modifica reale: controllare la carta del paese (nuova versione), lo storico e un preventivo di prova
+   (`orders.shipping_details.tariff.version` sull'ordine successivo).
+4. Rollback prezzi: « Rétablir cette version » sulla riga precedente dello storico.
+
