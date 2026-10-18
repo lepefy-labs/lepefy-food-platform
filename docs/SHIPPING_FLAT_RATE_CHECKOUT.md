@@ -816,4 +816,3 @@ Il ruolo `platform_owner` non è cambiato. La pagina tenant mostra un link « La
 3. Dopo una modifica reale: controllare la carta del paese (nuova versione), lo storico e un preventivo di prova
    (`orders.shipping_details.tariff.version` sull'ordine successivo).
 4. Rollback prezzi: « Rétablir cette version » sulla riga precedente dello storico.
-
