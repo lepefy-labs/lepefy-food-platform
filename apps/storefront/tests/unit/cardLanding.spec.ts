@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import type { TenantPaymentMethod } from '@lepefy/types';
 import { hasValidPromotion, isShowcaseEligible, selectCardShowcase, type CardShowcaseCandidate } from '../../src/lib/card/cardShowcase';
-import { cardPaymentBrandStrip, isOnlineCardMethod } from '../../src/lib/card/cardPaymentBrands';
+import { isOnlineCardMethod } from '../../src/lib/card/cardPaymentBrands';
+import { cardLandingMethods, cardPaymentTiles, resolveCardPaymentEntry } from '../../src/lib/card/cardPaymentTiles';
+import { visibleCardPaymentMethods } from '../../src/lib/payments/applePay';
 import { CARD_HERO_ASSETS, isAllowedHeroImageUrl, normalizeHeroPosition, resolveCardHeroImage } from '../../src/lib/card/cardHero';
-import { darkenHex, readableForeground } from '../../src/lib/card/cardTheme';
+import { darkenHex, lightenHex, readableForeground } from '../../src/lib/card/cardTheme';
 import { parseCardAmount, sanitizeAmountInput } from '../../src/lib/card/cardAmount';
 import { defaultTimezone, emptyWeek, openingHoursSchema, openingStatus, statusLabel, weekRows, type OpeningHours } from '../../src/lib/card/openingHours';
 import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
@@ -65,29 +67,106 @@ test.describe('vitrine /card', () => {
   });
 });
 
-test.describe('fascia moyens de paiement /card', () => {
-  test('carte = Visa + Mastercard, Stripe jamais une marque, Google Pay jamais promis', () => {
-    const strip = cardPaymentBrandStrip([method('card')]);
-    expect(strip).toEqual({ brands: ['visa', 'mastercard'], chips: [], processedByStripe: true });
-    expect(strip.brands as string[]).not.toContain('stripe');
-    expect(strip.brands as string[]).not.toContain('google_pay');
+test.describe('grille des moyens de paiement /card', () => {
+  const all = () => [method('cash'), method('bank_transfer'), method('satispay'), method('other', 'Revolut'), method('paypal'), method('apple_pay'), method('card')];
+  const layout = (methods: TenantPaymentMethod[]) => cardPaymentTiles(methods).map((tile) => [tile.kind, tile.span]);
+
+  test('six moyens : deux lignes de 4 colonnes, carte et virement sur deux colonnes, jamais les espèces', () => {
+    expect(layout(all())).toEqual([
+      ['card', 2], ['apple_pay', 1], ['paypal', 1],
+      ['satispay', 1], ['revolut', 1], ['bank_transfer', 2],
+    ]);
   });
 
-  test('seulement les méthodes visibles, dans un ordre stable', () => {
-    const strip = cardPaymentBrandStrip([method('cash'), method('paypal'), method('other', 'Revolut'), method('apple_pay'), method('bank_transfer'), method('satispay')]);
-    expect(strip.brands).toEqual(['apple_pay', 'paypal', 'satispay', 'revolut']);
-    expect(strip.chips).toEqual(['bank_transfer', 'cash']);
-    expect(strip.processedByStripe).toBe(true);
+  test('Visa et Mastercard = une seule tuile Carte, Stripe et Google Pay jamais des tuiles', () => {
+    const tiles = cardPaymentTiles([method('card'), { ...method('card'), id: 'card-2' }]);
+    expect(tiles).toEqual([{ methodId: 'card-', kind: 'card', label: null, span: 4 }]);
+    expect(tiles.map((tile) => tile.kind as string)).not.toContain('google_pay');
   });
 
-  test('sans moyen numérique : pas de mention Stripe', () => {
-    expect(cardPaymentBrandStrip([method('cash'), method('other', 'Ticket')])).toEqual({ brands: [], chips: ['cash'], processedByStripe: false });
-    expect(cardPaymentBrandStrip([])).toEqual({ brands: [], chips: [], processedByStripe: false });
+  test('espèces exclues de /card seulement, sans toucher aux autres modules', () => {
+    const methods = all();
+    expect(cardLandingMethods(methods).map((m) => m.method)).not.toContain('cash');
+    expect(methods.map((m) => m.method)).toContain('cash');
+    expect(cardPaymentTiles([method('cash')])).toEqual([]);
+  });
+
+  test('Apple Pay non supporté par l’appareil : aucune tuile, la grille se réorganise sans trou', () => {
+    const visible = visibleCardPaymentMethods(all(), true, false);
+    expect(layout(visible)).toEqual([
+      ['card', 2], ['paypal', 1], ['satispay', 1],
+      ['revolut', 2], ['bank_transfer', 2],
+    ]);
+    expect(layout(visibleCardPaymentMethods(all(), false, true)).map(([kind]) => kind)).not.toContain('apple_pay');
+  });
+
+  test('chaque ligne de la grille fait exactement 4 colonnes, quel que soit le jeu de moyens', () => {
+    const kinds: Array<[TenantPaymentMethod['method'], string | null]> = [['card', null], ['apple_pay', null], ['paypal', null], ['satispay', null], ['other', 'Revolut'], ['bank_transfer', null], ['other', 'Ticket Restaurant']];
+    for (let mask = 1; mask < 1 << kinds.length; mask += 1) {
+      const methods = kinds.filter((_, i) => mask & (1 << i)).map(([kind, label]) => method(kind, label));
+      const tiles = cardPaymentTiles(methods);
+      expect(tiles.length).toBe(methods.length);
+      let row = 0;
+      for (const tile of tiles) {
+        expect(row + tile.span, `mask ${mask}`).toBeLessThanOrEqual(4);
+        row = (row + tile.span) % 4;
+      }
+      expect(row, `mask ${mask}`).toBe(0);
+    }
+  });
+
+  test('un seul moyen : une tuile pleine largeur ; aucun moyen : aucune grille', () => {
+    expect(layout([method('paypal')])).toEqual([['paypal', 4]]);
+    expect(cardPaymentTiles([])).toEqual([]);
+    expect(cardPaymentTiles(cardLandingMethods([method('cash')]))).toEqual([]);
+  });
+
+  test('moyen inconnu mais configuré : tuile avec son libellé réel, jamais « Autres »', () => {
+    const tiles = cardPaymentTiles([method('card'), method('other', 'Ticket Restaurant'), method('other', null)]);
+    expect(tiles.map((tile) => [tile.kind, tile.label, tile.span])).toEqual([['card', null, 2], ['other', 'Ticket Restaurant', 2], ['other', 'Autre', 4]]);
+  });
+
+  test('tuile → écran ouvert directement : Stripe pour carte/Apple Pay, détail pour les moyens externes', () => {
+    const methods = cardLandingMethods(all());
+    expect(resolveCardPaymentEntry(methods, 'card-')).toEqual({ screen: 'online', method: method('card') });
+    expect(resolveCardPaymentEntry(methods, 'apple_pay-')?.screen).toBe('online');
+    for (const id of ['paypal-', 'satispay-', 'other-Revolut', 'bank_transfer-']) {
+      expect(resolveCardPaymentEntry(methods, id), id).toEqual({ screen: 'detail', method: methods.find((m) => m.id === id) });
+    }
+  });
+
+  test('id absent, inconnu, d’un autre tenant ou espèces : aucun écran direct (écran de choix)', () => {
+    const methods = all();
+    expect(resolveCardPaymentEntry(methods, null)).toBeNull();
+    expect(resolveCardPaymentEntry(methods, 'forged-id')).toBeNull();
+    expect(resolveCardPaymentEntry(methods, 'cash-')).toBeNull();
+    // Apple Pay retiré (appareil non compatible) : son id n'ouvre plus rien.
+    expect(resolveCardPaymentEntry(visibleCardPaymentMethods(methods, true, false), 'apple_pay-')).toBeNull();
   });
 
   test('en ligne = flux Stripe (carte, Apple Pay) ; le reste est externe', () => {
     expect(['card', 'apple_pay', 'paypal', 'satispay', 'bank_transfer', 'cash', 'other'].map((m) => isOnlineCardMethod({ method: m as TenantPaymentMethod['method'] })))
       .toEqual([true, true, false, false, false, false, false]);
+  });
+
+  test('surfaces des tuiles dérivées du tenant : verre clair sous texte foncé, carte lisible', () => {
+    for (const color of ['#1D4ED8', '#1D9E75', '#F2C811', '#111827']) {
+      expect(readableForeground(lightenHex(color, 0.9)), color).toBe('#111827');
+    }
+    expect(lightenHex('#000000', 0.5)).toBe('#808080');
+    expect(lightenHex('invalid', 0.9)).toBe('#F3F4F6');
+  });
+
+  test('grille câblée : la hero ne garde ni CTA unique « Payer maintenant » ni « Autres »', () => {
+    const hero = readFileSync('src/components/card/CardHero.tsx', 'utf8');
+    expect(hero).toContain('CardPaymentMethodGrid');
+    expect(hero).not.toContain('Payer maintenant');
+    expect(hero).not.toMatch(/['"]Autres['"]/);
+    const grid = readFileSync('src/components/card/CardPaymentMethodGrid.tsx', 'utf8');
+    // Cibles tactiles ≥ 56 px, focus clavier visible, mouvement réduit respecté.
+    expect(grid).toContain('min-h-14');
+    expect(grid).toContain('focus-visible:ring-4');
+    expect(grid).toContain('motion-reduce:transition-none');
   });
 });
 

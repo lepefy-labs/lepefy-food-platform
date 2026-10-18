@@ -6,8 +6,8 @@ import { IconChevronRight, IconShoppingBag } from '@tabler/icons-react';
 import { TenantLogo } from '@/components/branding/TenantLogo';
 import type { CardHeroImage } from '@/lib/card/cardHero';
 import { darkenHex, readableForeground } from '@/lib/card/cardTheme';
-import { PaymentBrandMark } from './CardPaymentBrands';
-import type { CardPaymentBrandStrip } from '@/lib/card/cardPaymentBrands';
+import { CardPaymentMethodGrid } from './CardPaymentMethodGrid';
+import type { CardPaymentTile } from '@/lib/card/cardPaymentTiles';
 import { hexToRgba } from '@/lib/card/methodColor';
 
 type Lang = 'fr' | 'it';
@@ -15,8 +15,8 @@ type Lang = 'fr' | 'it';
 const HERO_SIZES = '(min-width: 1024px) 600px, (min-width: 540px) 50vw, 100vw';
 
 const COPY = {
-  fr: { title: 'Payez en quelques secondes.', pay: 'Payer maintenant', shop: 'Commander sur la boutique', language: 'Langue', others: 'Autres' },
-  it: { title: 'Paga in pochi secondi.', pay: 'Paga ora', shop: 'Ordina sul negozio online', language: 'Lingua', others: 'Altri' },
+  fr: { title: 'Payez en quelques secondes.', shop: 'Commander sur la boutique', language: 'Langue' },
+  it: { title: 'Paga in pochi secondi.', shop: 'Ordina sul negozio online', language: 'Lingua' },
 } as const;
 
 interface CardHeroProps {
@@ -24,22 +24,23 @@ interface CardHeroProps {
   onLangChange: (lang: Lang) => void;
   tenant: { name: string; tagline: string | null; logo_url: string | null; primary_color: string; secondary_color: string };
   image: CardHeroImage | null;
-  /** Absent : aucun moyen de paiement visible, la hero devient une simple présentation. */
-  onPay?: () => void;
-  paymentBrands: CardPaymentBrandStrip;
+  /** Tuiles des moyens proposés ; vide : la hero devient une simple présentation. */
+  paymentTiles: CardPaymentTile[];
+  /** Ouvre directement l'écran du moyen choisi (id validé par PaymentMethodsAccordion). */
+  onSelectMethod: (methodId: string) => void;
   showShop: boolean;
 }
 
 /**
  * Hero payment-first de /card. Mobile : photo en haut (hauteur bornée en svh
- * pour garder « Payer maintenant » au-dessus de la ligne de flottaison dès
+ * pour garder la grille des moyens de paiement au-dessus de la ligne de flottaison dès
  * 320×568), texte et boutons dessous sur un fond sombre dérivé de la couleur
  * du tenant, dans lequel la photo se fond. Desktop : texte à gauche, photo à
  * droite. La photo (slot tenant, lib/card/cardHero.ts) est décorative : les
  * dimensions ne dépendent jamais d'elle (pas de CLS) et les boutons sont
  * utilisables avant son chargement.
  */
-export function CardHero({ lang, onLangChange, tenant, image: configuredImage, onPay, paymentBrands, showShop }: CardHeroProps) {
+export function CardHero({ lang, onLangChange, tenant, image: configuredImage, paymentTiles, onSelectMethod, showShop }: CardHeroProps) {
   const t = COPY[lang];
   // Photo introuvable ou refusée : la hero se replie sur le dégradé compact, jamais une icône d'image cassée.
   const [imageFailed, setImageFailed] = useState(false);
@@ -52,7 +53,7 @@ export function CardHero({ lang, onLangChange, tenant, image: configuredImage, o
   }, []);
   const background = darkenHex(tenant.primary_color, 0.8);
   const fade = (alpha: number) => hexToRgba(background, alpha);
-  const onlineBrands = paymentBrands.brands.slice(0, 4);
+  const onPay = paymentTiles.length > 0;
 
   // Photo présente : bande basse au cadrage centré sur le geste de paiement
   // (mobile), puis texte et photo côte à côte dès 540 px. Sans photo : une
@@ -115,28 +116,14 @@ export function CardHero({ lang, onLangChange, tenant, image: configuredImage, o
         {split && <div aria-hidden className="absolute inset-y-0 left-0 hidden w-1/4 min-[540px]:block" style={{ background: `linear-gradient(90deg, ${fade(1)} 0%, ${fade(0)} 100%)` }} />}
       </div>
 
-      <div className={`relative z-10 flex flex-col gap-2.5 px-5 pb-5 ${split ? '-mt-3 min-[540px]:order-1 min-[540px]:mt-0 min-[540px]:justify-end min-[540px]:px-6 min-[540px]:pb-7 min-[540px]:pt-24 lg:gap-3 lg:px-14 lg:pb-12' : 'lg:px-14 lg:pb-12'}`}>
+      <div className={`relative z-10 flex flex-col gap-2.5 px-4 pb-5 min-[360px]:px-5 ${split ? '-mt-3 min-[540px]:order-1 min-[540px]:mt-0 min-[540px]:justify-end min-[540px]:px-6 min-[540px]:pb-7 min-[540px]:pt-24 lg:gap-3 lg:px-14 lg:pb-12' : 'lg:px-14 lg:pb-12'}`}>
         {onPay && <p className="hidden text-sm font-bold uppercase tracking-[0.08em] text-white/90 min-[540px]:block">{tenant.name}</p>}
         <h1 className={onPay ? "whitespace-nowrap text-[clamp(1rem,4.7vw,1.65rem)] font-extrabold leading-tight min-[540px]:text-[clamp(1rem,2.5vw,1.8rem)]" : "text-[2rem] font-extrabold leading-[1.05] min-[390px]:text-[2.25rem] md:text-5xl lg:text-[3.5rem]"} style={{ fontFamily: 'var(--font-card-heading)' }}>
           {onPay ? t.title : tenant.name}
         </h1>
         {!onPay && tenant.tagline && <p className="max-w-md text-base leading-snug text-white/95 lg:text-xl">{tenant.tagline}</p>}
         <div className="mt-1.5 flex flex-col gap-2.5">
-          {onPay && (
-            <button
-              type="button"
-              onClick={onPay}
-              aria-label={t.pay}
-              className="group flex min-h-14 w-full flex-nowrap items-center justify-center gap-1.5 rounded-2xl border-2 border-white/80 bg-white px-3 py-3 text-gray-900 shadow-[0_8px_0_rgba(0,0,0,0.16),0_16px_28px_rgba(0,0,0,0.22)] transition-[transform,box-shadow] hover:shadow-[0_5px_0_rgba(0,0,0,0.16),0_10px_20px_rgba(0,0,0,0.2)] active:translate-y-1 active:shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white motion-reduce:transition-none lg:max-w-md"
-            >
-              {onlineBrands.map((brand, index) => (
-                <span key={brand} aria-hidden="true" className={`${index === 3 ? "hidden min-[390px]:flex" : "flex"} min-h-10 min-w-0 flex-1 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-1 shadow-sm transition-colors group-hover:bg-white`}>
-                  <PaymentBrandMark brand={brand} size="sm" />
-                </span>
-              ))}
-              <span aria-hidden="true" className="flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-2 text-xs font-bold shadow-sm transition-colors group-hover:bg-white">{t.others}</span>
-            </button>
-          )}
+          {onPay && <CardPaymentMethodGrid tiles={paymentTiles} lang={lang} primaryColor={tenant.primary_color} onSelect={onSelectMethod} />}
           {showShop && (
             <Link
               href="/"

@@ -13,7 +13,7 @@ import { useCardPaymentReturn } from '@/lib/card/useCardPaymentReturn';
 import { useCardHistoryStep } from '@/lib/card/useCardHistoryStep';
 import { visibleCardPaymentMethods } from '@/lib/payments/applePay';
 import { useApplePaySupport } from '@/lib/payments/useApplePaySupport';
-import { cardPaymentBrandStrip } from '@/lib/card/cardPaymentBrands';
+import { cardLandingMethods, cardPaymentTiles } from '@/lib/card/cardPaymentTiles';
 import { CARD_PAGE_BACKGROUND, readableForeground } from '@/lib/card/cardTheme';
 import type { CardHeroImage } from '@/lib/card/cardHero';
 import type { OpeningHours } from '@/lib/card/openingHours';
@@ -45,27 +45,29 @@ interface Props {
 
 /**
  * /card : landing payment-first (1. payer, 2. découvrir la boutique, 3. infos
- * du commerce). Écrans de paiement et d'issue inchangés dans leur logique :
- * PaymentMethodsAccordion → CardQuickPay → Stripe, retour après redirection
- * via useCardPaymentReturn.
+ * du commerce). Une tuile de la grille ouvre directement son écran
+ * (PaymentMethodsAccordion `initialMethodId` : CardQuickPay → Stripe, ou
+ * détail du moyen externe) ; retour après redirection via useCardPaymentReturn.
  */
 export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethods, applePayEnabled, reviewsEnabled, heroImage, showcaseProducts, openingHours }: Props) {
-  // Filtre unique pour le bouton « Payer maintenant », la fascia des marques et
-  // la liste : si seule la ligne apple_pay existe et que l'appareil ne supporte
-  // pas Apple Pay, rien n'est proposé (jamais de page de paiement vide).
+  // Filtre unique pour la grille et les écrans de paiement : jamais les espèces
+  // depuis /card ; si seule la ligne apple_pay existe et que l'appareil ne
+  // supporte pas Apple Pay, rien n'est proposé (jamais de page de paiement vide).
   const applePaySupported = useApplePaySupport();
-  const paymentMethods = visibleCardPaymentMethods(allCardMethods, applePayEnabled, applePaySupported);
+  const paymentMethods = cardLandingMethods(visibleCardPaymentMethods(allCardMethods, applePayEnabled, applePaySupported));
   const [lang, setLang] = useState<Lang>(() => {
     if (typeof window === 'undefined') return 'fr';
     try { return (localStorage.getItem('lepefy-card-lang') as Lang | null) === 'it' ? 'it' : 'fr'; } catch { return 'fr'; }
   });
   const [inPayment, setInPayment] = useState(false);
+  // Moyen choisi sur la landing ; null = écran de choix (réessai après une issue).
+  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
   const paymentReturn = useCardPaymentReturn();
   // CTA boutique après paiement : seulement si la boutique est ouverte.
   const shop = tenant.storefront_ready ? { color: tenant.primary_color, foreground: readableForeground(tenant.primary_color) } : null;
   const paymentView = inPayment || paymentReturn.result !== null;
   // Retour système depuis le paiement (ou son issue) : revient à la landing au lieu de quitter /card.
-  useCardHistoryStep(paymentView, () => { paymentReturn.clear(); setInPayment(false); });
+  useCardHistoryStep(paymentView, () => { paymentReturn.clear(); closePayment(); });
   const t = COPY[lang];
   // Langue réelle de la page pour les lecteurs d'écran (le <html> est rendu en fr).
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
@@ -76,9 +78,15 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
     try { localStorage.setItem('lepefy-card-lang', next); } catch { /* stockage indisponible : la langue reste celle de la session */ }
   }
 
-  function openPayment() {
+  function openPayment(methodId: string | null) {
+    setSelectedMethodId(methodId);
     setInPayment(true);
     window.scrollTo({ top: 0 });
+  }
+
+  function closePayment() {
+    setInPayment(false);
+    setSelectedMethodId(null);
   }
 
   return (
@@ -94,12 +102,13 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
               lang={lang}
               tenantName={tenant.name}
               shop={shop}
-              onReturnToCard={() => { paymentReturn.clear(); setInPayment(false); }}
-              onRetry={paymentMethods.length > 0 ? () => { paymentReturn.clear(); setInPayment(true); } : undefined}
+              onReturnToCard={() => { paymentReturn.clear(); closePayment(); }}
+              onRetry={paymentMethods.length > 0 ? () => { paymentReturn.clear(); openPayment(null); } : undefined}
             />
           ) : (
             <PaymentMethodsAccordion
               paymentMethods={paymentMethods}
+              initialMethodId={selectedMethodId}
               primaryColor={tenant.primary_color}
               currency={tenant.currency}
               tenantName={tenant.name}
@@ -107,7 +116,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
               tenantEmail={tenant.legal_email}
               shop={shop}
               lang={lang}
-              onClose={() => setInPayment(false)}
+              onClose={closePayment}
             />
           )}
         </main>
@@ -121,8 +130,8 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
               onLangChange={changeLang}
               tenant={tenant}
               image={heroImage}
-              onPay={paymentMethods.length > 0 ? openPayment : undefined}
-              paymentBrands={cardPaymentBrandStrip(paymentMethods)}
+              paymentTiles={cardPaymentTiles(paymentMethods)}
+              onSelectMethod={openPayment}
               showShop={tenant.storefront_ready}
             />
             <div className="mt-3 grid gap-4 px-4 sm:gap-5 lg:mt-6 lg:grid-cols-12 lg:items-start lg:gap-6 lg:px-0">

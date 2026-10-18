@@ -11,6 +11,7 @@ import { CardQuickPay, type CardQuickPayStage } from './CardQuickPay';
 import { PaymentBrandMark } from './CardPaymentBrands';
 import { methodColor, hexToRgba, isEmailValue } from '@/lib/card/methodColor';
 import { isOnlineCardMethod, isRevolutMethod } from '@/lib/card/cardPaymentBrands';
+import { resolveCardPaymentEntry } from '@/lib/card/cardPaymentTiles';
 import { useCardHistoryStep } from '@/lib/card/useCardHistoryStep';
 import { CARD_PAY_COLOR } from '@/lib/card/cardTheme';
 
@@ -21,23 +22,23 @@ const COPY = {
   fr: {
     back: 'Retour', secure: 'Paiement sécurisé', title: 'Comment voulez-vous payer ?', subtitle: 'Réglez votre achat en quelques instants.',
     others: 'Autres moyens de paiement',
-    othersText: 'Vous payez dans l’application du service ou en boutique : ce paiement n’est pas confirmé ici automatiquement.',
+    othersText: 'Vous payez dans l’application du service ou par virement : ce paiement n’est pas confirmé ici automatiquement.',
     card: 'Carte bancaire', applePay: 'Apple Pay', onlineInfo: 'Carte et Apple Pay : confirmation immédiate à l’écran, et par e-mail si vous indiquez votre adresse.', onlineInfoCard: 'Carte : confirmation immédiate à l’écran, et par e-mail si vous indiquez votre adresse.',
     bank: 'Copiez l’IBAN et payez depuis votre banque', paypal: 'Ouvre PayPal pour payer', satispay: 'Ouvre Satispay pour payer', revolut: 'Ouvre Revolut pour payer',
-    cash: 'À régler directement en boutique', other: 'Moyen de paiement alternatif',
-    beneficiary: 'Bénéficiaire', copy: 'Copier', copied: 'Copié !', bankTitle: 'Virement bancaire', cashTitle: 'Paiement en espèces',
-    cashText: 'Les espèces sont acceptées directement en boutique.', externalText: 'Vous allez continuer dans l’application ou le site du service de paiement.',
+    other: 'Moyen de paiement alternatif',
+    beneficiary: 'Bénéficiaire', copy: 'Copier', copied: 'Copié !', bankTitle: 'Virement bancaire',
+    externalText: 'Vous allez continuer dans l’application ou le site du service de paiement.',
     open: (x: string) => `Ouvrir ${x}`, choose: 'Moyen de paiement', othersTile: 'Autres moyens',
   },
   it: {
     back: 'Indietro', secure: 'Pagamento sicuro', title: 'Come vuoi pagare?', subtitle: 'Salda il tuo acquisto in pochi istanti.',
     others: 'Altri metodi di pagamento',
-    othersText: 'Paghi nell’app del servizio o in negozio: questo pagamento non viene confermato qui automaticamente.',
+    othersText: 'Paghi nell’app del servizio o con bonifico: questo pagamento non viene confermato qui automaticamente.',
     card: 'Carta bancaria', applePay: 'Apple Pay', onlineInfo: 'Carta e Apple Pay: conferma immediata sullo schermo, e via email se indichi il tuo indirizzo.', onlineInfoCard: 'Carta: conferma immediata sullo schermo, e via email se indichi il tuo indirizzo.',
     bank: 'Copia l’IBAN e paga dalla tua banca', paypal: 'Apre PayPal per pagare', satispay: 'Apre Satispay per pagare', revolut: 'Apre Revolut per pagare',
-    cash: 'Da saldare direttamente in negozio', other: 'Metodo di pagamento alternativo',
-    beneficiary: 'Beneficiario', copy: 'Copia', copied: 'Copiato!', bankTitle: 'Bonifico bancario', cashTitle: 'Pagamento in contanti',
-    cashText: 'I contanti sono accettati direttamente in negozio.', externalText: 'Continuerai nell’app o nel sito del servizio di pagamento.',
+    other: 'Metodo di pagamento alternativo',
+    beneficiary: 'Beneficiario', copy: 'Copia', copied: 'Copiato!', bankTitle: 'Bonifico bancario',
+    externalText: 'Continuerai nell’app o nel sito del servizio di pagamento.',
     open: (x: string) => `Apri ${x}`, choose: 'Metodo di pagamento', othersTile: 'Altri metodi',
   },
 } as const;
@@ -49,7 +50,6 @@ function description(pm: TenantPaymentMethod, t: Copy) {
     case 'bank_transfer': return t.bank;
     case 'paypal': return t.paypal;
     case 'satispay': return t.satispay;
-    case 'cash': return t.cash;
     case 'other': return isRevolutMethod(pm) ? t.revolut : t.other;
     default: return t.other;
   }
@@ -80,8 +80,11 @@ function tileStyle(selected: boolean): React.CSSProperties {
 
 const SURFACE = 'rounded-3xl bg-white shadow-[0_1px_2px_rgba(17,24,39,0.06)] ring-1 ring-black/[0.04]';
 
-export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency, lang, onClose, tenantName, tenantLogoUrl, tenantEmail, shop }: {
-  paymentMethods: TenantPaymentMethod[]; primaryColor: string; currency: string; lang: Lang; onClose: () => void;
+export function PaymentMethodsAccordion({ paymentMethods, initialMethodId = null, primaryColor, currency, lang, onClose, tenantName, tenantLogoUrl, tenantEmail, shop }: {
+  paymentMethods: TenantPaymentMethod[];
+  /** Moyen choisi sur la grille de la landing : son écran s'ouvre directement, sans tuiles de choix. Id inconnu → écran de choix. */
+  initialMethodId?: string | null;
+  primaryColor: string; currency: string; lang: Lang; onClose: () => void;
   tenantName: string; tenantLogoUrl: string | null; tenantEmail: string | null; shop: { color: string; foreground: string } | null;
 }) {
   const t = COPY[lang];
@@ -95,10 +98,17 @@ export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency
   // La carte (ou à défaut Apple Pay) est présélectionnée ; sans moyen en ligne,
   // la liste des autres moyens s'affiche directement.
   const OTHERS = 'others';
-  const [choice, setChoice] = useState<string>(onlineMethods[0]?.id ?? OTHERS);
+  // Entrée directe depuis la landing : figée au premier rendu (initialiseurs
+  // useState), jamais réappliquée ensuite. `direct` = aucun écran de choix :
+  // les retours (bouton et système) ramènent à la landing.
+  const [entry] = useState(() => resolveCardPaymentEntry(paymentMethods, initialMethodId));
+  const direct = entry !== null;
+  const [choice, setChoice] = useState<string>(() => (entry?.screen === 'online' ? entry.method.id : onlineMethods[0]?.id ?? OTHERS));
   const onlineId = choice === OTHERS ? null : choice;
-  const [detail, setDetail] = useState<TenantPaymentMethod | null>(null);
-  useCardHistoryStep(detail !== null, () => setDetail(null));
+  const [detail, setDetail] = useState<TenantPaymentMethod | null>(() => (entry?.screen === 'detail' ? entry.method : null));
+  // En entrée directe, l'entrée d'historique de la landing (DigitalCard) couvre déjà le détail.
+  useCardHistoryStep(detail !== null && !direct, () => setDetail(null));
+  const closeDetail = direct ? onClose : () => setDetail(null);
   const [stage, setStage] = useState<CardQuickPayStage>('amount');
   const handleStage = useCallback((next: CardQuickPayStage) => setStage(next), []);
   const ring = { '--tw-ring-color': primaryColor } as React.CSSProperties;
@@ -115,7 +125,7 @@ export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency
   const quickPay = selectedOnline && (
     <CardQuickPay
       key={selectedOnline.id}
-      embedded
+      embedded={!direct}
       mode={selectedOnline.method === 'apple_pay' ? 'apple_pay' : 'card'}
       tenantColor={selectedOnline.method === 'apple_pay' ? methodColor('apple_pay', primaryColor) : CARD_PAY_COLOR}
       currency={currency}
@@ -142,7 +152,6 @@ export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency
     const Icon = PAYMENT_ICONS[meta.iconName];
     const title = detail.label ?? meta.label;
     const bank = detail.method === 'bank_transfer';
-    const cash = detail.method === 'cash';
     const externalLink = detail.extra?.link || (detail.method === 'satispay' ? detail.value : null) || (detail.method === 'paypal' && detail.value && !isEmailValue(detail.value) ? detail.value : null);
     const label = (text: string) => <p className="mb-2 text-sm font-semibold text-gray-700">{text}</p>;
     const openButton = (href: string) => (
@@ -152,15 +161,13 @@ export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency
     );
     return (
       <div>
-        {backButton(() => setDetail(null))}
+        {backButton(closeDetail)}
         <div className={`${SURFACE} mt-4 p-5`}>
           <div className="mb-5 flex items-center gap-3">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white" style={{ backgroundColor: color }}><Icon size={24} aria-hidden="true" /></span>
-            <h2 className="text-2xl font-extrabold text-gray-900" style={{ fontFamily: 'var(--font-card-heading)' }}>{bank ? t.bankTitle : cash ? t.cashTitle : title}</h2>
+            <h2 className="text-2xl font-extrabold text-gray-900" style={{ fontFamily: 'var(--font-card-heading)' }}>{bank ? t.bankTitle : title}</h2>
           </div>
-          {cash ? (
-            <p className="rounded-2xl bg-gray-50 p-4 text-base leading-relaxed text-gray-800">{t.cashText}</p>
-          ) : bank ? (
+          {bank ? (
             <div className="space-y-5">
               {detail.extra?.beneficiary && <div>{label(t.beneficiary)}<CopyValue value={detail.extra.beneficiary} color={color} label={t.copy} copiedLabel={t.copied} /></div>}
               {detail.value && <div>{label('IBAN')}<CopyValue value={detail.value} color={color} label={t.copy} copiedLabel={t.copied} /></div>}
@@ -182,20 +189,20 @@ export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency
 
   return (
     <div className="space-y-5">
-      {!focus && (
+      {!focus && !direct && (
         <div className="flex items-center justify-between gap-3">
           {backButton(onClose)}
           <TenantLogo variant="compact" unoptimized identity={{ name: tenantName, logo_url: tenantLogoUrl }} className="max-w-[40vw]" fallbackClassName="text-gray-900" />
         </div>
       )}
-      {!focus && (
+      {!focus && !direct && (
         <header>
           <p className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-black/5"><IconLock size={15} aria-hidden="true" />{t.secure}</p>
           <h1 className="mt-3 text-[1.75rem] font-extrabold leading-tight text-gray-900" style={{ fontFamily: 'var(--font-card-heading)' }}>{t.title}</h1>
           <p className="mt-1 text-base text-gray-700">{t.subtitle}</p>
         </header>
       )}
-      {!focus && onlineMethods.length > 0 && (
+      {!focus && !direct && onlineMethods.length > 0 && (
         <div role="group" aria-label={t.choose} className={`grid gap-2.5 ${onlineMethods.length + (otherMethods.length > 0 ? 1 : 0) >= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
           {onlineMethods.map((pm) => {
             const isCard = pm.method === 'card';
@@ -221,7 +228,7 @@ export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency
         </div>
       )}
       {quickPay}
-      {!focus && otherMethods.length > 0 && choice === OTHERS && (
+      {!focus && !direct && otherMethods.length > 0 && choice === OTHERS && (
         <section aria-labelledby="card-other-title">
           <h2 id="card-other-title" className="text-sm font-bold uppercase tracking-wide text-gray-800">{t.others}</h2>
           <p className="mt-1 text-sm leading-snug text-gray-700">{t.othersText}</p>

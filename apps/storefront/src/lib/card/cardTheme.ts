@@ -28,3 +28,15 @@ export function darkenHex(hex: string, amount: number): string {
   const channel = (offset: number) => Math.round(parseInt(normalized.slice(offset, offset + 2), 16) * keep).toString(16).padStart(2, '0');
   return `#${channel(0)}${channel(2)}${channel(4)}`;
 }
+
+/** Couleur tenant éclaircie (mélange avec du blanc) : surfaces claires teintées, texte foncé lisible. */
+export function lightenHex(hex: string, amount: number): string {
+  const normalized = hex.replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return '#F3F4F6';
+  const mix = Math.min(1, Math.max(0, amount));
+  const channel = (offset: number) => {
+    const value = parseInt(normalized.slice(offset, offset + 2), 16);
+    return Math.round(value + (255 - value) * mix).toString(16).padStart(2, '0');
+  };
+  return `#${channel(0)}${channel(2)}${channel(4)}`;
+}
