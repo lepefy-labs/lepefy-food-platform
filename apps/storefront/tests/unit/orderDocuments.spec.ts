@@ -181,6 +181,22 @@ test('helpers: short ref, first name, brand colour contrast fallback, https-only
   expect(safeImageUrl('javascript:alert(1)')).toBeNull();
 });
 
+test('picking follow-up: printable checkboxes, date and time in A5/A4; pickup uses handover, one signature pair', () => {
+  const delivery = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'T' }, carton: null });
+  const pickup = buildPickingListViewModel({ order: order(ORDER_A, { fulfillment_type: 'pickup' }), items: ITEMS, tenant: { name: 'T' }, carton: null });
+  for (const format of ['a5', 'a4'] as const) {
+    const html = pickingListHtml([delivery], format);
+    expect(html).toContain('SUIVI DE PRÉPARATION');
+    expect(html).toContain('EXPÉDITION');
+    expect(html).toContain('DATE</span><span>HEURE');
+    expect((html.match(/class="pl-follow-check"/g) ?? [])).toHaveLength(3);
+    expect((html.match(/>Préparé par</g) ?? [])).toHaveLength(1);
+    expect((html.match(/>Contrôlé par</g) ?? [])).toHaveLength(1);
+    expect(pickingListHtml([pickup], format)).toContain('REMISE AU CLIENT');
+    expect(pickingListHtml([pickup], format)).not.toContain('>EXPÉDITION<');
+  }
+});
+
 // ─── HTML ───────────────────────────────────────────────────────────────────
 
 test('picking HTML: @page per format, one section per order (page breaks), escaped content', () => {

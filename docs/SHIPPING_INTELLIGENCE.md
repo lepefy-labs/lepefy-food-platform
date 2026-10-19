@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@1cf926d1`
-> **Ultima verifica:** 18 ottobre 2026
+> **Base codice verificata:** `main@68d7d35e`
+> **Ultima verifica:** 19 ottobre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale) + `151_shipping_shipment_creation.sql` + `152_shipping_automation_content.sql` (brouillons d'expédition, §2.4) + `159_shipping_tariff_publish.sql` (pubblicazione atomica dei prezzi forfait, §18.6)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
@@ -145,6 +145,8 @@ Colonne: `shipping_creation_status`, `shipping_creation_attempts`, `shipping_cre
 **Osservabilità.** Log `[shipping/draft] queued|started|created|failed|skipped_existing|ambiguous|linked` con solo tenant id, order id, provider e codice. Mai chiave API, indirizzo, telefono, e-mail o payload Packlink.
 
 ---
+
+**Liste de préparation (documenti ordini, aggiornamento 19/10/2026):** il renderer `apps/storefront/src/lib/orders/documents/pickingListHtml.ts` stampa, su A5/A4, il blocco manuale `SUIVI DE PRÉPARATION` con PRÉPARATION, EMBALLAGE, EXPÉDITION (o REMISE AU CLIENT per ritiro), caselle e campi data/ora, seguito dalla singola coppia di firme. Non legge né modifica stati logistici o prezzi. Il layout mantiene il blocco unito in fase di paginazione; vedere `docs/ORDER_DOCUMENTS.md`.
 
 ## 3. Navigazione Admin
 

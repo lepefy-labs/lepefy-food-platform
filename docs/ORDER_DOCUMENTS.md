@@ -12,13 +12,13 @@ Order
                                                                             → htmlToPdf (Gotenberg) → PDF
 ```
 
-- **Liste de préparation** (interna): emplacements, chaîne du froid, riepilogo unità/peso/colli, emballage suggéré (solo consegna), firme. Di default solo nome + CAP/città; indirizzo completo (via, complemento, «CAP città, paese», «Destinataire : …» se diverso dal cliente) solo con `picking_list_show_delivery_address`.
+- **Liste de préparation** (interna): emplacements, chaîne du froid, riepilogo unità/peso/colli, emballage suggéré (solo consegna), suivi di preparazione cartaceo (PRÉPARATION, EMBALLAGE, EXPÉDITION o REMISE AU CLIENT per ritiro, con caselle, data e ora) e firme (un'unica coppia). Di default solo nome + CAP/città; indirizzo completo (via, complemento, «CAP città, paese», «Destinataire : …» se diverso dal cliente) solo con `picking_list_show_delivery_address`.
 - **Bon de colis** (cliente, nel pacco; titolo stampato «RÉCAPITULATIF DE COMMANDE»): marca, «Merci <prénom> !», réf. courte e data, articoli, QR del portale, ringraziamento, contatti. Il view-model cliente è costruito campo per campo: non riceve mai la riga `orders` né item grezzi. Il loader non legge `notes`, `email`, telefono o pagamento.
 - File: `apps/storefront/src/lib/orders/documents/*`.
 
 ## 2. Formati
 
-`ORDER_DOCUMENT_FORMATS` (`formats.ts`): `a5` (148×210, default, raccomandato) e `a4` (210×297), portrait. Ogni formato ha il proprio layout (non un A4 scalato). Font informativo minimo 10 pt, quantità 16–17 pt, caselle 6/7 mm. Multipagina: righe non spezzate, `thead` ripetuto con la réf. come intestazione ridotta, piè di pagina «#REF · Page X/Y» (nel lotto la numerazione è quella del PDF intero).
+`ORDER_DOCUMENT_FORMATS` (`formats.ts`): `a5` (148×210, default, raccomandato) e `a4` (210×297), portrait. Ogni formato ha il proprio layout (non un A4 scalato). Font informativo minimo 10 pt, quantità 16–17 pt, caselle 6/7 mm. Il blocco finale di suivi e firme è mantenuto insieme (`avoid`); la compilazione su carta non aggiorna lo stato digitale dell'ordine. Multipagina: righe non spezzate, `thead` ripetuto con la réf. come intestazione ridotta, piè di pagina «#REF · Page X/Y» (nel lotto la numerazione è quella del PDF intero).
 
 Aggiungere un formato (letter, a6, thermal_80): voce del registro, layout nei due renderer, valore nel CHECK `is_valid_order_documents_config`.
 

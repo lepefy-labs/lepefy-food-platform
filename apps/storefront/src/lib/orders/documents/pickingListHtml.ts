@@ -38,7 +38,16 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .pl-carton { border: 0.4mm dashed #111; padding: 2mm 2.5mm; line-height: 1.45; }
 .pl-warn { font-weight: 700; }
 .pl-summary { display: flex; flex-wrap: wrap; gap: 2mm 6mm; }
-.pl-sign { display: flex; gap: 5mm; margin-top: 5mm; }
+.pl-sign { display: flex; gap: 5mm; margin-top: 3mm; }
+.pl-follow { break-inside: avoid; page-break-inside: avoid; margin-top: 4mm; }
+.pl-follow-title { font-weight: 800; letter-spacing: 0.08em; border-bottom: 0.3mm solid #111; padding-bottom: 1mm; margin-bottom: 1.5mm; }
+.pl-follow-head, .pl-follow-row { display: grid; grid-template-columns: 1.6fr 1fr 0.75fr; gap: 3mm; align-items: center; }
+.pl-follow-head { font-size: 10pt; font-weight: 700; }
+.pl-follow-row { min-height: 9mm; }
+.pl-follow-stage { display: flex; align-items: center; gap: 2mm; font-weight: 700; }
+.pl-follow-check { display: inline-block; width: 5mm; height: 5mm; border: 0.45mm solid #111; background: #fff; flex-shrink: 0; }
+.pl-follow-line { display: block; height: 7mm; border-bottom: 0.3mm solid #111; }
+.pl-follow-sign span { padding-bottom: 5mm; }
 .pl-sign span { flex: 1; border-bottom: 0.3mm solid #111; padding-bottom: 6mm; }
 .pl-notes { height: 24mm; background: repeating-linear-gradient(transparent 0 7.7mm, #999 7.7mm 8mm); }
 .pl-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
@@ -115,6 +124,13 @@ function cartonBlock(vm: InternalOrderDocumentViewModel, format: OrderDocumentFo
   return `<div class="avoid"><div class="pl-section keep-next">EMBALLAGE SUGGÉRÉ</div><div class="pl-carton">${detail}${alternatives}<div>${escapeHtml(footer)}</div>${warning}</div></div>`;
 }
 
+function followUpBlock(vm: InternalOrderDocumentViewModel): string {
+  const lastStage = vm.fulfillment === 'pickup' ? 'REMISE AU CLIENT' : 'EXPÉDITION';
+  const stages = ['PRÉPARATION', 'EMBALLAGE', lastStage];
+  const rows = stages.map((stage) => `<div class="pl-follow-row"><div class="pl-follow-stage"><span class="pl-follow-check"></span><span>${stage}</span></div><span class="pl-follow-line"></span><span class="pl-follow-line"></span></div>`).join('');
+  return `<div class="pl-follow avoid"><div class="pl-follow-title">SUIVI DE PRÉPARATION</div><div class="pl-follow-head"><span>ÉTAPE</span><span>DATE</span><span>HEURE</span></div>${rows}<div class="pl-sign pl-follow-sign"><span>Préparé par</span><span>Contrôlé par</span></div></div>`;
+}
+
 function header(vm: InternalOrderDocumentViewModel): string {
   return `<div class="pl-head">
 <div><p class="pl-title">LISTE DE PRÉPARATION</p><div class="pl-ref">#${escapeHtml(vm.ref)}</div></div>
@@ -150,7 +166,7 @@ ${itemsTableA4(vm)}
 <div>${cartonBlock(vm, format)}</div>
 <div><div class="pl-section keep-next">NOTES DE PRÉPARATION</div><div class="pl-notes"></div></div>
 </div>
-<div class="pl-sign avoid"><span>Préparé par</span><span>Contrôlé par</span><span>Heure</span></div>
+${followUpBlock(vm)}
 </section>`;
   }
   return `<section class="doc">
@@ -159,7 +175,7 @@ ${header(vm)}
 <div class="pl-section keep-next">${escapeHtml(summaryParts(vm).join(' · ').toUpperCase())}</div>
 ${itemsTableA5(vm)}
 ${cartonBlock(vm, format)}
-<div class="pl-sign avoid"><span>Préparé par</span><span>Contrôlé par</span></div>
+${followUpBlock(vm)}
 </section>`;
 }
 
