@@ -230,6 +230,21 @@ test('picking A5 uses print-safe compact spacing without shrinking picking check
   expect(a5).toContain('page-break-inside: avoid;');
 });
 
+test('picking displays available catalogue unit weight without mistaking it for historical format', () => {
+  const weights = new Map([['p-Kaolin 500 g', 500], ['p-Mitoumba', 750], ['p-Bobolo sous vide', 1000]]);
+  const vm = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'T' }, carton: null, productWeights: weights });
+  expect(vm.items.find((i) => i.name === 'Kaolin 500 g')?.catalogueWeight).toBeNull();
+  expect(vm.items.find((i) => i.name === 'Mitoumba')?.catalogueWeight).toBe('750 g');
+  expect(vm.items.find((i) => i.name === 'Bobolo sous vide')?.catalogueWeight).toBe('1 kg');
+  for (const format of ['a5', 'a4'] as const) {
+    const content = pickingListHtml([vm], format);
+    expect(content).toContain('Poids catalogue : 750 g');
+    expect(content).toContain('Poids catalogue : 1 kg');
+  }
+  const noWeight = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'T' }, carton: null });
+  expect(pickingListHtml([noWeight], 'a5')).not.toContain('Poids catalogue :');
+});
+
 // ─── HTML ───────────────────────────────────────────────────────────────────
 
 test('picking HTML: @page per format, one section per order (page breaks), escaped content', () => {

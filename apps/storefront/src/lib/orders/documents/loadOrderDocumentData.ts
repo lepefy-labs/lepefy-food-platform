@@ -20,6 +20,7 @@ export interface LoadedDocumentOrder {
   order: DocumentOrderRow;
   items: DocumentItemRow[];
   carton: ReturnType<typeof computeCartonSuggestion> & { maxParcelG: number } | null;
+  productWeights: ReadonlyMap<string, number>;
 }
 
 export interface LoadedOrderDocuments {
@@ -58,6 +59,24 @@ export async function loadOrderDocumentData(
     itemsByOrder.set(item.order_id, list);
   }
 
+  // Les poids actuels du catalogue sont indicatifs, pas des snapshots historiques.
+  // Chargement en une requête par lot, y compris pour les commandes à retirer.
+  const productWeights = new Map<string, number>();
+  if (mode === 'picking') {
+    const productIds = Array.from(new Set((itemsResult.data ?? [])
+      .map((item) => (item as DocumentItemRow).product_id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)));
+    if (productIds.length > 0) {
+      const { data: products, error: productError } = await db.from('products')
+        .select('id, weight_grams').eq('tenant_id', tenantId).in('id', productIds);
+      // Le PDF doit rester imprimable si le catalogue n'est pas disponible.
+      if (!productError) for (const product of products ?? []) {
+        const weight = Number(product.weight_grams);
+        if (product.weight_grams != null && Number.isFinite(weight) && weight > 0) productWeights.set(product.id, weight);
+      }
+    }
+  }
+
   let cartonContext: CartonContext | null = null;
   if (mode === 'picking') {
     const needsCarton = ids.map((id) => byId.get(id)).filter((order): order is DocumentOrderRow =>
@@ -80,7 +99,7 @@ export async function loadOrderDocumentData(
       const checkoutWeight = (order.shipping_details as { totalWeightG?: number } | null)?.totalWeightG;
       carton = { ...computeCartonSuggestion(cartonContext, items, checkoutWeight), maxParcelG: cartonContext.maxParcelG };
     }
-    orders.push({ order, items, carton });
+    orders.push({ order, items, carton, productWeights });
   }
   return { orders, missingIds };
 }

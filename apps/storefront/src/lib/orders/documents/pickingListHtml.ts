@@ -97,6 +97,10 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .format-a4 .pl-loc { font-size: 12pt; }
 `;
 
+function weightHint(item: PickingItemVM): string {
+  return item.catalogueWeight ? `<span class="pl-alt">Poids catalogue : ${escapeHtml(item.catalogueWeight)}</span>` : '';
+}
+
 function storageChip(item: PickingItemVM): string {
   return item.storage ? `<span class="pl-chip">${STORAGE_LABEL[item.storage]}</span>` : '';
 }
@@ -109,7 +113,7 @@ function itemsTableA5(vm: InternalOrderDocumentViewModel): string {
   const rows = vm.items.map((item) => `<tr>
 <td style="width:8mm"><span class="pl-box"></span></td>
 <td style="width:14mm" class="pl-qty">×${item.quantity}</td>
-<td><span class="pl-name">${escapeHtml(item.name)}</span>${item.nameAlt ? `<span class="pl-alt">↳ ${escapeHtml(item.nameAlt)}</span>` : ''}${item.storage ? `<div>${storageChip(item)}</div>` : ''}</td>
+<td><span class="pl-name">${escapeHtml(item.name)}</span>${item.nameAlt ? `<span class="pl-alt">↳ ${escapeHtml(item.nameAlt)}</span>` : ''}${weightHint(item)}${item.storage ? `<div>${storageChip(item)}</div>` : ''}</td>
 <td style="width:22mm;text-align:right">${location(item)}</td>
 </tr>`).join('');
   return `<table class="pl-items"><thead><tr><th colspan="3">ARTICLES <span class="pl-cont">· #${escapeHtml(vm.ref)}</span></th><th style="text-align:right">EMPL.</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -119,7 +123,7 @@ function itemsTableA4(vm: InternalOrderDocumentViewModel): string {
   const rows = vm.items.map((item) => `<tr>
 <td style="width:10mm"><span class="pl-box"></span></td>
 <td style="width:17mm" class="pl-qty">×${item.quantity}</td>
-<td><span class="pl-name">${escapeHtml(item.name)}</span>${item.nameAlt ? `<span class="pl-alt">↳ ${escapeHtml(item.nameAlt)}</span>` : ''}</td>
+<td><span class="pl-name">${escapeHtml(item.name)}</span>${item.nameAlt ? `<span class="pl-alt">↳ ${escapeHtml(item.nameAlt)}</span>` : ''}${weightHint(item)}</td>
 <td style="width:26mm">${item.storage ? storageChip(item) : '<span class="pl-meta">Sec</span>'}</td>
 <td style="width:26mm">${location(item)}</td>
 </tr>`).join('');

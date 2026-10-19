@@ -60,6 +60,8 @@ export interface PickingItemVM {
   quantity: number;
   storage: 'fresh' | 'frozen' | null;
   location: string | null;
+  /** Poids indicatif par unité du catalogue actuel, non garanti historique. */
+  catalogueWeight: string | null;
 }
 
 export interface PickingCartonVM {
@@ -144,6 +146,7 @@ export function buildPickingListViewModel(input: {
   tenant: Pick<DocumentTenant, 'name'>;
   carton: { suggestion: CartonSuggestion | null; missingWeightLines: number; maxParcelG?: number } | null;
   showDeliveryAddress?: boolean;
+  productWeights?: ReadonlyMap<string, number>;
 }): InternalOrderDocumentViewModel {
   const { order, tenant, carton } = input;
   const isPickup = order.fulfillment_type === 'pickup';
@@ -153,6 +156,13 @@ export function buildPickingListViewModel(input: {
     quantity: item.quantity,
     storage: item.storage_type === 'fresh' || item.storage_type === 'frozen' ? item.storage_type : null,
     location: item.warehouse_location?.trim() || null,
+    catalogueWeight: (() => {
+      const grams = item.product_id ? input.productWeights?.get(item.product_id) : undefined;
+      if (grams == null || !Number.isFinite(grams) || grams <= 0) return null;
+      // Le nom de l'article peut déjà contenir le format vendu.
+      if (/\b\d+(?:[.,]\d+)?\s*(?:kg|g|gr|grammes?)\b/i.test(item.name)) return null;
+      return grams >= 1000 && grams % 1000 === 0 ? `${grams / 1000} kg` : `${grams.toLocaleString('fr-FR')} g`;
+    })(),
   }));
   const a = address(order);
   const destination = isPickup ? null : [[a.postal_code, a.city].filter(Boolean).join(' '), a.country].filter(Boolean).join(', ') || null;
