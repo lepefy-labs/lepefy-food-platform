@@ -19,9 +19,9 @@ import {
 } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { methodColor } from '@/lib/card/methodColor';
-import ConfirmPaymentButton from '../_components/ui/ConfirmPaymentButton';
-import Badge from '../_components/ui/Badge';
-import Button, { ButtonLink, buttonClasses } from '../_components/ui/Button';
+import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
+import Badge from '../../_components/ui/Badge';
+import Button, { ButtonLink, buttonClasses } from '../../_components/ui/Button';
 import { PAYMENT_METHOD_REGISTRY, type PaymentMethodType } from '@lepefy/types';
 
 const PAYMENT_ICONS = {

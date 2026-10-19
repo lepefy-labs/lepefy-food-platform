@@ -138,7 +138,8 @@ test('picking view-model keeps operational data: locations sorted, cold chain, c
   const suggestion = suggestCartons(7400, PROFILES, 15000);
   const vm = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'Boutique Test' }, carton: { suggestion, missingWeightLines: 0, maxParcelG: 15000 } });
   expect(vm.ref).toBe('163835B8');
-  expect(vm.items.map((i) => i.location)).toEqual(['B-04', 'FRIGO-1', null]);
+  // Dry lines first (located, then without location), fresh after them (877fcc41).
+  expect(vm.items.map((i) => i.location)).toEqual(['B-04', null, 'FRIGO-1']);
   expect(vm.items.find((i) => i.name === 'Bobolo sous vide')?.storage).toBe('fresh');
   expect(vm.totalUnits).toBe(10);
   expect(vm.cartons?.lines[0]).toMatchObject({ count: 1, name: 'Standard' });

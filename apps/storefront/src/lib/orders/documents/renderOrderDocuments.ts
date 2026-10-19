@@ -14,18 +14,27 @@ export { MAX_BULK_ORDER_DOCUMENTS };
 import { loadOrderDocumentData, OrderDocumentDataError } from './loadOrderDocumentData';
 import { packingSlipHtml } from './packingSlipHtml';
 import { pickingListHtml } from './pickingListHtml';
+import { preparationSummaryHtml } from './preparationSummaryHtml';
+import { buildPreparationSummary, summaryGeneratedLabel, type CatalogueFact } from '@/lib/orders/preparation/preparationSummary';
 import type { OrderDocumentsConfig } from './settings';
 import { buildPackingSlipViewModel, buildPickingListViewModel, type DocumentTenant, type PackingSlipQrVM } from './viewModels';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
-export type OrderDocumentKind = 'picking_list' | 'packing_slip';
+export type OrderDocumentKind = 'picking_list' | 'packing_slip' | 'preparation_summary';
 
 /** Segment d'URL des routes ↔ type de document. */
 export const ORDER_DOCUMENT_ROUTE_KINDS: Record<string, OrderDocumentKind> = {
   'picking-list': 'picking_list',
   'packing-slip': 'packing_slip',
+  // Liste groupée de la session de préparation (en plus des listes individuelles).
+  'preparation-summary': 'preparation_summary',
 };
+
+/** Format par défaut du tenant pour un type de document. */
+export function defaultDocumentFormat(kind: OrderDocumentKind, settings: OrderDocumentsConfig): OrderDocumentFormat {
+  return kind === 'packing_slip' ? settings.packing_slip_format : settings.picking_list_format;
+}
 
 const GOTENBERG_TIMEOUT_MS = 25_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -52,10 +61,10 @@ export function isOrderUuid(value: string): boolean {
 }
 
 export function orderDocumentFilename(kind: OrderDocumentKind, format: OrderDocumentFormat, scope: { orderId: string } | { date: Date }): string {
-  const label = kind === 'picking_list' ? 'preparation' : 'bon-de-colis';
+  const label = kind === 'picking_list' ? 'preparation' : kind === 'preparation_summary' ? 'liste-groupee' : 'bon-de-colis';
   if ('orderId' in scope) return `commande-${orderShortRef(scope.orderId)}-${label}-${format}.pdf`;
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(scope.date);
-  return `${kind === 'picking_list' ? 'preparation' : 'bons-de-colis'}-${day}-${format}.pdf`;
+  return `${kind === 'picking_list' ? 'preparation' : kind === 'preparation_summary' ? 'liste-groupee' : 'bons-de-colis'}-${day}-${format}.pdf`;
 }
 
 function documentTenant(tenant: Tenant): DocumentTenant {
@@ -96,6 +105,19 @@ async function packingSlipQrs(db: ServiceClient, tenant: Tenant, orderIds: strin
   }
 }
 
+/** Faits du catalogue actuel (stock, actif) pour signaler une ligne à vérifier ; jamais bloquant. */
+export async function loadCatalogueFacts(db: ServiceClient, tenantId: string, productIds: Array<string | null>): Promise<Map<string, CatalogueFact>> {
+  const ids = Array.from(new Set(productIds.filter((id): id is string => typeof id === 'string' && id.length > 0)));
+  const facts = new Map<string, CatalogueFact>();
+  if (ids.length === 0) return facts;
+  const { data, error } = await db.from('products').select('id, stock, active').eq('tenant_id', tenantId).in('id', ids);
+  if (error) return facts;
+  for (const row of (data ?? []) as Array<{ id: string; stock: number | null; active: boolean | null }>) {
+    facts.set(row.id, { stock: row.stock ?? null, active: row.active !== false });
+  }
+  return facts;
+}
+
 export interface RenderedOrderDocument {
   pdf: Buffer;
   filename: string;
@@ -129,7 +151,7 @@ export async function renderOrderDocuments(input: {
 
   let loaded;
   try {
-    loaded = await loadOrderDocumentData(db, { tenantId: tenant.id, orderIds: input.orderIds, mode: kind === 'picking_list' ? 'picking' : 'packing' });
+    loaded = await loadOrderDocumentData(db, { tenantId: tenant.id, orderIds: input.orderIds, mode: kind === 'packing_slip' ? 'packing' : 'picking' });
   } catch (error) {
     if (error instanceof OrderDocumentDataError) throw new OrderDocumentError(503, 'Commandes momentanément illisibles. Réessayez.');
     throw error;
@@ -152,6 +174,10 @@ export async function renderOrderDocuments(input: {
     const vms = printable.map(({ order, items, carton, productWeights }) => buildPickingListViewModel({ order, items, tenant: { name: tenant.name }, carton, productWeights, showDeliveryAddress: settings.picking_list_show_delivery_address }));
     html = pickingListHtml(vms, format);
     footerLabel = vms.length === 1 ? `#${vms[0]!.ref} · Liste de préparation` : `Listes de préparation · ${vms.length} commandes`;
+  } else if (kind === 'preparation_summary') {
+    const vm = buildPreparationSummary(printable, await loadCatalogueFacts(db, tenant.id, printable.flatMap(({ items }) => items.map((item) => item.product_id))));
+    html = preparationSummaryHtml(vm, format, { tenantName: tenant.name, generatedAt: summaryGeneratedLabel(input.now ?? new Date()) });
+    footerLabel = `Liste groupée · ${vm.orderCount} commande${vm.orderCount > 1 ? 's' : ''}`;
   } else {
     const { qrs, unavailable } = settings.packing_slip_show_qr
       ? await packingSlipQrs(db, tenant, printable.map(({ order }) => order.id))
@@ -227,5 +253,5 @@ export function orderDocumentErrorResponse(error: unknown, request?: Request): N
 export function orderDocumentErrorPage(message: string): string {
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Document indisponible</title>
 <style>body{font-family:system-ui,sans-serif;background:#f9fafb;color:#111827;margin:0;padding:48px 16px}main{max-width:440px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:24px}h1{font-size:18px;margin:0 0 8px}p{color:#4b5563;line-height:1.5}a{display:inline-flex;min-height:44px;align-items:center;color:#111827;font-weight:600}</style></head>
-<body><main><h1>Document indisponible</h1><p>${escapeHtml(message)}</p><a href="/admin">Retour aux commandes</a></main></body></html>`;
+<body><main><h1>Document indisponible</h1><p>${escapeHtml(message)}</p><a href="/admin/orders">Retour aux commandes</a></main></body></html>`;
 }

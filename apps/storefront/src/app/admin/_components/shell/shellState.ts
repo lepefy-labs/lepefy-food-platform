@@ -39,6 +39,7 @@ export const SHELL_CSS = `
   html[data-admin-sidebar="collapsed"] .admin-sidebar .admin-collapse-icon { transform: rotate(180deg); }
   html[data-admin-sidebar="collapsed"] .admin-sidebar .admin-nav-rail-only { display: flex; }
   html[data-admin-sidebar="collapsed"] .admin-sidebar .admin-nav-full-only { display: none; }
+  html[data-admin-sidebar="collapsed"] .admin-sidebar .admin-nav-folded { display: block; }
 }
 `;
 

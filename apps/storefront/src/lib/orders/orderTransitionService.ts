@@ -2,6 +2,8 @@ import type { Order, OrderStatus } from '@lepefy/types';
 import type { createServiceClient } from '@/lib/supabase/server';
 import { runOrderTransitionSideEffects, validateOrderTransition } from './adminOrderWorkflow';
 import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
+import { preparationBlockers, preparationState, type OrderPreparationMode, type PreparationState } from './preparation/preparationPolicy';
+import { readOrderPreparationSettings, toPreparationMode } from './preparation/settings';
 
 export type OrderService = ReturnType<typeof createServiceClient>;
 export class OrderWorkflowError extends Error {
@@ -16,19 +18,6 @@ export interface PickingItemRow {
   cold_chain_checked_at: string | null;
 }
 
-export function pickingError(items: PickingItemRow[]): string | null {
-  if (items.length === 0) return 'La commande ne contient aucun article à préparer.';
-  const unpicked = items.filter(item => !item.picked_at).length;
-  const coldUnchecked = items.filter(item =>
-    (item.storage_type === 'fresh' || item.storage_type === 'frozen') && !item.cold_chain_checked_at,
-  ).length;
-  if (unpicked === 0 && coldUnchecked === 0) return null;
-  const parts: string[] = [];
-  if (unpicked > 0) parts.push(`${unpicked} ligne${unpicked > 1 ? 's' : ''} non prélevée${unpicked > 1 ? 's' : ''}`);
-  if (coldUnchecked > 0) parts.push(`${coldUnchecked} contrôle${coldUnchecked > 1 ? 's' : ''} froid manquant${coldUnchecked > 1 ? 's' : ''}`);
-  return `Préparation incomplète : ${parts.join(' · ')}.`;
-}
-
 export async function loadWorkflowOrder(service: OrderService, tenantId: string, orderId: string): Promise<Order> {
   const { data, error } = await service.from('orders').select('*').eq('id', orderId).eq('tenant_id', tenantId).maybeSingle();
   if (error) throw new OrderWorkflowError('Impossible de charger la commande.', 503);
@@ -36,17 +25,25 @@ export async function loadWorkflowOrder(service: OrderService, tenantId: string,
   return data as Order;
 }
 
-export async function assertPreparationComplete(service: OrderService, order: Order, packing: boolean) {
+/**
+ * Preparation side of preparing → shipped / ready_for_pickup, for every mode
+ * (lib/orders/preparation/preparationPolicy.ts). Returns the state so the
+ * caller can stamp a transition made without any recorded check.
+ */
+export async function assertPreparationComplete(service: OrderService, order: Order, packing: boolean): Promise<PreparationState> {
   const { data, error } = await service.from('order_items').select('storage_type, picked_at, cold_chain_checked_at')
     .eq('order_id', order.id).eq('tenant_id', order.tenant_id);
   if (error) throw new OrderWorkflowError('Impossible de vérifier la préparation.', 503);
   const items = (data ?? []) as PickingItemRow[];
-  const message = pickingError(items);
-  if (message) throw new PreparationIncompleteError(message);
-  if (packing && (!order.packing_completed_at || !order.packing_parcel_count || order.packing_parcel_count < 1
-    || (items.some(item => item.storage_type === 'fresh' || item.storage_type === 'frozen') && !order.cold_chain_packing_checked_at))) {
-    throw new PreparationIncompleteError('Emballage incomplet : validez les colis et les contrôles froid avant l’expédition.');
-  }
+  const blockers = preparationBlockers(order, items, packing);
+  if (blockers.length > 0) throw new PreparationIncompleteError(blockers.join(' '));
+  return preparationState(order, items);
+}
+
+/** Tenant mode to snapshot when preparation starts; null when migration 160 is absent. */
+export async function tenantPreparationSnapshot(service: OrderService, tenantId: string): Promise<OrderPreparationMode | null> {
+  const settings = await readOrderPreparationSettings(service as never, tenantId);
+  return settings.available ? toPreparationMode(settings.config) : null;
 }
 
 /** Both manual and provider transitions converge here. Only the CAS winner runs side effects.
@@ -55,6 +52,7 @@ export async function assertPreparationComplete(service: OrderService, order: Or
 export async function updateWorkflowOrder({ service, order, nextStatus, patch = {}, source = 'admin', shippedAt,
   sideEffects = runOrderTransitionSideEffects,
   onPreparationStarted = (db, tenantId, orderId) => requestShipmentDraft(db, tenantId, orderId, 'preparation_started'),
+  resolvePreparationMode = tenantPreparationSnapshot,
 }: {
   service: OrderService;
   order: Order;
@@ -65,6 +63,8 @@ export async function updateWorkflowOrder({ service, order, nextStatus, patch = 
   sideEffects?: typeof runOrderTransitionSideEffects;
   /** Provider-neutral shipment-draft queue (trigger « preparing »); never throws. */
   onPreparationStarted?: (service: OrderService, tenantId: string, orderId: string) => Promise<unknown>;
+  /** Mode snapshotted on new → preparing (default: tenant setting, null = no snapshot). */
+  resolvePreparationMode?: (service: OrderService, tenantId: string) => Promise<OrderPreparationMode | null>;
 }): Promise<Order> {
   const next = nextStatus ?? order.status;
   const trackingCode = patch.tracking_code !== undefined ? patch.tracking_code as string | null : order.tracking_code;
@@ -82,12 +82,20 @@ export async function updateWorkflowOrder({ service, order, nextStatus, patch = 
     if (!validation.ok) throw new OrderWorkflowError(validation.error);
     current = step;
   }
+  let preparation: PreparationState | null = null;
   if (order.status === 'preparing' && (next === 'shipped' || next === 'ready_for_pickup' || catchupDelivered)) {
-    await assertPreparationComplete(service, order, next !== 'ready_for_pickup');
+    preparation = await assertPreparationComplete(service, order, next !== 'ready_for_pickup');
   }
   const update = { ...patch };
   if (nextStatus !== undefined) update.status = next;
   if (order.status === 'new' && next === 'preparing' && !order.picking_started_at) update.picking_started_at = new Date().toISOString();
+  // Mode snapshot: decided once, when preparation starts; later setting changes never touch this order.
+  if (order.status === 'new' && next === 'preparing' && !order.preparation_mode && update.preparation_mode === undefined) {
+    const mode = await resolvePreparationMode(service, order.tenant_id).catch(() => null);
+    if (mode) update.preparation_mode = mode;
+  }
+  // « Sans confirmation »: the final transition is the only declaration — stamped, never a check.
+  if (preparation?.unverified && !order.preparation_unverified_at) update.preparation_unverified_at = new Date().toISOString();
   if ((next === 'shipped' || catchupDelivered) && !order.shipped_at) update.shipped_at = shippedAt ?? new Date().toISOString();
   if (Object.keys(update).length === 0) return order;
   const { data, error } = await service.from('orders').update(update)

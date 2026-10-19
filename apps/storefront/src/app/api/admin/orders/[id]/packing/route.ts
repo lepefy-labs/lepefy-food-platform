@@ -2,16 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { preparationState, type PreparationOrder } from '@/lib/orders/preparation/preparationPolicy';
+import { isMissingPreparationColumn, withoutPreparationColumns } from '@/lib/orders/preparation/compat';
+
+const PACKING_COLUMNS = 'id, status, fulfillment_type, packing_started_at, picking_completed_at, preparation_mode, paper_preparation_completed_at';
 
 interface PackingBody {
   parcel_count?: number | null;
   cold_chain_checked?: boolean;
+  /** Mode « emballage froid sur papier » : déclaration que l'emballage a été fait selon la liste. */
+  cold_chain_declared?: boolean;
 }
 
-interface OrderRow {
+interface OrderRow extends PreparationOrder {
   id: string;
-  status: string;
-  fulfillment_type: string;
   packing_started_at: string | null;
 }
 
@@ -33,12 +37,9 @@ export async function POST(
   const body = await req.json().catch(() => ({})) as PackingBody;
   const supabase = createServiceClient();
 
-  const { data: orderRaw, error: orderError } = await supabase
-    .from('orders')
-    .select('id, status, fulfillment_type, packing_started_at')
-    .eq('id', params.id)
-    .eq('tenant_id', tenant.id)
-    .maybeSingle();
+  const readOrder = (columns: string) => supabase.from('orders').select(columns).eq('id', params.id).eq('tenant_id', tenant.id).maybeSingle();
+  let { data: orderRaw, error: orderError } = await readOrder(PACKING_COLUMNS);
+  if (isMissingPreparationColumn(orderError)) ({ data: orderRaw, error: orderError } = await readOrder(withoutPreparationColumns(PACKING_COLUMNS)));
 
   if (orderError || !orderRaw) {
     return NextResponse.json({ error: 'Commande introuvable.' }, { status: 404 });
@@ -63,32 +64,37 @@ export async function POST(
   }
 
   const items = (itemsRaw ?? []) as ItemRow[];
-  const pickingComplete = items.length > 0 && items.every(item => {
-    if (!item.picked_at) return false;
-    if (item.storage_type === 'fresh' || item.storage_type === 'frozen') {
-      return Boolean(item.cold_chain_checked_at);
-    }
-    return true;
-  });
-  if (!pickingComplete) {
-    return NextResponse.json({ error: 'Terminez la préparation et les contrôles froid avant l’emballage.' }, { status: 409 });
+  // Same rule as the transition: digital checklist, paper declaration or « sans confirmation ».
+  const state = preparationState(order, items);
+  if (!state.pickingDone) {
+    return NextResponse.json({
+      error: state.mode.picking === 'paper'
+        ? 'Confirmez d’abord « Préparation terminée » avant l’emballage.'
+        : 'Terminez la préparation et les contrôles froid avant l’emballage.',
+    }, { status: 409 });
   }
 
-  const hasColdChain = items.some(item => item.storage_type === 'fresh' || item.storage_type === 'frozen');
+  const hasColdChain = state.hasColdChain;
   const parcelCount = body.parcel_count == null ? null : Number(body.parcel_count);
   if (parcelCount !== null && (!Number.isInteger(parcelCount) || parcelCount < 1 || parcelCount > 99)) {
     return NextResponse.json({ error: 'Le nombre de colis doit être compris entre 1 et 99.' }, { status: 400 });
   }
 
   const now = new Date().toISOString();
-  const coldCheckedAt = hasColdChain && body.cold_chain_checked === true ? now : null;
-  const complete = parcelCount !== null && (!hasColdChain || coldCheckedAt !== null);
+  const coldMode = state.mode.cold_chain_packing;
+  // Each mode writes only its own column: a paper declaration never fills the digital check.
+  const coldCheckedAt = hasColdChain && coldMode === 'digital' && body.cold_chain_checked === true ? now : null;
+  const coldDeclaredAt = hasColdChain && coldMode === 'paper' && body.cold_chain_declared === true ? now : null;
+  const coldOk = !hasColdChain || coldMode === 'none' || coldCheckedAt !== null || coldDeclaredAt !== null;
+  const complete = parcelCount !== null && coldOk;
 
   const update = {
     packing_started_at: order.packing_started_at ?? now,
     packing_parcel_count: parcelCount,
     cold_chain_packing_checked_at: coldCheckedAt,
-    packing_completed_at: complete ? now : null,
+    ...(coldMode === 'paper' ? { cold_chain_packing_declared_at: coldDeclaredAt } : {}),
+    // packing_completed_at = emballage validé dans Lepefy (colis + contrôle froid numérique ou sans objet).
+    packing_completed_at: complete && coldDeclaredAt === null ? now : null,
   };
 
   const { error: updateError } = await supabase
@@ -108,6 +114,7 @@ export async function POST(
     packing: {
       parcel_count: parcelCount,
       cold_chain_checked: coldCheckedAt !== null,
+      cold_chain_declared: coldDeclaredAt !== null,
       complete,
     },
   });

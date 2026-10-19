@@ -301,7 +301,7 @@ export async function confirmBackfill(db: SupabaseClient, input: { tenantId: str
       const statuses = new Set(plan.summaryOrderIds.map((id) => byId.get(id)?.status));
       const dispatched = await dispatchTenantNotification({
         tenantId: input.tenantId, eventType: 'order_backlog_summary', entityType: 'notification_backfill_run', entityId: row.id, occurrenceId: 'summary',
-        alert: backlogSummaryAlert(lines, statuses.size === 1 && statuses.has('preparing') ? '/admin?status=preparing' : '/admin'),
+        alert: backlogSummaryAlert(lines, statuses.size === 1 && statuses.has('preparing') ? '/admin/orders?status=preparing' : '/admin/orders'),
         audienceTypes: AUDIENCE, channels: row.channels, only: plan.summaryPairs, source: 'backfill', backfillRunId: row.id, sendNow: false,
         facts: { orders: plan.summaryOrderIds.length },
       }, deps);

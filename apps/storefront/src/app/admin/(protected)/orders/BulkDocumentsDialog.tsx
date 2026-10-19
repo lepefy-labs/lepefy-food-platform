@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { IconFileTypePdf } from '@tabler/icons-react';
-import { FormatSelect, type OrderDocumentsDefaults } from '../orders/[id]/OrderDocumentsCard';
+import { FormatSelect, type OrderDocumentsDefaults } from '../../orders/[id]/OrderDocumentsCard';
 import { MAX_BULK_ORDER_DOCUMENTS as MAX_BULK_DOCUMENTS, type OrderDocumentFormat } from '@/lib/orders/documents/formats';
 import { cn } from '@/lib/utils/cn';
-import Button, { ButtonAnchor } from '../_components/ui/Button';
-import Dialog from '../_components/ui/Dialog';
-import InlineAlert from '../_components/ui/InlineAlert';
+import Button, { ButtonAnchor } from '../../_components/ui/Button';
+import Dialog from '../../_components/ui/Dialog';
+import InlineAlert from '../../_components/ui/InlineAlert';
 
 type Kind = 'picking-list' | 'packing-slip';
 

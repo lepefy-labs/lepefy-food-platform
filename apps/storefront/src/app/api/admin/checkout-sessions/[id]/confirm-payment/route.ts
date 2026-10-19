@@ -95,6 +95,7 @@ export async function POST(
   }
 
   revalidatePath('/admin');
+  revalidatePath('/admin/orders');
   revalidatePath('/admin/checkout-funnel');
 
   if (!result.created) {

@@ -4,13 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { IconChevronDown } from '@tabler/icons-react';
-import { ADMIN_NAV_GROUPS, isHrefActive, isNavItemActive, navItemsById, type AdminNavItem } from '@/lib/admin/navigation';
+import { ADMIN_NAV_GROUPS, isHrefActive, isNavItemActive, isPrimaryNavGroup, navItemsById, type AdminNavGroup, type AdminNavItem } from '@/lib/admin/navigation';
 import { cn } from '@/lib/utils/cn';
 import { CountBadge } from '../ui/Badge';
 import { PLATFORM_NAV, isGroupActive } from '../platformNavConfig';
 import type { AdminShellNav } from './shellState';
 
 const PLATFORM_OPEN_KEY = 'lepefy-admin-platform-nav-open';
+const GROUPS_OPEN_KEY = 'lepefy-admin-nav-groups-open';
 
 const itemClass = (active: boolean) => cn(
   'admin-nav-item relative flex min-h-9 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors',
@@ -34,9 +35,9 @@ function NavLink({ item, pathname, badge }: { item: AdminNavItem; pathname: stri
   );
 }
 
-function readOpenGroups(): string[] {
+function readOpenGroups(key = PLATFORM_OPEN_KEY): string[] {
   try {
-    const value = JSON.parse(window.localStorage.getItem(PLATFORM_OPEN_KEY) ?? '[]');
+    const value = JSON.parse(window.localStorage.getItem(key) ?? '[]');
     return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
   } catch {
     return [];
@@ -104,19 +105,64 @@ function PlatformSection({ pathname }: { pathname: string }) {
   );
 }
 
+/**
+ * Folding group (every group but the daily ones): open on its active entry,
+ * otherwise as the viewer left it. In the collapsed rail every icon stays
+ * visible (admin-nav-folded).
+ */
+function FoldingGroup({ group, groupId, items, pathname, nav, opened, onToggle }: {
+  group: AdminNavGroup; groupId: string; items: AdminNavItem[]; pathname: string; nav: AdminShellNav; opened: boolean; onToggle: () => void;
+}) {
+  const active = items.some((item) => isNavItemActive(pathname, item));
+  const open = active || opened;
+  const panelId = `${groupId}-items`;
+  return (
+    <div role="group" aria-labelledby={groupId} className="space-y-0.5">
+      <button
+        id={groupId}
+        type="button"
+        onClick={() => { if (!active) onToggle(); }}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="admin-nav-group admin-nav-full-only flex min-h-9 w-full items-center justify-between gap-2 rounded-lg px-2.5 pb-1 pt-3 text-left text-xs font-semibold text-a-text-3 hover:text-a-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus"
+      >
+        <span>{group}</span>
+        <IconChevronDown size={14} aria-hidden="true" className={cn('transition-transform', open && 'rotate-180', active && 'opacity-40')} />
+      </button>
+      <span aria-hidden="true" className="admin-nav-separator mx-2 my-2 hidden border-t border-a-border" />
+      <div id={panelId} className={cn('admin-nav-folded space-y-0.5', !open && 'hidden')}>
+        {items.map((item) => <NavLink key={item.id} item={item} pathname={pathname} badge={item.badge ? nav.badges[item.badge.key] : 0} />)}
+      </div>
+    </div>
+  );
+}
+
 /** Navigation list shared by the desktop rail and the mobile drawer. */
 export default function AdminNav({ nav }: { nav: AdminShellNav }) {
   const pathname = usePathname() ?? '/admin';
   const items = navItemsById(nav.items);
+  const [opened, setOpened] = useState<string[]>([]);
+  useEffect(() => { setOpened(readOpenGroups(GROUPS_OPEN_KEY)); }, []);
+  function toggle(group: string) {
+    setOpened((current) => {
+      const next = current.includes(group) ? current.filter((item) => item !== group) : [...current, group];
+      try { window.localStorage.setItem(GROUPS_OPEN_KEY, JSON.stringify(next)); } catch { /* per-viewer convenience */ }
+      return next;
+    });
+  }
   return (
     <nav aria-label="Navigation principale" className="space-y-0.5 pb-3 [&>div:first-child>.admin-nav-group]:pt-1">
       {ADMIN_NAV_GROUPS.map((group) => {
         const groupItems = items.filter((item) => item.group === group);
         if (groupItems.length === 0) return null;
-        const groupId = `admin-nav-group-${group.toLowerCase().replace(/[^a-z]+/g, '-')}`;
+        const groupId = `admin-nav-group-${group.toLowerCase().normalize('NFD').replace(/[^a-z]+/g, '-')}`;
+        if (!isPrimaryNavGroup(group)) {
+          return <FoldingGroup key={group} group={group} groupId={groupId} items={groupItems} pathname={pathname} nav={nav} opened={opened.includes(group)} onToggle={() => toggle(group)} />;
+        }
         return (
           <div key={group} role="group" aria-labelledby={groupId} className="space-y-0.5">
-            <p id={groupId} className="admin-nav-group px-2.5 pb-1 pt-4 text-xs font-semibold text-a-text-3">{group}</p>
+            {/* « Essentiel » is the shop's daily work: named for assistive tech only. */}
+            <p id={groupId} className={cn('admin-nav-group px-2.5 pb-1 pt-4 text-xs font-semibold text-a-text-3', group === 'Essentiel' && 'sr-only')}>{group}</p>
             <span aria-hidden="true" className="admin-nav-separator mx-2 my-2 hidden border-t border-a-border" />
             {groupItems.map((item) => <NavLink key={item.id} item={item} pathname={pathname} badge={item.badge ? nav.badges[item.badge.key] : 0} />)}
           </div>

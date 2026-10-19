@@ -69,7 +69,7 @@ export default async function CheckoutFunnelPage({ searchParams }: { searchParam
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5 pb-10">
-      <Link href="/admin" className="inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-a-text-3 hover:text-a-text">
+      <Link href="/admin/orders" className="inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-a-text-3 hover:text-a-text">
         <IconArrowLeft size={16} /> Commandes
       </Link>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

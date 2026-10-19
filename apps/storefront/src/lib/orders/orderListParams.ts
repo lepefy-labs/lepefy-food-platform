@@ -5,11 +5,13 @@ import { readModuleConfig } from '@/lib/tenantConfig/moduleConfig';
 import { managedShippingProviderInfo } from '@/lib/shipping/providers/registry';
 import { parseOrderSort, type OperationalThresholds, type OrderSortKey } from './adminOrderOperations';
 import { ORDER_VIEWS, type OrderListFilters, type OrderView } from './loadOrderWorkQueue';
+import { readOrderPreparationSettings, toPreparationMode } from './preparation/settings';
+import { DIGITAL_PREPARATION } from './preparation/preparationPolicy';
 
 export const ORDER_STATUSES = ['new', 'preparing', 'ready_for_pickup', 'shipped', 'delivered', 'cancelled', 'stock_conflict'] as const;
 export const ORDER_PAYMENT_METHODS = ['stripe', 'external_link', 'satispay', 'in_store', 'cash', 'manual'] as const;
 
-/** URL state of /admin (orders work queue) and of its CSV export. */
+/** URL state of /admin/orders (orders work queue) and of its CSV export. */
 export const ORDER_LIST = defineListParams({
   view: { type: 'enum', values: ORDER_VIEWS.filter(Boolean) },
   status: { type: 'enum', values: ORDER_STATUSES },
@@ -47,14 +49,22 @@ export function parseOrderList(raw: RawSearchParams): { values: OrderListValues;
   };
 }
 
-/** Thresholds of the daily digest (tenant module config) and managed shipping availability. */
+/** Thresholds of the daily digest, managed shipping availability and the tenant's preparation mode. */
 export async function loadOrderOperationalContext(db: SupabaseClient, tenant: { id: string; shipping_provider?: string | null }) {
-  const digest = await readModuleConfig(db, dailyDigestModule, tenant.id).catch(() => null);
+  const [digest, preparation] = await Promise.all([
+    readModuleConfig(db, dailyDigestModule, tenant.id).catch(() => null),
+    readOrderPreparationSettings(db, tenant.id),
+  ]);
   const config = digest?.status === 'ok' ? digest.config : DAILY_DIGEST_DEFAULTS;
   const thresholds: OperationalThresholds = {
     prepareHours: config.prepare_hours,
     pickupHours: config.pickup_hours,
     trackingStaleHours: config.tracking_stale_hours,
   };
-  return { thresholds, managedProviderAvailable: Boolean(managedShippingProviderInfo(tenant.shipping_provider ?? null)) };
+  return {
+    thresholds,
+    managedProviderAvailable: Boolean(managedShippingProviderInfo(tenant.shipping_provider ?? null)),
+    preparationMode: preparation.available ? toPreparationMode(preparation.config) : DIGITAL_PREPARATION,
+    preparationSettings: preparation,
+  };
 }

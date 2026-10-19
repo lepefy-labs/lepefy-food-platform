@@ -3,15 +3,20 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconCheck, IconPackage, IconSnowflake } from '@tabler/icons-react';
+import type { PreparationModeValue } from '@/lib/orders/preparation/preparationPolicy';
 
 interface Props {
   orderId: string;
   status: string;
   pickingComplete: boolean;
+  /** Order's preparation modes (snapshot): which cold-chain confirmation this panel records. */
+  pickingMode?: PreparationModeValue;
+  coldMode?: PreparationModeValue;
   hasColdChain: boolean;
   estimatedParcels: number | null;
   initialParcelCount: number | null;
   initialColdChecked: boolean;
+  initialColdDeclared?: boolean;
   initialComplete: boolean;
   /** Without orders.manage the panel only shows the current state. */
   readOnly?: boolean;
@@ -21,16 +26,20 @@ export default function PackingPanel({
   orderId,
   status,
   pickingComplete,
+  pickingMode = 'digital',
+  coldMode = 'digital',
   hasColdChain,
   estimatedParcels,
   initialParcelCount,
   initialColdChecked,
+  initialColdDeclared = false,
   initialComplete,
   readOnly = false,
 }: Props) {
   const router = useRouter();
   const [parcelCount, setParcelCount] = useState(String(initialParcelCount ?? estimatedParcels ?? 1));
-  const [coldChecked, setColdChecked] = useState(initialColdChecked);
+  // Digital check (cold_chain_checked) or paper declaration (cold_chain_declared), never both.
+  const [coldChecked, setColdChecked] = useState(coldMode === 'paper' ? initialColdDeclared : initialColdChecked);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [complete, setComplete] = useState(initialComplete);
@@ -40,7 +49,7 @@ export default function PackingPanel({
   const canComplete = pickingComplete
     && Number.isInteger(Number(parcelCount))
     && Number(parcelCount) >= 1
-    && (!hasColdChain || coldChecked);
+    && (!hasColdChain || coldMode === 'none' || coldChecked);
 
   async function savePacking() {
     setSaving(true);
@@ -51,7 +60,7 @@ export default function PackingPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           parcel_count: Number(parcelCount),
-          cold_chain_checked: coldChecked,
+          ...(coldMode === 'paper' ? { cold_chain_declared: coldChecked } : { cold_chain_checked: coldChecked }),
         }),
       });
       const payload = await res.json().catch(() => null) as { error?: string; packing?: { complete?: boolean } } | null;
@@ -85,7 +94,9 @@ export default function PackingPanel({
       <div className="space-y-4 bg-a-surface p-4">
         {!pickingComplete && (
           <div className="rounded-xl border border-tone-warning-border bg-tone-warning-bg p-3 text-xs leading-5 text-tone-warning-fg">
-            Terminez d’abord la checklist de préparation : l’emballage ne peut pas être validé avant.
+            {pickingMode === 'paper'
+              ? 'Confirmez d’abord « Préparation terminée » : l’emballage ne peut pas être validé avant.'
+              : 'Terminez d’abord la checklist de préparation : l’emballage ne peut pas être validé avant.'}
           </div>
         )}
 
@@ -114,7 +125,13 @@ export default function PackingPanel({
           )}
         </div>
 
-        {hasColdChain && (
+        {hasColdChain && coldMode === 'none' && (
+          <p className="rounded-xl border border-a-border bg-a-surface-2 p-3 text-xs leading-5 text-a-text-2">
+            Emballage froid sans confirmation : aucun contrôle n’est enregistré, suivez la consigne imprimée sur la liste.
+          </p>
+        )}
+
+        {hasColdChain && coldMode !== 'none' && (
           <label className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-xl border p-3 ${coldChecked
             ? 'border-tone-info-border bg-tone-info-bg'
             : 'border-a-border bg-a-surface-2'
@@ -131,7 +148,7 @@ export default function PackingPanel({
             />
             <span className="min-w-0">
               <span className="flex items-center gap-1.5 text-sm font-semibold text-a-text">
-                <IconSnowflake size={16} className="text-tone-info-fg" /> Emballage chaîne du froid validé
+                <IconSnowflake size={16} className="text-tone-info-fg" /> {coldMode === 'paper' ? 'Emballage froid fait selon la liste (déclaration papier)' : 'Emballage chaîne du froid validé'}
               </span>
               <span className="mt-1 block text-xs leading-5 text-a-text-3">
                 Confirmez que frais/surgelés sont conditionnés avec l’emballage adapté avant fermeture des colis.

@@ -1,6 +1,7 @@
 import {
   IconBell,
   IconBuildingStore,
+  IconClipboardCheck,
   IconClockPlay,
   IconCreditCard,
   IconFileText,
@@ -27,6 +28,7 @@ export type SettingsSectionKey =
   | 'automatisations'
   | 'paiements'
   | 'documents'
+  | 'preparation'
   | 'integrations'
   | 'legal'
   | 'fonctionnalites';
@@ -159,6 +161,40 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     ],
   },
   {
+    key: 'commandes',
+    label: 'Commandes',
+    sections: [
+      {
+        key: 'preparation',
+        title: 'Préparation et emballage',
+        navLabel: 'Préparation et emballage',
+        description: 'Préparation dans Lepefy, sur papier ou sans confirmation.',
+        href: `${BASE}/preparation`,
+        icon: IconClipboardCheck,
+        accent: 'teal',
+        keywords: ['préparation', 'picking', 'papier', 'checklist', 'emballage', 'chaîne du froid', 'surgelés', 'frais'],
+        entries: [
+          { title: 'Checklist de préparation', description: 'Validation article par article, sur papier ou sans confirmation.', href: `${BASE}/preparation#checklist`, keywords: ['checklist', 'papier', 'imprimer', 'liste'] },
+          { title: 'Emballage des produits frais et surgelés', description: 'Contrôle froid dans Lepefy, sur papier ou sans confirmation.', href: `${BASE}/preparation#emballage-froid`, keywords: ['froid', 'surgelés', 'frais', 'isotherme'] },
+        ],
+      },
+      {
+        key: 'documents',
+        title: 'Documents des commandes',
+        navLabel: 'Documents',
+        description: 'Liste de préparation, bon de colis, formats A5/A4.',
+        href: `${BASE}/documents`,
+        icon: IconFileText,
+        accent: 'blue',
+        keywords: ['document', 'impression', 'imprimer', 'pdf', 'a5', 'a4'],
+        entries: [
+          { title: 'Liste de préparation', description: 'Format par défaut de la liste de préparation des commandes.', href: `${BASE}/documents#liste-preparation`, keywords: ['picking', 'préparation', 'format', 'a5', 'a4'] },
+          { title: 'Bon de colis', description: 'Récapitulatif client glissé dans le colis, avec QR de suivi.', href: `${BASE}/documents#bon-de-colis`, keywords: ['packing slip', 'colis', 'qr', 'prix', 'récapitulatif'] },
+        ],
+      },
+    ],
+  },
+  {
     key: 'commerce',
     label: 'Commerce',
     sections: [
@@ -174,20 +210,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         entries: [
           { title: 'Méthodes de paiement', description: 'Carte, virement, liens externes, espèces…', href: `${BASE}/paiements#moyens-de-paiement`, keywords: ['carte', 'virement', 'iban', 'paypal', 'espèces', 'lien'] },
           { title: 'Apple Pay', description: 'Activation et enregistrement du domaine pour la carte digitale.', href: `${BASE}/paiements#moyens-de-paiement`, keywords: ['apple', 'wallet', 'domaine'] },
-        ],
-      },
-      {
-        key: 'documents',
-        title: 'Documents des commandes',
-        navLabel: 'Documents',
-        description: 'Liste de préparation, bon de colis, formats A5/A4.',
-        href: `${BASE}/documents`,
-        icon: IconFileText,
-        accent: 'blue',
-        keywords: ['document', 'impression', 'imprimer', 'pdf', 'a5', 'a4'],
-        entries: [
-          { title: 'Liste de préparation', description: 'Format par défaut de la liste de préparation des commandes.', href: `${BASE}/documents#liste-preparation`, keywords: ['picking', 'préparation', 'format', 'a5', 'a4'] },
-          { title: 'Bon de colis', description: 'Récapitulatif client glissé dans le colis, avec QR de suivi.', href: `${BASE}/documents#bon-de-colis`, keywords: ['packing slip', 'colis', 'qr', 'prix', 'récapitulatif'] },
         ],
       },
       {

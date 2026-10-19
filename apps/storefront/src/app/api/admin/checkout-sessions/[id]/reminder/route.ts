@@ -229,6 +229,7 @@ export async function POST(
   }
 
   revalidatePath('/admin');
+  revalidatePath('/admin/orders');
   revalidatePath(`/admin/paiements-en-attente/${session.id}`);
   revalidatePath('/admin/checkout-funnel');
 

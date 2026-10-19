@@ -86,6 +86,7 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path === '/api/admin/tenant') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/daily-digest') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/order-documents/settings') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
+  if (path === '/api/admin/order-preparation/settings') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/feature-flags') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   // Journal d'activité (lecture seule ; le flag activity_journal est vérifié par requireActivityJournalApi).
   if (path === '/api/admin/activite/export') return read ? 'audit.export' : null;

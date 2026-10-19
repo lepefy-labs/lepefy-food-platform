@@ -1,5 +1,5 @@
 import {
-  IconBrandWhatsapp, IconBriefcase, IconBuildingWarehouse, IconCalendarEvent, IconCash, IconChartBar, IconCreditCard,
+  IconBrandWhatsapp, IconBriefcase, IconClipboardList, IconHome, IconBuildingWarehouse, IconCalendarEvent, IconCash, IconChartBar, IconCreditCard,
   IconFileInvoice, IconFileText, IconGift, IconHistory, IconLayoutDashboard, IconMessageCircle, IconPackage, IconPackages, IconPhoto,
   IconPlus, IconQrcode, IconScan, IconSettings, IconShoppingBag, IconSparkles, IconStar, IconToolsKitchen2, IconTruck,
   IconTruckDelivery, IconTruckLoading, IconUserPlus, IconUsers, type Icon,
@@ -18,7 +18,9 @@ import type { AdminTone } from './tokens';
  * lib/auth/adminRoutePermissions.ts.
  */
 
-export type AdminNavGroup = 'Boutique' | 'Opérations' | 'Croissance' | 'Canaux' | 'Gestion' | 'Événementiel' | 'Service sur place' | 'Commun';
+export type AdminNavGroup =
+  | 'Essentiel' | 'Ventes' | 'Croissance' | 'Canaux' | 'Gestion' | 'Contenu & outils' | 'Administration'
+  | 'Événementiel' | 'Service sur place';
 export type AdminNavFlag = 'gestion' | 'whatsapp' | 'activity';
 export type AdminNavBadgeKey = 'pendingPayments' | 'pendingEventRequests' | 'newInquiries' | 'pendingRentalRequests';
 
@@ -53,19 +55,32 @@ export interface AdminQuickAction {
   keywords?: string[];
 }
 
-export const ADMIN_NAV_GROUPS: AdminNavGroup[] = ['Boutique', 'Opérations', 'Croissance', 'Canaux', 'Gestion', 'Événementiel', 'Service sur place', 'Commun'];
+export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
+  'Essentiel', 'Événementiel', 'Service sur place', 'Ventes', 'Croissance', 'Canaux', 'Gestion', 'Contenu & outils', 'Administration',
+];
+
+/**
+ * Daily work: always open, the shop's « Essentiel » without a heading. The
+ * other groups fold (open on their active entry) so the rail stays short
+ * without hiding any module.
+ */
+export const ADMIN_NAV_PRIMARY_GROUPS: readonly AdminNavGroup[] = ['Essentiel', 'Événementiel', 'Service sur place'];
+
+export function isPrimaryNavGroup(group: AdminNavGroup): boolean {
+  return ADMIN_NAV_PRIMARY_GROUPS.includes(group);
+}
 
 export const ADMIN_NAV: AdminNavItem[] = [
-  // Boutique
-  { id: 'orders', label: 'Commandes', href: '/admin', icon: IconShoppingBag, group: 'Boutique', workspace: 'shop', anyOf: ['orders.view'], match: 'exact', alsoActive: [{ href: '/admin/orders' }, { href: '/admin/paiements-en-attente' }], badge: { key: 'pendingPayments', tone: 'warning', label: 'paiements à vérifier' }, mobile: 1, keywords: ['ordres', 'préparation', 'expédition', 'précommandes'] },
-  { id: 'card-payments', label: 'Paiements carte', href: '/admin/paiements-carte', icon: IconCreditCard, group: 'Boutique', workspace: 'shop', anyOf: ['orders.view'], keywords: ['stripe', 'cp-'] },
-  { id: 'checkout-funnel', label: 'Funnel checkout', href: '/admin/checkout-funnel', icon: IconChartBar, group: 'Boutique', workspace: 'shop', anyOf: ['orders.view'], match: 'exact', keywords: ['conversion', 'abandon'] },
-  { id: 'catalogue', label: 'Catalogue', href: '/admin/catalogue', icon: IconPackage, group: 'Boutique', workspace: 'shop', anyOf: ['catalog.view'], alsoActive: [{ href: '/admin/products' }], mobile: 2, keywords: ['produits', 'stock', 'prix', 'catégories'] },
-  { id: 'customers', label: 'Clients', href: '/admin/clients', icon: IconUsers, group: 'Boutique', workspace: 'shop', anyOf: ['customers.view'], keywords: ['crm', 'segments', 'campagnes'] },
-  { id: 'home-slides', label: 'Slides d’accueil', href: '/admin/accueil-slides', icon: IconPhoto, group: 'Boutique', workspace: 'shop', anyOf: ['catalog.manage'], match: 'exact', keywords: ['bannière', 'hero'] },
-  // Opérations
-  { id: 'loyalty-scan', label: 'Scan fidélité', href: '/admin/loyalty/scan', icon: IconScan, group: 'Opérations', workspace: 'shop', anyOf: ['loyalty.scan'], match: 'exact', mobile: 3, keywords: ['carte', 'caisse', 'points'] },
-  { id: 'shipping', label: 'Livraison', href: '/admin/livraison', icon: IconTruck, group: 'Opérations', workspace: 'shop', anyOf: ['shipping.view'], keywords: ['packlink', 'zones', 'tarifs', 'expéditions', 'emballages'] },
+  // Essentiel — the shop's daily work (Aujourd'hui, Commandes, Produits, Livraisons, Clients)
+  { id: 'today', label: 'Aujourd’hui', href: '/admin', icon: IconHome, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], match: 'exact', mobile: 1, keywords: ['accueil', 'tableau de bord', 'priorités', 'dashboard'] },
+  { id: 'orders', label: 'Commandes', href: '/admin/orders', icon: IconShoppingBag, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], alsoActive: [{ href: '/admin/paiements-en-attente' }], badge: { key: 'pendingPayments', tone: 'warning', label: 'paiements à vérifier' }, mobile: 2, keywords: ['ordres', 'préparation', 'expédition', 'précommandes', 'session de préparation'] },
+  { id: 'catalogue', label: 'Produits', href: '/admin/catalogue', icon: IconPackage, group: 'Essentiel', workspace: 'shop', anyOf: ['catalog.view'], alsoActive: [{ href: '/admin/products' }], mobile: 3, keywords: ['catalogue', 'stock', 'prix', 'catégories'] },
+  { id: 'shipping', label: 'Livraisons', href: '/admin/livraison', icon: IconTruck, group: 'Essentiel', workspace: 'shop', anyOf: ['shipping.view'], keywords: ['packlink', 'zones', 'tarifs', 'expéditions', 'emballages', 'forfait'] },
+  { id: 'customers', label: 'Clients', href: '/admin/clients', icon: IconUsers, group: 'Essentiel', workspace: 'shop', anyOf: ['customers.view'], keywords: ['crm', 'segments', 'campagnes'] },
+  // Ventes
+  { id: 'card-payments', label: 'Paiements carte', href: '/admin/paiements-carte', icon: IconCreditCard, group: 'Ventes', workspace: 'shop', anyOf: ['orders.view'], keywords: ['stripe', 'cp-'] },
+  { id: 'checkout-funnel', label: 'Funnel checkout', href: '/admin/checkout-funnel', icon: IconChartBar, group: 'Ventes', workspace: 'shop', anyOf: ['orders.view'], match: 'exact', keywords: ['conversion', 'abandon', 'paniers à relancer'] },
+  { id: 'loyalty-scan', label: 'Scan fidélité', href: '/admin/loyalty/scan', icon: IconScan, group: 'Ventes', workspace: 'shop', anyOf: ['loyalty.scan'], match: 'exact', mobile: 4, keywords: ['carte', 'caisse', 'points'] },
   // Croissance
   { id: 'loyalty', label: 'Fidélité & parrainage', href: '/admin/loyalty', icon: IconGift, group: 'Croissance', workspace: 'shop', anyOf: ['loyalty.manage'], match: 'exact' },
   { id: 'ambassadors', label: 'Ambassadeurs', href: '/admin/ambassadeurs', icon: IconStar, group: 'Croissance', workspace: 'shop', anyOf: ['growth.manage'], match: 'exact', keywords: ['commissions'] },
@@ -90,17 +105,20 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { id: 'event-content', label: 'Galerie / Contenu', href: '/admin/evenementiel/contenu', icon: IconPhoto, group: 'Événementiel', workspace: 'events', anyOf: ['event_content.manage'], alsoActive: [{ href: '/admin/evenementiel/services' }, { href: '/admin/evenementiel/galerie' }] },
   { id: 'rental-delivery', label: 'Livraison matériel', href: '/admin/evenementiel/livraison-materiel', icon: IconTruckDelivery, group: 'Événementiel', workspace: 'events', anyOf: ['event_content.manage'] },
   { id: 'event-scan', label: 'Service repas / Scan', href: '/scan', icon: IconScan, group: 'Service sur place', workspace: 'events', anyOf: ['scan.access'], match: 'exact', mobile: 3, keywords: ['billets', 'repas'] },
-  // Commun
-  { id: 'public-content', label: 'Contenu public', href: '/admin/contenu', icon: IconFileText, group: 'Commun', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['notre origine', 'histoire'] },
-  { id: 'tools', label: 'Outils & QR', href: '/admin/outils', icon: IconQrcode, group: 'Commun', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['affiche', 'qr code'] },
-  { id: 'settings', label: 'Paramètres', href: '/admin/parametres', icon: IconSettings, group: 'Commun', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['réglages', 'configuration', 'notifications'] },
-  { id: 'activity', label: 'Journal d’activité', href: '/admin/activite', icon: IconHistory, group: 'Commun', workspace: 'all', anyOf: ['audit.view'], flag: 'activity', keywords: ['audit', 'historique', 'traçabilité', 'qui a modifié'] },
-  { id: 'billing', label: 'Abonnement', href: '/admin/billing', icon: IconCreditCard, group: 'Commun', workspace: 'all', anyOf: ['billing.view'], match: 'exact', keywords: ['facture'] },
-  { id: 'ai-usage', label: 'Utilisation IA', href: '/admin/ai-usage', icon: IconChartBar, group: 'Commun', workspace: 'all', anyOf: ['ai_usage.view'], match: 'exact' },
+  // Contenu & outils
+  { id: 'home-slides', label: 'Slides d’accueil', href: '/admin/accueil-slides', icon: IconPhoto, group: 'Contenu & outils', workspace: 'shop', anyOf: ['catalog.manage'], match: 'exact', keywords: ['bannière', 'hero'] },
+  { id: 'public-content', label: 'Contenu public', href: '/admin/contenu', icon: IconFileText, group: 'Contenu & outils', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['notre origine', 'histoire'] },
+  { id: 'tools', label: 'Outils & QR', href: '/admin/outils', icon: IconQrcode, group: 'Contenu & outils', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['affiche', 'qr code'] },
+  // Administration
+  { id: 'settings', label: 'Paramètres', href: '/admin/parametres', icon: IconSettings, group: 'Administration', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['réglages', 'configuration', 'notifications', 'préparation papier'] },
+  { id: 'activity', label: 'Journal d’activité', href: '/admin/activite', icon: IconHistory, group: 'Administration', workspace: 'all', anyOf: ['audit.view'], flag: 'activity', keywords: ['audit', 'historique', 'traçabilité', 'qui a modifié'] },
+  { id: 'billing', label: 'Abonnement', href: '/admin/billing', icon: IconCreditCard, group: 'Administration', workspace: 'all', anyOf: ['billing.view'], match: 'exact', keywords: ['facture'] },
+  { id: 'ai-usage', label: 'Utilisation IA', href: '/admin/ai-usage', icon: IconChartBar, group: 'Administration', workspace: 'all', anyOf: ['ai_usage.view'], match: 'exact' },
 ];
 
 export const ADMIN_QUICK_ACTIONS: AdminQuickAction[] = [
   { id: 'new-order', label: 'Nouvelle commande', href: '/admin/orders/new', icon: IconPlus, workspace: 'shop', anyOf: ['orders.manage'], keywords: ['précommande', 'whatsapp', 'téléphone'] },
+  { id: 'prepare-orders', label: 'Préparer les commandes', href: '/admin/orders/preparation', icon: IconClipboardList, workspace: 'shop', anyOf: ['orders.view'], keywords: ['session de préparation', 'liste groupée', 'imprimer', 'picking'] },
   { id: 'new-product', label: 'Nouveau produit', href: '/admin/catalogue/nouveau', icon: IconPlus, workspace: 'shop', anyOf: ['catalog.manage'] },
   { id: 'new-catalog-campaign', label: 'Nouvelle campagne catalogue', href: '/admin/catalogue/campagnes/nouvelle', icon: IconPlus, workspace: 'shop', anyOf: ['catalog.manage'], keywords: ['promotion', 'nouveauté'] },
   { id: 'new-customer', label: 'Ajouter un client', href: '/admin/clients?new=1', icon: IconUserPlus, workspace: 'shop', anyOf: ['customers.manage'] },
@@ -152,7 +170,7 @@ export function navItemsById(ids: string[]): AdminNavItem[] {
   return ADMIN_NAV.filter((item) => set.has(item.id));
 }
 
-/** Mobile bottom bar: up to three visible entries flagged `mobile`, by position. */
+/** Mobile bottom bar: up to three visible entries flagged `mobile`, by position (+ « Plus »). */
 export function mobileNavItems(ids: string[]): AdminNavItem[] {
   return navItemsById(ids).filter((item) => item.mobile !== undefined).sort((a, b) => (a.mobile ?? 0) - (b.mobile ?? 0)).slice(0, 3);
 }

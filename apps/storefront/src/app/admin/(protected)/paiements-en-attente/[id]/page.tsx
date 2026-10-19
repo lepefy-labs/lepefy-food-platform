@@ -182,7 +182,7 @@ export default async function PendingPaymentManagementPage({ params }: { params:
 
   return (
     <div className="mx-auto w-full max-w-5xl pb-10">
-      <Link href="/admin" className="mb-3 inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-a-text-3 hover:text-a-text">
+      <Link href="/admin/orders" className="mb-3 inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-a-text-3 hover:text-a-text">
         <IconArrowLeft size={16} /> Commandes
       </Link>
 

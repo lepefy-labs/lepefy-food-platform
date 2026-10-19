@@ -1,231 +1,196 @@
 import Link from 'next/link'
-import { Suspense } from 'react'
-import { IconClipboardList, IconDownload, IconPlus, IconSnowflake } from '@tabler/icons-react'
+import { redirect } from 'next/navigation'
+import {
+  IconCash, IconCircleCheck, IconClipboardList, IconPlus, IconPrinter, IconTruckDelivery, type Icon,
+} from '@tabler/icons-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenant } from '@/lib/tenant/getTenant'
 import { getCurrentAdminAccessContext, canAdmin } from '@/lib/auth/adminRbac'
-import { ORDER_SORT_OPTIONS, type QueueKey } from '@/lib/orders/adminOrderOperations'
-import { loadOrderWorkQueue, type OrderView, type WorkQueueResult } from '@/lib/orders/loadOrderWorkQueue'
-import { loadOrderOperationalContext, ORDER_LIST, parseOrderList, type OrderListValues } from '@/lib/orders/orderListParams'
-import { pageWindow } from '@/lib/admin/listParams'
-import { formatNumber, pluralize } from '@/lib/admin/format'
-import { ORDER_STATUS_META } from '@/lib/admin/statusRegistry'
-import type { AdminTone } from '@/lib/admin/tokens'
+import { classifyOrderOperation, type OperationalOrder } from '@/lib/orders/adminOrderOperations'
+import { loadOrderWorkQueue, type WorkQueueResult } from '@/lib/orders/loadOrderWorkQueue'
+import { loadOrderOperationalContext, ORDER_LIST } from '@/lib/orders/orderListParams'
+import { buildPriorityItems, buildQuickActions, describeRecentOrder, type KpiCounts, type QuickAction, type RecentOrderRow } from '@/lib/admin/todayDashboard'
+import { formatDate, formatMoney, formatNumber, pluralize } from '@/lib/admin/format'
+import { PREPARATION_MODE_LABELS } from '@/lib/orders/preparation/preparationPolicy'
 import { cn } from '@/lib/utils/cn'
-import { readOrderDocumentSettings } from '@/lib/orders/documents/settings'
-import OrdersTable, { type ListOrder } from './OrdersTable'
-import PendingPaymentsBanner, { type PendingPaymentSession } from './PendingPaymentsBanner'
 import AdminPageHeader from '../_components/ui/AdminPageHeader'
-import AdminStatCard from '../_components/ui/AdminStatCard'
-import { CountBadge, TONE_BADGE_CLASS } from '../_components/ui/Badge'
-import { ButtonAnchor, ButtonLink } from '../_components/ui/Button'
+import { ButtonLink } from '../_components/ui/Button'
+import { TONE_SOLID_BG_CLASS } from '../_components/ui/Badge'
 import InlineAlert from '../_components/ui/InlineAlert'
-import { Card } from '../_components/ui/Panel'
+import { Panel } from '../_components/ui/Panel'
 import { ErrorState } from '../_components/ui/States'
-import FilterBar, { type ActiveFilterChip, type FilterView } from '../_components/data/FilterBar'
-import Pagination from '../_components/data/Pagination'
+import TodayPrepareList, { type PrepareRow } from './TodayPrepareList'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
-const PAYMENT_LABELS: Record<string, string> = {
-  stripe: 'Carte bancaire', satispay: 'Satispay', in_store: 'En magasin', external_link: 'Lien de paiement', cash: 'Espèces', manual: 'Manuel',
+const QUICK_ICONS: Record<QuickAction['key'], Icon> = {
+  prepare: IconClipboardList, print: IconPrinter, ship: IconTruckDelivery, new_order: IconPlus, payments: IconCash,
 }
 
-const OPERATIONAL_VIEWS: { key: Exclude<OrderView, ''> & QueueKey; label: string; helper: string; tone: AdminTone }[] = [
-  { key: 'to_treat', label: 'À traiter', helper: 'Une action de l’équipe est attendue', tone: 'info' },
-  { key: 'preparing', label: 'En préparation', helper: 'Préparation et emballage', tone: 'warning' },
-  { key: 'to_ship', label: 'À expédier', helper: 'Colis prêts à partir', tone: 'warning' },
-  { key: 'in_transit', label: 'En transit', helper: 'Confirmé par le transporteur', tone: 'info' },
-  { key: 'incidents', label: 'Incidents', helper: 'Signalés par le transporteur', tone: 'danger' },
-  { key: 'pickup_ready', label: 'Retraits prêts', helper: 'Client attendu en boutique', tone: 'success' },
-]
+/** Orders list query keys (ORDER_LIST): an old /admin?… link is an orders link. */
+const ORDER_LIST_KEYS = [...Object.keys(ORDER_LIST.spec), 'page', 'size']
 
-const VIEW_LABELS: Partial<Record<OrderView, string>> = {
-  to_treat: 'À traiter', preparing: 'En préparation', to_ship: 'À expédier', in_transit: 'En transit', incidents: 'Incidents',
-  pickup_ready: 'Retraits prêts', urgent: 'Urgents', finished: 'Terminés', payment_pending: 'Paiement à vérifier', aged: 'Plus de 24 h',
-  picking_incomplete: 'Préparation incomplète', packing_pending: 'Emballage à terminer', tracking_missing: 'Suivi manquant',
+function greeting(now: Date): string {
+  const hour = Number(new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hour12: false, timeZone: 'Europe/Paris' }).format(now))
+  return hour >= 18 || hour < 5 ? 'Bonsoir' : 'Bonjour'
 }
 
-export default async function AdminPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+/**
+ * « Aujourd'hui » — operational home of the shop workspace. Answers what to do
+ * now; the full orders cockpit lives at /admin/orders. One light read of the
+ * active orders (the same work-queue classifier as Commandes), two head
+ * counts for payments that are not orders yet, one 8-row recent query.
+ * No provider call, no history scan.
+ */
+export default async function AdminTodayPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+  // Back-compat: /admin?status=…, ?view=…, ?q=… (notifications, bookmarks) open the orders list.
+  const legacy = new URLSearchParams()
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (!ORDER_LIST_KEYS.includes(key)) continue
+    for (const entry of Array.isArray(value) ? value : [value]) if (entry !== undefined) legacy.append(key, entry)
+  }
+  if (legacy.toString()) redirect(`/admin/orders?${legacy.toString()}`)
+
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood')
   const supabase = createServiceClient()
-  const { values, filters, sort } = parseOrderList(searchParams)
-  const [access, operational, documentSettings] = await Promise.all([
-    getCurrentAdminAccessContext(tenant.id),
-    loadOrderOperationalContext(supabase, tenant),
-    readOrderDocumentSettings(supabase, tenant.id),
-  ])
-  const documentDefaults = {
-    pickingFormat: documentSettings.config.picking_list_format,
-    packingSlipEnabled: documentSettings.config.packing_slip_enabled,
-    packingSlipFormat: documentSettings.config.packing_slip_format,
-    packingSlipQrUnavailable: !documentSettings.available && documentSettings.config.packing_slip_show_qr,
-  }
-  const canManage = Boolean(access && canAdmin(access, 'orders.manage'))
   const now = new Date()
+  const dayStart = new Date(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now) + 'T00:00:00')
+  const [access, operational] = await Promise.all([getCurrentAdminAccessContext(tenant.id), loadOrderOperationalContext(supabase, tenant)])
+  const canManage = Boolean(access && canAdmin(access, 'orders.manage'))
 
-  const [{ data: stats, error: statsError }, { data: carriersRaw }, { data: pendingPaymentsRaw }, { count: activePreordersCount }, { count: preordersToVerifyCount }, queue] = await Promise.all([
-    supabase.from('admin_order_dashboard_stats').select('*').eq('tenant_id', tenant.id).maybeSingle(),
-    supabase.from('carriers').select('name').eq('tenant_id', tenant.id).eq('active', true).order('position', { ascending: true }),
-    supabase
-      .from('checkout_sessions')
-      .select('id, email, full_name, items, shipping_total, ambassador_discount_amount, external_payment_type, external_payment_label, created_at')
-      .eq('tenant_id', tenant.id)
-      .eq('payment_method', 'external_link')
-      // Storefront checkouts only: assisted preorders are verified in Précommandes (own flow and notifications).
-      .eq('origin', 'storefront')
-      .in('status', ['open', 'expired', 'awaiting_verification'])
-      .is('order_id', null)
-      .order('created_at', { ascending: true }),
-    supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('origin', 'assisted').in('status', ['draft', 'open', 'awaiting_verification']),
+  const [queue, { count: pendingLinkPayments }, { count: preordersToVerify }, { data: recentRaw }, { count: todayCount }] = await Promise.all([
+    loadOrderWorkQueue(supabase, tenant.id, {
+      filters: { view: 'to_prepare', status: '', dateFrom: '', dateTo: '', fulfillment: '', payment: '', search: '' },
+      sort: 'priority', page: 1, pageSize: 8, now, thresholds: operational.thresholds,
+      managedProviderAvailable: operational.managedProviderAvailable, originCountry: tenant.country, tenantPreparationMode: operational.preparationMode,
+    }).catch((error: unknown): WorkQueueResult | null => { console.error('[admin/today] work queue unavailable', error); return null }),
+    supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id)
+      .eq('payment_method', 'external_link').eq('origin', 'storefront').in('status', ['open', 'expired', 'awaiting_verification']).is('order_id', null),
     supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('origin', 'assisted').eq('status', 'awaiting_verification'),
-    loadOrderWorkQueue(supabase, tenant.id, { filters, sort, page: values.page, pageSize: values.pageSize, thresholds: operational.thresholds, now, managedProviderAvailable: operational.managedProviderAvailable, originCountry: tenant.country })
-      .catch((error: unknown): WorkQueueResult | null => { console.error('[admin/orders] work queue unavailable', error); return null }),
+    supabase.from('orders').select('id, created_at, updated_at, status, payment_status, fulfillment_type, full_name, total')
+      .eq('tenant_id', tenant.id).order('updated_at', { ascending: false }).limit(8),
+    supabase.from('orders').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).gte('created_at', dayStart.toISOString()),
   ])
-  const carriers = ((carriersRaw ?? []) as { name: string }[]).map(carrier => carrier.name)
-  const pendingPayments = (pendingPaymentsRaw ?? []) as PendingPaymentSession[]
 
-  const href = (patch: Partial<Record<keyof OrderListValues, unknown>>) => ORDER_LIST.href('/admin', values, patch)
-  const totalCount = Number(stats?.total_count ?? 0)
-  const kpi = (key: QueueKey) => queue?.kpis[key] ?? 0
-  const countsUnavailable = Boolean(statsError || !queue)
-  const statusCounts: Record<string, number> = {
-    new: Number(stats?.new_count ?? 0),
-    preparing: Number(stats?.preparing_count ?? 0),
-    ready_for_pickup: Number(stats?.ready_for_pickup_count ?? 0),
-    shipped: Number(stats?.shipped_count ?? 0),
-    delivered: Number(stats?.delivered_count ?? 0),
-    cancelled: Number(stats?.cancelled_count ?? 0),
-    stock_conflict: queue?.activeStatusCounts.stock_conflict ?? 0,
-  }
-  const orderList = (queue?.rows ?? []) as unknown as ListOrder[]
-  const window = pageWindow(queue?.total ?? 0, queue?.currentPage ?? 1, values.pageSize)
-  const view = filters.view
-  const hasFilters = ORDER_LIST.activeCount(values, ['view', 'status', 'fulfillment', 'payment', 'dateFrom', 'dateTo']) > 0 || Boolean(filters.search)
-  // A search or a status filter often targets a closed order: show it. Livraison / Retrait / Urgents stay work queues.
-  const finishedCollapsed = !filters.search && !values.status && view !== 'finished'
-  // Reset keeps the chosen sort and page size: they are preferences, not filters.
-  const resetHref = ORDER_LIST.href('/admin', { ...ORDER_LIST.parse({}), sort: values.sort, pageSize: values.pageSize }, {})
+  const kpis: KpiCounts = queue?.kpis ?? {}
+  const linkPayments = pendingLinkPayments ?? 0
+  const preorders = preordersToVerify ?? 0
+  const priorities = buildPriorityItems({ kpis, pendingLinkPayments: linkPayments, preordersToVerify: preorders })
+  const paymentsToVerify = (kpis.payment_unverified ?? 0) + linkPayments + preorders
+  const actions = buildQuickActions({ kpis, mode: operational.preparationMode, canManage, paymentsToVerify })
+  const recent = ((recentRaw ?? []) as RecentOrderRow[]).map((row) => ({ row, entry: describeRecentOrder(row) }))
+  const name = access?.nickname || access?.firstName || null
+  const dateLabel = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' }).format(now)
 
-  // Quick views: fulfillment and a few queue views; KPI cards cover the rest.
-  const views: FilterView[] = [
-    { key: 'all', label: 'Tous', active: !view && !filters.fulfillment, href: href({ view: undefined, fulfillment: undefined }) },
-    { key: 'delivery', label: 'Livraison', active: filters.fulfillment === 'delivery', href: href({ fulfillment: filters.fulfillment === 'delivery' ? undefined : 'delivery' }) },
-    { key: 'pickup', label: 'Retrait', active: filters.fulfillment === 'pickup', href: href({ fulfillment: filters.fulfillment === 'pickup' ? undefined : 'pickup' }) },
-    { key: 'urgent', label: 'Urgents', count: kpi('urgent'), countTone: 'urgent', active: view === 'urgent', href: href({ view: view === 'urgent' ? undefined : 'urgent', status: undefined }) },
-    { key: 'incidents', label: 'Incidents', count: kpi('incidents'), countTone: 'danger', active: view === 'incidents', href: href({ view: view === 'incidents' ? undefined : 'incidents', status: undefined }) },
-    { key: 'finished', label: 'Terminés', active: view === 'finished', href: href({ view: view === 'finished' ? undefined : 'finished', status: undefined }) },
-  ]
-  const chips: ActiveFilterChip[] = [
-    ...(view && !['urgent', 'incidents', 'finished'].includes(view) ? [{ key: 'view', label: VIEW_LABELS[view] ?? view, href: href({ view: undefined }) }] : []),
-    ...(filters.status ? [{ key: 'status', label: `Statut : ${ORDER_STATUS_META[filters.status]?.label ?? filters.status}`, href: href({ status: undefined }) }] : []),
-    ...(filters.payment ? [{ key: 'payment', label: `Paiement : ${PAYMENT_LABELS[filters.payment] ?? filters.payment}`, href: href({ payment: undefined }) }] : []),
-    ...(filters.dateFrom ? [{ key: 'dateFrom', label: `Depuis le ${filters.dateFrom.split('-').reverse().join('/')}`, href: href({ dateFrom: undefined }) }] : []),
-    ...(filters.dateTo ? [{ key: 'dateTo', label: `Jusqu’au ${filters.dateTo.split('-').reverse().join('/')}`, href: href({ dateTo: undefined }) }] : []),
-  ]
-  const controls: { view: OrderView | null; label: string; count: number; tone: AdminTone; icon?: boolean }[] = [
-    { view: 'picking_incomplete', label: 'Préparation incomplète', count: Number(stats?.picking_incomplete_count ?? 0), tone: 'warning' },
-    { view: 'packing_pending', label: 'Emballage à terminer', count: Number(stats?.packing_pending_count ?? 0), tone: 'warning' },
-    { view: 'tracking_missing', label: 'Suivi manquant', count: Number(stats?.tracking_missing_count ?? 0), tone: 'warning' },
-    { view: null, label: 'Chaîne du froid', count: Number(stats?.cold_chain_action_count ?? 0), tone: 'urgent', icon: true },
-    { view: 'payment_pending', label: 'Paiement à vérifier', count: Number(stats?.pending_payment_count ?? 0), tone: 'warning' },
-  ]
-  const exportQuery = ORDER_LIST.query({ ...values, page: 1, pageSize: ORDER_LIST.defaultPageSize })
+  const prepareRows: PrepareRow[] = ((queue?.rows ?? []) as unknown as Array<Omit<OperationalOrder, 'order_items'> & {
+    id: string; full_name: string | null; email: string | null; order_items: Array<{ quantity: number; storage_type: string | null; cold_chain_checked_at?: string | null }>
+  }>).map((order) => {
+    const operation = classifyOrderOperation({ ...order, originCountry: tenant.country, managedProviderAvailable: operational.managedProviderAvailable, tenantPreparationMode: operational.preparationMode }, operational.thresholds, now)
+    return {
+      id: order.id,
+      ref: `#${order.id.slice(0, 8).toUpperCase()}`,
+      customer: order.full_name ?? order.email ?? 'Client',
+      createdAt: formatDate(order.created_at, 'datetime'),
+      units: order.order_items.reduce((sum, item) => sum + item.quantity, 0),
+      lines: order.order_items.length,
+      pickup: order.fulfillment_type === 'pickup',
+      country: order.fulfillment_type === 'delivery' ? order.shipping_address?.country ?? null : null,
+      international: operation.handling.international,
+      fresh: operation.handling.fresh,
+      frozen: operation.handling.frozen,
+      step: operation.step,
+      urgency: operation.urgency,
+      action: operation.action.label,
+    }
+  })
 
   return (
-    <div className="mx-auto w-full max-w-7xl">
+    <div className="mx-auto w-full max-w-7xl space-y-4 pb-10">
       <AdminPageHeader
-        title="Commandes"
-        meta={pluralize(totalCount, 'commande')}
-        description="Traitez d’abord les commandes qui demandent votre attention."
+        title={`${greeting(now)}${name ? ` ${name}` : ''}`}
+        meta={<span className="capitalize">{dateLabel}</span>}
+        description={`${tenant.name} · ${todayCount ? `${pluralize(todayCount, 'nouvelle commande', 'nouvelles commandes')} aujourd’hui` : 'aucune nouvelle commande aujourd’hui'}`}
         actions={<>
-          <ButtonLink href="/admin/orders/precommandes">
-            <IconClipboardList size={17} aria-hidden="true" /> Précommandes
-            <CountBadge tone="warning" count={activePreordersCount ?? 0} label={`${activePreordersCount ?? 0} précommandes actives`} />
-          </ButtonLink>
-          <ButtonAnchor href={`/api/admin/orders/export${exportQuery ? `?${exportQuery}` : ''}`} variant="secondary" title="Exporter la liste filtrée (CSV, 2 000 commandes max.)">
-            <IconDownload size={17} aria-hidden="true" /> Exporter
-          </ButtonAnchor>
+          <ButtonLink href="/admin/orders">Toutes les commandes</ButtonLink>
           {canManage && <ButtonLink href="/admin/orders/new" variant="primary"><IconPlus size={17} aria-hidden="true" /> Nouvelle commande</ButtonLink>}
         </>}
       />
 
-      <div className="space-y-3">
-        {countsUnavailable && <InlineAlert tone="warning" action={<Link href="/admin" className="underline">Réessayer</Link>}>Certains compteurs sont indisponibles.</InlineAlert>}
-        {queue && !queue.priorityAvailable && <InlineAlert tone="info">Plus de 5 000 commandes actives : la liste est triée par date et les compteurs sont partiels.</InlineAlert>}
+      {!queue && <InlineAlert tone="warning" action={<Link href="/admin" className="underline">Réessayer</Link>}>Certains compteurs sont indisponibles. Les commandes restent accessibles dans Commandes.</InlineAlert>}
 
-        <section aria-labelledby="work-queue-title">
-          <h2 id="work-queue-title" className="sr-only">File de fulfillment</h2>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-            {OPERATIONAL_VIEWS.map(item => {
-              const active = view === item.key
-              return (
-                <AdminStatCard
-                  key={item.key}
-                  href={href({ view: active ? undefined : item.key, status: undefined })}
-                  title={item.label}
-                  value={formatNumber(kpi(item.key))}
-                  description={item.helper}
-                  active={active}
-                  tone={item.tone}
-                />
-              )
-            })}
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-a-text-3">
-            <span className="mr-0.5">Contrôles</span>
-            {controls.map(control => {
-              const className = cn('inline-flex min-h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium',
-                control.count > 0 ? TONE_BADGE_CLASS[control.tone] : 'border-a-border bg-a-surface text-a-text-3')
-              const content = <>{control.icon && <IconSnowflake size={13} aria-hidden="true" />}{control.label} <b className="font-semibold tabular-nums">{control.count}</b></>
-              return control.view && control.count > 0
-                ? <Link key={control.label} href={href({ view: view === control.view ? undefined : control.view, status: undefined })} aria-current={view === control.view ? 'true' : undefined} className={cn(className, 'hover:underline', view === control.view && 'ring-1 ring-a-brand')}>{content}</Link>
-                : <span key={control.label} className={className}>{content}</span>
-            })}
-          </div>
-        </section>
-
-        {pendingPayments.length > 0 && <PendingPaymentsBanner sessions={pendingPayments} tenantCurrency={tenant.currency} />}
-        {(preordersToVerifyCount ?? 0) > 0 && (
-          <InlineAlert tone="warning" action={<Link href="/admin/orders/precommandes" className="underline">Vérifier</Link>}>
-            {pluralize(preordersToVerifyCount ?? 0, 'précommande')} avec un paiement à vérifier.
-          </InlineAlert>
-        )}
-
-        <Card as="section" className="overflow-hidden">
-          <h2 className="sr-only">Liste des commandes</h2>
-          <Suspense fallback={<div className="h-14 border-b border-a-border" />}>
-            <FilterBar
-              views={views}
-              viewsLabel="Filtres rapides"
-              search={{ label: 'Rechercher une commande', placeholder: 'Client, e-mail, n° ou UUID de commande' }}
-              filters={[
-                { type: 'select', key: 'status', label: 'Statut', allLabel: 'Tous les statuts', options: Object.entries(ORDER_STATUS_META).map(([key, meta]) => ({ value: key, label: statusCounts[key] ? `${meta.label} (${formatNumber(statusCounts[key]!)})` : meta.label })) },
-                { type: 'select', key: 'payment', label: 'Paiement', allLabel: 'Tous les paiements', options: Object.entries(PAYMENT_LABELS).filter(([key]) => key !== 'manual').map(([value, label]) => ({ value, label })) },
-                { type: 'date-range', label: 'Date de commande', fromKey: 'dateFrom', toKey: 'dateTo' },
-              ]}
-              activeChips={chips}
-              resetHref={resetHref}
-              panelClears={['view']}
-              sort={{ value: queue?.appliedSort ?? sort, options: ORDER_SORT_OPTIONS.map(option => ({ value: option.key, label: option.label })) }}
-              resultLabel={pluralize(window.total, 'résultat')}
-            />
-          </Suspense>
-          {!queue
-            ? <ErrorState title="Impossible de charger les commandes." description="La file de travail n’a pas répondu. Les commandes ne sont pas perdues." action={<ButtonLink href={href({ page: window.page })}>Réessayer</ButtonLink>} />
-            : <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} thresholds={operational.thresholds} canManage={canManage} managedProviderAvailable={operational.managedProviderAvailable} nowIso={now.toISOString()} originCountry={tenant.country} sort={queue.appliedSort} documentDefaults={documentDefaults} resetHref={resetHref} hasFilters={hasFilters} finishedCollapsed={finishedCollapsed} />}
-          {queue && window.total > 0 && (
-            <Pagination
-              window={window}
-              noun="commandes"
-              hrefForPage={(page) => href({ page })}
-              hrefForPageSize={(pageSize) => href({ pageSize })}
-              pageSizes={ORDER_LIST.pageSizes}
-            />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <Panel id="today-priorities" title="À régler en priorité" flush
+          description={priorities.length ? pluralize(priorities.reduce((sum, item) => sum + item.count, 0), 'point à traiter', 'points à traiter') : undefined}>
+          {priorities.length === 0 ? (
+            <p className="flex items-center gap-2 px-4 py-4 text-sm text-tone-success-fg">
+              <IconCircleCheck size={18} aria-hidden="true" /> Rien d’urgent : aucun paiement, stock ou incident à régler.
+            </p>
+          ) : (
+            <ul className="divide-y divide-a-border">
+              {priorities.map((item) => (
+                <li key={item.key}>
+                  <Link href={item.href} className="grid min-h-14 grid-cols-[4px_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-2.5 hover:bg-a-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus">
+                    <span aria-hidden="true" className={cn('h-full min-h-8 rounded-full', TONE_SOLID_BG_CLASS[item.tone])} />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-a-text">{item.label}</span>
+                      <span className="block text-xs text-a-text-3">{item.detail}</span>
+                    </span>
+                    <b className="text-lg font-bold tabular-nums text-a-text">{formatNumber(item.count)}</b>
+                    <span className="text-sm font-semibold text-a-brand-fg">{item.cta}<span className="sr-only"> — {item.label}</span></span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )}
-        </Card>
+        </Panel>
+
+        <Panel id="today-activity" title="Dernières mises à jour" flush>
+          {recent.length === 0 ? <p className="px-4 py-4 text-sm text-a-text-3">Aucune commande pour le moment.</p> : (
+            <ol className="divide-y divide-a-border">
+              {recent.map(({ row, entry }) => (
+                <li key={row.id}>
+                  <Link href={`/admin/orders/${row.id}`} className="flex min-h-11 items-center gap-3 px-4 py-2 text-sm hover:bg-a-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus">
+                    <time dateTime={entry.at} className="w-12 shrink-0 text-xs tabular-nums text-a-text-3">{formatDate(entry.at, 'time')}</time>
+                    <span aria-hidden="true" className={cn('h-2 w-2 shrink-0 rounded-full', TONE_SOLID_BG_CLASS[entry.tone])} />
+                    <span className="min-w-0 flex-1 truncate">{entry.label} <span className="font-mono text-xs text-a-text-2">#{row.id.slice(0, 8).toUpperCase()}</span><span className="text-a-text-3"> · {row.full_name ?? 'Client'}</span></span>
+                    <span className="shrink-0 text-xs font-semibold tabular-nums text-a-text-2">{formatMoney(Number(row.total ?? 0), tenant.currency || 'EUR')}</span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Panel>
       </div>
+
+      <section aria-labelledby="today-actions-title">
+        <h2 id="today-actions-title" className="mb-2 text-base font-semibold text-a-text">Que voulez-vous faire ?</h2>
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {actions.map((action) => {
+            const ActionIcon = QUICK_ICONS[action.key]
+            return (
+              <li key={action.key}>
+                <Link href={action.href} className={cn('flex h-full min-h-24 flex-col gap-1 rounded-[10px] border bg-a-surface p-3 hover:bg-a-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus',
+                  action.primary ? 'border-a-brand ring-1 ring-inset ring-a-brand' : 'border-a-border')}>
+                  <span className={cn('flex h-8 w-8 items-center justify-center rounded-lg', action.primary ? 'bg-a-brand text-a-on-brand' : 'bg-a-brand-soft text-a-brand-fg')}>
+                    <ActionIcon size={18} aria-hidden="true" />
+                  </span>
+                  <span className="text-sm font-semibold text-a-text">{action.label}</span>
+                  <span className="text-xs text-a-text-3">{action.detail}</span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+
+      <Panel id="today-prepare" title={`Commandes à préparer${queue ? ` · ${formatNumber(queue.total)}` : ''}`} flush
+        description={`Préparation : ${PREPARATION_MODE_LABELS[operational.preparationMode.picking].toLowerCase()} · ordre de priorité opérationnelle`}
+        actions={<ButtonLink href="/admin/orders?view=to_prepare" size="sm">Tout voir</ButtonLink>}>
+        {!queue
+          ? <ErrorState title="Impossible de charger les commandes à préparer." action={<ButtonLink href="/admin">Réessayer</ButtonLink>} />
+          : <TodayPrepareList rows={prepareRows} total={queue.total} />}
+      </Panel>
     </div>
   )
 }

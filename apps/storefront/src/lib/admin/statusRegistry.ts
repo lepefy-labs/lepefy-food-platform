@@ -29,6 +29,16 @@ export const ORDER_STATUS_LABELS_IT: Record<string, string> = {
   stock_conflict: 'Conflitto di stock',
 };
 
+/** Preparation step of a new / preparing order (lib/orders/preparation/preparationPolicy.ts). */
+export const PREPARATION_STEP_META: Record<string, AdminStatusMeta> = {
+  to_print: { label: 'À imprimer', tone: 'info' },
+  to_prepare: { label: 'À préparer', tone: 'info' },
+  printed: { label: 'Liste imprimée', tone: 'neutral' },
+  in_progress: { label: 'Préparation en cours', tone: 'warning' },
+  prepared: { label: 'Préparation terminée', tone: 'success' },
+  ready: { label: 'Prêt à expédier', tone: 'success' },
+};
+
 export const PAYMENT_STATUS_META: Record<string, AdminStatusMeta> = {
   paid: { label: 'Payé', tone: 'success' },
   pending: { label: 'En attente', tone: 'warning' },

@@ -111,6 +111,7 @@ export async function POST(req: NextRequest) {
   }
 
   revalidatePath('/admin');
+  revalidatePath('/admin/orders');
   return NextResponse.json({
     preorderId: sessionId,
     reference: preorderReference(sessionId),

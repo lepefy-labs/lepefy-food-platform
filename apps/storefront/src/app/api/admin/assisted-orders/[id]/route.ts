@@ -168,5 +168,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   revalidatePath('/admin');
+  revalidatePath('/admin/orders');
   return NextResponse.json({ id: session.id, status: 'draft', total: parsed.content.cart.total, linkRevoked: Boolean(session.pay_token_hash) });
 }

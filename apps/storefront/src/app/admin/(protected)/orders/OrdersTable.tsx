@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  IconAlertTriangle, IconBuildingStore, IconChevronDown, IconDownload, IconExternalLink,
+  IconAlertTriangle, IconBuildingStore, IconChevronDown, IconClipboardList, IconDownload, IconExternalLink,
   IconFileTypePdf, IconLeaf, IconPrinter, IconSnowflake, IconTruck, IconTruckDelivery,
 } from '@tabler/icons-react';
 import { ORDER_DOCUMENT_FORMATS } from '@/lib/orders/documents/formats';
@@ -18,23 +18,25 @@ import type { NormalizedShipmentStatus, OrderStatus, ShipmentTrackingEvent } fro
 import { formatDate, formatMoney, formatWeight } from '@/lib/admin/format';
 import type { AdminTone } from '@/lib/admin/tokens';
 import { cn } from '@/lib/utils/cn';
-import Badge from '../_components/ui/Badge';
-import Button, { ButtonAnchor, buttonClasses } from '../_components/ui/Button';
-import ConfirmDialog from '../_components/ui/ConfirmDialog';
-import CopyableValue from '../_components/ui/CopyableValue';
-import StatusBadge from '../_components/ui/StatusBadge';
-import { useAdminToast } from '../_components/ui/Toaster';
-import BulkTrackingModal, { type PendingTrackingOrder } from '../_components/ui/BulkTrackingModal';
-import DataTable, { type DataColumn, type DataRowGroup } from '../_components/data/DataTable';
-import { BulkBar, RowSelectionProvider } from '../_components/data/RowSelection';
-import { EmptyState } from '../_components/ui/States';
+import Badge from '../../_components/ui/Badge';
+import Button, { ButtonAnchor, buttonClasses } from '../../_components/ui/Button';
+import ConfirmDialog from '../../_components/ui/ConfirmDialog';
+import CopyableValue from '../../_components/ui/CopyableValue';
+import StatusBadge from '../../_components/ui/StatusBadge';
+import { useAdminToast } from '../../_components/ui/Toaster';
+import BulkTrackingModal, { type PendingTrackingOrder } from '../../_components/ui/BulkTrackingModal';
+import DataTable, { type DataColumn, type DataRowGroup } from '../../_components/data/DataTable';
+import { BulkBar, RowSelectionProvider } from '../../_components/data/RowSelection';
+import { EmptyState } from '../../_components/ui/States';
 import AdminOrdersPoller from './AdminOrdersPoller';
 import BulkDocumentsDialog from './BulkDocumentsDialog';
-import type { OrderDocumentsDefaults } from '../orders/[id]/OrderDocumentsCard';
+import type { OrderDocumentsDefaults } from '../../orders/[id]/OrderDocumentsCard';
+import type { OrderPreparationMode } from '@/lib/orders/preparation/preparationPolicy';
+import PreparationStepBadge from '../../_components/ui/PreparationStepBadge';
 
 interface ShippingAddress { city?: string; postal_code?: string; country?: string; line1?: string }
 interface ShippingDetails { carrierName?: string; serviceName?: string; numParcels?: number; totalWeightG?: number }
-export interface OrderItemRow { id: string; name: string; quantity: number; subtotal: number; storage_type: string | null; warehouse_location?: string | null }
+export interface OrderItemRow { id: string; name: string; quantity: number; subtotal: number; storage_type: string | null; warehouse_location?: string | null; cold_chain_checked_at?: string | null }
 export interface ListOrder {
   id: string; created_at: string; updated_at: string; full_name: string | null; email: string | null;
   fulfillment_type: 'delivery' | 'pickup'; shipping_address: ShippingAddress | null; shipping_details: ShippingDetails | null;
@@ -44,11 +46,17 @@ export interface ListOrder {
   shipping_normalized_status: NormalizedShipmentStatus | null; shipping_provider_synced_at: string | null; shipping_sync_error: string | null;
   shipping_tracking_events: ShipmentTrackingEvent[] | null; shipping_estimated_delivery_at: string | null; shipped_at?: string | null;
   picking_started_at: string | null; picking_completed_at: string | null; packing_completed_at: string | null; packing_parcel_count: number | null;
+  cold_chain_packing_checked_at?: string | null;
+  // Migration 160 (preparationPolicy): mode snapshot and paper flow.
+  preparation_mode?: OrderPreparationMode | null; picking_list_printed_at?: string | null;
+  paper_preparation_started_at?: string | null; paper_preparation_completed_at?: string | null; cold_chain_packing_declared_at?: string | null;
   order_items: OrderItemRow[];
 }
 interface DetailData { suggestion: CartonSuggestion | null; missingWeightLines: number }
 interface Props {
-  orders: ListOrder[]; tenantCurrency: string; carriers: string[]; thresholds: OperationalThresholds;
+  orders: ListOrder[]; tenantCurrency: string;
+  /** Tenant's current preparation mode: step of the orders not started yet. */
+  tenantPreparationMode: OrderPreparationMode; carriers: string[]; thresholds: OperationalThresholds;
   canManage: boolean; managedProviderAvailable: boolean; nowIso: string; originCountry: string; sort: OrderSortKey;
   documentDefaults: OrderDocumentsDefaults;
   /** Link that clears every filter (empty state). */
@@ -111,7 +119,7 @@ function csvOf(rows: ListOrder[]) {
   return `﻿${lines.join('\r\n')}\r\n`;
 }
 
-export default function OrdersTable({ orders, tenantCurrency, carriers, thresholds, canManage, managedProviderAvailable, nowIso, originCountry, sort, documentDefaults, resetHref, hasFilters, finishedCollapsed }: Props) {
+export default function OrdersTable({ orders, tenantPreparationMode, tenantCurrency, carriers, thresholds, canManage, managedProviderAvailable, nowIso, originCountry, sort, documentDefaults, resetHref, hasFilters, finishedCollapsed }: Props) {
   const router = useRouter();
   const toast = useAdminToast();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -129,7 +137,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
   const [pendingTracking, setPendingTracking] = useState<PendingTrackingOrder[] | null>(null);
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const money = (value: number | null | undefined) => formatMoney(Number(value ?? 0), tenantCurrency || 'EUR');
-  const operations = useMemo(() => new Map(orders.map(order => [order.id, classifyOrderOperation({ ...order, originCountry, managedProviderAvailable }, thresholds, now)])), [orders, managedProviderAvailable, thresholds, now]);
+  const operations = useMemo(() => new Map(orders.map(order => [order.id, classifyOrderOperation({ ...order, originCountry, managedProviderAvailable, tenantPreparationMode }, thresholds, now)])), [orders, originCountry, managedProviderAvailable, tenantPreparationMode, thresholds, now]);
   // Rows of the collapsed « Terminées » group are off screen: they leave the selection (bulk actions never touch hidden orders).
   const rowIds = useMemo(() => orders.filter(order => finishedOpen || sort !== 'priority' || operations.get(order.id)?.group !== 'finished').map(order => order.id), [orders, finishedOpen, sort, operations]);
   useEffect(() => { setExpanded(new Set()); setDetail({}); setDetailError(new Set()); }, [orders]);
@@ -205,6 +213,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
     return (
       <div className="flex flex-col items-start gap-1">
         <StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} />
+        {operation.step && <PreparationStepBadge step={operation.step} />}
         {transport && !done(order) && <Badge tone={transport.tone}>Transport : {transport.label}</Badge>}
         {lastMove && order.status === 'shipped' && <p className="text-xs text-a-text-3">Mouvement {formatSince(lastMove, now)}</p>}
         {eta && <p className="text-xs text-a-text-3">Livraison estimée : {eta}</p>}
@@ -347,7 +356,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
             <p className="truncate font-semibold">{order.full_name ?? order.email ?? 'Client'}</p>
             <p className="text-xs text-a-text-3">{formatDate(order.created_at, 'datetime')} · <b className="font-semibold text-a-text">{money(order.total)}</b></p>
           </div>
-          <StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} />
+          <span className="flex flex-col items-end gap-1"><StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} />{operation.step && <PreparationStepBadge step={operation.step} />}</span>
         </div>
         {flag && <p className="mt-1.5 flex items-start gap-1 text-xs font-semibold text-tone-urgent-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{flag}</p>}
         <div className="mt-2">{preparationSummary(order, true)}<HandlingBadges operation={operation} /></div>
@@ -384,6 +393,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
       />
       <BulkBar rowIds={rowIds}>
         {(ids) => <>
+          <Link href={`/admin/orders/preparation?ids=${ids.join(',')}`} className={buttonClasses({ variant: 'secondary', size: 'sm' })}><IconClipboardList size={16} aria-hidden="true" />Préparer la sélection</Link>
           <Button variant="secondary" size="sm" onClick={() => setDocumentIds(ids)}><IconPrinter size={16} aria-hidden="true" />Documents…</Button>
           <Button variant="secondary" size="sm" onClick={() => exportSelection(ids)}><IconDownload size={16} aria-hidden="true" />Exporter (CSV)</Button>
           {canManage && <Button size="sm" onClick={() => setBulkIds(ids)}><IconTruckDelivery size={16} aria-hidden="true" />Traiter la sélection</Button>}

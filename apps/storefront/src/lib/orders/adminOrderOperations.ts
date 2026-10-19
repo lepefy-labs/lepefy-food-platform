@@ -1,5 +1,9 @@
 import type { NormalizedShipmentStatus, OrderStatus, ShipmentTrackingEvent } from '@lepefy/types';
 import { SHIPPING_SYNC_PREPARATION_INCOMPLETE, shipmentEventsNewestFirst, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
+import {
+  DIGITAL_PREPARATION, preparationState, preparationStep,
+  type OrderPreparationMode, type PreparationOrder, type PreparationStep,
+} from './preparation/preparationPolicy';
 
 // Single operational classifier of the Admin → Commandes work queue. KPIs,
 // views, the "Priorité opérationnelle" sort and every row read it: no queue
@@ -7,7 +11,7 @@ import { SHIPPING_SYNC_PREPARATION_INCOMPLETE, shipmentEventsNewestFirst, shipme
 // snapshots only, never a live provider call). The order state machine stays
 // in orderTransitionService; nothing here mutates an order.
 
-export interface OperationalOrder {
+export interface OperationalOrder extends Omit<PreparationOrder, 'status' | 'order_items'> {
   id?: string;
   status: OrderStatus;
   fulfillment_type: 'delivery' | 'pickup';
@@ -16,8 +20,10 @@ export interface OperationalOrder {
   updated_at: string;
   total?: number | null;
   shipping_address?: { country?: string | null } | null;
-  order_items?: Array<{ storage_type?: string | null }> | null;
+  order_items?: Array<{ storage_type?: string | null; picked_at?: string | null; cold_chain_checked_at?: string | null }> | null;
   originCountry?: string | null;
+  /** Tenant's current preparation mode: decides the step of an order not started yet. */
+  tenantPreparationMode?: OrderPreparationMode;
   shipped_at?: string | null;
   picking_started_at?: string | null;
   picking_completed_at?: string | null;
@@ -33,7 +39,11 @@ export interface OperationalOrder {
 }
 
 export interface OperationalThresholds { prepareHours: number; pickupHours: number; trackingStaleHours: number }
-export type QueueKey = 'to_treat' | 'preparing' | 'to_ship' | 'in_transit' | 'incidents' | 'pickup_ready' | 'urgent' | 'finished';
+export type QueueKey = 'to_treat' | 'preparing' | 'to_ship' | 'in_transit' | 'incidents' | 'pickup_ready' | 'urgent' | 'finished'
+  // Work views of the « Aujourd'hui » dashboard (same classifier, one count per order and view).
+  | 'to_prepare' | 'to_print' | 'late_preparation' | 'late_pickup' | 'tracking_issues' | 'payment_unverified' | 'stock_conflict'
+  // « Contrôles » chips, aware of each order's preparation mode (never a missing digital click in paper mode).
+  | 'picking_incomplete' | 'packing_pending' | 'tracking_missing' | 'cold_chain' | 'paper_in_progress';
 
 export type PriorityGroup =
   | 'action_required' | 'preparation_overdue' | 'pickup_overdue' | 'preparing'
@@ -105,9 +115,9 @@ function isEtaOverdue(order: OperationalOrder, now: Date): boolean {
     && Date.parse(order.shipping_estimated_delivery_at!) < now.getTime();
 }
 
+/** Preparation and packing satisfied for the order's mode (preparationPolicy). */
 function isReadyToShip(order: OperationalOrder): boolean {
-  return order.status === 'preparing' && order.fulfillment_type === 'delivery'
-    && Boolean(order.picking_completed_at) && Boolean(order.packing_completed_at);
+  return order.status === 'preparing' && order.fulfillment_type === 'delivery' && preparationState(order).readyForFinal;
 }
 
 function usesManagedShipment(order: OperationalOrder): boolean {
@@ -159,11 +169,17 @@ export function nextOrderAction(order: OperationalOrder, anomaly: OrderAnomaly |
   if (order.status === 'stock_conflict') return action('Vérifier le conflit');
   if (hasLogisticsIncident(order)) return action('Résoudre l’incident', 'incident', true, 'tracking');
   if (order.payment_status !== 'paid') return action('Vérifier le paiement', 'detail', true, 'payment');
+  if (order.status === 'new' && (order.tenantPreparationMode ?? DIGITAL_PREPARATION).picking === 'paper') return action('Imprimer et démarrer');
   if (order.status === 'new') return action('Préparer');
   if (order.status === 'preparing') {
-    if (!order.picking_completed_at) return action('Poursuivre la préparation', 'detail', true, 'preparation');
+    const preparation = preparationState(order);
+    if (!preparation.pickingDone) {
+      return preparation.mode.picking === 'paper'
+        ? action(order.paper_preparation_started_at || order.picking_list_printed_at ? 'Terminer la préparation' : 'Imprimer la liste', 'detail', true, 'preparation')
+        : action('Poursuivre la préparation', 'detail', true, 'preparation');
+    }
     if (order.fulfillment_type === 'pickup') return action('Marquer prête au retrait');
-    if (!order.packing_completed_at) return action('Terminer l’emballage', 'detail', true, 'packing');
+    if (!preparation.packingDone) return action('Terminer l’emballage', 'detail', true, 'packing');
     if (usesManagedShipment(order)) return action(order.shipping_provider_reference ? 'Gérer l’expédition' : 'Associer l’expédition', 'detail', true, 'shipment');
     return action('Expédier');
   }
@@ -200,6 +216,8 @@ export interface OrderOperation {
   /** Timestamp driving the order inside its group. */
   operationalAt: string;
   action: NextOrderAction;
+  /** Preparation step (new / preparing only), from preparationPolicy. */
+  step: PreparationStep | null;
 }
 
 export function classifyOrderOperation(order: OperationalOrder, thresholds: OperationalThresholds, now: Date): OrderOperation {
@@ -207,7 +225,7 @@ export function classifyOrderOperation(order: OperationalOrder, thresholds: Oper
   const handling = orderHandlingFlags(order);
   if (isTerminalOrder(order)) {
     flags.add('finished');
-    return { group: 'finished', handling, flags, anomaly: null, urgency: null, notice: null, operationalAt: order.updated_at, action: nextOrderAction(order) };
+    return { group: 'finished', handling, flags, anomaly: null, urgency: null, notice: null, operationalAt: order.updated_at, action: nextOrderAction(order), step: null };
   }
 
   const anomaly = orderAnomaly(order, thresholds, now);
@@ -236,13 +254,41 @@ export function classifyOrderOperation(order: OperationalOrder, thresholds: Oper
   if (readyToShip) flags.add('to_ship');
   if (order.status === 'shipped' && order.fulfillment_type === 'delivery' && MOVING_STATUSES.has(order.shipping_normalized_status as NormalizedShipmentStatus)) flags.add('in_transit');
   if (order.status === 'ready_for_pickup' && order.fulfillment_type === 'pickup') flags.add('pickup_ready');
+  if (group === 'preparation_overdue') flags.add('late_preparation');
+  if (group === 'pickup_overdue') flags.add('late_pickup');
+  if (anomaly?.code === 'payment_unverified') flags.add('payment_unverified');
+  if (order.status === 'stock_conflict') flags.add('stock_conflict');
+  if (anomaly && ['shipped_without_tracking', 'tracking_stale', 'eta_overdue'].includes(anomaly.code)) flags.add('tracking_issues');
+
+  const step = preparationStep(order, order.tenantPreparationMode ?? DIGITAL_PREPARATION);
+  const preparation = preparationState(order);
+  const pickupPrepared = order.fulfillment_type === 'pickup' && order.status === 'preparing' && preparation.pickingDone;
+  if ((order.status === 'new' || order.status === 'preparing') && order.payment_status === 'paid' && !readyToShip && !pickupPrepared) {
+    flags.add('to_prepare');
+    if (step?.key === 'to_print') flags.add('to_print');
+  }
+  if (order.status === 'preparing') {
+    if (preparation.mode.picking === 'digital' && !preparation.pickingDone) flags.add('picking_incomplete');
+    if (order.fulfillment_type === 'delivery' && preparation.pickingDone && !preparation.packingDone) flags.add('packing_pending');
+    if (order.fulfillment_type === 'delivery' && preparation.packingDone && !order.tracking_code) flags.add('tracking_missing');
+    if (preparation.paperInProgress) flags.add('paper_in_progress');
+  }
+  // Chaîne du froid: only checks the order's mode expects in Lepefy (digital lines / digital packing check).
+  if (['new', 'preparing', 'ready_for_pickup'].includes(order.status) && preparation.hasColdChain) {
+    const lineMode = order.preparation_mode ? preparation.mode.picking : order.status === 'new' ? (order.tenantPreparationMode ?? DIGITAL_PREPARATION).picking : 'digital';
+    const linesPending = lineMode === 'digital' && (order.order_items ?? [])
+      .some((item) => (item.storage_type === 'fresh' || item.storage_type === 'frozen') && !item.cold_chain_checked_at);
+    const packingPending = order.fulfillment_type === 'delivery' && order.status === 'preparing' && preparation.pickingDone
+      && preparation.mode.cold_chain_packing === 'digital' && !order.cold_chain_packing_checked_at;
+    if (linesPending || packingPending) flags.add('cold_chain');
+  }
 
   const urgency = preparationOverdue
     ? `${order.status === 'new' ? 'Ouverte' : 'En préparation'} depuis ${formatOperationalDuration(preparationAge!)}`
     : pickupOverdue ? `Inactive depuis ${formatOperationalDuration(pickupAge!)}` : null;
   const notice = readyToShip && usesManagedShipment(order) && !order.shipping_provider_reference ? 'Expédition à associer' : null;
 
-  return { group, handling, flags, anomaly, urgency, notice, operationalAt, action: nextOrderAction(order, anomaly) };
+  return { group, handling, flags, anomaly, urgency, notice, operationalAt, action: nextOrderAction(order, anomaly), step };
 }
 
 /** Back-compat: queue flags of one order. */

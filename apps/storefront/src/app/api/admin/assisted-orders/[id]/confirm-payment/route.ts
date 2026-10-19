@@ -91,6 +91,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   revalidatePath('/admin');
+  revalidatePath('/admin/orders');
   return NextResponse.json({
     orderId: result.order.id,
     orderNumber: orderNumberFor(result.order.id),

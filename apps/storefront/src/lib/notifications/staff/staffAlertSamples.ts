@@ -60,7 +60,7 @@ export function buildStaffAlertSamples(): StaffAlertSample[] {
         { orderNumber: '#A82F19C4', customer: 'Marie K.', total: 86.5, priority: 'high', international: true, fresh: true, frozen: false },
         { orderNumber: '#E5F6A7B8', customer: 'Moussa T.', total: 42, priority: 'normal', international: false, fresh: false, frozen: false },
         { orderNumber: '#C9D0E1F2', customer: null, total: 19.9, priority: 'normal', international: false, fresh: false, frozen: false },
-      ], '/admin?status=preparing'),
+      ], '/admin/orders?status=preparing'),
     },
     { id: 'staff-shipment-failed', group: shipping, label: 'Expédition non créée', alert: shipmentAlert('shipment_creation_failed', order({ shipment: { ...order().shipment!, draftStatus: 'Échec de création' } }), 'Colis non déterminable (dimensions du carton manquantes (Livraison → Emballages)).') },
     { id: 'staff-shipment-action', group: shipping, label: 'Expédition à vérifier', alert: shipmentAlert('shipment_action_required', order({ shipment: shipped }), 'Incident signalé par le transporteur (Adresse incomplète)') },

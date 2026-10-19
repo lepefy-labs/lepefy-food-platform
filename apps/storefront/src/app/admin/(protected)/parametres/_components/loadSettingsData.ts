@@ -1,5 +1,7 @@
 import 'server-only';
 import { readOrderDocumentSettings } from '@/lib/orders/documents/settings';
+import { readOrderPreparationSettings } from '@/lib/orders/preparation/settings';
+import { PREPARATION_MODE_LABELS } from '@/lib/orders/preparation/preparationPolicy';
 import type { NotificationTeamMember, Tenant, TenantNotificationRecipient, TenantSocialLink } from '@lepefy/types';
 import { createServiceClient } from '@/lib/supabase/server';
 import { loadNotificationRecipients as loadRecipientsWithSubscriptions, loadNotificationTeamMembers } from '@/lib/notifications/notificationSubscriptions';
@@ -52,12 +54,13 @@ const plural = (count: number, singular: string, pluralForm: string) => `${count
 /** Card statuses of the Settings Hub, derived from real tenant data only. */
 export async function loadSettingsStatuses(tenant: Tenant): Promise<SettingsStatusMap> {
   const db = createServiceClient();
-  const [socialLinks, recipients, payments, digest, documents] = await Promise.all([
+  const [socialLinks, recipients, payments, digest, documents, preparationSettings] = await Promise.all([
     loadSocialLinks(db, tenant.id),
     loadNotificationRecipients(db, tenant.id),
     db.from('tenant_payment_methods').select('active').eq('tenant_id', tenant.id),
     loadDailyDigestSettings(db, tenant.id),
     readOrderDocumentSettings(db, tenant.id),
+    readOrderPreparationSettings(db, tenant.id),
   ]);
 
   const profileComplete = Boolean(tenant.storefront_url && tenant.whatsapp_number);
@@ -90,6 +93,9 @@ export async function loadSettingsStatuses(tenant: Tenant): Promise<SettingsStat
     documents: !documents.available
       ? { label: 'Par défaut (A5)', tone: 'neutral' }
       : { label: `Préparation ${documents.config.picking_list_format.toUpperCase()} · ${documents.config.packing_slip_enabled ? `bon de colis ${documents.config.packing_slip_format.toUpperCase()}` : 'sans bon de colis'}`, tone: 'ok' },
+    preparation: !preparationSettings.available
+      ? { label: 'Dans Lepefy (par défaut)', tone: 'neutral' }
+      : { label: `Préparation ${PREPARATION_MODE_LABELS[preparationSettings.config.picking_mode].toLowerCase()} · froid ${PREPARATION_MODE_LABELS[preparationSettings.config.cold_chain_packing_mode].toLowerCase()}`, tone: 'ok' },
     integrations: integrations > 0 ? { label: plural(integrations, 'service connecté', 'services connectés'), tone: 'ok' } : { label: 'Aucun service', tone: 'neutral' },
     legal: legalComplete ? { label: 'Complet', tone: 'ok' } : { label: 'À compléter', tone: 'warning' },
   };

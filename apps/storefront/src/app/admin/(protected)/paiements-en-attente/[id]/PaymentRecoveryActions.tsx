@@ -115,7 +115,7 @@ export default function PaymentRecoveryActions({
         return;
       }
       setCancelOpen(false);
-      router.push('/admin');
+      router.push('/admin/orders');
       router.refresh();
     } catch {
       setCancelError('Impossible d’annuler cette demande.');
@@ -164,7 +164,7 @@ export default function PaymentRecoveryActions({
           <section className="rounded-2xl border border-tone-warning-border bg-tone-warning-bg p-5">
             <h2 className="font-bold text-a-text">Décision paiement</h2>
             <p className="mt-1 text-sm leading-6 text-a-text-2">Confirmez uniquement après avoir réellement constaté la réception du paiement externe.</p>
-            <div className="mt-4 max-w-xs"><ConfirmPaymentButton endpoint={`/api/admin/checkout-sessions/${sessionId}/confirm-payment`} label="Confirmer réception" confirmingLabel="Confirmation…" style={{ backgroundColor: '#D97706' }} onSuccess={(warning) => { if (!warning) { router.push('/admin'); router.refresh(); } }} /></div>
+            <div className="mt-4 max-w-xs"><ConfirmPaymentButton endpoint={`/api/admin/checkout-sessions/${sessionId}/confirm-payment`} label="Confirmer réception" confirmingLabel="Confirmation…" style={{ backgroundColor: '#D97706' }} onSuccess={(warning) => { if (!warning) { router.push('/admin/orders'); router.refresh(); } }} /></div>
           </section>
         ) : (
           <section className="rounded-2xl border border-a-border bg-a-surface p-5 text-sm text-a-text-3">Votre rôle permet de consulter cette demande, mais pas de confirmer manuellement un paiement externe.</section>

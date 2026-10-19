@@ -36,6 +36,10 @@ import { carrierDisplayName, shipmentEventsNewestFirst } from '@/lib/shipping/sh
 import { getCurrentAdminAccessContext, canAdmin } from '@/lib/auth/adminRbac'
 import { dailyDigestModule, DAILY_DIGEST_DEFAULTS } from '@/lib/notifications/dailyDigestConfig'
 import { readModuleConfig } from '@/lib/tenantConfig/moduleConfig'
+import { DIGITAL_PREPARATION, orderPreparationMode, preparationBlockers, preparationState, PREPARATION_MODE_LABELS } from '@/lib/orders/preparation/preparationPolicy'
+import { readOrderPreparationSettings, toPreparationMode } from '@/lib/orders/preparation/settings'
+import PaperPreparationPanel from '../../../orders/[id]/PaperPreparationPanel'
+import PreparationStepBadge from '../../../_components/ui/PreparationStepBadge'
 import {
   classifyOrderOperation, formatSince, orderDetailTransition, PRIORITY_GROUP_LABELS, transportState,
   type OperationalOrder, type OrderActionSection, type OrderAnomalyCode,
@@ -137,7 +141,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
 
   if (!order) notFound()
 
-  const [{ data: rawItems }, { data: carriersRaw }, access, digest, documentSettings, shipmentAutomation] = await Promise.all([
+  const [{ data: rawItems }, { data: carriersRaw }, access, digest, documentSettings, shipmentAutomation, preparationSettings] = await Promise.all([
     (supabase as unknown as {
       from(t: 'order_items'): ReturnType<ReturnType<typeof createServiceClient>['from']>
     }).from('order_items')
@@ -154,6 +158,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
     readModuleConfig(supabase, dailyDigestModule, tenant.id).catch(() => null),
     readOrderDocumentSettings(supabase, tenant.id),
     readShippingAutomationSettings(supabase, tenant.id),
+    readOrderPreparationSettings(supabase, tenant.id),
   ])
 
   const items = (rawItems ?? []).sort((a, b) => {
@@ -174,16 +179,21 @@ export default async function AdminOrderPage({ params }: PageProps) {
   // et lien de suivi à partager quand le client n'a pas d'e-mail.
   const isAssisted = order.order_origin === 'assisted'
   const showPaymentAudit = isAssisted || Boolean(order.payment_confirmation_source && order.payment_confirmation_source !== 'stripe_webhook')
-  const [assistedSessionResult, confirmerResult] = await Promise.all([
+  const [assistedSessionResult, confirmerResult, preparerResult] = await Promise.all([
     isAssisted && order.checkout_session_id
       ? supabase.from('checkout_sessions').select('id, phone').eq('id', order.checkout_session_id).eq('tenant_id', tenant.id).maybeSingle()
       : Promise.resolve({ data: null }),
     order.payment_confirmed_by
       ? supabase.from('admin_users').select('email').eq('id', order.payment_confirmed_by).maybeSingle()
       : Promise.resolve({ data: null }),
+    order.paper_preparation_completed_by
+      ? supabase.from('admin_users').select('email, nickname, first_name').eq('id', order.paper_preparation_completed_by).maybeSingle()
+      : Promise.resolve({ data: null }),
   ])
   const assistedSession = assistedSessionResult.data as { id: string; phone: string | null } | null
   const confirmedByEmail = (confirmerResult.data as { email: string } | null)?.email ?? null
+  const preparer = preparerResult.data as { email: string; nickname: string | null; first_name: string | null } | null
+  const preparedBy = preparer ? preparer.nickname || preparer.first_name || preparer.email : null
   const trackingLink = isAssisted ? buildOrderTrackingLink(order.id, order.email, shopBaseUrl(tenant)) : null
   const shippingDetails = (order.shipping_details ?? null) as ShippingDetails | null
   const isPickup = order.fulfillment_type === 'pickup'
@@ -208,14 +218,26 @@ export default async function AdminOrderPage({ params }: PageProps) {
   const pickedCount = items.filter(item => item.picked_at).length
   const coldItems = items.filter(item => item.storage_type === 'fresh' || item.storage_type === 'frozen')
   const coldChecked = coldItems.filter(item => item.cold_chain_checked_at).length
-  const pickingComplete = items.length > 0 && pickedCount === items.length && coldChecked === coldItems.length
+  // Preparation rules of this order's mode (snapshot; a new order shows the tenant's current mode).
+  const tenantPreparationMode = preparationSettings.available ? toPreparationMode(preparationSettings.config) : DIGITAL_PREPARATION
+  const preparation = preparationState(order, items)
+  const displayMode = order.preparation_mode ? orderPreparationMode(order) : order.status === 'new' ? tenantPreparationMode : DIGITAL_PREPARATION
+  const digitalPicking = displayMode.picking === 'digital'
+  const pickingComplete = preparation.pickingDone
   const pickingProgress = { total: items.length, picked: pickedCount, coldRequired: coldItems.length, coldChecked, complete: pickingComplete }
+  const preparationGate = {
+    pickingMode: preparation.mode.picking,
+    coldMode: preparation.mode.cold_chain_packing,
+    pickingDone: preparation.pickingDone,
+    packingDone: preparation.packingDone,
+    blockers: order.status === 'preparing' ? preparationBlockers(order, items, !isPickup) : [],
+  }
 
   // Same classifier as the work queue: group, reliable anomaly, contextual urgency, next action.
   const now = new Date()
   const managedProvider = managedShippingProviderInfo(order.shipping_provider_key ?? tenant.shipping_provider)
   const managed = !isPickup && order.shipping_tracking_mode !== 'manual' && Boolean(managedProvider)
-  const operation = classifyOrderOperation({ ...(order as unknown as OperationalOrder), managedProviderAvailable: Boolean(managedProvider) }, thresholds, now)
+  const operation = classifyOrderOperation({ ...(order as unknown as OperationalOrder), order_items: items, managedProviderAvailable: Boolean(managedProvider), tenantPreparationMode }, thresholds, now)
   const transition = orderDetailTransition(order, managed)
   const terminal = operation.group === 'finished'
   const transport = transportState(order)
@@ -245,7 +267,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
     : null
 
   const alertTone = operation.anomaly && (operation.flags.has('incidents') || operation.anomaly.code === 'stock_conflict') ? 'danger' : 'warning'
-  const pickingNeedsAttention = order.status === 'preparing' && !pickingComplete
+  const pickingNeedsAttention = order.status === 'preparing' && !pickingComplete && digitalPicking
   const mapQuery = address
     ? [address.line1, address.postal_code, address.city, address.country].filter(Boolean).join(', ')
     : ''
@@ -254,7 +276,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
   return (
     <div className="mx-auto w-full max-w-7xl pb-10">
       <Link
-        href="/admin"
+        href="/admin/orders"
         className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-a-text-3 transition hover:bg-a-surface-2 hover:text-a-text"
       >
         <IconArrowLeft size={17} aria-hidden="true" />
@@ -275,7 +297,8 @@ export default async function AdminOrderPage({ params }: PageProps) {
                 <IconSnowflake size={13} aria-hidden="true" /> Chaîne du froid
               </span>
             )}
-            {order.status === 'preparing' && (
+            {operation.step && !digitalPicking && <PreparationStepBadge step={operation.step} />}
+            {order.status === 'preparing' && digitalPicking && (
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${pickingComplete
                 ? 'bg-tone-success-bg text-tone-success-fg'
                 : 'bg-tone-warning-bg text-tone-warning-fg'
@@ -375,9 +398,38 @@ export default async function AdminOrderPage({ params }: PageProps) {
           )}
 
           <div id="picking-checklist" className="scroll-mt-24">
-            <AdminBlockAccent tone="primary">
-              <PickingChecklist orderId={order.id} orderStatus={order.status} items={items} canManage={canManage} />
-            </AdminBlockAccent>
+            {digitalPicking ? (
+              <AdminBlockAccent tone="primary">
+                <PickingChecklist orderId={order.id} orderStatus={order.status} items={items} canManage={canManage} />
+              </AdminBlockAccent>
+            ) : (
+              <div className="space-y-3">
+                <PaperPreparationPanel
+                  orderId={order.id}
+                  status={order.status}
+                  delivery={!isPickup}
+                  pickingMode={displayMode.picking}
+                  coldMode={displayMode.cold_chain_packing}
+                  hasColdChain={hasColdChain}
+                  printedAt={order.picking_list_printed_at ?? null}
+                  completedAt={order.paper_preparation_completed_at ?? null}
+                  completedBy={preparedBy}
+                  coldDeclaredAt={order.cold_chain_packing_declared_at ?? null}
+                  parcelCount={order.packing_parcel_count}
+                  suggestedParcels={cartonSuggestion?.parcels.length ?? shippingDetails?.numParcels ?? null}
+                  pickingFormat={documentSettings.config.picking_list_format}
+                  paid={order.payment_status === 'paid'}
+                  canManage={canManage}
+                />
+                <details className="rounded-2xl border border-a-border bg-a-surface">
+                  <summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm font-semibold text-a-text-2">Articles de la commande · {items.length} ligne{items.length > 1 ? 's' : ''} (checklist facultative)</summary>
+                  <div className="border-t border-a-border p-2">
+                    <PickingChecklist orderId={order.id} orderStatus={order.status} items={items} canManage={canManage} />
+                  </div>
+                </details>
+                <p className="px-1 text-xs text-a-text-3">Mode de préparation : {PREPARATION_MODE_LABELS[displayMode.picking].toLowerCase()} · emballage froid : {PREPARATION_MODE_LABELS[displayMode.cold_chain_packing].toLowerCase()}{order.preparation_mode ? ' (fixé au démarrage)' : ''}.</p>
+              </div>
+            )}
           </div>
 
           <AdminBlockAccent tone="info">
@@ -505,6 +557,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
             draftCreation={draftCreation}
             coldChain={{ fresh: freshQty, frozen: frozenQty }}
             pickingProgress={pickingProgress}
+            preparation={preparationGate}
             cartonSuggestion={cartonSuggestion}
             missingWeightLines={missingWeightLines}
             canManage={canManage}

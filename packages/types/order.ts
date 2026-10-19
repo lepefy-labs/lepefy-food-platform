@@ -83,6 +83,19 @@ export interface Order {
   packing_parcel_count: number | null;
   /** Required for delivery orders containing fresh/frozen products. */
   cold_chain_packing_checked_at: string | null;
+  /** Migration 160 — mode snapshot taken when preparation starts (null = digital/digital). */
+  preparation_mode?: { picking: 'digital' | 'paper' | 'none'; cold_chain_packing: 'digital' | 'paper' | 'none' } | null;
+  /** First explicit « Imprimer et démarrer » (never set by the PDF GET). */
+  picking_list_printed_at?: string | null;
+  paper_preparation_started_at?: string | null;
+  paper_preparation_started_by?: string | null;
+  /** Explicit « Préparation terminée » declaration (paper mode). Never sets picked_at / picking_completed_at. */
+  paper_preparation_completed_at?: string | null;
+  paper_preparation_completed_by?: string | null;
+  /** Cold-chain packing declared on paper; distinct from cold_chain_packing_checked_at (digital). */
+  cold_chain_packing_declared_at?: string | null;
+  /** Final transition in mode « sans confirmation »: no check recorded. */
+  preparation_unverified_at?: string | null;
   notes: string | null;
   /** Migration 128 — absents tant que la migration n'est pas appliquée. */
   order_origin?: OrderOrigin;

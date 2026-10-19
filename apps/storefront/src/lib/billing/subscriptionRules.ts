@@ -183,6 +183,7 @@ export const SUSPENDED_ADMIN_PERMISSIONS = ['orders.view', 'billing.view'] as co
 
 export function isAdminPathAllowedWhenSuspended(pathname: string): boolean {
   return pathname === '/admin'
+    || pathname === '/admin/orders'
     || pathname.startsWith('/admin/orders/')
     || pathname === '/admin/billing'
     || pathname.startsWith('/admin/securite');

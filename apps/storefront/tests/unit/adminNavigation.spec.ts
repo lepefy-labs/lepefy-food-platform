@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
-  ADMIN_NAV, ADMIN_QUICK_ACTIONS, isNavItemActive, mobileNavItems, navItemsById, resolveAdminNavigation, type AdminNavContext,
-} from '../../src/lib/admin/navigation';
+  ADMIN_NAV, ADMIN_QUICK_ACTIONS, isNavItemActive, mobileNavItems, navItemsById, resolveAdminNavigation, type AdminNavContext, ADMIN_NAV_PRIMARY_GROUPS, ADMIN_NAV_GROUPS, isPrimaryNavGroup } from '../../src/lib/admin/navigation';
 import { defaultAdminDestination, permissionsForAdminPath } from '../../src/lib/auth/adminRoutePermissions';
 
 const NO_FLAGS = { gestion: false, whatsapp: false, activity: false };
@@ -67,12 +66,12 @@ test('the default destination always opens for the same permissions (no redirect
 test('full shop admin sees the shop and common entries, flagged modules only with their flag', () => {
   const full = resolveAdminNavigation(ctx({ permissions: ['*'] }));
   expect(full.items).toEqual([
-    'orders', 'card-payments', 'checkout-funnel', 'catalogue', 'customers', 'home-slides',
-    'loyalty-scan', 'shipping',
+    'today', 'orders', 'catalogue', 'shipping', 'customers',
+    'card-payments', 'checkout-funnel', 'loyalty-scan',
     'loyalty', 'ambassadors', 'reviews', 'nala-analytics', 'ai-lab',
-    'public-content', 'tools', 'settings', 'billing', 'ai-usage',
+    'home-slides', 'public-content', 'tools', 'settings', 'billing', 'ai-usage',
   ]);
-  expect(full.actions).toEqual(['new-order', 'new-product', 'new-catalog-campaign', 'new-customer']);
+  expect(full.actions).toEqual(['new-order', 'prepare-orders', 'new-product', 'new-catalog-campaign', 'new-customer']);
   expect(full.platform).toBe(false);
 
   const withFlags = resolveAdminNavigation(ctx({ permissions: ['*'], flags: { gestion: true, whatsapp: true, activity: true } }));
@@ -108,8 +107,12 @@ test('platform owner sees everything of the workspace plus the platform block', 
 
 test('active state: exact, prefix and extra paths', () => {
   const byId = (id: string) => ADMIN_NAV.find((item) => item.id === id)!;
-  expect(isNavItemActive('/admin', byId('orders'))).toBe(true);
+  expect(isNavItemActive('/admin', byId('today'))).toBe(true);
+  expect(isNavItemActive('/admin/orders', byId('today'))).toBe(false);
+  expect(isNavItemActive('/admin', byId('orders'))).toBe(false);
+  expect(isNavItemActive('/admin/orders', byId('orders'))).toBe(true);
   expect(isNavItemActive('/admin/orders/123', byId('orders'))).toBe(true);
+  expect(isNavItemActive('/admin/orders/preparation', byId('orders'))).toBe(true);
   expect(isNavItemActive('/admin/paiements-en-attente/abc', byId('orders'))).toBe(true);
   expect(isNavItemActive('/admin/catalogue', byId('orders'))).toBe(false);
   expect(isNavItemActive('/admin/catalogue/abc', byId('catalogue'))).toBe(true);
@@ -121,10 +124,17 @@ test('active state: exact, prefix and extra paths', () => {
 
 test('mobile bar: at most three visible entries in their declared order', () => {
   const full = resolveAdminNavigation(ctx({ permissions: ['*'] }));
-  expect(mobileNavItems(full.items).map((item) => item.id)).toEqual(['orders', 'catalogue', 'loyalty-scan']);
+  expect(mobileNavItems(full.items).map((item) => item.id)).toEqual(['today', 'orders', 'catalogue']);
   const cashier = resolveAdminNavigation(ctx({ permissions: ['loyalty.scan'] }));
   expect(mobileNavItems(cashier.items).map((item) => item.id)).toEqual(['loyalty-scan']);
   const events = resolveAdminNavigation(ctx({ workspace: 'events', permissions: ['*'] }));
   expect(mobileNavItems(events.items).map((item) => item.id)).toEqual(['events-overview', 'event-reservations', 'event-scan']);
   expect(navItemsById(['shipping', 'orders']).map((item) => item.id)).toEqual(['orders', 'shipping']);
+});
+
+test('daily groups stay open, every other module folds without disappearing', () => {
+  expect(ADMIN_NAV_PRIMARY_GROUPS).toEqual(['Essentiel', 'Événementiel', 'Service sur place']);
+  const shopPrimary = ADMIN_NAV.filter((item) => item.workspace === 'shop' && isPrimaryNavGroup(item.group)).map((item) => item.id);
+  expect(shopPrimary).toEqual(['today', 'orders', 'catalogue', 'shipping', 'customers']);
+  for (const item of ADMIN_NAV) expect(ADMIN_NAV_GROUPS, item.id).toContain(item.group);
 });

@@ -47,6 +47,7 @@ Aggiungere un formato (letter, a6, thermal_80): voce del registro, layout nei du
 | `GET /api/admin/orders/[id]/documents/picking-list?format=a5\|a4&download=1` | `orders.view` | |
 | `GET /api/admin/orders/[id]/documents/packing-slip?format=…` | `orders.view` | crea il token del portale al primo bon |
 | `GET /api/admin/orders/documents/{picking-list\|packing-slip}?ids=a,b&format=…` | `orders.view` | un solo PDF, ordine degli `ids`, max 50 |
+| `GET /api/admin/orders/documents/preparation-summary?ids=a,b&format=…` | `orders.view` | **liste groupée** della Session de préparation (una riga per articolo con ripartizione per ordine, secs → frais → surgelés); formato di default = quello della liste de préparation. Documento in più, non sostituisce le liste individuali. Vedi `docs/ORDER_PREPARATION.md` §4 |
 
 - Risposta: `application/pdf`, `inline` (o `attachment` con `download=1`), `Cache-Control: private, no-store`, `X-Robots-Tag: noindex`. Nomi: `commande-CC4314FE-preparation-a5.pdf`, `commande-CC4314FE-bon-de-colis-a5.pdf`, `preparation-2026-10-05-a5.pdf`, `bons-de-colis-2026-10-05-a5.pdf`.
 - Errori (francese; pagina HTML se aperta in navigazione): formato sconosciuto 400, ordine assente/altro tenant 404, annullato 409, bon de colis disattivato 409, lotto > 50 413, Gotenberg assente/irraggiungibile/timeout 503, errore di conversione 502. Nel lotto gli ordini assenti, di altro tenant o annullati sono esclusi (`X-Documents-Skipped`).

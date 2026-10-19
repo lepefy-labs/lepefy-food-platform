@@ -15,6 +15,7 @@ import CartonSuggestionCard from './CartonSuggestionCard';
 import OrderDocumentsCard, { type OrderDocumentsDefaults } from './OrderDocumentsCard';
 import type { CartonSuggestion } from '@/lib/shipping/cartonSuggestion';
 import type { Order } from '@lepefy/types';
+import type { PreparationModeValue } from '@/lib/orders/preparation/preparationPolicy';
 
 interface ShippingDetails {
   totalWeightG?: number;
@@ -38,6 +39,15 @@ interface PickingProgress {
   complete: boolean;
 }
 
+/** Preparation gate of this order, computed on the server by preparationPolicy (same rule as the transition). */
+export interface PreparationGate {
+  pickingMode: PreparationModeValue;
+  coldMode: PreparationModeValue;
+  pickingDone: boolean;
+  packingDone: boolean;
+  blockers: string[];
+}
+
 /** Guidance shown when the next step happens in another panel (no duplicated mutation). */
 export interface NextStepGuide { label: string; hint: string; href: string }
 
@@ -52,6 +62,7 @@ interface Props {
   draftCreation?: boolean;
   coldChain?: { fresh: number; frozen: number };
   pickingProgress: PickingProgress;
+  preparation: PreparationGate;
   cartonSuggestion?: CartonSuggestion | null;
   missingWeightLines?: number;
   canManage: boolean;
@@ -84,6 +95,7 @@ export default function OrderDetail({
   draftCreation = false,
   coldChain = { fresh: 0, frozen: 0 },
   pickingProgress,
+  preparation,
   cartonSuggestion = null,
   missingWeightLines = 0,
   canManage,
@@ -115,16 +127,14 @@ export default function OrderDetail({
   const needsTracking = action?.status === 'shipped';
   const finishingPreparation = order.status === 'preparing'
     && (action?.status === 'shipped' || action?.status === 'ready_for_pickup');
-  const pickingBlocked = finishingPreparation && !pickingProgress.complete;
-  const packingProgress = {
-    parcelCount: order.packing_parcel_count,
-    complete: Boolean(order.packing_completed_at && order.packing_parcel_count && order.packing_parcel_count > 0),
-  };
+  const paperPicking = preparation.pickingMode === 'paper';
+  const pickingBlocked = finishingPreparation && !preparation.pickingDone;
+  const packingProgress = { parcelCount: order.packing_parcel_count, complete: preparation.packingDone };
   const packingBlocked = order.status === 'preparing' && action?.status === 'shipped' && !packingProgress.complete;
   const actionDisabled = saving || (needsTracking && !trackingCode.trim()) || pickingBlocked || packingBlocked;
   const blockReason = pickingBlocked
-    ? 'Terminez la checklist de préparation (lignes et contrôles froid).'
-    : packingBlocked ? 'Validez d’abord l’emballage (nombre de colis).'
+    ? (paperPicking ? 'Confirmez « Préparation terminée » dans le panneau Préparation sur papier.' : 'Terminez la checklist de préparation (lignes et contrôles froid).')
+    : packingBlocked ? (preparation.blockers[0] ?? 'Validez d’abord l’emballage (nombre de colis).')
       : needsTracking && !trackingCode.trim() ? 'Renseignez le code de suivi.' : null;
   const hasColdChain = coldChain.fresh > 0 || coldChain.frozen > 0;
   const terminal = order.status === 'delivered' || order.status === 'cancelled';
@@ -208,11 +218,15 @@ export default function OrderDetail({
               }`}>
                 <div className="flex items-center justify-between gap-3">
                   <p className={`text-xs font-bold uppercase tracking-wide ${pickingProgress.complete ? 'text-tone-success-fg' : 'text-tone-warning-fg'}`}>Préparation</p>
-                  <span className="text-xs font-semibold text-a-text-2">{pickingProgress.picked}/{pickingProgress.total}</span>
+                  {preparation.pickingMode === 'digital' && <span className="text-xs font-semibold text-a-text-2">{pickingProgress.picked}/{pickingProgress.total}</span>}
                 </div>
                 {pickingProgress.complete ? (
                   <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-tone-success-fg">
-                    <IconCheck size={14} aria-hidden="true" /> Préparation et contrôles froid terminés.
+                    <IconCheck size={14} aria-hidden="true" /> {preparation.pickingMode === 'digital' ? 'Préparation et contrôles froid terminés.' : preparation.pickingMode === 'paper' ? 'Préparation papier confirmée.' : 'Sans confirmation : aucun contrôle enregistré.'}
+                  </p>
+                ) : paperPicking ? (
+                  <p className="mt-2 text-xs leading-5 text-tone-warning-fg">
+                    <a href="#picking-checklist" className="font-semibold underline">Confirmez « Préparation terminée »</a> quand la liste papier est faite.
                   </p>
                 ) : (
                   <p className="mt-2 text-xs leading-5 text-tone-warning-fg">
@@ -247,7 +261,13 @@ export default function OrderDetail({
                     </span>
                   )}
                 </div>
-                <p className="mt-2 text-xs leading-5 text-tone-info-fg">Le contrôle froid de chaque ligne doit être validé avant la remise ou l&apos;expédition.</p>
+                <p className="mt-2 text-xs leading-5 text-tone-info-fg">
+                  {preparation.coldMode === 'digital'
+                    ? 'Le contrôle froid doit être validé dans Lepefy avant la remise ou l’expédition.'
+                    : preparation.coldMode === 'paper'
+                      ? 'Emballage froid sur papier : à confirmer à la fin de la préparation.'
+                      : 'Emballage froid sans confirmation : suivez la consigne imprimée sur la liste.'}
+                </p>
               </div>
             )}
 
@@ -293,11 +313,14 @@ export default function OrderDetail({
         <PackingPanel
           orderId={order.id}
           status={order.status}
-          pickingComplete={pickingProgress.complete}
+          pickingComplete={preparation.pickingDone}
+          pickingMode={preparation.pickingMode}
+          coldMode={preparation.coldMode}
           hasColdChain={hasColdChain}
           estimatedParcels={shippingDetails?.numParcels ?? null}
           initialParcelCount={order.packing_parcel_count}
           initialColdChecked={Boolean(order.cold_chain_packing_checked_at)}
+          initialColdDeclared={Boolean(order.cold_chain_packing_declared_at)}
           initialComplete={packingProgress.complete}
           readOnly={!canManage}
         />
@@ -308,7 +331,7 @@ export default function OrderDetail({
       )}
 
       {managed && managedProvider && (order.status !== 'new' || draftCreation) && order.status !== 'cancelled' && (
-        <ManagedShipmentPanel order={order} provider={managedProvider} ready={pickingProgress.complete && packingProgress.complete} canManage={canManage} draftCreation={draftCreation} />
+        <ManagedShipmentPanel order={order} provider={managedProvider} ready={preparation.pickingDone && packingProgress.complete} canManage={canManage} draftCreation={draftCreation} />
       )}
 
       {order.payment_method === 'in_store' && !isPaid && (

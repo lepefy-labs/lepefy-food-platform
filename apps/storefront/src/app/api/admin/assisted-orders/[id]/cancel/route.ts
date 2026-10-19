@@ -54,5 +54,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
 
   revalidatePath('/admin');
+  revalidatePath('/admin/orders');
   return NextResponse.json({ id: session.id, status: 'cancelled' });
 }

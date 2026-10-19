@@ -102,7 +102,7 @@ test('covered month and transfer reference', () => {
 });
 
 test('suspended tenant keeps billing and read-only orders', () => {
-  for (const path of ['/admin', '/admin/billing', '/admin/orders/abc', '/admin/securite']) expect(isAdminPathAllowedWhenSuspended(path), path).toBe(true);
+  for (const path of ['/admin', '/admin/billing', '/admin/orders', '/admin/orders/abc', '/admin/securite']) expect(isAdminPathAllowedWhenSuspended(path), path).toBe(true);
   for (const path of ['/admin/catalogue', '/admin/clients', '/admin/billing/x', '/admin/livraison']) expect(isAdminPathAllowedWhenSuspended(path), path).toBe(false);
   expect(isAdminApiAllowedWhenSuspended('orders.view', 'GET')).toBe(true);
   expect(isAdminApiAllowedWhenSuspended('orders.view', 'PATCH')).toBe(false);

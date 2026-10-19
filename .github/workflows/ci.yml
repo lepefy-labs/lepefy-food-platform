@@ -475,3 +475,13 @@ jobs:
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/159_shipping_tariff_publish.sql
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/159_shipping_tariff_publish.sql
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/159_shipping_tariff_publish.test.sql
+
+      - name: Order preparation modes — config CHECK, order snapshot, paper audit events (160)
+        if: ${{ !cancelled() }}
+        env:
+          PGPASSWORD: test
+        run: |
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/160_order_preparation_modes.fixture.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/160_order_preparation_modes.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/160_order_preparation_modes.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/160_order_preparation_modes.test.sql

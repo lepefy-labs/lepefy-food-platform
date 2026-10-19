@@ -56,6 +56,7 @@ export async function POST(
   }
 
   revalidatePath('/admin');
+  revalidatePath('/admin/orders');
   revalidatePath('/admin/checkout-funnel');
 
   return NextResponse.json({ id: params.id, status: 'cancelled' as const });

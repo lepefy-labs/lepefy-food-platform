@@ -11,7 +11,7 @@ export const fetchCache = 'force-no-store';
 export const maxDuration = 60;
 
 /**
- * CSV of the orders list with the filters and sort of /admin (same query
+ * CSV of the orders list with the filters and sort of /admin/orders (same query
  * string). Read-only, `orders.view` (adminApiPermissions), capped at
  * ORDER_EXPORT_LIMIT rows; X-Export-Truncated tells when the cap was hit.
  */
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   try {
     result = await loadOrderWorkQueue(db, tenant.id, {
       filters, sort, page: 1, pageSize: ORDER_EXPORT_LIMIT, now: new Date(),
-      thresholds: context.thresholds, managedProviderAvailable: context.managedProviderAvailable, originCountry: tenant.country,
+      thresholds: context.thresholds, managedProviderAvailable: context.managedProviderAvailable, originCountry: tenant.country, tenantPreparationMode: context.preparationMode,
     });
   } catch (error) {
     console.error('[admin/orders/export] work queue unavailable', error);

@@ -108,7 +108,8 @@ test.describe('work queue classification', () => {
     expect(orderQueueFlags(make(), thresholds, now).has('to_treat')).toBe(true);
     expect(orderQueueFlags(make({ status: 'preparing' }), thresholds, now).has('to_treat')).toBe(true);
     const packed = make({ status: 'preparing', picking_completed_at: hoursAgo(1), packing_completed_at: hoursAgo(1) });
-    expect([...orderQueueFlags(packed, thresholds, now)].sort()).toEqual(['preparing', 'to_ship', 'to_treat']);
+    // tracking_missing: packed delivery without tracking code (same rule as the former SQL « Suivi manquant »).
+    expect([...orderQueueFlags(packed, thresholds, now)].sort()).toEqual(['preparing', 'to_ship', 'to_treat', 'tracking_missing']);
     const transit = orderQueueFlags(make(moving(5)), thresholds, now);
     expect(transit.has('in_transit')).toBe(true);
     expect(transit.has('to_treat')).toBe(false);

@@ -8,6 +8,11 @@ import {
   type FulfillmentType,
 } from '@/lib/orders/adminOrderWorkflow';
 import type { OrderStatus } from '@lepefy/types';
+import { preparationBlockers, preparationState, type PreparationOrder } from '@/lib/orders/preparation/preparationPolicy';
+import { isMissingPreparationColumn, withoutPreparationColumns } from '@/lib/orders/preparation/compat';
+
+const BULK_COLUMNS = 'id, status, fulfillment_type, tracking_code, tracking_carrier, email, full_name, packing_completed_at, packing_parcel_count, '
+  + 'cold_chain_packing_checked_at, preparation_mode, cold_chain_packing_declared_at, paper_preparation_completed_at, preparation_unverified_at';
 
 type SkipReason = 'wrong_status' | 'missing_tracking';
 
@@ -21,6 +26,11 @@ interface BulkOrderRow {
   full_name: string | null;
   packing_completed_at: string | null;
   packing_parcel_count: number | null;
+  preparation_mode: PreparationOrder['preparation_mode'];
+  cold_chain_packing_checked_at: string | null;
+  cold_chain_packing_declared_at: string | null;
+  paper_preparation_completed_at: string | null;
+  preparation_unverified_at: string | null;
 }
 
 interface PickingItemRow {
@@ -28,16 +38,6 @@ interface PickingItemRow {
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
   picked_at: string | null;
   cold_chain_checked_at: string | null;
-}
-
-function pickingComplete(items: PickingItemRow[]) {
-  return items.length > 0 && items.every(item => {
-    if (!item.picked_at) return false;
-    if (item.storage_type === 'fresh' || item.storage_type === 'frozen') {
-      return Boolean(item.cold_chain_checked_at);
-    }
-    return true;
-  });
 }
 
 export async function POST(req: NextRequest) {
@@ -57,11 +57,10 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createServiceClient();
-  const { data: ordersRaw, error: fetchError } = await admin
-    .from('orders')
-    .select('id, status, fulfillment_type, tracking_code, tracking_carrier, email, full_name, packing_completed_at, packing_parcel_count')
-    .in('id', orderIds)
-    .eq('tenant_id', tenant.id);
+  const readOrders = (columns: string) => admin.from('orders').select(columns).in('id', orderIds).eq('tenant_id', tenant.id);
+  let { data: ordersRaw, error: fetchError } = await readOrders(BULK_COLUMNS);
+  // Before migration 160: same rules without its columns (digital mode for every order).
+  if (isMissingPreparationColumn(fetchError)) ({ data: ordersRaw, error: fetchError } = await readOrders(withoutPreparationColumns(BULK_COLUMNS)));
 
   if (fetchError) {
     return NextResponse.json({ error: fetchError.message }, { status: 500 });
@@ -69,6 +68,7 @@ export async function POST(req: NextRequest) {
 
   const orders = (ordersRaw ?? []) as unknown as BulkOrderRow[];
   const preparingIds = orders.filter(order => order.status === 'preparing').map(order => order.id);
+  const itemsByOrder = new Map<string, PickingItemRow[]>();
 
   if (preparingIds.length > 0) {
     const { data: pickingItemsRaw, error: pickingError } = await admin
@@ -80,39 +80,49 @@ export async function POST(req: NextRequest) {
     if (pickingError) {
       return NextResponse.json({ error: 'Impossible de vérifier la préparation des commandes.' }, { status: 500 });
     }
-
-    const itemsByOrder = new Map<string, PickingItemRow[]>();
     for (const item of (pickingItemsRaw ?? []) as PickingItemRow[]) {
       const list = itemsByOrder.get(item.order_id) ?? [];
       list.push(item);
       itemsByOrder.set(item.order_id, list);
     }
-
-    const incomplete = preparingIds.filter(id => !pickingComplete(itemsByOrder.get(id) ?? []));
-    if (incomplete.length > 0) {
-      return NextResponse.json(
-        {
-          error: `Préparation incomplète pour ${incomplete.length} commande${incomplete.length > 1 ? 's' : ''}. Terminez la préparation et les contrôles froid avant de traiter la sélection.`,
-          orderIds: incomplete,
-        },
-        { status: 409 },
-      );
-    }
   }
 
-  const incompletePacking = orders.filter(order =>
-    order.status === 'preparing'
-    && order.fulfillment_type === 'delivery'
-    && (!order.packing_completed_at || !order.packing_parcel_count || order.packing_parcel_count < 1),
+  // Same preparation rules as one-by-one transitions (preparationPolicy, mode snapshot of each order).
+  const preparing = orders.filter(order => order.status === 'preparing');
+  const incomplete = preparing.filter(order => preparationBlockers(order, itemsByOrder.get(order.id) ?? [], false).length > 0);
+  if (incomplete.length > 0) {
+    return NextResponse.json(
+      {
+        error: `Préparation incomplète pour ${incomplete.length} commande${incomplete.length > 1 ? 's' : ''}. Terminez ou confirmez la préparation avant de traiter la sélection.`,
+        orderIds: incomplete.map(order => order.id),
+      },
+      { status: 409 },
+    );
+  }
+
+  const incompletePacking = preparing.filter(order =>
+    order.fulfillment_type === 'delivery' && preparationBlockers(order, itemsByOrder.get(order.id) ?? [], true).length > 0,
   );
   if (incompletePacking.length > 0) {
     return NextResponse.json(
       {
-        error: `Packing incomplet pour ${incompletePacking.length} commande${incompletePacking.length > 1 ? 's' : ''}. Finalisez les colis avant l’expédition.`,
+        error: `Emballage incomplet pour ${incompletePacking.length} commande${incompletePacking.length > 1 ? 's' : ''}. Renseignez les colis (et l’emballage froid) avant l’expédition.`,
         orderIds: incompletePacking.map(order => order.id),
       },
       { status: 409 },
     );
+  }
+  const unverifiedIds = new Set(preparing
+    .filter(order => !order.preparation_unverified_at && preparationState(order, itemsByOrder.get(order.id) ?? []).unverified)
+    .map(order => order.id));
+
+  // « Sans confirmation »: the transition is recorded as made without any check (audited, best-effort).
+  async function stampUnverified(moved: BulkOrderRow[]) {
+    const ids = moved.filter(order => unverifiedIds.has(order.id)).map(order => order.id);
+    if (ids.length === 0) return;
+    const { error } = await admin.from('orders').update({ preparation_unverified_at: new Date().toISOString() })
+      .in('id', ids).eq('tenant_id', tenant.id).is('preparation_unverified_at', null);
+    if (error) console.error('[admin/orders/bulk-status] unverified stamp failed:', error.message);
   }
 
   const toShipped: BulkOrderRow[] = [];
@@ -171,6 +181,7 @@ export async function POST(req: NextRequest) {
       .in('id', toShipped.map(order => order.id))
       .eq('tenant_id', tenant.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await stampUnverified(toShipped);
 
     for (const order of toShipped) {
       const providedTracking = tracking?.[order.id];
@@ -195,6 +206,7 @@ export async function POST(req: NextRequest) {
       .in('id', toReadyForPickup.map(order => order.id))
       .eq('tenant_id', tenant.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await stampUnverified(toReadyForPickup);
 
     for (const order of toReadyForPickup) {
       await runOrderTransitionSideEffects({

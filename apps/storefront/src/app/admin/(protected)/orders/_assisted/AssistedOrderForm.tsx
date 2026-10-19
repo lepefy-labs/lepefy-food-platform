@@ -882,7 +882,7 @@ export default function AssistedOrderForm({
               {submitting === 'draft' ? 'Enregistrement…' : 'Enregistrer comme brouillon'}
             </button>
           )}
-          <Link href={isEdit && initial ? `/admin/orders/precommandes/${initial.preorderId}` : '/admin'} className="mt-2 flex min-h-11 items-center justify-center text-sm font-semibold text-a-text-3 hover:text-a-text">Annuler</Link>
+          <Link href={isEdit && initial ? `/admin/orders/precommandes/${initial.preorderId}` : '/admin/orders'} className="mt-2 flex min-h-11 items-center justify-center text-sm font-semibold text-a-text-3 hover:text-a-text">Annuler</Link>
         </div>
       </aside>
 

@@ -3,6 +3,8 @@ import {
   classifyOrderOperation, compareOrders,
   type OperationalOrder, type OperationalThresholds, type OrderSortKey, type PrioritizedOrder, type QueueKey,
 } from '@/lib/orders/adminOrderOperations';
+import type { OrderPreparationMode } from '@/lib/orders/preparation/preparationPolicy';
+import { isMissingPreparationColumn, withoutPreparationColumns } from '@/lib/orders/preparation/compat';
 
 // Server-side loader of Admin → Commandes. Strategy (no migration):
 //  1. one light read of the tenant's ACTIVE orders (status/timestamps/snapshot
@@ -13,14 +15,18 @@ import {
 //  4. full rows (with items) only for the ≤ pageSize ids of the page.
 // Every query is tenant-scoped; no provider is called.
 
-export type OrderView = '' | QueueKey | 'payment_pending' | 'aged' | 'picking_incomplete' | 'packing_pending' | 'tracking_missing';
+export type OrderView = '' | QueueKey | 'payment_pending' | 'aged';
 
-export const ORDER_VIEWS: readonly OrderView[] = ['', 'to_treat', 'preparing', 'to_ship', 'in_transit', 'incidents', 'pickup_ready', 'urgent', 'finished', 'payment_pending', 'aged', 'picking_incomplete', 'packing_pending', 'tracking_missing'];
+/** Views answered by the classifier on the active set (same rules as the KPIs and the dashboard). */
+export const KPI_KEYS: readonly Exclude<QueueKey, 'finished'>[] = [
+  'to_treat', 'preparing', 'to_ship', 'in_transit', 'incidents', 'pickup_ready', 'urgent',
+  'to_prepare', 'to_print', 'late_preparation', 'late_pickup', 'tracking_issues', 'payment_unverified', 'stock_conflict',
+  'picking_incomplete', 'packing_pending', 'tracking_missing', 'cold_chain', 'paper_in_progress',
+];
 
-/** Views answered by the classifier on the active set (same rules as the KPIs). */
-const CLASSIFIED_VIEWS = new Set<OrderView>(['to_treat', 'preparing', 'to_ship', 'in_transit', 'incidents', 'pickup_ready', 'urgent']);
+export const ORDER_VIEWS: readonly OrderView[] = ['', ...KPI_KEYS, 'finished', 'payment_pending', 'aged'];
 
-export const KPI_KEYS: readonly QueueKey[] = ['to_treat', 'preparing', 'to_ship', 'in_transit', 'incidents', 'pickup_ready', 'urgent'];
+const CLASSIFIED_VIEWS = new Set<OrderView>(KPI_KEYS);
 
 /** Safety cap of the in-memory active set; beyond it the list falls back to date order. */
 export const ACTIVE_ORDER_LIMIT = 5000;
@@ -37,9 +43,13 @@ export interface OrderListFilters {
   view: OrderView;
 }
 
+/** Migration 160 columns read by the preparation policy. */
+export const PREPARATION_COLUMNS = 'preparation_mode, picking_list_printed_at, paper_preparation_started_at, paper_preparation_completed_at, cold_chain_packing_declared_at';
+
 const LIGHT_SELECT = 'id, status, fulfillment_type, payment_status, created_at, updated_at, total, shipped_at, '
   + 'picking_started_at, picking_completed_at, packing_completed_at, shipping_tracking_mode, shipping_provider_reference, '
-  + 'shipping_normalized_status, shipping_sync_error, shipping_estimated_delivery_at, tracking_code, shipping_address, order_items(storage_type)';
+  + 'shipping_normalized_status, shipping_sync_error, shipping_estimated_delivery_at, tracking_code, shipping_address, '
+  + 'packing_parcel_count, cold_chain_packing_checked_at, ' + PREPARATION_COLUMNS + ', order_items(storage_type, cold_chain_checked_at)';
 
 const FULL_SELECT = `
   id, created_at, updated_at, email, full_name, status, total,
@@ -49,8 +59,9 @@ const FULL_SELECT = `
   shipping_provider_key, shipping_provider_reference, shipping_normalized_status,
   shipping_provider_synced_at, shipping_sync_error, shipped_at,
   shipping_estimated_delivery_at, picking_started_at, picking_completed_at,
-  packing_completed_at, packing_parcel_count,
-  order_items(id, name, quantity, subtotal, storage_type, warehouse_location)
+  packing_completed_at, packing_parcel_count, cold_chain_packing_checked_at,
+  ${PREPARATION_COLUMNS},
+  order_items(id, product_id, name, quantity, subtotal, storage_type, warehouse_location, cold_chain_checked_at)
 `;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,9 +79,6 @@ export function applyOrderFilters(query: Query, filters: OrderListFilters, now: 
   if (view === 'finished') q = q.in('status', ['delivered', 'cancelled']);
   else if (view === 'payment_pending') q = q.eq('payment_status', 'pending');
   else if (view === 'aged') q = q.lte('created_at', new Date(now.getTime() - AGED_MS).toISOString()).not('status', 'in', '(delivered,cancelled)');
-  else if (view === 'picking_incomplete') q = q.eq('status', 'preparing').is('picking_completed_at', null);
-  else if (view === 'packing_pending') q = q.eq('status', 'preparing').eq('fulfillment_type', 'delivery').not('picking_completed_at', 'is', null).is('packing_completed_at', null);
-  else if (view === 'tracking_missing') q = q.eq('status', 'preparing').eq('fulfillment_type', 'delivery').not('packing_completed_at', 'is', null).is('tracking_code', null);
   else if (!view && filters.status) q = q.eq('status', filters.status);
   if (filters.fulfillment) q = q.eq('fulfillment_type', filters.fulfillment);
   if (filters.payment) q = q.eq('payment_method', filters.payment);
@@ -132,8 +140,8 @@ async function loadTrackingEvents(db: SupabaseClient, tenantId: string, ids: str
   return events;
 }
 
-async function loadActive(db: SupabaseClient, tenantId: string, filters: OrderListFilters | null, now: Date) {
-  let query: Query = db.from('orders').select(LIGHT_SELECT).eq('tenant_id', tenantId).not('status', 'in', '(delivered,cancelled)');
+async function loadActive(db: SupabaseClient, tenantId: string, filters: OrderListFilters | null, now: Date, selects: Selects) {
+  let query: Query = db.from('orders').select(selects.light).eq('tenant_id', tenantId).not('status', 'in', '(delivered,cancelled)');
   if (filters) query = applyOrderFilters(query, filters, now);
   const { data, error } = await query.order('created_at', { ascending: true }).order('id').limit(ACTIVE_ORDER_LIMIT + 1);
   if (error) throw error;
@@ -153,6 +161,8 @@ export interface WorkQueueInput {
   now: Date;
   managedProviderAvailable: boolean;
   originCountry: string;
+  /** Tenant's current preparation mode (step of orders not started yet). */
+  tenantPreparationMode?: OrderPreparationMode;
 }
 
 export interface WorkQueueResult {
@@ -170,16 +180,30 @@ export interface WorkQueueResult {
   appliedSort: OrderSortKey;
 }
 
+interface Selects { light: string; full: string }
+const SELECTS: Selects = { light: LIGHT_SELECT, full: FULL_SELECT };
+const LEGACY_SELECTS: Selects = { light: withoutPreparationColumns(LIGHT_SELECT), full: withoutPreparationColumns(FULL_SELECT) };
+
+/** Before migration 160 the same queue runs without its columns (every order then follows the digital rules). */
 export async function loadOrderWorkQueue(db: SupabaseClient, tenantId: string, input: WorkQueueInput): Promise<WorkQueueResult> {
+  try {
+    return await runWorkQueue(db, tenantId, input, SELECTS);
+  } catch (error) {
+    if (!isMissingPreparationColumn(error)) throw error;
+    return runWorkQueue(db, tenantId, input, LEGACY_SELECTS);
+  }
+}
+
+async function runWorkQueue(db: SupabaseClient, tenantId: string, input: WorkQueueInput, selects: Selects): Promise<WorkQueueResult> {
   const { filters, pageSize, thresholds, now } = input;
   const filtered = hasListFilters(filters);
-  const all = await loadActive(db, tenantId, null, now);
-  const scoped = filtered ? await loadActive(db, tenantId, filters, now) : all;
+  const all = await loadActive(db, tenantId, null, now, selects);
+  const scoped = filtered ? await loadActive(db, tenantId, filters, now, selects) : all;
   const overflow = all.overflow || scoped.overflow;
 
   const events = await loadTrackingEvents(db, tenantId, [...all.rows, ...(filtered ? scoped.rows : [])].filter(needsEvents).map((row) => row.id!));
   const classify = (row: OperationalOrder): PrioritizedOrder => {
-    const order = { ...row, originCountry: input.originCountry, managedProviderAvailable: input.managedProviderAvailable, shipping_tracking_events: (events.get(row.id!) ?? null) as OperationalOrder['shipping_tracking_events'] };
+    const order = { ...row, originCountry: input.originCountry, managedProviderAvailable: input.managedProviderAvailable, tenantPreparationMode: input.tenantPreparationMode, shipping_tracking_events: (events.get(row.id!) ?? null) as OperationalOrder['shipping_tracking_events'] };
     return { order, operation: classifyOrderOperation(order, thresholds, now) };
   };
   const allClassified = all.rows.map(classify);
@@ -201,7 +225,7 @@ export async function loadOrderWorkQueue(db: SupabaseClient, tenantId: string, i
       .sort((a, b) => compareOrders(sort, a, b));
     const window = planPriorityPage(matching.length, 0, input.page, pageSize);
     const ids = matching.slice(window.activeStart, window.activeEnd).map(({ order }) => order.id!);
-    return { ...base, rows: await loadFullRows(db, tenantId, ids), total: matching.length, currentPage: window.currentPage, totalPages: window.totalPages };
+    return { ...base, rows: await loadFullRows(db, tenantId, ids, selects), total: matching.length, currentPage: window.currentPage, totalPages: window.totalPages };
   }
 
   // Priority on the whole list: sorted active orders first, then terminal ones.
@@ -214,14 +238,14 @@ export async function loadOrderWorkQueue(db: SupabaseClient, tenantId: string, i
     const activeIds = active.slice(window.activeStart, window.activeEnd).map(({ order }) => order.id!);
     let terminalRows: Array<Record<string, unknown>> = [];
     if (window.terminalCount > 0) {
-      const query = applyOrderFilters(db.from('orders').select(FULL_SELECT).eq('tenant_id', tenantId).in('status', ['delivered', 'cancelled']), filters, now);
+      const query = applyOrderFilters(db.from('orders').select(selects.full).eq('tenant_id', tenantId).in('status', ['delivered', 'cancelled']), filters, now);
       const { data, error } = await orderByDb(query, 'priority').range(window.terminalFrom, window.terminalFrom + window.terminalCount - 1);
       if (error) throw error;
       terminalRows = await attachEvents(db, tenantId, (data ?? []) as Array<Record<string, unknown>>);
     }
     return {
       ...base,
-      rows: [...await loadFullRows(db, tenantId, activeIds), ...terminalRows],
+      rows: [...await loadFullRows(db, tenantId, activeIds, selects), ...terminalRows],
       total: active.length + (terminalTotal ?? 0),
       currentPage: window.currentPage,
       totalPages: window.totalPages,
@@ -229,7 +253,7 @@ export async function loadOrderWorkQueue(db: SupabaseClient, tenantId: string, i
   }
 
   // Plain DB order (date/amount sorts, "Terminés"), paginated by the database.
-  const query = applyOrderFilters(db.from('orders').select(FULL_SELECT, { count: 'exact' }).eq('tenant_id', tenantId), filters, now);
+  const query = applyOrderFilters(db.from('orders').select(selects.full, { count: 'exact' }).eq('tenant_id', tenantId), filters, now);
   const first = await orderByDb(query, sort).range((Math.max(1, input.page) - 1) * pageSize, Math.max(1, input.page) * pageSize - 1);
   if (first.error) throw first.error;
   const total = first.count ?? 0;
@@ -237,7 +261,7 @@ export async function loadOrderWorkQueue(db: SupabaseClient, tenantId: string, i
   let data = (first.data ?? []) as Array<Record<string, unknown>>;
   if (window.currentPage !== Math.max(1, input.page)) {
     const from = (window.currentPage - 1) * pageSize;
-    const retry = await orderByDb(applyOrderFilters(db.from('orders').select(FULL_SELECT).eq('tenant_id', tenantId), filters, now), sort).range(from, from + pageSize - 1);
+    const retry = await orderByDb(applyOrderFilters(db.from('orders').select(selects.full).eq('tenant_id', tenantId), filters, now), sort).range(from, from + pageSize - 1);
     if (retry.error) throw retry.error;
     data = (retry.data ?? []) as Array<Record<string, unknown>>;
   }
@@ -245,11 +269,11 @@ export async function loadOrderWorkQueue(db: SupabaseClient, tenantId: string, i
 }
 
 /** Full rows of the page, in the given order, with their tracking events. */
-async function loadFullRows(db: SupabaseClient, tenantId: string, ids: string[]): Promise<Array<Record<string, unknown>>> {
+async function loadFullRows(db: SupabaseClient, tenantId: string, ids: string[], selects: Selects): Promise<Array<Record<string, unknown>>> {
   if (ids.length === 0) return [];
-  const { data, error } = await db.from('orders').select(FULL_SELECT).eq('tenant_id', tenantId).in('id', ids);
+  const { data, error } = await db.from('orders').select(selects.full).eq('tenant_id', tenantId).in('id', ids);
   if (error) throw error;
-  const byId = new Map(((data ?? []) as Array<Record<string, unknown>>).map((row) => [row.id as string, row]));
+  const byId = new Map(((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => [row.id as string, row]));
   return attachEvents(db, tenantId, ids.map((id) => byId.get(id)).filter((row): row is Record<string, unknown> => Boolean(row)));
 }
 

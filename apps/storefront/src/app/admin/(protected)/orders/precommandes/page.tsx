@@ -15,7 +15,7 @@ export default async function PreordersPage() {
   const canManage = Boolean(access && canAdmin(access, 'orders.manage'))
   return (
     <div className="mx-auto w-full max-w-6xl pb-8">
-      <Link href="/admin" className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-a-text-3 hover:bg-a-surface-2 hover:text-a-text">
+      <Link href="/admin/orders" className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-a-text-3 hover:bg-a-surface-2 hover:text-a-text">
         <IconArrowLeft size={17} /> Commandes
       </Link>
       <AdminPageHeader

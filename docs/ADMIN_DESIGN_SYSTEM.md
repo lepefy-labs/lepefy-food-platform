@@ -80,14 +80,16 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 - **`Panel`**, `Card`, `cardClasses`, `DescriptionList`/`DescriptionItem`, `InfoField` (`ui/Panel.tsx`, promossi da Gestion); `Breadcrumb` autonomo (`ui/AdminPageHeader.tsx`); `controlClasses`, `labelClasses`, `hintClasses` per i form scritti a mano (`ui/Form.tsx`); **`AdminTabs`** (`ui/Tabs.tsx`) per le sotto-pagine (Livraison, WhatsApp, sezioni piattaforma).
 
 ### Shell e navigazione (`src/lib/admin/navigation.ts`, `src/app/admin/_components/shell/`)
+- **Gruppi**: `Essentiel` (Aujourd'hui, Commandes, Produits, Livraisons, Clients) sempre aperto e senza titolo visibile; `ADMIN_NAV_PRIMARY_GROUPS` (Essentiel, Événementiel, Service sur place) aperti; gli altri (Ventes, Croissance, Canaux, Gestion, Contenu & outils, Administration) pieghevoli, aperti sulla voce attiva, stato in `localStorage` `lepefy-admin-nav-groups-open`, tutte le icone visibili nel rail compresso (`admin-nav-folded`).
 - **Registry** `ADMIN_NAV` (voci) e `ADMIN_QUICK_ACTIONS` (azioni della palette): `id`, `label`, `href`, `icon`, `group`, `workspace`, `anyOf` (capability), `flag` (`gestion`, `whatsapp`), `match`/`alsoActive`, `badge` (chiave + tono), `mobile` (posizione nella barra), `keywords`. Aggiungere un modulo = una voce; il gruppo appare se ha almeno una voce visibile.
 - **Risoluzione** `resolveAdminNavigation()` nel layout protetto (permessi già ristretti dalla sospensione, flag letti sul server): il client riceve solo gli id visibili, i badge e gli scope di ricerca.
 - **`AdminShell`**: rail desktop 240 px comprimibile a 64 px (pallino al posto del contatore), drawer mobile `Dialog placement="left"`, barra mobile in basso, palette comandi (`Dialog bare placement="top"`, combobox + listbox, ↑ ↓ Entrée, ricerca remota con debounce), link « Aller au contenu ».
 - **`Menu`** (`ui/Menu.tsx`): menu a tendina accessibile (frecce, Home/End, Esc riporta il focus, click esterno) per workspace e account.
 - La piattaforma resta in `platformNavConfig.ts` (gruppi espandibili), resa dalla stessa shell.
 
-### Commandes (modulo pilota)
-- Stato URL in `lib/orders/orderListParams.ts` (`ORDER_LIST`, `parseOrderList`, sort legacy `date_desc`… ancora accettati), condiviso da `/admin` ed export.
+### Aujourd'hui e Commandes
+- `/admin` è la dashboard « Aujourd'hui » (Panel « À régler en priorité » con banda di tono, « Dernières mises à jour », azioni rapide come card-link, lista « Commandes à préparer » con selezione); il cockpit Commandes è su `/admin/orders`. `PreparationStepBadge` (tono da `PREPARATION_STEP_META` del registry) mostra l'étape di preparazione su lista, dashboard e dettaglio. Vedi `docs/ORDER_PREPARATION.md`.
+- Stato URL in `lib/orders/orderListParams.ts` (`ORDER_LIST`, `parseOrderList`, sort legacy `date_desc`… ancora accettati), condiviso da `/admin/orders` ed export; `/admin?<chiave ORDER_LIST>` reindirizza a `/admin/orders`.
 - `GET /api/admin/orders/export` (`orders.view`): stessi filtri e ordinamento della lista, max 2 000 righe (`X-Export-Truncated`), CSV UTF-8 con BOM, `;`, importi con virgola, formule neutralizzate (`lib/orders/ordersCsv.ts`).
 - Le card KPI e i chip « Contrôles » sono filtri (secondo clic annulla); cambiare statut/paiement dal pannello azzera la vista (`panelClears`).
 - « Traiter la sélection » chiede conferma (solo le commande « En préparation » cambiano stato).

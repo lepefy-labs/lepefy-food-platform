@@ -5,7 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { resolveRequestedFormat } from '@/lib/orders/documents/formats';
 import { readOrderDocumentSettings } from '@/lib/orders/documents/settings';
 import {
-  OrderDocumentError, orderDocumentErrorResponse, ORDER_DOCUMENT_ROUTE_KINDS, parseOrderIdList, pdfResponse, renderOrderDocuments,
+  OrderDocumentError, orderDocumentErrorResponse, ORDER_DOCUMENT_ROUTE_KINDS, defaultDocumentFormat, parseOrderIdList, pdfResponse, renderOrderDocuments,
 } from '@/lib/orders/documents/renderOrderDocuments';
 
 export const runtime = 'nodejs';
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest, { params }: { params: { kind: st
     const orderIds = parseOrderIdList(request.nextUrl.searchParams.get('ids'));
     const db = createServiceClient();
     const settings = await readOrderDocumentSettings(db, tenant.id);
-    const fallback = kind === 'picking_list' ? settings.config.picking_list_format : settings.config.packing_slip_format;
+    const fallback = defaultDocumentFormat(kind, settings.config);
     const format = resolveRequestedFormat(request.nextUrl.searchParams.get('format'), fallback);
     if (!format) throw new OrderDocumentError(400, 'Format invalide : choisissez A5 ou A4.');
     const document = await renderOrderDocuments({ db, tenant, kind, orderIds, format, settings: settings.config, bulk: true });
