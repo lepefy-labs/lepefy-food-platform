@@ -18,7 +18,7 @@ Order
 
 ## 2. Formati
 
-`ORDER_DOCUMENT_FORMATS` (`formats.ts`): `a5` (148×210, default, raccomandato) e `a4` (210×297), portrait. Ogni formato ha il proprio layout (non un A4 scalato). Font informativo minimo 10 pt, quantità 16–17 pt, caselle 6/7 mm. Il blocco finale di suivi e firme è mantenuto insieme (`avoid`); la compilazione su carta non aggiorna lo stato digitale dell'ordine. Multipagina: righe non spezzate, `thead` ripetuto con la réf. come intestazione ridotta, piè di pagina «#REF · Page X/Y» (nel lotto la numerazione è quella del PDF intero).
+`ORDER_DOCUMENT_FORMATS` (`formats.ts`): `a5` (148×210, default, raccomandato) e `a4` (210×297), portrait. Ogni formato ha il proprio layout (non un A4 scalato). Font informativo minimo 10 pt, quantità 16–17 pt, caselle 6/7 mm. L'A5 usa spaziature verticali ottimizzate (intestazione, righe, carton, suivi e firme) senza ridurre il testo sotto 10 pt o le caselle di picking da 6 mm; nessuna seconda conversione Gotenberg. Se il contenuto è lungo, il documento può continuare su più pagine. Il blocco finale di suivi e firme è mantenuto insieme (`avoid`); la compilazione su carta non aggiorna lo stato digitale dell'ordine. Multipagina: righe non spezzate, `thead` ripetuto con la réf. come intestazione ridotta, piè di pagina «#REF · Page X/Y» (nel lotto la numerazione è quella del PDF intero).
 
 Aggiungere un formato (letter, a6, thermal_80): voce del registro, layout nei due renderer, valore nel CHECK `is_valid_order_documents_config`.
 
