@@ -112,6 +112,28 @@ test('settings PATCH schema: partial updates accepted, unknown fields and bad fo
 
 // ─── View models ────────────────────────────────────────────────────────────
 
+test('picking order: dry first, fresh second and frozen last; locations sorted within each group', () => {
+  const input = [
+    item(ORDER_A, 'Frozen B', { storage_type: 'frozen', warehouse_location: 'F-02' }),
+    item(ORDER_A, 'Fresh B', { storage_type: 'fresh', warehouse_location: 'R-02' }),
+    item(ORDER_A, 'Dry B', { storage_type: 'dry', warehouse_location: 'B-10' }),
+    item(ORDER_A, 'Frozen A', { storage_type: 'frozen', warehouse_location: 'F-01' }),
+    item(ORDER_A, 'Unknown storage', { storage_type: null, warehouse_location: 'A-01' }),
+    item(ORDER_A, 'Fresh A', { storage_type: 'fresh', warehouse_location: 'R-01' }),
+    item(ORDER_A, 'Dry A', { storage_type: 'dry', warehouse_location: 'B-02' }),
+  ];
+  const original = input.map((x) => x.name);
+  const vm = buildPickingListViewModel({ order: order(ORDER_A), items: input, tenant: { name: 'T' }, carton: null });
+  expect(vm.items.map((x) => x.name)).toEqual(['Unknown storage', 'Dry A', 'Dry B', 'Fresh A', 'Fresh B', 'Frozen A', 'Frozen B']);
+  expect(input.map((x) => x.name)).toEqual(original);
+  for (const format of ['a5', 'a4'] as const) {
+    const html = pickingListHtml([vm], format);
+    expect(html.indexOf('Dry B')).toBeLessThan(html.indexOf('Fresh A'));
+    expect(html.indexOf('Fresh B')).toBeLessThan(html.indexOf('Frozen A'));
+  }
+});
+
+
 test('picking view-model keeps operational data: locations sorted, cold chain, cartons for delivery only', () => {
   const suggestion = suggestCartons(7400, PROFILES, 15000);
   const vm = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'Boutique Test' }, carton: { suggestion, missingWeightLines: 0, maxParcelG: 15000 } });

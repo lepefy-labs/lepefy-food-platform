@@ -90,8 +90,13 @@ export interface InternalOrderDocumentViewModel {
   missingWeightLines: number;
 }
 
-export function sortPickingItems<T extends Pick<DocumentItemRow, 'warehouse_location'>>(items: T[]): T[] {
+export function sortPickingItems<T extends Pick<DocumentItemRow, 'warehouse_location' | 'storage_type'>>(items: T[]): T[] {
+  // Chaîne du froid : les articles secs d'abord, frais ensuite, surgelés en dernier.
+  // À l'intérieur de chaque groupe, garder le parcours par emplacement.
+  const rank = (storage: DocumentItemRow['storage_type']) => storage === 'frozen' ? 2 : storage === 'fresh' ? 1 : 0;
   return items.slice().sort((a, b) => {
+    const byStorage = rank(a.storage_type) - rank(b.storage_type);
+    if (byStorage !== 0) return byStorage;
     const la = a.warehouse_location ?? '';
     const lb = b.warehouse_location ?? '';
     if (!la && !lb) return 0;
