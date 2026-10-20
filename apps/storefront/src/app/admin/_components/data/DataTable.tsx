@@ -14,7 +14,8 @@ export interface DataColumn<Row> {
   /** Tailwind width/min-width classes for the column. */
   className?: string;
   /** Hide below a breakpoint when a mobile card list is not used. */
-  hideBelow?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  /** `wide`: from 1760 px, for tables next to the expanded sidebar. */
+  hideBelow?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'wide';
   /** Server-side sort key; the header becomes a link. */
   sortKey?: string;
 }
@@ -84,7 +85,7 @@ interface DataTableProps<Row> {
 }
 
 const HIDE: Record<NonNullable<DataColumn<unknown>['hideBelow']>, string> = {
-  sm: 'hidden sm:table-cell', md: 'hidden md:table-cell', lg: 'hidden lg:table-cell', xl: 'hidden xl:table-cell', '2xl': 'hidden 2xl:table-cell',
+  sm: 'hidden sm:table-cell', md: 'hidden md:table-cell', lg: 'hidden lg:table-cell', xl: 'hidden xl:table-cell', '2xl': 'hidden 2xl:table-cell', wide: 'hidden min-[1760px]:table-cell',
 };
 const ALIGN = { left: 'text-left', right: 'text-right', center: 'text-center' } as const;
 

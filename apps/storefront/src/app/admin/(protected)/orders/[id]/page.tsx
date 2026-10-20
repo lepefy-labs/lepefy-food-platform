@@ -40,7 +40,8 @@ import { DIGITAL_PREPARATION, orderPreparationMode, preparationBlockers, prepara
 import { readOrderPreparationSettings, toPreparationMode } from '@/lib/orders/preparation/settings'
 import PaperPreparationPanel from '../../../orders/[id]/PaperPreparationPanel'
 import PreparationStepBadge from '../../../_components/ui/PreparationStepBadge'
-import { CLOSURE_NOTIFICATION_LABELS, CLOSURE_REASON_LABELS, closureIdempotencyKey, type ClosureNotification } from '@/lib/orders/closure/closureRules'
+import { CLOSURE_NOTIFICATION_LABELS, CLOSURE_REASON_LABELS, closureIdempotencyKey, isClosableStatus, type ClosureNotification } from '@/lib/orders/closure/closureRules'
+import OrderClosureLauncher from '../../../orders/[id]/OrderClosureLauncher'
 import {
   classifyOrderOperation, formatSince, orderDetailTransition, PRIORITY_GROUP_LABELS, transportState,
   type OperationalOrder, type OrderActionSection, type OrderAnomalyCode,
@@ -323,6 +324,14 @@ export default async function AdminOrderPage({ params }: PageProps) {
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between lg:justify-end lg:gap-5">
+          {canManage && isClosableStatus(order.status, order.fulfillment_type) && (
+            <OrderClosureLauncher
+              order={order}
+              tenantName={tenant.name}
+              totalLabel={formatPrice(order.total, tenant.currency)}
+              paymentLabel={order.external_payment_label ?? paymentLabel(order.payment_method)}
+            />
+          )}
           {showCta && ctaHref && (
             <a href={ctaHref} className={`inline-flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-a-focus sm:w-auto ${operation.action.primary ? 'bg-a-brand text-a-on-brand hover:opacity-90' : 'border border-a-border bg-a-surface text-a-text-2 hover:bg-a-surface-2'}`}>
               {operation.action.label}
@@ -591,8 +600,6 @@ export default async function AdminOrderPage({ params }: PageProps) {
             missingWeightLines={missingWeightLines}
             canManage={canManage}
             nextStep={nextStep}
-            tenantName={tenant.name}
-            paymentLabel={order.external_payment_label ?? paymentLabel(order.payment_method)}
             documents={{
               pickingFormat: documentSettings.config.picking_list_format,
               packingSlipEnabled: documentSettings.config.packing_slip_enabled,

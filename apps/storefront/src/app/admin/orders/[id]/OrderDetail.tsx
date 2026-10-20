@@ -3,13 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconArrowDown, IconBan, IconCheck, IconPackage, IconSnowflake, IconTemperature } from '@tabler/icons-react';
+import { IconArrowDown, IconCheck, IconPackage, IconSnowflake, IconTemperature } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { orderDetailTransition } from '@/lib/orders/adminOrderOperations';
 import { carrierDisplayName } from '@/lib/shipping/shipmentPresentation';
 import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
-import OrderClosureDialog from './OrderClosureDialog';
-import { isClosableStatus } from '@/lib/orders/closure/closureRules';
 import PackingPanel from './PackingPanel';
 import ManagedShipmentPanel from './ManagedShipmentPanel';
 import CartonSuggestionCard from './CartonSuggestionCard';
@@ -69,9 +67,6 @@ interface Props {
   canManage: boolean;
   nextStep?: NextStepGuide | null;
   documents: OrderDocumentsDefaults;
-  /** Closure dialog: shop name (pre-filled message) and payment label. */
-  tenantName: string;
-  paymentLabel: string;
 }
 
 function formatCarrierName(raw: string | undefined): string {
@@ -105,8 +100,6 @@ export default function OrderDetail({
   canManage,
   nextStep = null,
   documents,
-  tenantName,
-  paymentLabel,
 }: Props) {
   const router = useRouter();
   const isPickup = order.fulfillment_type === 'pickup';
@@ -121,7 +114,6 @@ export default function OrderDetail({
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveError, setSaveError] = useState(false);
   const [isPaid, setIsPaid] = useState(!isInStorePending);
-  const [closureOpen, setClosureOpen] = useState(false);
   // Provider refreshes may update snapshots while the form component remains mounted.
   useEffect(() => {
     setCarrier(originalCarrier);
@@ -389,25 +381,11 @@ export default function OrderDetail({
         <h2 id="order-documents-title" className="mb-3 text-xs font-bold uppercase tracking-wide text-a-text-3">Documents</h2>
         <div className="space-y-3">
           <OrderDocumentsCard orderId={order.id} cancelled={order.status === 'cancelled'} defaults={documents} />
-          {canManage && isClosableStatus(order.status, order.fulfillment_type) && (
-            <button type="button" onClick={() => setClosureOpen(true)} disabled={saving}
-              className="inline-flex min-h-11 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-a-text-2 hover:bg-a-hover hover:text-a-text focus-visible:outline-2 focus-visible:outline-a-focus disabled:opacity-50">
-              <IconBan size={16} aria-hidden="true" className="text-tone-danger-fg" /> Clôturer ou annuler…
-            </button>
-          )}
+
         </div>
       </section>
 
-      {canManage && isClosableStatus(order.status, order.fulfillment_type) && (
-        <OrderClosureDialog
-          open={closureOpen}
-          onClose={() => setClosureOpen(false)}
-          order={order}
-          tenantName={tenantName}
-          totalLabel={formatPrice(order.total, currency)}
-          paymentLabel={paymentLabel}
-        />
-      )}
+
     </>
   );
 }
