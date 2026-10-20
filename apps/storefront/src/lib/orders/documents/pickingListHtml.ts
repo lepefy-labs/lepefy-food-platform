@@ -36,6 +36,15 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .pl-loc { font-family: 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace; font-weight: 700; white-space: nowrap; }
 .pl-loc-empty { color: #555; }
 .pl-carton { border: 0.4mm dashed #111; padding: 2mm 2.5mm; line-height: 1.45; }
+.pl-shipping-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 2mm; align-items: start; margin-top: 2mm; }
+.pl-shipping-grid > div { min-width: 0; }
+.pl-shipping-grid .pl-section { margin-top: 0; }
+.pl-shipping-grid .pl-carton { overflow-wrap: anywhere; }
+.pl-shipping-cost { border: 0.3mm solid #111; padding: 1.2mm 1.5mm; font-size: 10pt; line-height: 1.25; }
+.pl-shipping-price { font-weight: 800; font-size: 12pt; margin: 0.6mm 0 1.2mm; white-space: nowrap; }
+.pl-shipping-real-line { height: 5mm; border-bottom: 0.3mm solid #111; }
+.pl-shipping-grid .pl-notes-inline { margin-top: 2mm; }
+
 .pl-warn { font-weight: 700; }
 .pl-summary { display: flex; flex-wrap: wrap; gap: 2mm 6mm; }
 .pl-sign { display: flex; gap: 5mm; margin-top: 3mm; }
@@ -73,7 +82,12 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .format-a5 .pl-items thead th { padding-top: 0.6mm; padding-bottom: 0.6mm; }
 .format-a5 .pl-items td { padding-top: 0.9mm; padding-bottom: 0.9mm; }
 .format-a5 .pl-chip { margin-top: 0.3mm; }
-.format-a5 .pl-carton { padding: 1.2mm 2mm; line-height: 1.3; }
+.format-a5 .pl-carton { padding: 1mm 1.3mm; line-height: 1.2; font-size: 10pt; }
+.format-a5 .pl-shipping-grid { gap: 1.5mm; margin-top: 1.5mm; }
+.format-a5 .pl-shipping-cost { padding: 1mm; }
+.format-a5 .pl-shipping-price { font-size: 11pt; }
+.format-a5 .pl-shipping-grid .pl-section { letter-spacing: 0.01em; font-size: 10pt; }
+
 .format-a5 .pl-follow { margin-top: 2mm; }
 .format-a5 .pl-follow-title { padding-bottom: 0.5mm; margin-bottom: 0.8mm; }
 .format-a5 .pl-follow-head { font-size: 10pt; }
@@ -145,6 +159,23 @@ function cartonBlock(vm: InternalOrderDocumentViewModel, format: OrderDocumentFo
   return `<div class="avoid"><div class="pl-section keep-next">EMBALLAGE SUGGÉRÉ</div><div class="pl-carton">${detail}${alternatives}<div>${escapeHtml(footer)}</div>${warning}</div></div>`;
 }
 
+function shippingComparison(vm: InternalOrderDocumentViewModel): string {
+  if (vm.fulfillment !== 'delivery') return '';
+  return `<div><div class="pl-section keep-next">COÛT LIVRAISON</div>
+<div class="pl-shipping-cost"><div>Payé par client</div>
+<div class="pl-shipping-price">${vm.shippingPaid ? escapeHtml(vm.shippingPaid) : 'Non renseigné'}</div>
+<div>Coût réel</div><div class="pl-shipping-real-line"></div></div></div>`;
+}
+
+/** Les deux panneaux restent côte à côte; aucun montant n'est inventé. */
+function packagingAndCost(vm: InternalOrderDocumentViewModel, format: OrderDocumentFormat): string {
+  if (vm.fulfillment !== 'delivery') return '';
+  const notes = format === 'a4'
+    ? `<div class="pl-notes-inline"><div class="pl-section keep-next">NOTES DE PRÉPARATION</div><div class="pl-notes"></div></div>`
+    : '';
+  return `<div class="pl-shipping-grid avoid"><div>${cartonBlock(vm, format)}</div><div>${shippingComparison(vm)}${notes}</div></div>`;
+}
+
 function followUpBlock(vm: InternalOrderDocumentViewModel): string {
   const lastStage = vm.fulfillment === 'pickup' ? 'REMISE AU CLIENT' : 'EXPÉDITION';
   const stages = ['PRÉPARATION', 'EMBALLAGE', lastStage];
@@ -183,10 +214,7 @@ ${header(vm)}
 <div class="pl-grid2 pl-meta"><div><b>Client</b><br>${vm.deliveryAddress ? `<b>${escapeHtml(vm.customerName)}</b>${addressBlock(vm)}` : customerLine(vm)}</div><div><b>Résumé</b><br>${escapeHtml(summaryParts(vm).join(' · '))}</div></div>
 <div class="pl-section keep-next">ARTICLES</div>
 ${itemsTableA4(vm)}
-<div class="pl-grid2 avoid" style="margin-top:4mm">
-<div>${cartonBlock(vm, format)}</div>
-<div><div class="pl-section keep-next">NOTES DE PRÉPARATION</div><div class="pl-notes"></div></div>
-</div>
+${packagingAndCost(vm, format)}
 ${followUpBlock(vm)}
 </section>`;
   }
@@ -195,7 +223,7 @@ ${header(vm)}
 <div class="pl-meta">${vm.deliveryAddress ? `<b>${escapeHtml(vm.customerName)}</b>${addressBlock(vm)}` : customerLine(vm)}</div>
 <div class="pl-section keep-next">${escapeHtml(summaryParts(vm).join(' · ').toUpperCase())}</div>
 ${itemsTableA5(vm)}
-${cartonBlock(vm, format)}
+${packagingAndCost(vm, format)}
 ${followUpBlock(vm)}
 </section>`;
 }

@@ -246,6 +246,29 @@ test('picking displays available catalogue unit weight without mistaking it for 
   expect(pickingListHtml([noWeight], 'a5')).not.toContain('Poids catalogue :');
 });
 
+test('picking shipping comparison is alongside suggested packaging, with historic client price', () => {
+  const delivery = buildPickingListViewModel({
+    order: order(ORDER_A, { shipping_cost: 12.5 }), items: ITEMS,
+    tenant: { name: 'T', currency: 'EUR' }, carton: null,
+  });
+  expect(delivery.shippingPaid).toContain('12,50');
+  for (const format of ['a5', 'a4'] as const) {
+    const content = pickingListHtml([delivery], format);
+    expect(content).toContain('pl-shipping-grid avoid');
+    expect(content).toContain('COÛT LIVRAISON');
+    expect(content).toContain('Payé par client');
+    expect(content).toContain('Coût réel');
+    expect(content).toContain('12,50');
+    expect(content).toContain('EMBALLAGE SUGGÉRÉ');
+  }
+  const missing = buildPickingListViewModel({ order: order(ORDER_A, { shipping_cost: null }), items: ITEMS, tenant: { name: 'T' }, carton: null });
+  expect(pickingListHtml([missing], 'a5')).toContain('Non renseigné');
+  const free = buildPickingListViewModel({ order: order(ORDER_A, { shipping_cost: 0 }), items: ITEMS, tenant: { name: 'T' }, carton: null });
+  expect(free.shippingPaid).toContain('0,00');
+  const pickup = buildPickingListViewModel({ order: order(ORDER_A, { fulfillment_type: 'pickup' }), items: ITEMS, tenant: { name: 'T' }, carton: null });
+  expect(pickingListHtml([pickup], 'a5')).not.toContain('COÛT LIVRAISON');
+});
+
 // ─── HTML ───────────────────────────────────────────────────────────────────
 
 test('picking HTML: @page per format, one section per order (page breaks), escaped content', () => {

@@ -90,6 +90,8 @@ export interface InternalOrderDocumentViewModel {
   parcelCount: number | null;
   cartons: PickingCartonVM | null;
   missingWeightLines: number;
+  /** Frais de livraison historiques facturés au client; null si inconnus. */
+  shippingPaid: string | null;
 }
 
 export function sortPickingItems<T extends Pick<DocumentItemRow, 'warehouse_location' | 'storage_type'>>(items: T[]): T[] {
@@ -143,7 +145,7 @@ function dims(carton: { box_length_cm: number; box_width_cm: number; box_height_
 export function buildPickingListViewModel(input: {
   order: DocumentOrderRow;
   items: DocumentItemRow[];
-  tenant: Pick<DocumentTenant, 'name'>;
+  tenant: Pick<DocumentTenant, 'name'> & Partial<Pick<DocumentTenant, 'currency'>>;
   carton: { suggestion: CartonSuggestion | null; missingWeightLines: number; maxParcelG?: number } | null;
   showDeliveryAddress?: boolean;
   productWeights?: ReadonlyMap<string, number>;
@@ -206,6 +208,8 @@ export function buildPickingListViewModel(input: {
     parcelCount: suggestion ? suggestion.parcels.length : null,
     cartons,
     missingWeightLines: suggestion ? carton?.missingWeightLines ?? 0 : 0,
+    shippingPaid: !isPickup && order.shipping_cost != null && Number.isFinite(Number(order.shipping_cost)) && Number(order.shipping_cost) >= 0
+      ? formatPrice(Number(order.shipping_cost), tenant.currency || 'EUR') : null,
   };
 }
 
