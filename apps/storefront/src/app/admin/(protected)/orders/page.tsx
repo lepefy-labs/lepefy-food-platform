@@ -177,7 +177,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
                   href={href({ view: active ? undefined : item.key, status: undefined })}
                   title={item.label}
                   value={formatNumber(kpi(item.key))}
-                  description={item.helper}
+                  description={item.key === 'preparing' && kpi('to_ship') > 0 ? `Dont ${formatNumber(kpi('to_ship'))} prête${kpi('to_ship') > 1 ? 's' : ''} à expédier` : item.helper}
                   active={active}
                   tone={item.tone}
                 />

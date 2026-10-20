@@ -44,6 +44,7 @@ export interface ListOrder {
   subtotal: number; shipping_cost: number; total: number; payment_method: string | null; payment_status: string; status: OrderStatus;
   tracking_code: string | null; tracking_carrier: string | null; shipping_tracking_url: string | null;
   shipping_tracking_mode: 'managed' | 'manual' | null; shipping_provider_key: string | null; shipping_provider_reference: string | null;
+  shipping_creation_status?: string | null; shipping_creation_updated_at?: string | null;
   shipping_normalized_status: NormalizedShipmentStatus | null; shipping_provider_synced_at: string | null; shipping_sync_error: string | null;
   shipping_tracking_events: ShipmentTrackingEvent[] | null; shipping_estimated_delivery_at: string | null; shipped_at?: string | null;
   picking_started_at: string | null; picking_completed_at: string | null; packing_completed_at: string | null; packing_parcel_count: number | null;
@@ -101,17 +102,22 @@ function rowToneOf(operation: OrderOperation): AdminTone | undefined {
   return undefined;
 }
 
+// Fresh / frozen are already counted next to the units (« 7 frais », « 9 surgelés »): no second badge.
 function HandlingBadges({ operation }: { operation: OrderOperation }) {
-  const { international, fresh, frozen, score } = operation.handling;
-  if (!international && !fresh && !frozen) return null;
+  const { international, score } = operation.handling;
+  if (!international && score !== 3) return null;
   return (
     <span className="mt-1 flex flex-wrap gap-1" aria-label="Attention logistique">
       {score === 3 && <Badge tone="danger">Priorité élevée</Badge>}
       {international && <Badge tone="info">International</Badge>}
-      {fresh && <Badge tone="success" icon={<IconLeaf size={12} aria-hidden="true" />}>Produits frais</Badge>}
-      {frozen && <Badge tone="info" icon={<IconSnowflake size={12} aria-hidden="true" />}>Surgelés</Badge>}
     </span>
   );
+}
+
+/** New / preparing orders show their preparation step only (more precise than « En préparation »); other statuses their status. */
+function OrderStateBadge({ order, operation }: { order: ListOrder; operation: OrderOperation }) {
+  if (operation.step) return <PreparationStepBadge step={operation.step} />;
+  return <StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} closureType={order.closure_type} />;
 }
 
 function csvOf(rows: ListOrder[]) {
@@ -214,9 +220,8 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
     const eta = order.status === 'shipped' ? formatEta(order.shipping_estimated_delivery_at) : null;
     return (
       <div className="flex flex-col items-start gap-1">
-        <StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} closureType={order.closure_type} />
+        <OrderStateBadge order={order} operation={operation} />
         {order.closure_reason && <p className="text-xs text-a-text-3">{CLOSURE_REASON_LABELS[order.closure_reason as ClosureReason] ?? ''}</p>}
-        {operation.step && <PreparationStepBadge step={operation.step} />}
         {transport && !done(order) && <Badge tone={transport.tone}>Transport : {transport.label}</Badge>}
         {lastMove && order.status === 'shipped' && <p className="text-xs text-a-text-3">Mouvement {formatSince(lastMove, now)}</p>}
         {eta && <p className="text-xs text-a-text-3">Livraison estimée : {eta}</p>}
@@ -359,7 +364,7 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
             <p className="truncate font-semibold">{order.full_name ?? order.email ?? 'Client'}</p>
             <p className="text-xs text-a-text-3">{formatDate(order.created_at, 'datetime')} · <b className="font-semibold text-a-text">{money(order.total)}</b></p>
           </div>
-          <span className="flex flex-col items-end gap-1"><StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} closureType={order.closure_type} />{operation.step && <PreparationStepBadge step={operation.step} />}</span>
+          <span className="flex flex-col items-end gap-1"><OrderStateBadge order={order} operation={operation} /></span>
         </div>
         {flag && <p className="mt-1.5 flex items-start gap-1 text-xs font-semibold text-tone-urgent-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{flag}</p>}
         <div className="mt-2">{preparationSummary(order, true)}<HandlingBadges operation={operation} /></div>

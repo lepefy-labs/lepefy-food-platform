@@ -31,6 +31,9 @@ export interface OperationalOrder extends Omit<PreparationOrder, 'status' | 'ord
   shipping_tracking_mode?: 'managed' | 'manual' | null;
   managedProviderAvailable?: boolean;
   shipping_provider_reference?: string | null;
+  shipping_provider_key?: string | null;
+  /** Last provisioning transition (migration 151): creation time of a `draft_created` draft. */
+  shipping_creation_updated_at?: string | null;
   shipping_normalized_status?: NormalizedShipmentStatus | null;
   shipping_sync_error?: string | null;
   shipping_tracking_events?: ShipmentTrackingEvent[] | null;
@@ -123,6 +126,23 @@ function isReadyToShip(order: OperationalOrder): boolean {
   return state.readyForFinal || state.awaitingProviderParcels;
 }
 
+const PROVIDER_NAMES: Record<string, string> = { packlink: 'Packlink' };
+
+/**
+ * Draft created by Lepefy and not purchased yet at the provider (still `pending`):
+ * the next step happens in the provider's tool (label purchase), not in Lepefy.
+ */
+export function providerDraftToFinalize(order: Pick<OperationalOrder, 'status' | 'fulfillment_type' | 'shipping_creation_status' | 'shipping_provider_reference' | 'shipping_normalized_status' | 'shipping_sync_error'>): boolean {
+  return order.status === 'preparing' && order.fulfillment_type === 'delivery' && order.shipping_creation_status === 'draft_created'
+    && Boolean(order.shipping_provider_reference) && !order.shipping_sync_error
+    && (!order.shipping_normalized_status || order.shipping_normalized_status === 'pending');
+}
+
+/** "Packlink" for a known provider key, null otherwise (callers then say « le transporteur »). */
+export function providerDisplayName(key: string | null | undefined): string | null {
+  return key ? PROVIDER_NAMES[key.toLowerCase()] ?? null : null;
+}
+
 function usesManagedShipment(order: OperationalOrder): boolean {
   return order.shipping_tracking_mode !== 'manual' && (order.shipping_tracking_mode === 'managed' || Boolean(order.managedProviderAvailable));
 }
@@ -184,6 +204,10 @@ export function nextOrderAction(order: OperationalOrder, anomaly: OrderAnomaly |
     if (order.fulfillment_type === 'pickup') return action('Marquer prête au retrait');
     if (!preparation.packingDone && !preparation.awaitingProviderParcels) {
       return action(preparation.mode.picking === 'none' ? 'Indiquer les colis' : 'Terminer l’emballage', 'detail', true, 'packing');
+    }
+    if (usesManagedShipment(order) && providerDraftToFinalize(order)) {
+      const provider = providerDisplayName(order.shipping_provider_key);
+      return action(provider ? `Finaliser dans ${provider}` : 'Finaliser l’expédition', 'detail', true, 'shipment');
     }
     if (usesManagedShipment(order)) return action(order.shipping_provider_reference ? 'Gérer l’expédition' : 'Associer l’expédition', 'detail', true, 'shipment');
     return action('Expédier');
@@ -251,7 +275,12 @@ export function classifyOrderOperation(order: OperationalOrder, thresholds: Oper
   else if (order.status === 'ready_for_pickup') { group = 'pickup_ready'; operationalAt = order.updated_at; }
   else { group = 'preparing'; operationalAt = preparationStartedAt(order); }
 
+  // A ready order whose provider draft waits for purchase beyond the preparation threshold.
+  const draftAge = readyToShip && providerDraftToFinalize(order) ? hoursSince(order.shipping_creation_updated_at, now) : null;
+  const draftOverdue = draftAge !== null && draftAge >= thresholds.prepareHours;
+
   if (handling.score === 3) flags.add('urgent');
+  if (draftOverdue) flags.add('urgent');
   if (hasLogisticsIncident(order)) flags.add('incidents');
   if (['action_required', 'preparation_overdue', 'pickup_overdue'].includes(group)) flags.add('urgent');
   if (group !== 'shipping' && group !== 'pickup_ready') flags.add('to_treat');
@@ -290,7 +319,8 @@ export function classifyOrderOperation(order: OperationalOrder, thresholds: Oper
 
   const urgency = preparationOverdue
     ? `${order.status === 'new' ? 'Ouverte' : 'En préparation'} depuis ${formatOperationalDuration(preparationAge!)}`
-    : pickupOverdue ? `Inactive depuis ${formatOperationalDuration(pickupAge!)}` : null;
+    : pickupOverdue ? `Inactive depuis ${formatOperationalDuration(pickupAge!)}`
+    : draftOverdue ? `Brouillon ${providerDisplayName(order.shipping_provider_key) ?? 'transporteur'} à finaliser depuis ${formatOperationalDuration(draftAge!)}` : null;
   const notice = readyToShip && usesManagedShipment(order) && !order.shipping_provider_reference ? 'Expédition à associer' : null;
 
   return { group, handling, flags, anomaly, urgency, notice, operationalAt, action: nextOrderAction(order, anomaly), step };
@@ -363,11 +393,15 @@ export function compareOrders(sort: OrderSortKey, a: PrioritizedOrder, b: Priori
 }
 
 /** Carrier-side state shown apart from the internal order status (null for pickup). */
-export function transportState(order: Pick<OperationalOrder, 'fulfillment_type' | 'shipping_sync_error' | 'shipping_provider_reference' | 'shipping_normalized_status' | 'shipping_tracking_mode' | 'tracking_code'>):
-  { label: string; tone: 'danger' | 'success' | 'neutral' } | null {
+export function transportState(order: Pick<OperationalOrder, 'status' | 'fulfillment_type' | 'shipping_sync_error' | 'shipping_provider_reference' | 'shipping_normalized_status' | 'shipping_tracking_mode' | 'tracking_code' | 'shipping_creation_status' | 'shipping_provider_key'>):
+  { label: string; tone: 'danger' | 'warning' | 'success' | 'neutral' } | null {
   if (order.fulfillment_type === 'pickup') return null;
   if (order.shipping_sync_error === SHIPPING_SYNC_PREPARATION_INCOMPLETE) return { label: 'En transit · préparation à valider', tone: 'danger' };
   if (order.shipping_sync_error) return { label: 'Synchro en erreur', tone: 'danger' };
+  if (providerDraftToFinalize(order)) {
+    const provider = providerDisplayName(order.shipping_provider_key);
+    return { label: provider ? `à finaliser dans ${provider}` : 'brouillon à finaliser', tone: 'warning' };
+  }
   if (order.shipping_provider_reference) {
     const status = order.shipping_normalized_status;
     return { label: shipmentStatusLabel(status), tone: status && INCIDENT_STATUSES.has(status) ? 'danger' : status === 'delivered' ? 'success' : 'neutral' };

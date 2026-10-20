@@ -216,7 +216,7 @@ export function preparationBlockers(order: PreparationOrder, items: PreparationI
   return blockers;
 }
 
-export type PreparationStepKey = 'to_print' | 'to_prepare' | 'printed' | 'in_progress' | 'prepared' | 'ready';
+export type PreparationStepKey = 'to_print' | 'to_prepare' | 'printed' | 'in_progress' | 'prepared' | 'parcels_to_enter' | 'ready';
 
 export interface PreparationStep { key: PreparationStepKey; label: string }
 
@@ -226,6 +226,7 @@ const STEP_LABELS: Record<PreparationStepKey, string> = {
   printed: 'Liste imprimée',
   in_progress: 'Préparation en cours',
   prepared: 'Préparation terminée',
+  parcels_to_enter: 'Colis à indiquer',
   ready: 'Prêt à expédier',
 };
 
@@ -242,7 +243,7 @@ export function preparationStep(order: PreparationOrder, tenantMode: OrderPrepar
   const state = preparationState({ ...order, tenantPreparationMode: order.tenantPreparationMode ?? tenantMode });
   if (state.readyForFinal || state.awaitingProviderParcels) return step('ready');
   // « Sans confirmation »: nothing was declared, only the parcel count is missing.
-  if (state.pickingDone && mode.picking === 'none') return { key: 'prepared', label: 'Colis à indiquer' };
+  if (state.pickingDone && mode.picking === 'none') return step('parcels_to_enter');
   if (state.pickingDone) return step('prepared');
   if (mode.picking === 'paper') return step(order.paper_preparation_started_at || order.picking_list_printed_at ? 'printed' : 'to_print');
   return step('in_progress');

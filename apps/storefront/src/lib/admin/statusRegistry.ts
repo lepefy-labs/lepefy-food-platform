@@ -36,6 +36,8 @@ export const PREPARATION_STEP_META: Record<string, AdminStatusMeta> = {
   printed: { label: 'Liste imprimée', tone: 'neutral' },
   in_progress: { label: 'Préparation en cours', tone: 'warning' },
   prepared: { label: 'Préparation terminée', tone: 'success' },
+  // Orange: the team still has something to do in Lepefy (green = nothing left).
+  parcels_to_enter: { label: 'Colis à indiquer', tone: 'warning' },
   ready: { label: 'Prêt à expédier', tone: 'success' },
 };
 

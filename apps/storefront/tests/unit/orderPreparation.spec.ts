@@ -12,7 +12,8 @@ import {
 import { completePaperPreparation, startPreparation, withdrawPaperPreparation } from '../../src/lib/orders/preparation/preparationService';
 import { buildPreparationSummary } from '../../src/lib/orders/preparation/preparationSummary';
 import { OrderWorkflowError, PreparationIncompleteError, updateWorkflowOrder, type OrderService } from '../../src/lib/orders/orderTransitionService';
-import { classifyOrderOperation, type OperationalOrder } from '../../src/lib/orders/adminOrderOperations';
+import { classifyOrderOperation, transportState, type OperationalOrder } from '../../src/lib/orders/adminOrderOperations';
+import { PREPARATION_STEP_META } from '../../src/lib/admin/statusRegistry';
 import { buildPriorityItems, buildQuickActions, describeRecentOrder } from '../../src/lib/admin/todayDashboard';
 import { ORDER_LIST } from '../../src/lib/orders/orderListParams';
 import { ORDER_VIEWS } from '../../src/lib/orders/loadOrderWorkQueue';
@@ -214,7 +215,9 @@ test.describe('orders created directly in preparation (paid storefront orders)',
     expect(op.flags.has('picking_incomplete')).toBe(false);
     expect(op.flags.has('packing_pending')).toBe(true);
     expect(op.action.label).toBe('Indiquer les colis');
-    expect(op.step).toEqual({ key: 'prepared', label: 'Colis à indiquer' });
+    expect(op.step).toEqual({ key: 'parcels_to_enter', label: 'Colis à indiquer' });
+    // Something left to do in Lepefy: orange, never the green of a finished step.
+    expect(PREPARATION_STEP_META.parcels_to_enter!.tone).toBe('warning');
   });
 
   test('with a Lepefy Packlink draft nothing is left to do in Lepefy: « À expédier », no packing alarm', () => {
@@ -225,10 +228,39 @@ test.describe('orders created directly in preparation (paid storefront orders)',
     expect(op.flags.has('to_ship')).toBe(true);
     expect(op.flags.has('cold_chain')).toBe(false);
     expect(op.step?.label).toBe('Prêt à expédier');
-    expect(op.action.label).toBe('Gérer l’expédition');
+    // The draft still waits for its purchase in Packlink: the transport line and the action say so.
+    expect(op.action.label).toBe('Finaliser dans Packlink');
+    expect(op.urgency).toBeNull();
     // The transition itself is unchanged: without the carrier's parcel list it still needs a count.
     expect(preparationBlockers({ ...baseOrder({ shipping_creation_status: 'draft_created' } as Partial<Order>), tenantPreparationMode: NONE }, [{ ...dry }], true))
       .toEqual(['Nombre de colis à renseigner avant l’expédition.']);
+  });
+});
+
+test.describe('provider draft still to finalise', () => {
+  const draft = (patch: Partial<Order> = {}) => ({ ...(baseOrder({ preparation_mode: null, shipping_tracking_mode: 'managed', shipping_provider_key: 'packlink',
+    shipping_provider_reference: 'IT2026PRO0007003523', shipping_creation_status: 'draft_created', shipping_normalized_status: 'pending',
+    packing_parcel_count: 1, ...patch } as Partial<Order>) as unknown as OperationalOrder), order_items: [{ storage_type: 'dry', picked_at: null }],
+  tenantPreparationMode: NONE, managedProviderAvailable: true });
+
+  test('transport reads « à finaliser dans Packlink » until the carrier moves', () => {
+    expect(transportState(draft())).toEqual({ label: 'à finaliser dans Packlink', tone: 'warning' });
+    expect(transportState(draft({ shipping_normalized_status: 'in_transit' } as Partial<Order>))?.label).toBe('En transit');
+    // Associated by hand (not a Lepefy draft): the plain provider status.
+    expect(transportState(draft({ shipping_creation_status: null } as Partial<Order>))?.label).toBe('En attente');
+    expect(transportState(draft({ shipping_provider_key: 'other' } as Partial<Order>))?.label).toBe('brouillon à finaliser');
+  });
+
+  test('a draft waiting beyond the preparation threshold is urgent, the order stays « À expédier »', () => {
+    const fresh = classifyOrderOperation(draft({ shipping_creation_updated_at: '2026-10-20T02:00:00Z' } as Partial<Order>), thresholds, now);
+    expect(fresh.group).toBe('to_ship');
+    expect(fresh.urgency).toBeNull();
+    expect(fresh.flags.has('urgent')).toBe(false);
+    const stale = classifyOrderOperation(draft({ shipping_creation_updated_at: '2026-10-16T08:00:00Z' } as Partial<Order>), thresholds, now);
+    expect(stale.group).toBe('to_ship');
+    expect(stale.urgency).toBe('Brouillon Packlink à finaliser depuis 4 j');
+    expect(stale.flags.has('urgent')).toBe(true);
+    expect(stale.action.label).toBe('Finaliser dans Packlink');
   });
 });
 

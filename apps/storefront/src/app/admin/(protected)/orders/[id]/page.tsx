@@ -125,6 +125,7 @@ const SECTION_HINTS: Partial<Record<OrderActionSection, string>> = {
 
 const TRANSPORT_TONES = {
   danger: 'bg-tone-danger-bg text-tone-danger-fg ring-tone-danger-border',
+  warning: 'bg-tone-warning-bg text-tone-warning-fg ring-tone-warning-border',
   success: 'bg-tone-success-bg text-tone-success-fg ring-tone-success-border',
   neutral: 'bg-a-surface-2 text-a-text-2 ring-a-border',
 }
