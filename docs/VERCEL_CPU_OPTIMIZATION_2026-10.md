@@ -147,7 +147,7 @@ Vedi §7.
 
 ---
 
-## 5. Impatto atteso (da misurare)
+## 5. Impatto atteso (misurato in §6 e §11)
 
 | Invocazione | Prima (per caricamento) | Dopo (atteso) | Perché |
 |---|---|---|---|
@@ -178,17 +178,21 @@ Normalizzazione (per confrontare giorni con traffico diverso):
 - **CPU per run di smoke**: CPU del giorno ÷ (run + traffico reale stimato) solo come indicazione;
 - confrontare almeno un giorno senza push con un giorno con push.
 
-| Metrica | Baseline | 1 h dopo il deploy (09:28–10:28 UTC, 16/10) | 24 h | 72 h |
-|---|---:|---:|---:|---:|
-| CPU chloefood / giorno | 22–26 min (10–15/10) | NON DISPONIBILE (Usage aggiorna per giorno) | DA MISURARE | DA MISURARE |
-| Invocazioni chloefood | 11–17k / giorno; 7,6K / 12 h | 411 / 1 h | DA MISURARE | DA MISURARE |
-| Active CPU P75 | 200 ms | 153–165 ms | DA MISURARE | DA MISURARE |
-| Prefetch dinamici (`/cart`, `/gadgets`, `/compte/connexion`, `/orders`, `/supprimer-compte`) | 387–522 ciascuno / 12 h | **0** (route assenti) | DA MISURARE | DA MISURARE |
-| quantity-groups ÷ `/api/auth/session` | ≈ 2,2 | 2 ÷ 4 = 0,5 (campione piccolo) | DA MISURARE | DA MISURARE |
-| Invocazioni per caricamento (totale ÷ session) | ≈ 15 | non significativo (vedi nota) | DA MISURARE | DA MISURARE |
-| Richieste HeadlessChrome | ≈ 35,9k / 24 h | 0 tra i primi user-agent; 693 richieste totali, tutte da browser reali | DA MISURARE | DA MISURARE |
-| Run in produzione (suite completa) | fino a 9 / giorno | 0 (1 run di sola smoke) | DA MISURARE | DA MISURARE |
-| Error rate | 0 % | 0 % | DA MISURARE | DA MISURARE |
+| Metrica | Baseline | 1 h dopo il deploy (16/10, 09:28–10:28 UTC) | 24 h (17/10) | 72 h (17–19/10, media giornaliera) | 4 giorni (12 h fino al 20/10, 20:20 UTC) |
+|---|---:|---:|---:|---:|---:|
+| CPU chloefood / giorno | media 22,8 min (10–15/10; 16,9–26,2) | NON DISPONIBILE | 21m54s | **18,5 min** (21m54s · 14m30s · 18m57s) → −19 % | 20/10 parziale: 27m35s (11 commit, vedi §11) |
+| Invocazioni chloefood / giorno | media 13,8k (10–15/10; 6,5–17,2k) | 411 / 1 h | 9.187 | **8.348** (9.187 · 5.976 · 9.880) → −40 % | 20/10 parziale: 10.039; 12 h: 6,1K |
+| CPU per invocazione (calcolata) | 78–156 ms (media ≈ 99 ms) | — | 143 ms | 133 ms | 165 ms (20/10) |
+| Active CPU P75 | 200 ms | 153–165 ms | NON DISPONIBILE (retention 12 h) | NON DISPONIBILE | 327 ms |
+| `/cart` · `/gadgets` · `/compte/connexion` · `/orders` · `/supprimer-compte` (12 h) | 522 · 496 · 472 · 387 · 170 | 0 · 0 · 0 · 0 · 0 | NON DISPONIBILE | NON DISPONIBILE | 34 · 3 · 11 · 8 · 0 |
+| `/api/quantity-groups` (12 h) | 1,1K | 2 (1 h) | NON DISPONIBILE | NON DISPONIBILE | 43 |
+| `/api/auth/session` (12 h) = caricamenti completi | 491 | 4 (1 h) | NON DISPONIBILE | NON DISPONIBILE | 87 |
+| quantity-groups ÷ session | ≈ 2,2 | 0,5 | — | — | **0,49** |
+| Invocazioni ÷ session | ≈ 15 | non significativo | — | — | ≈ 70 (non più un indicatore utile: vedi §11) |
+| Richieste Firewall / 24 h | 43,3k | 693 / 1 h | NON DISPONIBILE | NON DISPONIBILE | **12,4k** (−71 %) |
+| di cui HeadlessChrome | ≈ 35,9k | 0 | NON DISPONIBILE | NON DISPONIBILE | **1,0k** (−97 %); `LepefySynthetic` 0 |
+| Run `storefront-confirmation` in produzione | fino a 9 / giorno, suite completa | 1 smoke | 0 | 0 | 0 (nessun push sui percorsi storefront dopo il 16/10) |
+| Errori / timeout (12 h) | 0 % / 0 % | 0 % / 0 % | NON DISPONIBILE | NON DISPONIBILE | 0 % / **1,4 %** (vedi §11) |
 
 Nota sull'ora post-deploy: con solo 4 caricamenti completi, il rapporto invocazioni ÷ session è dominato da invocazioni indipendenti dai caricamenti (admin aperto: `/api/admin/orders/poll` 39, `/admin` 31, ~30 pagine admin; tick n8n ~31; `/api/geocode/search` 26 di un checkout reale; ~150 schede prodotto con 1–3 invocazioni ciascuna). Diventa confrontabile solo sulle 24 h.
 
@@ -261,5 +265,41 @@ Metriche disponibili subito dopo il deploy (16/10, ~09:20 UTC):
 
 - `GET /api/quantity-groups` in produzione: 1ª richiesta `X-Vercel-Cache: MISS`, 2ª e 3ª `HIT` (`Age` 2 s, 4 s); al browser arriva `Cache-Control: public` (Vercel rimuove `s-maxage`).
 - `/conditions-generales-vente`: `X-Vercel-Cache: HIT` (servita dal CDN, nessuna funzione).
-- Active CPU, invocazioni per route e quota HeadlessChrome: **DA MISURARE** a 24 h e 72 h (§6). La finestra di 12 h dell'Observability contiene ancora il traffico precedente al deploy.
+- Active CPU, invocazioni per route e quota HeadlessChrome a 24 h, 72 h e 4 giorni: §6 e §11 (misurati il 20/10).
 - Prima ora interamente post-deploy (Observability *Last hour* e Firewall *Past Hour*, 10:28 UTC): 411 invocazioni, P75 153–165 ms, 0 errori; nessuna invocazione di `/cart`, `/gadgets`, `/compte/connexion`, `/orders`, `/supprimer-compte`; `/api/quantity-groups` 2; un ordine reale completato nel frattempo (checkout, webhook Stripe, `order-confirmation`) senza errori.
+
+---
+
+## 11. Esito a 4 giorni (20/10/2026)
+
+**Cosa ha funzionato (DIMOSTRATO).**
+- Traffico sintetico: HeadlessChrome da ≈35,9k a 1,0k richieste/24 h (−97 %); richieste Firewall totali da 43,3k a 12,4k (−71 %); nessuna esecuzione della suite completa in produzione dal deploy.
+- Prefetch dinamici: le cinque destinazioni passano da 170–522 a 0–34 invocazioni/12 h (resta solo la navigazione reale).
+- Quantity groups: da 1,1K a 43 invocazioni/12 h; 0,49 per caricamento completo (prima 2,2).
+- Invocazioni giornaliere di chloefood: −40 % sulla media dei tre giorni interi successivi (8.348 contro 13.800).
+
+**Cosa non è cambiato abbastanza.** L'Active CPU giornaliera scende solo del 19 % (18,5 min contro 22,8) e il 20/10, con 11 commit in un giorno, risale a 27m35s prima di fine giornata. Le invocazioni eliminate erano **leggere** (prefetch fino a `loading.tsx`, letture brevi): la CPU per invocazione sale da ~99 a 133–165 ms perché resta il lavoro pesante. Il limite Hobby resta superato (chloefood 6h 38m su 30 giorni).
+
+**Dove va la CPU oggi** (12 h fino al 20/10 20:20 UTC, 341 route, ≈1.022 s ≈ 17 min):
+
+| Categoria | Route | Invocazioni | CPU | Quota |
+|---|---:|---:|---:|---:|
+| Schede prodotto `/products/*` (ISR) | 148 | 2.544 | 574 s | **56 %** |
+| Altre pagine ISR (`/accueil`, `/card`, `/avis`, pagine legali) | 6 | 290 | 149 s | **15 %** |
+| Admin (`/admin/**`, `/api/admin/**`) | 60 | 1.876 | 96 s | 9 % |
+| Tick interni n8n (`/api/internal/*`) | 7 | 415 | 82 s | 8 % |
+| Catalogo `/` e `/index` | 2 | 375 | 68 s | 7 % |
+| API pubbliche | 25 | 492 | 35 s | 3 % |
+| Altre pagine (manifest, account…) | 19 | 355 | 18 s | 2 % |
+
+**Causa principale ora: rigenerazioni ISR (≈71 % della CPU).** ISR Observability (12 h): 2,1K rivalidazioni time-based (885 prima), 0 per tag. `/accueil`, `/avis`, `/card`, `/politique-confidentialite` e i prodotti più visti hanno ciascuno ~30 scritture in 12 h, cioè una ogni ~24 minuti; ogni rigenerazione costa 0,2–0,9 s di CPU (`/accueil` ≈ 0,9 s). Nessun crawler rilevante nel Firewall (user-agent con «bot» < 80 richieste/24 h). Con `revalidate = 300`, **qualunque** richiesta a una pagina scaduta da più di 5 minuti — una visita o il prefetch automatico delle card prodotto e dei link verso pagine ISR, che questo ciclo ha volutamente lasciato attivo — ne avvia la rigenerazione. Ne deriva che il costo cresce con il prodotto *numero di sessioni di navigazione × dimensione del catalogo*, non con le pagine viste: è strutturale e peggiorerà con più prodotti e più tenant. La correlazione con il prefetch delle card è PROBABILE (stessa cadenza su tutte le pagine linkate, assenza di bot), non isolata da una misura diretta.
+
+**Nuovi segnali di affidabilità (fuori perimetro, da segnalare).** Nelle stesse 12 h: `/api/internal/shipping-sync` 29,4 % di errori, `/api/internal/notifications/dispatch` 6,3 % (49 s di CPU, ×5 rispetto al 16/10), `/api/internal/catalog-schedule` 1,9 %; timeout complessivi 1,4 %. Sono comparsi dopo i rilasci del 17–20/10 (ordini V3, dispatcher notifiche staff, «resilient n8n ticks»): da verificare nel modulo interessato, non sono effetti di questo ciclo.
+
+**Prossimi interventi, in ordine di impatto atteso sulla CPU.**
+1. **ISR prodotti e pagine vetrina**: portare `revalidate` da 300 s a 3600 s (o più) su `/products/[slug]`, `/accueil`, `/card`, `/avis`, pagine legali, affidandosi all'invalidazione esplicita già esistente (`withStorefrontInvalidation`, `revalidateCatalogCache` del tick promo) e aggiungendo un `revalidatePath` mirato dei prodotti acquistati quando lo stock cambia (webhook/conversione ordine). Effetto teorico sulle rigenerazioni: fino a ×12 in meno a parità di traffico; il checkout resta autorevole su prezzo e stock.
+2. In alternativa o in aggiunta: `prefetch={false}` sulle card prodotto nelle griglie lunghe (scroll infinito), mantenendo il prefetch su hover/intento se misurato utile.
+3. **Catalogo `/`** cacheabile (7 %) e **navigazione admin** con la stessa regola di prefetch (9 %).
+4. **Tick n8n** con pre-controllo su Supabase (8 %).
+
+Il passaggio a Pro resta necessario: anche con −19 % il ritmo attuale (≈ 18–20 min/giorno per chloefood) vale ≈ 9–10 h/mese contro 4 h incluse.
