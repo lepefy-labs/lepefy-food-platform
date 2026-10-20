@@ -53,7 +53,7 @@ export const PREPARATION_COLUMNS = 'preparation_mode, picking_list_printed_at, p
 const LIGHT_SELECT = 'id, status, fulfillment_type, payment_status, created_at, updated_at, total, shipped_at, '
   + 'picking_started_at, picking_completed_at, packing_completed_at, shipping_tracking_mode, shipping_provider_reference, '
   + 'shipping_normalized_status, shipping_sync_error, shipping_estimated_delivery_at, tracking_code, shipping_address, '
-  + 'packing_parcel_count, packing_started_at, cold_chain_packing_checked_at, ' + PREPARATION_COLUMNS + ', order_items(storage_type, picked_at, cold_chain_checked_at)';
+  + 'packing_parcel_count, packing_started_at, cold_chain_packing_checked_at, shipping_creation_status, ' + PREPARATION_COLUMNS + ', order_items(storage_type, picked_at, cold_chain_checked_at)';
 
 const FULL_SELECT = `
   id, created_at, updated_at, email, full_name, status, total,
@@ -63,7 +63,7 @@ const FULL_SELECT = `
   shipping_provider_key, shipping_provider_reference, shipping_normalized_status,
   shipping_provider_synced_at, shipping_sync_error, shipped_at,
   shipping_estimated_delivery_at, picking_started_at, picking_completed_at,
-  packing_completed_at, packing_started_at, packing_parcel_count, cold_chain_packing_checked_at,
+  packing_completed_at, packing_started_at, packing_parcel_count, cold_chain_packing_checked_at, shipping_creation_status,
   ${PREPARATION_COLUMNS}, closure_type, closure_reason,
   order_items(id, product_id, name, quantity, subtotal, storage_type, warehouse_location, picked_at, cold_chain_checked_at)
 `;

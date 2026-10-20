@@ -117,7 +117,10 @@ function isEtaOverdue(order: OperationalOrder, now: Date): boolean {
 
 /** Preparation and packing satisfied for the order's mode (preparationPolicy). */
 function isReadyToShip(order: OperationalOrder): boolean {
-  return order.status === 'preparing' && order.fulfillment_type === 'delivery' && preparationState(order).readyForFinal;
+  if (order.status !== 'preparing' || order.fulfillment_type !== 'delivery') return false;
+  const state = preparationState(order);
+  // « Sans confirmation » + Lepefy provider draft: the parcels are at the provider, the order waits for the carrier.
+  return state.readyForFinal || state.awaitingProviderParcels;
 }
 
 function usesManagedShipment(order: OperationalOrder): boolean {
@@ -179,7 +182,9 @@ export function nextOrderAction(order: OperationalOrder, anomaly: OrderAnomaly |
         : action('Poursuivre la préparation', 'detail', true, 'preparation');
     }
     if (order.fulfillment_type === 'pickup') return action('Marquer prête au retrait');
-    if (!preparation.packingDone) return action('Terminer l’emballage', 'detail', true, 'packing');
+    if (!preparation.packingDone && !preparation.awaitingProviderParcels) {
+      return action(preparation.mode.picking === 'none' ? 'Indiquer les colis' : 'Terminer l’emballage', 'detail', true, 'packing');
+    }
     if (usesManagedShipment(order)) return action(order.shipping_provider_reference ? 'Gérer l’expédition' : 'Associer l’expédition', 'detail', true, 'shipment');
     return action('Expédier');
   }
@@ -269,7 +274,7 @@ export function classifyOrderOperation(order: OperationalOrder, thresholds: Oper
   }
   if (order.status === 'preparing') {
     if (preparation.mode.picking === 'digital' && !preparation.pickingDone) flags.add('picking_incomplete');
-    if (order.fulfillment_type === 'delivery' && preparation.pickingDone && !preparation.packingDone) flags.add('packing_pending');
+    if (order.fulfillment_type === 'delivery' && preparation.pickingDone && !preparation.packingDone && !preparation.awaitingProviderParcels) flags.add('packing_pending');
     if (order.fulfillment_type === 'delivery' && preparation.packingDone && !order.tracking_code) flags.add('tracking_missing');
     if (preparation.paperInProgress) flags.add('paper_in_progress');
   }

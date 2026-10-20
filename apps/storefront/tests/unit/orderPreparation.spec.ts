@@ -209,10 +209,26 @@ test.describe('orders created directly in preparation (paid storefront orders)',
     expect(db.rows.order_items![0]!.picked_at).toBeNull();
   });
 
-  test('the classifier shows them as the tenant mode (no « Préparation incomplète »)', () => {
+  test('the classifier shows them as the tenant mode (no « Préparation incomplète », no false « terminée »)', () => {
     const op = classifyOrderOperation({ ...(baseOrder({ preparation_mode: null }) as unknown as OperationalOrder), order_items: [{ storage_type: 'dry', picked_at: null }], tenantPreparationMode: NONE }, thresholds, now);
     expect(op.flags.has('picking_incomplete')).toBe(false);
-    expect(op.action.label).toBe('Terminer l’emballage');
+    expect(op.flags.has('packing_pending')).toBe(true);
+    expect(op.action.label).toBe('Indiquer les colis');
+    expect(op.step).toEqual({ key: 'prepared', label: 'Colis à indiquer' });
+  });
+
+  test('with a Lepefy Packlink draft nothing is left to do in Lepefy: « À expédier », no packing alarm', () => {
+    const op = classifyOrderOperation({ ...(baseOrder({ preparation_mode: null, shipping_tracking_mode: 'managed', shipping_provider_key: 'packlink',
+      shipping_provider_reference: 'IT2026PRO0006916175', shipping_creation_status: 'draft_created' } as Partial<Order>) as unknown as OperationalOrder),
+    order_items: [{ storage_type: 'frozen', picked_at: null }], tenantPreparationMode: NONE, managedProviderAvailable: true }, thresholds, now);
+    expect(op.flags.has('packing_pending')).toBe(false);
+    expect(op.flags.has('to_ship')).toBe(true);
+    expect(op.flags.has('cold_chain')).toBe(false);
+    expect(op.step?.label).toBe('Prêt à expédier');
+    expect(op.action.label).toBe('Gérer l’expédition');
+    // The transition itself is unchanged: without the carrier's parcel list it still needs a count.
+    expect(preparationBlockers({ ...baseOrder({ shipping_creation_status: 'draft_created' } as Partial<Order>), tenantPreparationMode: NONE }, [{ ...dry }], true))
+      .toEqual(['Nombre de colis à renseigner avant l’expédition.']);
   });
 });
 

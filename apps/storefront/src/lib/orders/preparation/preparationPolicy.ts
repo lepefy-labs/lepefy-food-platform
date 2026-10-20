@@ -56,6 +56,8 @@ export interface PreparationOrder {
   paper_preparation_completed_at?: string | null;
   cold_chain_packing_declared_at?: string | null;
   packing_started_at?: string | null;
+  /** Provider draft created by Lepefy (`draft_created`): its parcels are recorded at the provider. */
+  shipping_creation_status?: string | null;
   order_items?: PreparationItem[] | null;
   /**
    * Tenant's current mode. Applies to an order without snapshot as long as no
@@ -125,6 +127,11 @@ export interface PreparationState {
   paperInProgress: boolean;
   /** A final transition now would record no check (mode « sans confirmation »). */
   unverified: boolean;
+  /**
+   * « Sans confirmation » delivery with a Lepefy provider draft and no parcel count: nothing is left
+   * for the team in Lepefy, the carrier sync records the provider's parcels when the parcel leaves.
+   */
+  awaitingProviderParcels: boolean;
 }
 
 /**
@@ -172,8 +179,10 @@ export function preparationState(order: PreparationOrder, items: PreparationItem
   const readyForFinal = pickingDone && (!delivery || packingDone);
   const paperInProgress = mode.picking === 'paper' && order.status === 'preparing' && !order.paper_preparation_completed_at;
   const unverified = mode.picking === 'none' || (coldApplies && mode.cold_chain_packing === 'none');
+  const awaitingProviderParcels = delivery && mode.picking === 'none' && pickingDone && coldPackingDone && !parcelsKnown
+    && order.shipping_creation_status === 'draft_created';
 
-  return { mode, modeSource, hasColdChain, lines, pickingDone, coldPackingDone, parcelsKnown, packingDone, readyForFinal, paperInProgress, unverified };
+  return { mode, modeSource, hasColdChain, lines, pickingDone, coldPackingDone, parcelsKnown, packingDone, readyForFinal, paperInProgress, unverified, awaitingProviderParcels };
 }
 
 /**
@@ -231,7 +240,9 @@ export function preparationStep(order: PreparationOrder, tenantMode: OrderPrepar
   const { mode } = effectivePreparationMode({ ...order, tenantPreparationMode: order.tenantPreparationMode ?? tenantMode });
   if (order.status === 'new') return step(mode.picking === 'paper' && !order.picking_list_printed_at ? 'to_print' : 'to_prepare');
   const state = preparationState({ ...order, tenantPreparationMode: order.tenantPreparationMode ?? tenantMode });
-  if (state.readyForFinal) return step('ready');
+  if (state.readyForFinal || state.awaitingProviderParcels) return step('ready');
+  // « Sans confirmation »: nothing was declared, only the parcel count is missing.
+  if (state.pickingDone && mode.picking === 'none') return { key: 'prepared', label: 'Colis à indiquer' };
   if (state.pickingDone) return step('prepared');
   if (mode.picking === 'paper') return step(order.paper_preparation_started_at || order.picking_list_printed_at ? 'printed' : 'to_print');
   return step('in_progress');
