@@ -4,7 +4,10 @@ import { buildOrdersCsv, ORDER_CSV_HEADER, type ExportOrderRow } from '../../src
 
 test('orders list URL: views, filters, legacy sorts and page size', () => {
   const { values, filters, sort } = parseOrderList({ view: 'incidents', status: 'preparing', payment: 'cash', sort: 'date_desc', size: '25', page: '2', q: 'Ntjam' });
-  expect(filters).toEqual({ view: 'incidents', status: 'preparing', fulfillment: '', payment: 'cash', dateFrom: '', dateTo: '', search: 'Ntjam' });
+  expect(filters).toEqual({ view: 'incidents', status: 'preparing', fulfillment: '', payment: 'cash', dateFrom: '', dateTo: '', search: 'Ntjam', closure: '', closureReason: '' });
+  // Closure filters (migration 161): type and reason, unknown values dropped.
+  expect(parseOrderList({ closure: 'external', reason: 'duplicate' }).filters).toMatchObject({ closure: 'external', closureReason: 'duplicate' });
+  expect(parseOrderList({ closure: 'lost', reason: 'whatever' }).filters).toMatchObject({ closure: '', closureReason: '' });
   expect(sort).toBe('newest');
   expect(values.pageSize).toBe(25);
   expect(values.page).toBe(2);

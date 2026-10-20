@@ -345,6 +345,28 @@ ${signature(context, 'Merci de votre compréhension.')}`,
   };
 }
 
+/**
+ * Custom message written by the shop when it closes an order (lib/orders/closure).
+ * Not necessarily a cancellation: it may tell the customer that the order goes on
+ * directly with the shop. Plain text, escaped, line breaks kept.
+ */
+export function orderClosureMessageEmail(context: TenantNotificationContext, input: OrderBase & { message: string }): RenderedEmail {
+  const paragraphs = input.message.trim().split(/\n{2,}/)
+    .map((block) => `<p>${esc(block).replace(/\n/g, '<br>')}</p>`).join('\n');
+  return {
+    subject: subject(input.testMode, `Votre commande ${input.orderNumber} chez ${context.tenantName}`),
+    replyTo: context.emailBranding?.supportEmail,
+    html: page(context, {
+      testMode: input.testMode,
+      title: `Votre commande ${input.orderNumber}`,
+      body: `${paragraphs}
+${infoBox([['📦 Commande', input.orderNumber]])}
+${supportBox(context, '💬 Une question ?')}
+${signature(context, 'À bientôt.')}`,
+    }),
+  };
+}
+
 export function paymentReminderEmail(context: TenantNotificationContext, input: {
   paymentReference: string; fullName: string | null; paymentMethodLabel: string; amount: number;
   providerHandoffStarted: boolean; resumeLink: string; testMode?: boolean;

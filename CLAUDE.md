@@ -118,6 +118,12 @@ The shipping logic is the most complex part of the codebase:
 - « Imprimer et démarrer » is `POST /api/admin/orders/preparation/start` (idempotent) followed by the PDF GET — document GETs never mutate. Session de préparation `/admin/orders/preparation?ids=` is stateless; the grouped list is PDF kind `preparation-summary`.
 - Reads selecting the 160 columns go through `lib/orders/preparation/compat.ts` fallbacks until the migration is applied.
 
+### Order closure (cancel / handled outside the platform) — `docs/ORDER_CLOSURE.md`
+
+- The only way to cancel an order is `POST /api/admin/orders/[id]/close` → `lib/orders/closure/orderClosureService.ts` (`PATCH status: 'cancelled'` is refused). Status stays `cancelled`; `orders.closure_type` (`cancelled | handled_externally`, migration 161) says whether it is a lost sale. Rules (reasons, allowed communication, carrier guard) live in `closureRules.ts`, shared with the dialog.
+- Customer communication is the admin's choice: none, the standard « annulée » email (key `order-cancelled:<id>`), or a custom message (key `order-closure-message:<id>`); `runOrderTransitionSideEffects({ customerEmail: false })` suppresses the standard one. Never change `payment_status`, refund, restock or touch Packlink on closure.
+- Statistics: count commercial cancellations as `status = 'cancelled' and coalesce(closure_type, 'cancelled') = 'cancelled'`; an external closure is neither a lost sale nor platform revenue.
+
 ### Shipment drafts (provider-neutral, Packlink first) — `docs/SHIPPING_INTELLIGENCE.md` §2.4
 
 - Lepefy only creates an unpurchased provider **draft** (Packlink `POST /v1/shipments`, no `service_id`); purchase stays in Packlink PRO. Never touches customer shipping price, never sets `shipped`, never emails.

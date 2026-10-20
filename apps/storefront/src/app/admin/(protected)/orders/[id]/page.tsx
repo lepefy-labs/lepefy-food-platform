@@ -40,6 +40,7 @@ import { DIGITAL_PREPARATION, orderPreparationMode, preparationBlockers, prepara
 import { readOrderPreparationSettings, toPreparationMode } from '@/lib/orders/preparation/settings'
 import PaperPreparationPanel from '../../../orders/[id]/PaperPreparationPanel'
 import PreparationStepBadge from '../../../_components/ui/PreparationStepBadge'
+import { CLOSURE_NOTIFICATION_LABELS, CLOSURE_REASON_LABELS, closureIdempotencyKey, type ClosureNotification } from '@/lib/orders/closure/closureRules'
 import {
   classifyOrderOperation, formatSince, orderDetailTransition, PRIORITY_GROUP_LABELS, transportState,
   type OperationalOrder, type OrderActionSection, type OrderAnomalyCode,
@@ -190,6 +191,14 @@ export default async function AdminOrderPage({ params }: PageProps) {
       ? supabase.from('admin_users').select('email, nickname, first_name').eq('id', order.paper_preparation_completed_by).maybeSingle()
       : Promise.resolve({ data: null }),
   ])
+  // Closure (migration 161): author and the delivery state of the customer message in the notification ledger.
+  const closureKey = order.closed_at ? closureIdempotencyKey((order.closure_notification ?? 'none') as ClosureNotification, order.id) : null
+  const [closerResult, closureDeliveryResult] = await Promise.all([
+    order.closed_by ? supabase.from('admin_users').select('email, nickname, first_name').eq('id', order.closed_by).maybeSingle() : Promise.resolve({ data: null }),
+    closureKey ? supabase.from('notification_deliveries').select('status, accepted_at').eq('tenant_id', tenant.id).eq('idempotency_key', closureKey).maybeSingle() : Promise.resolve({ data: null }),
+  ])
+  const closer = closerResult.data as { email: string; nickname: string | null; first_name: string | null } | null
+  const closureDelivery = closureDeliveryResult.data as { status: string; accepted_at: string | null } | null
   const assistedSession = assistedSessionResult.data as { id: string; phone: string | null } | null
   const confirmedByEmail = (confirmerResult.data as { email: string } | null)?.email ?? null
   const preparer = preparerResult.data as { email: string; nickname: string | null; first_name: string | null } | null
@@ -287,7 +296,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <h1 className="font-mono text-xl font-semibold tracking-tight text-a-text sm:text-2xl">{reference}</h1>
-            <StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} />
+            <StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} closureType={order.closure_type} />
             {transport && !terminal && <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${TRANSPORT_TONES[transport.tone]}`}>Transport : {transport.label}</span>}
             <span className="inline-flex items-center gap-1 rounded-full bg-a-hover px-2 py-0.5 text-xs font-medium text-a-text-2">
               {isPickup ? <IconBuildingStore size={13} aria-hidden="true" /> : <IconTruck size={13} aria-hidden="true" />}{isPickup ? 'Retrait magasin' : 'Livraison'}
@@ -358,9 +367,29 @@ export default async function AdminOrderPage({ params }: PageProps) {
       )}
 
       {order.status === 'cancelled' ? (
-        <p className="mb-5 rounded-2xl border border-a-border bg-a-surface-2 px-4 py-3 text-sm text-a-text-2">
-          Commande annulée {formatSince(order.updated_at, now)}.
-        </p>
+        order.closed_at ? (
+          <section aria-labelledby="order-closure-title" className="mb-5 rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm sm:p-5">
+            <h2 id="order-closure-title" className="text-sm font-semibold text-a-text">
+              {order.closure_type === 'handled_externally' ? 'Commande traitée hors plateforme' : 'Commande annulée'} {formatSince(order.closed_at, now)}
+            </h2>
+            <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+              <div><dt className="text-xs text-a-text-3">Motif</dt><dd className="text-a-text">{order.closure_reason ? CLOSURE_REASON_LABELS[order.closure_reason] : '—'}</dd></div>
+              <div><dt className="text-xs text-a-text-3">Par</dt><dd className="text-a-text">{closer ? closer.nickname || closer.first_name || closer.email : '—'} · {formatDate(order.closed_at, 'fr')}</dd></div>
+              <div><dt className="text-xs text-a-text-3">Client</dt><dd className="text-a-text">
+                {order.closure_notification ? CLOSURE_NOTIFICATION_LABELS[order.closure_notification as ClosureNotification] : '—'}
+                {closureKey && <span className="block text-xs text-a-text-3">{!order.email ? 'Pas d’e-mail : rien n’a été envoyé.' : closureDelivery?.status === 'accepted' ? 'E-mail envoyé.' : closureDelivery?.status === 'dead' ? 'E-mail non envoyé après plusieurs essais.' : 'E-mail en cours d’envoi (renvoyé automatiquement en cas d’échec).'}</span>}
+              </dd></div>
+              <div><dt className="text-xs text-a-text-3">Statistiques</dt><dd className="text-a-text-2">{order.closure_type === 'handled_externally' ? 'Pas comptée comme vente perdue' : 'Comptée parmi les annulations'}</dd></div>
+              {order.closure_note && <div className="sm:col-span-2"><dt className="text-xs text-a-text-3">Note interne</dt><dd className="whitespace-pre-wrap break-words text-a-text">{order.closure_note}</dd></div>}
+              {order.closure_message && <div className="sm:col-span-2"><dt className="text-xs text-a-text-3">Message envoyé au client</dt><dd className="whitespace-pre-wrap break-words rounded-xl bg-a-surface-2 p-3 text-a-text-2">{order.closure_message}</dd></div>}
+            </dl>
+            {order.payment_status === 'paid' && <p className="mt-3 text-xs text-tone-warning-fg">Paiement encaissé : aucun remboursement n’a été fait par Lepefy.</p>}
+          </section>
+        ) : (
+          <p className="mb-5 rounded-2xl border border-a-border bg-a-surface-2 px-4 py-3 text-sm text-a-text-2">
+            Commande annulée {formatSince(order.updated_at, now)}.
+          </p>
+        )
       ) : (
         <section aria-labelledby="order-progress-title" className="mb-5 rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm sm:p-5">
           <h2 id="order-progress-title" className="sr-only">Avancement de la commande</h2>
@@ -562,6 +591,8 @@ export default async function AdminOrderPage({ params }: PageProps) {
             missingWeightLines={missingWeightLines}
             canManage={canManage}
             nextStep={nextStep}
+            tenantName={tenant.name}
+            paymentLabel={order.external_payment_label ?? paymentLabel(order.payment_method)}
             documents={{
               pickingFormat: documentSettings.config.picking_list_format,
               packingSlipEnabled: documentSettings.config.packing_slip_enabled,

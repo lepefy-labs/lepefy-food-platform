@@ -85,6 +85,7 @@ export interface RecentOrderRow {
   fulfillment_type: 'delivery' | 'pickup';
   full_name: string | null;
   total: number | null;
+  closure_type?: string | null;
 }
 
 export interface ActivityEntry { orderId: string; at: string; label: string; tone: AdminTone }
@@ -101,6 +102,7 @@ export function describeRecentOrder(row: RecentOrderRow): ActivityEntry {
   let tone: AdminTone = 'info';
   if (fresh && row.status === 'new') label = 'Nouvelle commande';
   else if (row.status === 'stock_conflict') { label = 'Conflit de stock'; tone = 'danger'; }
+  else if (row.status === 'cancelled' && row.closure_type === 'handled_externally') { label = 'Traitée hors plateforme'; tone = 'info'; }
   else if (row.status === 'cancelled') { label = 'Commande annulée'; tone = 'neutral'; }
   else if (row.status === 'delivered') { label = pickup ? 'Retrait terminé' : 'Colis livré'; tone = 'success'; }
   else if (row.status === 'shipped') label = 'Colis expédié';

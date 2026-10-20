@@ -13,6 +13,7 @@ import { buildPriorityItems, buildQuickActions, describeRecentOrder, type KpiCou
 import { formatDate, formatMoney, formatNumber, pluralize } from '@/lib/admin/format'
 import { PREPARATION_MODE_LABELS } from '@/lib/orders/preparation/preparationPolicy'
 import { cn } from '@/lib/utils/cn'
+import { isMissingPreparationColumn, withoutPreparationColumns } from '@/lib/orders/preparation/compat'
 import AdminPageHeader from '../_components/ui/AdminPageHeader'
 import { ButtonLink } from '../_components/ui/Button'
 import { TONE_SOLID_BG_CLASS } from '../_components/ui/Badge'
@@ -57,6 +58,13 @@ export default async function AdminTodayPage({ searchParams }: { searchParams: R
   const now = new Date()
   const dayStart = new Date(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now) + 'T00:00:00')
   const [access, operational] = await Promise.all([getCurrentAdminAccessContext(tenant.id), loadOrderOperationalContext(supabase, tenant)])
+  const RECENT_COLUMNS = 'id, created_at, updated_at, status, payment_status, fulfillment_type, full_name, total, closure_type'
+  const readRecent = (columns: string) => supabase.from('orders').select(columns).eq('tenant_id', tenant.id).order('updated_at', { ascending: false }).limit(8)
+  // Before migration 161: same list without closure_type.
+  const readRecentOrders = async () => {
+    const first = await readRecent(RECENT_COLUMNS)
+    return isMissingPreparationColumn(first.error) ? readRecent(withoutPreparationColumns(RECENT_COLUMNS)) : first
+  }
   const canManage = Boolean(access && canAdmin(access, 'orders.manage'))
 
   const [queue, { count: pendingLinkPayments }, { count: preordersToVerify }, { data: recentRaw }, { count: todayCount }] = await Promise.all([
@@ -68,8 +76,7 @@ export default async function AdminTodayPage({ searchParams }: { searchParams: R
     supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id)
       .eq('payment_method', 'external_link').eq('origin', 'storefront').in('status', ['open', 'expired', 'awaiting_verification']).is('order_id', null),
     supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('origin', 'assisted').eq('status', 'awaiting_verification'),
-    supabase.from('orders').select('id, created_at, updated_at, status, payment_status, fulfillment_type, full_name, total')
-      .eq('tenant_id', tenant.id).order('updated_at', { ascending: false }).limit(8),
+    readRecentOrders(),
     supabase.from('orders').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).gte('created_at', dayStart.toISOString()),
   ])
 
@@ -79,7 +86,7 @@ export default async function AdminTodayPage({ searchParams }: { searchParams: R
   const priorities = buildPriorityItems({ kpis, pendingLinkPayments: linkPayments, preordersToVerify: preorders })
   const paymentsToVerify = (kpis.payment_unverified ?? 0) + linkPayments + preorders
   const actions = buildQuickActions({ kpis, mode: operational.preparationMode, canManage, paymentsToVerify })
-  const recent = ((recentRaw ?? []) as RecentOrderRow[]).map((row) => ({ row, entry: describeRecentOrder(row) }))
+  const recent = ((recentRaw ?? []) as unknown as RecentOrderRow[]).map((row) => ({ row, entry: describeRecentOrder(row) }))
   const name = access?.nickname || access?.firstName || null
   const dateLabel = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' }).format(now)
 

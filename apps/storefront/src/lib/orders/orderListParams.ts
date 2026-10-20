@@ -7,6 +7,7 @@ import { parseOrderSort, type OperationalThresholds, type OrderSortKey } from '.
 import { ORDER_VIEWS, type OrderListFilters, type OrderView } from './loadOrderWorkQueue';
 import { readOrderPreparationSettings, toPreparationMode } from './preparation/settings';
 import { DIGITAL_PREPARATION } from './preparation/preparationPolicy';
+import { CLOSURE_REASONS } from './closure/closureRules';
 
 export const ORDER_STATUSES = ['new', 'preparing', 'ready_for_pickup', 'shipped', 'delivered', 'cancelled', 'stock_conflict'] as const;
 export const ORDER_PAYMENT_METHODS = ['stripe', 'external_link', 'satispay', 'in_store', 'cash', 'manual'] as const;
@@ -17,6 +18,8 @@ export const ORDER_LIST = defineListParams({
   status: { type: 'enum', values: ORDER_STATUSES },
   fulfillment: { type: 'enum', values: ['delivery', 'pickup'] },
   payment: { type: 'enum', values: ORDER_PAYMENT_METHODS },
+  closure: { type: 'enum', values: ['cancelled', 'external'] },
+  reason: { type: 'enum', values: CLOSURE_REASONS },
   dateFrom: { type: 'date' },
   dateTo: { type: 'date' },
   q: { type: 'string', maxLength: 120 },
@@ -45,6 +48,8 @@ export function parseOrderList(raw: RawSearchParams): { values: OrderListValues;
       dateFrom: values.dateFrom ?? '',
       dateTo: values.dateTo ?? '',
       search: sanitizeOrderSearch(values.q),
+      closure: values.closure ?? '',
+      closureReason: values.reason ?? '',
     },
   };
 }

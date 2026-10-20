@@ -13,6 +13,7 @@ import { ORDER_STATUS_META } from '@/lib/admin/statusRegistry'
 import type { AdminTone } from '@/lib/admin/tokens'
 import { cn } from '@/lib/utils/cn'
 import { readOrderDocumentSettings } from '@/lib/orders/documents/settings'
+import { CLOSURE_REASON_LABELS, CLOSURE_REASONS, type ClosureReason } from '@/lib/orders/closure/closureRules'
 import OrdersTable, { type ListOrder } from './OrdersTable'
 import PendingPaymentsBanner, { type PendingPaymentSession } from './PendingPaymentsBanner'
 import AdminPageHeader from '../../_components/ui/AdminPageHeader'
@@ -102,12 +103,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
     cancelled: Number(stats?.cancelled_count ?? 0),
     stock_conflict: queue?.activeStatusCounts.stock_conflict ?? 0,
   }
+  const externalClosures = Number((stats as { external_closure_count?: number } | null)?.external_closure_count ?? 0)
   const orderList = (queue?.rows ?? []) as unknown as ListOrder[]
   const window = pageWindow(queue?.total ?? 0, queue?.currentPage ?? 1, values.pageSize)
   const view = filters.view
-  const hasFilters = ORDER_LIST.activeCount(values, ['view', 'status', 'fulfillment', 'payment', 'dateFrom', 'dateTo']) > 0 || Boolean(filters.search)
+  const hasFilters = ORDER_LIST.activeCount(values, ['view', 'status', 'fulfillment', 'payment', 'dateFrom', 'dateTo', 'closure', 'reason']) > 0 || Boolean(filters.search)
   // A search or a status filter often targets a closed order: show it. Livraison / Retrait / Urgents stay work queues.
-  const finishedCollapsed = !filters.search && !values.status && view !== 'finished'
+  const finishedCollapsed = !filters.search && !values.status && !values.closure && !values.reason && view !== 'finished'
   // Reset keeps the chosen sort and page size: they are preferences, not filters.
   const resetHref = ORDER_LIST.href('/admin/orders', { ...ORDER_LIST.parse({}), sort: values.sort, pageSize: values.pageSize }, {})
 
@@ -123,6 +125,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
   const chips: ActiveFilterChip[] = [
     ...(view && !['urgent', 'incidents', 'finished'].includes(view) ? [{ key: 'view', label: VIEW_LABELS[view] ?? view, href: href({ view: undefined }) }] : []),
     ...(filters.status ? [{ key: 'status', label: `Statut : ${ORDER_STATUS_META[filters.status]?.label ?? filters.status}`, href: href({ status: undefined }) }] : []),
+    ...(values.closure ? [{ key: 'closure', label: `Clôture : ${values.closure === 'external' ? 'traitées hors plateforme' : 'annulations'}`, href: href({ closure: undefined }) }] : []),
+    ...(values.reason ? [{ key: 'reason', label: `Motif : ${CLOSURE_REASON_LABELS[values.reason as ClosureReason]}`, href: href({ reason: undefined }) }] : []),
     ...(filters.payment ? [{ key: 'payment', label: `Paiement : ${PAYMENT_LABELS[filters.payment] ?? filters.payment}`, href: href({ payment: undefined }) }] : []),
     ...(filters.dateFrom ? [{ key: 'dateFrom', label: `Depuis le ${filters.dateFrom.split('-').reverse().join('/')}`, href: href({ dateFrom: undefined }) }] : []),
     ...(filters.dateTo ? [{ key: 'dateTo', label: `Jusqu’au ${filters.dateTo.split('-').reverse().join('/')}`, href: href({ dateTo: undefined }) }] : []),
@@ -210,6 +214,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
               filters={[
                 { type: 'select', key: 'status', label: 'Statut', allLabel: 'Tous les statuts', options: Object.entries(ORDER_STATUS_META).map(([key, meta]) => ({ value: key, label: statusCounts[key] ? `${meta.label} (${formatNumber(statusCounts[key]!)})` : meta.label })) },
                 { type: 'select', key: 'payment', label: 'Paiement', allLabel: 'Tous les paiements', options: Object.entries(PAYMENT_LABELS).filter(([key]) => key !== 'manual').map(([value, label]) => ({ value, label })) },
+                { type: 'select', key: 'closure', label: 'Clôture', allLabel: 'Toutes les commandes', options: [
+                  { value: 'cancelled', label: statusCounts.cancelled ? `Annulations (${formatNumber(statusCounts.cancelled)})` : 'Annulations' },
+                  { value: 'external', label: externalClosures ? `Traitées hors plateforme (${formatNumber(externalClosures)})` : 'Traitées hors plateforme' },
+                ] },
+                { type: 'select', key: 'reason', label: 'Motif de clôture', allLabel: 'Tous les motifs', options: CLOSURE_REASONS.map((reason) => ({ value: reason, label: CLOSURE_REASON_LABELS[reason] })) },
                 { type: 'date-range', label: 'Date de commande', fromKey: 'dateFrom', toKey: 'dateTo' },
               ]}
               activeChips={chips}

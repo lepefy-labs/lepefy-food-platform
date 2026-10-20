@@ -16,6 +16,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!body || Array.isArray(body)) return NextResponse.json({ error: 'Corps invalide.' }, { status: 400 });
     const { status, tracking_carrier, tracking_code, notes, payment_status } = body;
     if (status !== undefined && !isOrderStatus(status)) return NextResponse.json({ error: 'Statut invalide.' }, { status: 400 });
+    // One path only for cancellations: reason, customer communication and author are recorded by /close.
+    if (status === 'cancelled') return NextResponse.json({ error: 'Utilisez « Clôturer ou annuler » pour annuler une commande.' }, { status: 400 });
     const patch: Record<string, unknown> = {};
     for (const [key, value] of Object.entries({ tracking_carrier, tracking_code, notes })) {
       if (value === undefined) continue;

@@ -1,11 +1,12 @@
 /**
- * Migration 160 may reach production after the code (migrations are applied
+ * Migrations 160 and 161 may reach production after the code (migrations are applied
  * by hand). Reads that select its columns retry without them: the orders then
  * have no snapshot, i.e. the historical digital rules. Writes of those columns
  * only happen once the `order_preparation` module is registered (same
  * migration), so they never run before it.
  */
-const PREPARATION_COLUMN = /preparation_mode|picking_list_printed_at|paper_preparation_|cold_chain_packing_declared_at|preparation_unverified_at/;
+// Migration 160 (preparation) and 161 (closure) columns.
+const PREPARATION_COLUMN = /preparation_mode|picking_list_printed_at|paper_preparation_|cold_chain_packing_declared_at|preparation_unverified_at|closure_type|closure_reason|closed_at/;
 
 export function isMissingPreparationColumn(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;

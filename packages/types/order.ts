@@ -96,6 +96,14 @@ export interface Order {
   cold_chain_packing_declared_at?: string | null;
   /** Final transition in mode « sans confirmation »: no check recorded. */
   preparation_unverified_at?: string | null;
+  /** Migration 161 — closure of a cancelled order (null on historical cancellations). */
+  closure_type?: 'cancelled' | 'handled_externally' | null;
+  closure_reason?: 'handled_externally' | 'duplicate' | 'customer_request' | 'product_unavailable' | 'other' | null;
+  closure_note?: string | null;
+  closure_notification?: 'none' | 'standard' | 'custom' | null;
+  closure_message?: string | null;
+  closed_at?: string | null;
+  closed_by?: string | null;
   notes: string | null;
   /** Migration 128 — absents tant que la migration n'est pas appliquée. */
   order_origin?: OrderOrigin;

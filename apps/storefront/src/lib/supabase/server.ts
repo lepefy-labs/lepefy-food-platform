@@ -98,7 +98,8 @@ export function createRouteClient() {
  * del Journal d'activité (lib/audit/requestContext.ts); `auditActor` lo impone
  * per i worker e i job senza admin (es. sync spedizioni).
  */
-export function createServiceClient(options: { auditActor?: AuditActor } = {}) {
+export function createServiceClient(options: { auditActor?: AuditActor; requestTimeoutMs?: number } = {}) {
+  const auditFetch = createAuditFetch(options.auditActor);
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -107,7 +108,20 @@ export function createServiceClient(options: { auditActor?: AuditActor } = {}) {
         getAll() { return []; },
         setAll() {},
       },
-      global: { fetch: createAuditFetch(options.auditActor) },
+      global: { fetch: options.requestTimeoutMs ? withRequestTimeout(auditFetch, options.requestTimeoutMs) : auditFetch },
     },
   );
+}
+
+/**
+ * Bounds every request of a client (scheduled ticks): a stalled database call
+ * fails fast with a TimeoutError instead of running into the function's
+ * maxDuration, so the tick answers and the next run retries.
+ */
+export function withRequestTimeout(fetchImpl: typeof fetch, ms: number): typeof fetch {
+  return (input, init) => {
+    const timeout = AbortSignal.timeout(ms);
+    const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+    return fetchImpl(input, { ...init, signal });
+  };
 }

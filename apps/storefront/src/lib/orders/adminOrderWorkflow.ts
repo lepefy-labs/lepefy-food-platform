@@ -103,6 +103,7 @@ export async function runOrderTransitionSideEffects({
   trackingCode,
   trackingCarrier,
   shippingEstimatedDeliveryAt,
+  customerEmail = true,
 }: {
   tenantId: string;
   orderId: string;
@@ -117,6 +118,11 @@ export async function runOrderTransitionSideEffects({
   trackingCode?: string | null;
   trackingCarrier?: string | null;
   shippingEstimatedDeliveryAt?: string | null;
+  /**
+   * false: no customer email for this transition (closure « Ne pas notifier » or
+   * a custom message sent by lib/orders/closure). Loyalty and reviews still run.
+   */
+  customerEmail?: boolean;
 }, dependencies: OrderTransitionSideEffectDependencies = { processOrderPointsOnDelivery, notifyN8n, getTenantNotificationContext, ensureReviewInviteForOrder }) {
   if (nextStatus === previousStatus) return;
 
@@ -133,6 +139,7 @@ export async function runOrderTransitionSideEffects({
     }
   }
 
+  if (!customerEmail) return;
   if (!process.env.N8N_WEBHOOK_URL) return;
   if (!email) {
     console.info('[admin order workflow] order without email — customer notification skipped — order_id:', orderId);

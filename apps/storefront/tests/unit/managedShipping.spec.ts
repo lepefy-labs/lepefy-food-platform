@@ -3,13 +3,15 @@ import type { Order } from '@lepefy/types';
 import { packlinkAdapter, parsePacklinkShipment, normalizePacklinkStatus, resolveTrackingUrl } from '../../src/lib/shipping/providers/packlink';
 import { managedShippingProviderInfo } from '../../src/lib/shipping/providers/registry';
 import { applyShipmentSnapshot, syncOrderShipment } from '../../src/lib/shipping/syncOrderShipment';
-import { loadWorkflowOrder, PreparationIncompleteError, updateWorkflowOrder, type OrderService } from '../../src/lib/orders/orderTransitionService';
+import { loadWorkflowOrder, OrderWorkflowError, PreparationIncompleteError, updateWorkflowOrder, type OrderService } from '../../src/lib/orders/orderTransitionService';
 import { runOrderTransitionSideEffects } from '../../src/lib/orders/adminOrderWorkflow';
 import type { TenantNotificationContext } from '../../src/lib/notifications/getTenantNotificationContext';
 import { shipmentEventLabel, shipmentEventsNewestFirst } from '../../src/lib/shipping/shipmentPresentation';
 import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
 import { shippingSyncAuthorized } from '../../src/lib/shipping/shippingSyncAuth';
-import { runShippingSyncBatch } from '../../src/lib/shipping/shippingSyncBatch';
+import { isTransientSyncFailure, runShippingSyncBatch } from '../../src/lib/shipping/shippingSyncBatch';
+import { ShippingProviderError } from '../../src/lib/shipping/providers/types';
+import { withRequestTimeout } from '../../src/lib/supabase/server';
 
 const reference = 'IT2026PRC0005858260';
 const payload = { trackings: ['fallback'], carrier_shipment_tracking_number: '179196133702310',
@@ -214,8 +216,38 @@ test('admin endpoints are POST-only orders.manage and internal auth fails closed
 });
 test('bounded scheduler excludes historical, terminal and unsupported shipments', async () => {
   const db = fakeService(initialOrder({ status: 'delivered', shipping_tracking_mode: 'managed', shipping_provider_reference: reference, shipping_provider_key: 'packlink' }));
-  expect(await runShippingSyncBatch(db.service)).toEqual({ processed: 0, succeeded: 0, failed: 0, blocked: 0 });
+  expect(await runShippingSyncBatch(db.service)).toEqual({ processed: 0, succeeded: 0, failed: 0, blocked: 0, transient: 0, deferred: 0 });
   expect(db.queries[0]).toBe('orders:id, tenant_id');
+});
+
+test('a backend stall is not an alert: timeouts and 503s are transient, the time budget defers the rest', async () => {
+  const db = fakeService();
+  db.rows.orders = Array.from({ length: 6 }, (_, index) => ({ ...initialOrder(), id: `order-${index}`,
+    tenant_id: 'tenant-a', shipping_tracking_mode: 'managed', shipping_provider_key: 'packlink', shipping_provider_reference: `REF${index}` }));
+  let clock = 0;
+  const timeout = Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+  const result = await runShippingSyncBatch(db.service, async (_service, _tenantId, orderId) => {
+    clock += 12_000;
+    if (orderId === 'order-0') throw timeout;
+    if (orderId === 'order-1') throw new OrderWorkflowError('Impossible de charger la commande.', 503);
+    return initialOrder();
+  }, { startBefore: 30_000, now: () => clock });
+  expect(result).toMatchObject({ processed: 6, failed: 0, transient: 2 });
+  expect(result.succeeded + result.transient + result.deferred).toBe(6);
+  expect(result.deferred).toBeGreaterThan(0);
+  expect(isTransientSyncFailure(new ShippingProviderError('shipping_provider_unavailable'))).toBe(true);
+  expect(isTransientSyncFailure(new ShippingProviderError('shipment_not_found'))).toBe(false);
+  expect(isTransientSyncFailure(new OrderWorkflowError('La commande a été modifiée. Actualisez et réessayez.'))).toBe(false);
+  expect(isTransientSyncFailure(new Error('boom'))).toBe(false);
+});
+
+test('bounded client requests abort a stalled call', async () => {
+  const hanging: typeof fetch = (_input, init) => new Promise((_resolve, reject) => {
+    init?.signal?.addEventListener('abort', () => reject(init.signal!.reason));
+  });
+  await expect(withRequestTimeout(hanging, 20)('https://db.example.invalid/rest/v1/orders')).rejects.toMatchObject({ name: 'TimeoutError' });
+  const quick: typeof fetch = async () => new Response('ok');
+  expect(await (await withRequestTimeout(quick, 1000)('https://db.example.invalid')).text()).toBe('ok');
 });
 
 test('batch isolates failures, resolves tenant per order and enforces limit', async () => {
@@ -228,7 +260,7 @@ test('batch isolates failures, resolves tenant per order and enforces limit', as
     if (orderId === 'order-0') throw new Error('test-failure');
     return initialOrder();
   });
-  expect(result).toEqual({ processed: 6, succeeded: 5, failed: 1, blocked: 0 });
+  expect(result).toEqual({ processed: 6, succeeded: 5, failed: 1, blocked: 0, transient: 0, deferred: 0 });
   expect(calls).toEqual(Array.from({ length: 6 }, (_, index) => `tenant-${index}:order-${index}`));
 });
 
@@ -263,7 +295,7 @@ test('parcel in transit before preparation is recorded: snapshot kept, flagged, 
   expect(db.order().shipping_sync_error).toBe('preparation_incomplete');
   expect(db.order().shipping_provider_synced_at).toBeTruthy();
   expect(await runShippingSyncBatch(db.service, (service, tenantId, orderId) => syncOrderShipment(service, tenantId, orderId, undefined, adapter, null)))
-    .toEqual({ processed: 1, succeeded: 0, failed: 0, blocked: 1 });
+    .toEqual({ processed: 1, succeeded: 0, failed: 0, blocked: 1, transient: 0, deferred: 0 });
   // Preparation recorded by the operator: the next tick ships the order and clears the flag.
   db.rows.order_items = [{ order_id: 'order-a', tenant_id: 'tenant-a', storage_type: 'frozen', picked_at: 'yes', cold_chain_checked_at: 'yes' }];
   Object.assign(db.rows.orders![0]!, { packing_completed_at: '2026-10-12T19:00:00Z', packing_parcel_count: 1 });

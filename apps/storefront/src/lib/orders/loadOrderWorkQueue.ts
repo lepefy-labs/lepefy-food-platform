@@ -41,6 +41,10 @@ export interface OrderListFilters {
   payment: string;
   search: string;
   view: OrderView;
+  /** Migration 161: '' | 'cancelled' (commercial cancellations) | 'external' (traitées hors plateforme). */
+  closure?: string;
+  /** Migration 161: closure reason key. */
+  closureReason?: string;
 }
 
 /** Migration 160 columns read by the preparation policy. */
@@ -60,7 +64,7 @@ const FULL_SELECT = `
   shipping_provider_synced_at, shipping_sync_error, shipped_at,
   shipping_estimated_delivery_at, picking_started_at, picking_completed_at,
   packing_completed_at, packing_parcel_count, cold_chain_packing_checked_at,
-  ${PREPARATION_COLUMNS},
+  ${PREPARATION_COLUMNS}, closure_type, closure_reason,
   order_items(id, product_id, name, quantity, subtotal, storage_type, warehouse_location, cold_chain_checked_at)
 `;
 
@@ -69,6 +73,7 @@ type Query = any;
 
 function hasListFilters(filters: OrderListFilters): boolean {
   return Boolean(filters.status || filters.dateFrom || filters.dateTo || filters.fulfillment || filters.payment || filters.search
+    || filters.closure || filters.closureReason
     || (filters.view && !CLASSIFIED_VIEWS.has(filters.view) && filters.view !== 'finished'));
 }
 
@@ -80,6 +85,10 @@ export function applyOrderFilters(query: Query, filters: OrderListFilters, now: 
   else if (view === 'payment_pending') q = q.eq('payment_status', 'pending');
   else if (view === 'aged') q = q.lte('created_at', new Date(now.getTime() - AGED_MS).toISOString()).not('status', 'in', '(delivered,cancelled)');
   else if (!view && filters.status) q = q.eq('status', filters.status);
+  // Closure (161): « cancelled » = commercial cancellations (historical ones included), « external » = handled outside the platform.
+  if (filters.closure === 'external') q = q.eq('status', 'cancelled').eq('closure_type', 'handled_externally');
+  else if (filters.closure === 'cancelled') q = q.eq('status', 'cancelled').or('closure_type.is.null,closure_type.eq.cancelled');
+  if (filters.closureReason) q = q.eq('status', 'cancelled').eq('closure_reason', filters.closureReason);
   if (filters.fulfillment) q = q.eq('fulfillment_type', filters.fulfillment);
   if (filters.payment) q = q.eq('payment_method', filters.payment);
   if (filters.dateFrom) q = q.gte('created_at', new Date(filters.dateFrom).toISOString());

@@ -89,6 +89,7 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 
 ### Aujourd'hui e Commandes
 - `/admin` è la dashboard « Aujourd'hui » (Panel « À régler en priorité » con banda di tono, « Dernières mises à jour », azioni rapide come card-link, lista « Commandes à préparer » con selezione); il cockpit Commandes è su `/admin/orders`. `PreparationStepBadge` (tono da `PREPARATION_STEP_META` del registry) mostra l'étape di preparazione su lista, dashboard e dettaglio. Vedi `docs/ORDER_PREPARATION.md`.
+- Clôture: `OrderClosureDialog` (dialog in due passaggi, azione distruttiva solo al passo finale, mai CTA primaria nel dettaglio); `StatusBadge closureType` mostra « Traitée hors plateforme » (info). Vedi `docs/ORDER_CLOSURE.md`.
 - Stato URL in `lib/orders/orderListParams.ts` (`ORDER_LIST`, `parseOrderList`, sort legacy `date_desc`… ancora accettati), condiviso da `/admin/orders` ed export; `/admin?<chiave ORDER_LIST>` reindirizza a `/admin/orders`.
 - `GET /api/admin/orders/export` (`orders.view`): stessi filtri e ordinamento della lista, max 2 000 righe (`X-Export-Truncated`), CSV UTF-8 con BOM, `;`, importi con virgola, formule neutralizzate (`lib/orders/ordersCsv.ts`).
 - Le card KPI e i chip « Contrôles » sono filtri (secondo clic annulla); cambiare statut/paiement dal pannello azzera la vista (`panelClears`).

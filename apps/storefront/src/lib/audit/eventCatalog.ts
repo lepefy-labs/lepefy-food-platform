@@ -30,6 +30,7 @@ export const AUDIT_EVENT_TYPES = {
   'orders.order.status_changed': { label: 'Statut de la commande modifié', module: 'orders', category: 'activity', severity: 'info', retention: 'business' },
   'orders.order.tracking_updated': { label: 'Suivi modifié', module: 'orders', category: 'activity', severity: 'info', retention: 'business' },
   'orders.order.updated': { label: 'Commande modifiée', module: 'orders', category: 'activity', severity: 'info', retention: 'business' },
+  'orders.order.closed': { label: 'Commande clôturée (annulation ou hors plateforme)', module: 'orders', category: 'activity', severity: 'notice', retention: 'business' },
   'orders.preparation.paper_started': { label: 'Préparation papier démarrée', module: 'orders', category: 'activity', severity: 'info', retention: 'business' },
   'orders.preparation.paper_completed': { label: 'Préparation papier déclarée terminée', module: 'orders', category: 'activity', severity: 'info', retention: 'business' },
   'orders.preparation.unverified_advance': { label: 'Commande avancée sans contrôle de préparation', module: 'orders', category: 'activity', severity: 'notice', retention: 'business' },

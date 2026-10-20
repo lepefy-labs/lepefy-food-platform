@@ -249,7 +249,9 @@ test('picking displays available catalogue unit weight without mistaking it for 
 test('picking shipping comparison is alongside suggested packaging, with historic client price', () => {
   const delivery = buildPickingListViewModel({
     order: order(ORDER_A, { shipping_cost: 12.5 }), items: ITEMS,
-    tenant: { name: 'T', currency: 'EUR' }, carton: null,
+    tenant: { name: 'T', currency: 'EUR' },
+    // The packaging block only exists with a carton suggestion: the comparison sits beside it.
+    carton: { suggestion: suggestCartons(7400, PROFILES, 15000), missingWeightLines: 0, maxParcelG: 15000 },
   });
   expect(delivery.shippingPaid).toContain('12,50');
   for (const format of ['a5', 'a4'] as const) {

@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconArrowDown, IconCheck, IconPackage, IconSnowflake, IconTemperature } from '@tabler/icons-react';
+import { IconArrowDown, IconBan, IconCheck, IconPackage, IconSnowflake, IconTemperature } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { orderDetailTransition } from '@/lib/orders/adminOrderOperations';
 import { carrierDisplayName } from '@/lib/shipping/shipmentPresentation';
 import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
-import ConfirmDialog from '../../_components/ui/ConfirmDialog';
+import OrderClosureDialog from './OrderClosureDialog';
+import { isClosableStatus } from '@/lib/orders/closure/closureRules';
 import PackingPanel from './PackingPanel';
 import ManagedShipmentPanel from './ManagedShipmentPanel';
 import CartonSuggestionCard from './CartonSuggestionCard';
@@ -68,6 +69,9 @@ interface Props {
   canManage: boolean;
   nextStep?: NextStepGuide | null;
   documents: OrderDocumentsDefaults;
+  /** Closure dialog: shop name (pre-filled message) and payment label. */
+  tenantName: string;
+  paymentLabel: string;
 }
 
 function formatCarrierName(raw: string | undefined): string {
@@ -101,6 +105,8 @@ export default function OrderDetail({
   canManage,
   nextStep = null,
   documents,
+  tenantName,
+  paymentLabel,
 }: Props) {
   const router = useRouter();
   const isPickup = order.fulfillment_type === 'pickup';
@@ -115,7 +121,7 @@ export default function OrderDetail({
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveError, setSaveError] = useState(false);
   const [isPaid, setIsPaid] = useState(!isInStorePending);
-  const [cancelOpen, setCancelOpen] = useState(false);
+  const [closureOpen, setClosureOpen] = useState(false);
   // Provider refreshes may update snapshots while the form component remains mounted.
   useEffect(() => {
     setCarrier(originalCarrier);
@@ -184,11 +190,6 @@ export default function OrderDetail({
         tracking_code: trackingCode.trim() || null,
       } : {}),
     }, 'Commande mise à jour.');
-  }
-
-  async function cancelOrder() {
-    await patchOrder({ status: 'cancelled', notes: notes.trim() || null }, 'Commande annulée.');
-    setCancelOpen(false);
   }
 
   const sd = shippingDetails;
@@ -388,26 +389,25 @@ export default function OrderDetail({
         <h2 id="order-documents-title" className="mb-3 text-xs font-bold uppercase tracking-wide text-a-text-3">Documents</h2>
         <div className="space-y-3">
           <OrderDocumentsCard orderId={order.id} cancelled={order.status === 'cancelled'} defaults={documents} />
-          {canManage && !['cancelled', 'delivered', 'shipped'].includes(order.status) && (
-            <button type="button" onClick={() => setCancelOpen(true)} disabled={saving}
-              className="min-h-11 w-full rounded-lg border border-tone-danger-border px-3 py-2 text-sm font-semibold text-tone-danger-fg hover:bg-tone-danger-bg focus-visible:outline-2 focus-visible:outline-tone-danger-solid disabled:opacity-50">
-              Annuler la commande
+          {canManage && isClosableStatus(order.status, order.fulfillment_type) && (
+            <button type="button" onClick={() => setClosureOpen(true)} disabled={saving}
+              className="inline-flex min-h-11 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-a-text-2 hover:bg-a-hover hover:text-a-text focus-visible:outline-2 focus-visible:outline-a-focus disabled:opacity-50">
+              <IconBan size={16} aria-hidden="true" className="text-tone-danger-fg" /> Clôturer ou annuler…
             </button>
           )}
         </div>
       </section>
 
-      <ConfirmDialog
-        open={cancelOpen}
-        title="Annuler cette commande ?"
-        description="La commande passera au statut annulé. Vérifiez le paiement et les éventuelles actions de remboursement avant de confirmer."
-        confirmLabel="Annuler la commande"
-        cancelLabel="Conserver"
-        destructive
-        loading={saving}
-        onCancel={() => { if (!saving) setCancelOpen(false); }}
-        onConfirm={() => { void cancelOrder(); }}
-      />
+      {canManage && isClosableStatus(order.status, order.fulfillment_type) && (
+        <OrderClosureDialog
+          open={closureOpen}
+          onClose={() => setClosureOpen(false)}
+          order={order}
+          tenantName={tenantName}
+          totalLabel={formatPrice(order.total, currency)}
+          paymentLabel={paymentLabel}
+        />
+      )}
     </>
   );
 }

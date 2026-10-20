@@ -16,6 +16,7 @@ export interface ExportOrderRow {
   shipping_cost: number | null;
   total: number | null;
   status: string;
+  closure_type?: string | null;
   payment_method: string | null;
   payment_status: string | null;
   tracking_carrier: string | null;
@@ -65,7 +66,7 @@ export function buildOrdersCsv(rows: ExportOrderRow[]): string {
     amount(order.subtotal),
     amount(order.shipping_cost),
     amount(order.total),
-    statusMeta(ORDER_STATUS_META, order.status).label,
+    order.status === 'cancelled' && order.closure_type === 'handled_externally' ? 'Traitée hors plateforme' : statusMeta(ORDER_STATUS_META, order.status).label,
     PAYMENT_METHOD_LABELS[order.payment_method ?? ''] ?? order.payment_method ?? '',
     statusMeta(PAYMENT_STATUS_META, order.payment_status).label,
     carrierDisplayName(order.tracking_carrier ?? order.shipping_details?.carrierName) ?? '',

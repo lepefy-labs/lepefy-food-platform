@@ -23,10 +23,14 @@ export async function POST(request: NextRequest) {
   const startedAt = Date.now();
   try {
     // Journal d'activité: changes written by this tick are attributed to the sync job.
-    const service = createServiceClient({ auditActor: { actorType: 'automation', ref: 'shipping-sync', source: 'worker' } });
-    const result = await runShippingSyncBatch(service);
+    // Every database request is bounded: a stalled backend ends the tick cleanly (n8n waits 55 s, Vercel kills at 60 s).
+    const service = createServiceClient({ auditActor: { actorType: 'automation', ref: 'shipping-sync', source: 'worker' }, requestTimeoutMs: 10_000 });
+    // No new order after 30 s: the response always leaves the scheduler's 55 s window.
+    const result = await runShippingSyncBatch(service, undefined, { startBefore: startedAt + 30_000 });
     // Isolated: a draft failure never fails the tracking sync tick. Start before 35 s, end by ~55 s.
-    const drafts = await runShipmentDraftBatch(service, defaultShipmentDraftDependencies, { limit: 3, startBefore: startedAt + 35_000 })
+    // Own client without request timeout: a draft write after the provider call must never be cut half-way.
+    const draftService = createServiceClient({ auditActor: { actorType: 'automation', ref: 'shipping-sync', source: 'worker' } });
+    const drafts = await runShipmentDraftBatch(draftService, defaultShipmentDraftDependencies, { limit: 3, startBefore: startedAt + 35_000 })
       .catch(() => { console.error('[shipping/draft] failed — code: batch_unavailable'); return null; });
     return NextResponse.json({ ok: true, ...result, drafts }, { headers });
   } catch {

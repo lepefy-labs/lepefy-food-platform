@@ -33,6 +33,7 @@ import BulkDocumentsDialog from './BulkDocumentsDialog';
 import type { OrderDocumentsDefaults } from '../../orders/[id]/OrderDocumentsCard';
 import type { OrderPreparationMode } from '@/lib/orders/preparation/preparationPolicy';
 import PreparationStepBadge from '../../_components/ui/PreparationStepBadge';
+import { CLOSURE_REASON_LABELS, type ClosureReason } from '@/lib/orders/closure/closureRules';
 
 interface ShippingAddress { city?: string; postal_code?: string; country?: string; line1?: string }
 interface ShippingDetails { carrierName?: string; serviceName?: string; numParcels?: number; totalWeightG?: number }
@@ -50,6 +51,7 @@ export interface ListOrder {
   // Migration 160 (preparationPolicy): mode snapshot and paper flow.
   preparation_mode?: OrderPreparationMode | null; picking_list_printed_at?: string | null;
   paper_preparation_started_at?: string | null; paper_preparation_completed_at?: string | null; cold_chain_packing_declared_at?: string | null;
+  closure_type?: string | null; closure_reason?: string | null;
   order_items: OrderItemRow[];
 }
 interface DetailData { suggestion: CartonSuggestion | null; missingWeightLines: number }
@@ -212,7 +214,8 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
     const eta = order.status === 'shipped' ? formatEta(order.shipping_estimated_delivery_at) : null;
     return (
       <div className="flex flex-col items-start gap-1">
-        <StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} />
+        <StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} closureType={order.closure_type} />
+        {order.closure_reason && <p className="text-xs text-a-text-3">{CLOSURE_REASON_LABELS[order.closure_reason as ClosureReason] ?? ''}</p>}
         {operation.step && <PreparationStepBadge step={operation.step} />}
         {transport && !done(order) && <Badge tone={transport.tone}>Transport : {transport.label}</Badge>}
         {lastMove && order.status === 'shipped' && <p className="text-xs text-a-text-3">Mouvement {formatSince(lastMove, now)}</p>}
@@ -356,7 +359,7 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
             <p className="truncate font-semibold">{order.full_name ?? order.email ?? 'Client'}</p>
             <p className="text-xs text-a-text-3">{formatDate(order.created_at, 'datetime')} · <b className="font-semibold text-a-text">{money(order.total)}</b></p>
           </div>
-          <span className="flex flex-col items-end gap-1"><StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} />{operation.step && <PreparationStepBadge step={operation.step} />}</span>
+          <span className="flex flex-col items-end gap-1"><StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} closureType={order.closure_type} />{operation.step && <PreparationStepBadge step={operation.step} />}</span>
         </div>
         {flag && <p className="mt-1.5 flex items-start gap-1 text-xs font-semibold text-tone-urgent-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{flag}</p>}
         <div className="mt-2">{preparationSummary(order, true)}<HandlingBadges operation={operation} /></div>

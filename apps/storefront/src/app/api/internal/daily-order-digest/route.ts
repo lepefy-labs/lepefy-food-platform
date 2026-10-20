@@ -22,7 +22,8 @@ export async function POST(request:NextRequest){
     !timingSafeEqual(Buffer.from(secret),Buffer.from(provided))){
     return NextResponse.json({error:'Unauthorized'},{status:401});
   }
-  const db=createServiceClient(),now=new Date();
+  // Bounded requests: a stalled database answers 503 (n8n retries, the claim stays retryable) instead of a 60 s kill.
+  const db=createServiceClient({requestTimeoutMs:8_000}),now=new Date();
   let selection:Awaited<ReturnType<typeof listDigestTenants>>;
   try{
     selection=await listDigestTenants(db);
