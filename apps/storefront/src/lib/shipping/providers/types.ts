@@ -19,6 +19,8 @@ export interface ProviderShipmentSnapshot {
   providerStatus: string | null;
   normalizedStatus: NormalizedShipmentStatus;
   events: ShipmentTrackingEvent[];
+  /** Parcels recorded by the provider for this shipment (null when the payload does not list them). */
+  parcelCount?: number | null;
 }
 
 /** Provider-neutral draft request built from a Lepefy order; never contains secrets. */

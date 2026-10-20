@@ -51,6 +51,12 @@ function date(value: unknown): string | null {
   return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
 }
 
+/** Number of parcels listed by Packlink (`parcels` or `packages`); null when absent or implausible. */
+export function packlinkParcelCount(shipment: Record<string, unknown>): number | null {
+  const list = Array.isArray(shipment.parcels) ? shipment.parcels : Array.isArray(shipment.packages) ? shipment.packages : null;
+  return list && list.length >= 1 && list.length <= 99 ? list.length : null;
+}
+
 export function parsePacklinkShipment(reference: string, payload: unknown, timeline: unknown): ProviderShipmentSnapshot {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload) || !Array.isArray(timeline)) {
     throw new ShippingProviderError('shipment_payload_invalid');
@@ -90,6 +96,7 @@ export function parsePacklinkShipment(reference: string, payload: unknown, timel
     trackingUrl: resolveTrackingUrl(shipment.tracking_url, trackingCode),
     estimatedDeliveryAt: date(shipment.estimated_delivery_date), providerStatus,
     normalizedStatus: normalizePacklinkStatus(providerStatus), events,
+    parcelCount: packlinkParcelCount(shipment),
   };
 }
 

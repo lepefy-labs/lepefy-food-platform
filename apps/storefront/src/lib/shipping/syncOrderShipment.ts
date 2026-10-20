@@ -1,5 +1,6 @@
 import type { Order, OrderStatus } from '@lepefy/types';
-import { assertPreparationComplete, loadWorkflowOrder, OrderWorkflowError, PreparationIncompleteError, updateWorkflowOrder, type OrderService } from '@/lib/orders/orderTransitionService';
+import { assertPreparationComplete, loadWorkflowOrder, OrderWorkflowError, PreparationIncompleteError, tenantPreparationSnapshot, updateWorkflowOrder, type OrderService } from '@/lib/orders/orderTransitionService';
+import { effectivePreparationMode } from '@/lib/orders/preparation/preparationPolicy';
 import { getShippingProvider } from './providers/registry';
 import { SHIPPING_SYNC_PREPARATION_INCOMPLETE } from './shipmentPresentation';
 import { ShippingProviderError, type ProviderShipmentSnapshot, type ShippingProviderAdapter } from './providers/types';
@@ -28,12 +29,33 @@ export function shipmentSnapshotPatch(snapshot: ProviderShipmentSnapshot, synced
   };
 }
 
+/**
+ * Mode « sans confirmation » only: when the carrier has the parcels of the draft Lepefy created and nobody
+ * entered a parcel count, the provider's own parcel list is used (a recorded fact, never an estimate).
+ */
+export function providerParcelCount(order: Order, snapshot: ProviderShipmentSnapshot, next: OrderStatus, pickingMode: string | null): number | null {
+  if (order.status !== 'preparing' || (next !== 'shipped' && next !== 'delivered')) return null;
+  if ((order.packing_parcel_count ?? 0) >= 1 || order.shipping_creation_status !== 'draft_created') return null;
+  if (pickingMode !== 'none' || !snapshot.parcelCount || snapshot.parcelCount < 1) return null;
+  return snapshot.parcelCount;
+}
+
 export async function applyShipmentSnapshot(service: OrderService, order: Order, snapshot: ProviderShipmentSnapshot,
   sideEffects?: Parameters<typeof updateWorkflowOrder>[0]['sideEffects']) {
   if (order.fulfillment_type !== 'delivery' || order.status === 'cancelled') throw new OrderWorkflowError('Cette commande ne peut pas utiliser le suivi automatique.');
   const next = shipmentOrderTarget(order.status, snapshot);
   const firstTransit = snapshot.events.find(event => event.status === 'in_transit' || event.status === 'out_for_delivery');
-  return updateWorkflowOrder({ service, order, nextStatus: next, patch: shipmentSnapshotPatch(snapshot), source: 'provider',
+  const patch = shipmentSnapshotPatch(snapshot);
+  let scoped = order;
+  if (order.status === 'preparing' && next !== order.status && !(order.packing_parcel_count && order.packing_parcel_count >= 1)
+    && order.shipping_creation_status === 'draft_created' && snapshot.parcelCount) {
+    const tenantMode = order.preparation_mode ? null : await tenantPreparationSnapshot(service, order.tenant_id).catch(() => null);
+    const { mode } = effectivePreparationMode({ ...order, tenantPreparationMode: tenantMode ?? undefined });
+    const parcels = providerParcelCount(order, snapshot, next, mode.picking);
+    // Same CAS write as the transition: the count is only kept if the order really ships.
+    if (parcels) { patch.packing_parcel_count = parcels; scoped = { ...order, packing_parcel_count: parcels }; }
+  }
+  return updateWorkflowOrder({ service, order: scoped, nextStatus: next, patch, source: 'provider',
     shippedAt: firstTransit?.occurredAt, sideEffects });
 }
 

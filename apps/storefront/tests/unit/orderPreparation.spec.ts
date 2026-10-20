@@ -20,6 +20,9 @@ import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
 import { ORDER_DOCUMENT_ROUTE_KINDS } from '../../src/lib/orders/documents/renderOrderDocuments';
 import type { DocumentItemRow, DocumentOrderRow } from '../../src/lib/orders/documents/viewModels';
 import { isMissingPreparationColumn, withoutPreparationColumns } from '../../src/lib/orders/preparation/compat';
+import { applyShipmentSnapshot, providerParcelCount } from '../../src/lib/shipping/syncOrderShipment';
+import { packlinkParcelCount } from '../../src/lib/shipping/providers/packlink';
+import type { ProviderShipmentSnapshot } from '../../src/lib/shipping/providers/types';
 
 const MIGRATION = readFileSync(resolve(__dirname, '../../../../supabase/migrations/160_order_preparation_modes.sql'), 'utf8');
 const PAPER: OrderPreparationMode = { picking: 'paper', cold_chain_packing: 'paper' };
@@ -210,6 +213,44 @@ test.describe('orders created directly in preparation (paid storefront orders)',
     const op = classifyOrderOperation({ ...(baseOrder({ preparation_mode: null }) as unknown as OperationalOrder), order_items: [{ storage_type: 'dry', picked_at: null }], tenantPreparationMode: NONE }, thresholds, now);
     expect(op.flags.has('picking_incomplete')).toBe(false);
     expect(op.action.label).toBe('Terminer l’emballage');
+  });
+});
+
+test.describe('« sans confirmation »: parcel count from the Packlink draft', () => {
+  const moving: ProviderShipmentSnapshot = { provider: 'packlink', providerReference: 'IT2026PRO0007003523', carrier: 'Poste Italiane', trackingCode: '1UW1YZT061231',
+    trackingUrl: null, estimatedDeliveryAt: null, providerStatus: 'IN_TRANSIT', normalizedStatus: 'in_transit', parcelCount: 1,
+    events: [{ occurredAt: '2026-10-20T16:00:00Z', description: 'PARTITA', providerStatus: 'IN_TRANSIT', status: 'in_transit' }] };
+  const draftOrder = (patch: Partial<Order> = {}) => baseOrder({ preparation_mode: null, shipping_tracking_mode: 'managed', shipping_provider_key: 'packlink',
+    shipping_provider_reference: 'IT2026PRO0007003523', shipping_creation_status: 'draft_created', ...patch } as Partial<Order>);
+
+  test('Packlink lists its parcels as « packages » (or « parcels »)', () => {
+    expect(packlinkParcelCount({ packages: [{ weight: 1.3 }] })).toBe(1);
+    expect(packlinkParcelCount({ parcels: [{}, {}] })).toBe(2);
+    expect(packlinkParcelCount({ packages: [] })).toBeNull();
+    expect(packlinkParcelCount({})).toBeNull();
+  });
+
+  test('only for picking « none », a Lepefy draft, a moving parcel and no count entered', () => {
+    expect(providerParcelCount(draftOrder(), moving, 'shipped', 'none')).toBe(1);
+    expect(providerParcelCount(draftOrder(), moving, 'shipped', 'paper')).toBeNull();
+    expect(providerParcelCount(draftOrder(), moving, 'shipped', 'digital')).toBeNull();
+    expect(providerParcelCount(draftOrder({ shipping_creation_status: null } as Partial<Order>), moving, 'shipped', 'none')).toBeNull();
+    expect(providerParcelCount(draftOrder({ packing_parcel_count: 2 }), moving, 'shipped', 'none')).toBeNull();
+    expect(providerParcelCount(draftOrder(), moving, 'preparing', 'none')).toBeNull();
+    expect(providerParcelCount(draftOrder(), { ...moving, parcelCount: null }, 'shipped', 'none')).toBeNull();
+  });
+
+  test('the sync ships the order with the provider count instead of blocking; paper still needs its declaration', async () => {
+    const db = fakeDb([draftOrder()], [{ ...dry }]);
+    db.rows.tenant_feature_settings = [{ tenant_id: 'tenant-a', feature_key: 'order_preparation', enabled: true, config: { version: 1, picking_mode: 'none', cold_chain_packing_mode: 'none' } }];
+    const saved = await applyShipmentSnapshot(db.service, db.order(), moving, async () => undefined);
+    expect(saved).toMatchObject({ status: 'shipped', packing_parcel_count: 1, preparation_mode: NONE, tracking_code: '1UW1YZT061231' });
+    expect(saved.preparation_unverified_at).toBeTruthy();
+
+    const paper = fakeDb([draftOrder()], [{ ...dry }]);
+    paper.rows.tenant_feature_settings = [{ tenant_id: 'tenant-a', feature_key: 'order_preparation', enabled: true, config: { version: 1, picking_mode: 'paper', cold_chain_packing_mode: 'paper' } }];
+    await expect(applyShipmentSnapshot(paper.service, paper.order(), moving, async () => undefined)).rejects.toBeInstanceOf(PreparationIncompleteError);
+    expect(paper.order().packing_parcel_count).toBeNull();
   });
 });
 
