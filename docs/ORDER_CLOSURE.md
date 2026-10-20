@@ -1,6 +1,6 @@
 # Clôture des commandes — annulation motivée et commandes traitées hors plateforme
 
-> Stato: implementato su `main` (base analizzata `c8354c1f`, 20/10/2026). Migration `161_order_closure.sql` additiva, senza backfill: va applicata perché la chiusura funzioni (prima della 161 la route risponde 503 e le liste ignorano le colonne nuove).
+> Stato: implementato su `main` (base analizzata `c8354c1f`, 20/10/2026). Migration `161_order_closure.sql` additiva, senza backfill, applicata in produzione il 20/10/2026 dopo il deploy di `0b406741` (verificata: 7 colonne su `orders`, tipo audit `orders.order.closed`, viste con `external_closure_count`, nessun ordine modificato). In un ambiente senza la 161 la route risponde 503 e le liste ignorano le colonne nuove.
 > Proposta approvata (DISCOVER, mockup PRE/POST, decisioni D1–D4): artifact «Clôture des commandes».
 
 ## 1. Modello
