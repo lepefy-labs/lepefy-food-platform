@@ -41,8 +41,10 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .pl-shipping-grid .pl-section { margin-top: 0; }
 .pl-shipping-grid .pl-carton { overflow-wrap: anywhere; }
 .pl-shipping-cost { border: 0.3mm solid #111; padding: 1.2mm 1.5mm; font-size: 10pt; line-height: 1.25; }
-.pl-shipping-price { font-weight: 800; font-size: 12pt; margin: 0.6mm 0 1.2mm; white-space: nowrap; }
-.pl-shipping-real-line { height: 5mm; border-bottom: 0.3mm solid #111; }
+.pl-shipping-cost-row { display: flex; align-items: baseline; gap: 1.5mm; min-height: 5mm; }
+.pl-shipping-cost-row + .pl-shipping-cost-row { margin-top: 1mm; }
+.pl-shipping-price { font-weight: 800; white-space: nowrap; }
+.pl-shipping-real-line { flex: 1; min-width: 8mm; border-bottom: 0.3mm solid #111; height: 4mm; }
 .pl-shipping-grid .pl-notes-inline { margin-top: 2mm; }
 
 .pl-warn { font-weight: 700; }
@@ -85,7 +87,7 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .format-a5 .pl-carton { padding: 1mm 1.3mm; line-height: 1.2; font-size: 10pt; }
 .format-a5 .pl-shipping-grid { gap: 1.5mm; margin-top: 1.5mm; }
 .format-a5 .pl-shipping-cost { padding: 1mm; }
-.format-a5 .pl-shipping-price { font-size: 11pt; }
+.format-a5 .pl-shipping-price { font-size: 10pt; }
 .format-a5 .pl-shipping-grid .pl-section { letter-spacing: 0.01em; font-size: 10pt; }
 
 .format-a5 .pl-follow { margin-top: 2mm; }
@@ -162,9 +164,8 @@ function cartonBlock(vm: InternalOrderDocumentViewModel, format: OrderDocumentFo
 function shippingComparison(vm: InternalOrderDocumentViewModel): string {
   if (vm.fulfillment !== 'delivery') return '';
   return `<div><div class="pl-section keep-next">COÛT LIVRAISON</div>
-<div class="pl-shipping-cost"><div>Payé par client</div>
-<div class="pl-shipping-price">${vm.shippingPaid ? escapeHtml(vm.shippingPaid) : 'Non renseigné'}</div>
-<div>Coût réel</div><div class="pl-shipping-real-line"></div></div></div>`;
+<div class="pl-shipping-cost"><div class="pl-shipping-cost-row"><span>Payé par client :</span><span class="pl-shipping-price">${vm.shippingPaid ? escapeHtml(vm.shippingPaid) : 'Non renseigné'}</span></div>
+<div class="pl-shipping-cost-row"><span>Coût réel :</span><span class="pl-shipping-real-line"></span></div></div></div>`;
 }
 
 /** Les deux panneaux restent côte à côte; aucun montant n'est inventé. */

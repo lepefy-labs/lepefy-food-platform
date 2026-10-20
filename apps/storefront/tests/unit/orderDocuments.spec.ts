@@ -269,6 +269,20 @@ test('picking shipping comparison is alongside suggested packaging, with histori
   expect(pickingListHtml([pickup], 'a5')).not.toContain('COÛT LIVRAISON');
 });
 
+test('shipping comparison uses exactly two compact rows with inline value and handwritten line', () => {
+  const vm = buildPickingListViewModel({
+    order: order(ORDER_A, { shipping_cost: 10.4 }),
+    items: ITEMS, tenant: { name: 'T', currency: 'EUR' }, carton: null,
+  });
+  for (const format of ['a5', 'a4'] as const) {
+    const html = pickingListHtml([vm], format);
+    expect(html).toContain('Payé par client :</span><span class="pl-shipping-price">');
+    expect(html).toContain('Coût réel :</span><span class="pl-shipping-real-line">');
+    expect(html).toContain('10,40');
+    expect((html.match(/class="pl-shipping-cost-row"/g) ?? [])).toHaveLength(2);
+  }
+});
+
 // ─── HTML ───────────────────────────────────────────────────────────────────
 
 test('picking HTML: @page per format, one section per order (page breaks), escaped content', () => {
