@@ -18,6 +18,7 @@ import { verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
 import { normalizeShippingAddress, type NormalizedShippingAddress } from '@/lib/address/addressRules';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
+import { revalidateProductAvailability } from '@/lib/cache/storefrontCache';
 import { notifyOrderAttention, notifyOrderCreated } from '@/lib/notifications/staff/orderEvents';
 
 interface CartItemPayload {
@@ -168,6 +169,8 @@ export async function POST(req: NextRequest) {
           error: ERROR_COPY.productsUnavailable,
         }, { status: 409 });
       }
+      // Stock décrémenté : fiches ISR de ces produits à régénérer (jamais bloquant).
+      await revalidateProductAvailability(supabase, tenant.id, stockDecrementItems.map((item) => item.product_id));
 
       const { data: order, error: orderError } = await supabase
         .from('orders')

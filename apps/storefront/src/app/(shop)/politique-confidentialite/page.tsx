@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getTenant } from '@/lib/tenant/getTenant';
+import { getDisplayTenant } from '@/lib/tenant/getTenant';
 
 export const metadata: Metadata = {
   title: 'Politique de confidentialité',
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 // ISR : contenu légal, aucune donnée personnalisée par utilisateur — même
 // raisonnement que la home (page.tsx) et products/[slug]/page.tsx.
-export const revalidate = 300;
+export const revalidate = 3600; // = SHOP_DISPLAY_TTL_SECONDS (lib/cache/storefrontCache.ts) : littéral exigé par Next
 
 const FALLBACK = 'non renseigné';
 
@@ -20,7 +20,7 @@ function MailtoOrFallback({ email }: { email: string }) {
 
 export default async function PolitiqueConfidentialitePage() {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(tenantSlug);
+  const tenant = await getDisplayTenant(tenantSlug);
 
   const legalName = tenant.legal_name ?? FALLBACK;
   const legalAddress = tenant.legal_address ?? FALLBACK;

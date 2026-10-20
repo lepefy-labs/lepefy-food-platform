@@ -68,6 +68,18 @@ test('the bottom navigation still navigates to dynamic pages without prefetch', 
   await expect(page.locator('main a[href^="/products/"]').first()).toBeVisible();
 });
 
+// La durée ISR effective est la plus courte des lectures en cache du rendu :
+// l'en-tête s-maxage la révèle (une lecture à 60 s ramènerait la page à 60 s).
+test('shop ISR pages regenerate at most once an hour', async ({ page, request }) => {
+  await page.goto('/');
+  const product = await page.locator('main a[href^="/products/"]').first().getAttribute('href');
+  for (const path of ['/accueil', '/avis', '/card', '/politique-confidentialite', '/conditions-generales-vente', product!]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    expect(response.headers()['cache-control'], path).toMatch(/s-maxage=3600\b/);
+  }
+});
+
 test('an empty cart page view does not load the quantity rules', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const requests = countQuantityGroupRequests(page);

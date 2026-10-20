@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { Components } from 'react-markdown';
 import ReactMarkdown from 'react-markdown';
-import { getTenant } from '@/lib/tenant/getTenant';
+import { getDisplayTenant } from '@/lib/tenant/getTenant';
 import { getLatestLegalDocument } from '@/lib/legal/getLatestLegalDocument';
 
 // Même traitement typographique que politique-confidentialite/page.tsx
@@ -24,15 +24,16 @@ const MARKDOWN_COMPONENTS: Components = {
 };
 
 // ISR : dernière version publiée dans tenant_legal_documents (filtrée par
-// tenant, aucune donnée personnelle), relue au plus toutes les 5 minutes —
-// même fraîcheur que /politique-confidentialite. Le lien du pied de page est
+// tenant, aucune donnée personnelle), relue au plus une fois par heure —
+// même fraîcheur que /politique-confidentialite (documents écrits hors de
+// l'application, aucune invalidation : publier une version = ≤ 1 h). Le lien du pied de page est
 // préchargé sur chaque page : en dynamique, chaque vue coûtait une fonction.
 // Le consentement à l'inscription relit toujours la version courante côté serveur.
-export const revalidate = 300;
+export const revalidate = 3600; // = SHOP_DISPLAY_TTL_SECONDS (lib/cache/storefrontCache.ts) : littéral exigé par Next
 
 export async function generateMetadata(): Promise<Metadata> {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(tenantSlug);
+  const tenant = await getDisplayTenant(tenantSlug);
   return {
     title: `Conditions Générales de Vente | ${tenant.name}`,
     description: `Conditions générales de vente de ${tenant.name}.`,
@@ -41,7 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ConditionsGeneralesVentePage() {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(tenantSlug);
+  const tenant = await getDisplayTenant(tenantSlug);
   const terms = await getLatestLegalDocument(tenant.id, 'terms', { cached: true });
 
   return (

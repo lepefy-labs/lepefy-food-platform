@@ -3,13 +3,14 @@ import { requireBusinessManagementApi } from '@/lib/gestion/featureGate';
 import { badRequest, callGestionRpc, revalidateGestion } from '@/lib/gestion/rpc';
 import { firstIssue, receiptSchema } from '@/lib/gestion/schemas';
 import { RECEIVED_AT_MAX_SKEW_MS } from '@/lib/gestion/domain';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 // Réception + mouvements de stock + incrément de products.stock : une seule transaction (RPC), idempotente.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+async function handlePOST(req: NextRequest, { params }: { params: { id: string } }) {
   const gate = await requireBusinessManagementApi();
   if (!gate.ok) return gate.response;
   const parsed = receiptSchema.safeParse(await req.json().catch(() => null));
@@ -33,3 +34,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     created: result.row.out_created, purchaseStatus: result.row.out_purchase_status,
   }, { status: result.row.out_created ? 201 : 200 });
 }
+
+// Le stock affiché par les fiches produit (ISR) change : invalidation du catalogue.
+export const POST = withStorefrontInvalidation(['catalog'], handlePOST);

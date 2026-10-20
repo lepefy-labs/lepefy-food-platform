@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { revalidateTenantCache } from '@/lib/cache/storefrontCache';
+import { revalidateProductAvailability, revalidateTenantCache } from '@/lib/cache/storefrontCache';
 import { recordSaasSubscriptionPayment } from '@/lib/billing/recordSubscriptionPayment';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -413,6 +413,8 @@ export async function POST(req: NextRequest) {
         '— reason:', stockError.message);
     } else {
       console.info('[webhook] Stock decremented — order:', order.id);
+      // Fiches ISR de ces produits à régénérer (jamais bloquant).
+      await revalidateProductAvailability(supabase, resolvedTenantId, stockDecrementItems.map((item) => item.product_id));
     }
 
     // ── Insert order_items ───────────────────────────────────────────────────

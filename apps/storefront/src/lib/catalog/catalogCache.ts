@@ -1,6 +1,6 @@
 import { unstable_cache } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
-import { catalogCacheTag } from '@/lib/cache/storefrontCache';
+import { catalogCacheTag, SHOP_DISPLAY_TTL_SECONDS } from '@/lib/cache/storefrontCache';
 import { prioritizedCatalogIds } from './productMerchandising';
 import { buildProductsQuery, type CatalogSort } from './pagination';
 import type { Category } from '@lepefy/types';
@@ -17,7 +17,9 @@ import type { Category } from '@lepefy/types';
 // Assez court pour que le stock épuisé descende vite en bas de liste même
 // sans invalidation (commandes payées), assez long pour absorber le trafic.
 const RANKING_TTL_SECONDS = 60;
-const CATEGORIES_TTL_SECONDS = 300;
+// Catégories et visuels : lus par /accueil et /card (ISR), donc à la durée
+// des pages ISR ; toute écriture catalogue de l'admin invalide le tag.
+const CATEGORIES_TTL_SECONDS = SHOP_DISPLAY_TTL_SECONDS;
 
 function cached<Args extends unknown[], R>(
   tenantId: string,

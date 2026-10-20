@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireBusinessManagementApi } from '@/lib/gestion/featureGate';
 import { badRequest, callGestionRpc, revalidateGestion } from '@/lib/gestion/rpc';
 import { adjustmentSchema, firstIssue } from '@/lib/gestion/schemas';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -9,7 +10,7 @@ export const fetchCache = 'force-no-store';
 
 // Rectification de stock motivée : products.stock + mouvement + audit dans la même transaction (RPC).
 // Ne crée jamais de coût d'achat.
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const gate = await requireBusinessManagementApi();
   if (!gate.ok) return gate.response;
   const parsed = adjustmentSchema.safeParse(await req.json().catch(() => null));
@@ -22,3 +23,6 @@ export async function POST(req: NextRequest) {
   revalidateGestion();
   return NextResponse.json({ id: result.row.out_movement_id, created: result.row.out_created, stockAfter: result.row.out_stock_after });
 }
+
+// Le stock affiché par les fiches produit (ISR) change : invalidation du catalogue.
+export const POST = withStorefrontInvalidation(['catalog'], handlePOST);

@@ -1,6 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { isTenantFeatureEnabled } from '@/lib/entitlements/tenantFeatureSettings';
-import { getTenantServiceState, moduleForFeature } from '@/lib/billing/tenantServiceState';
+import { getDisplayTenantServiceState, getTenantServiceState, moduleForFeature } from '@/lib/billing/tenantServiceState';
 
 export const PLATFORM_FEATURE_KEYS = {
   shop: 'shop',
@@ -28,10 +28,13 @@ function isOverrideApplicable(override: TenantFeatureOverride, now: Date): boole
     && (expiresAtMs === null || expiresAtMs > nowMs);
 }
 
-export async function hasTenantFeature(tenantId: string, featureKey: string): Promise<boolean> {
+/** `display`: ISR pages only (long-lived service state); never for a write guard. */
+export interface FeatureReadOptions { display?: boolean }
+
+export async function hasTenantFeature(tenantId: string, featureKey: string, options: FeatureReadOptions = {}): Promise<boolean> {
   // A suspended tenant, or a platform-suspended module, has no feature at all
   // (overrides included): see lib/billing/tenantServiceState.ts.
-  const serviceState = await getTenantServiceState(tenantId);
+  const serviceState = await (options.display ? getDisplayTenantServiceState(tenantId) : getTenantServiceState(tenantId));
   const suspendedModule = moduleForFeature(featureKey);
   if (serviceState.suspended || (suspendedModule && serviceState.suspendedModules.includes(suspendedModule))) return false;
 
@@ -61,9 +64,9 @@ export async function hasTenantFeature(tenantId: string, featureKey: string): Pr
   return planEntitlement;
 }
 
-async function canUseOperationalFeature(tenantId: string, featureKey: string, label: string): Promise<boolean> {
+async function canUseOperationalFeature(tenantId: string, featureKey: string, label: string, options: FeatureReadOptions = {}): Promise<boolean> {
   try {
-    if (!(await hasTenantFeature(tenantId, featureKey))) return false;
+    if (!(await hasTenantFeature(tenantId, featureKey, options))) return false;
   } catch (error) {
     console.error(`[entitlements] Unable to resolve ${label} entitlement; failing closed.`, { tenantId, error });
     return false;
@@ -80,6 +83,6 @@ export async function canUseNala(tenantId: string): Promise<boolean> {
   return canUseOperationalFeature(tenantId, PLATFORM_FEATURE_KEYS.nala, 'Nala');
 }
 
-export async function canUseReviews(tenantId: string): Promise<boolean> {
-  return canUseOperationalFeature(tenantId, PLATFORM_FEATURE_KEYS.reviews, 'Reviews');
+export async function canUseReviews(tenantId: string, options: FeatureReadOptions = {}): Promise<boolean> {
+  return canUseOperationalFeature(tenantId, PLATFORM_FEATURE_KEYS.reviews, 'Reviews', options);
 }

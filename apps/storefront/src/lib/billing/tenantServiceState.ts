@@ -1,6 +1,7 @@
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { SHOP_DISPLAY_TTL_SECONDS } from '@/lib/cache/storefrontCache';
 import {
   isModuleKey,
   isSuspendedAt,
@@ -62,9 +63,11 @@ async function loadRows(tenantId: string): Promise<CachedRows> {
   };
 }
 
-function cachedRows(tenantId: string): Promise<CachedRows> {
-  return unstable_cache(() => loadRows(tenantId), ['tenant-service-state', tenantId], {
-    revalidate: 60,
+function cachedRows(tenantId: string, display = false): Promise<CachedRows> {
+  // Variante « affichage » des pages ISR : même tag, durée SHOP_DISPLAY_TTL_SECONDS
+  // (lib/cache/storefrontCache.ts). guardModule() garde toujours la variante courte.
+  return unstable_cache(() => loadRows(tenantId), [display ? 'tenant-service-state-display' : 'tenant-service-state', tenantId], {
+    revalidate: display ? SHOP_DISPLAY_TTL_SECONDS : 60,
     tags: [serviceStateCacheTag(tenantId)],
   })().catch((error) => {
     console.warn('[service-state] cache read failed, tenant treated as active', tenantId, error);
@@ -86,6 +89,11 @@ export function serviceStateFromRows(rows: CachedRows, now: Date = new Date()): 
 
 export async function getTenantServiceState(tenantId: string): Promise<TenantServiceState> {
   return serviceStateFromRows(await cachedRows(tenantId));
+}
+
+/** Layouts des pages ISR (boutique, /card) : affichage seulement, jamais un garde d'écriture. */
+export async function getDisplayTenantServiceState(tenantId: string): Promise<TenantServiceState> {
+  return serviceStateFromRows(await cachedRows(tenantId, true));
 }
 
 export function isModuleAvailable(state: TenantServiceState, module: ModuleKey): boolean {

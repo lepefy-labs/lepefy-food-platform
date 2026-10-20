@@ -2,7 +2,7 @@ import { unstable_cache } from 'next/cache';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 import { canUseNala } from '@/lib/entitlements/tenantEntitlements';
 import { canShowPublicReviews } from '@/lib/reviews/publicReviewData';
-import { shopShellCacheTag } from '@/lib/cache/storefrontCache';
+import { SHOP_DISPLAY_TTL_SECONDS, shopShellCacheTag } from '@/lib/cache/storefrontCache';
 import type { TenantSocialLink } from '@lepefy/types';
 
 export interface ShopShellData {
@@ -28,6 +28,7 @@ export function getShopShellData(tenantId: string): Promise<ShopShellData> {
       return { socialLinks, nalaEnabled, reviewsAvailable };
     },
     ['shop-shell-data', tenantId],
-    { revalidate: 300, tags: [shopShellCacheTag(tenantId)] },
+    // Affichage seulement : durée des pages ISR (SHOP_DISPLAY_TTL_SECONDS).
+    { revalidate: SHOP_DISPLAY_TTL_SECONDS, tags: [shopShellCacheTag(tenantId)] },
   )();
 }

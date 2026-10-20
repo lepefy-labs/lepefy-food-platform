@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Manrope, DM_Sans } from 'next/font/google';
-import { getTenant } from '@/lib/tenant/getTenant';
+import { getDisplayTenant } from '@/lib/tenant/getTenant';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import { canUseReviews } from '@/lib/entitlements/tenantEntitlements';
@@ -12,7 +12,7 @@ import { getCardShowcaseProducts } from '@/lib/card/getCardShowcaseProducts';
 const manrope = Manrope({ subsets: ['latin'], weight: ['700', '800'], variable: '--font-card-heading', display: 'swap' });
 const dmSans  = DM_Sans({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-card-body', display: 'swap' });
 
-export const revalidate = 300;
+export const revalidate = 3600; // = SHOP_DISPLAY_TTL_SECONDS (lib/cache/storefrontCache.ts) : littéral exigé par Next
 
 export const metadata: Metadata = {
   manifest: '/api/card/manifest',
@@ -20,11 +20,11 @@ export const metadata: Metadata = {
 
 export default async function CardPage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(slug);
+  const tenant = await getDisplayTenant(slug);
   const [socialLinks, allPaymentMethods, reviewsEnabled, cardSettings, showcaseProducts] = await Promise.all([
     getTenantSocialLinks(tenant.id),
     getTenantPaymentMethods(tenant.id),
-    canUseReviews(tenant.id),
+    canUseReviews(tenant.id, { display: true }),
     getCardPublicSettings(tenant),
     // Vitrine seulement si la boutique est ouverte (même règle que le CTA boutique).
     tenant.storefront_ready ? getCardShowcaseProducts(tenant.id) : Promise.resolve([]),

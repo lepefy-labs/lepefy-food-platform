@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { eventHref, serviceHref } from '@/lib/events/eventsHubUrl';
 import type { Metadata } from 'next';
 import { createPublicClient } from '@/lib/supabase/public';
-import { getTenant } from '@/lib/tenant/getTenant';
+import { getDisplayTenant } from '@/lib/tenant/getTenant';
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { PRODUCT_CARD_SELECT } from '@/lib/catalog/productCardSelect';
 import { StorySection } from '@/components/home/StorySection';
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 
 // ISR : tenant, catégories et produits vedettes ne sont jamais personnalisés
 // (le panier reste 100% client, Zustand/localStorage — rien à isoler ici).
-export const revalidate = 300;
+export const revalidate = 3600; // = SHOP_DISPLAY_TTL_SECONDS (lib/cache/storefrontCache.ts) : littéral exigé par Next
 
 export type HomeProduct = {
   id: string;
@@ -67,7 +67,7 @@ function heroProducts(products: SuggestionProduct[], currency: string) {
 
 export default async function HomePage() {
   const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant   = await getTenant(slug);
+  const tenant   = await getDisplayTenant(slug);
   const supabase = createPublicClient();
 
   // Ces lectures ne dépendent que de tenant.id — aucune ne dépend du

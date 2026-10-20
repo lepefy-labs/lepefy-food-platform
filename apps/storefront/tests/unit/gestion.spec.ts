@@ -39,7 +39,8 @@ test('every Gestion API handler goes through the feature guard and is never cach
   expect(apiRoutes.length).toBeGreaterThanOrEqual(16);
   for (const file of apiRoutes) {
     const source = readFileSync(file, 'utf8');
-    const handlers = source.match(/export async function (GET|POST|PATCH|DELETE)/g) ?? [];
+    // Exported directly or wrapped (`export const POST = withStorefrontInvalidation(...)`).
+    const handlers = source.match(/export (async function|const) (GET|POST|PATCH|DELETE)\b/g) ?? [];
     const guards = source.match(/requireBusinessManagementApi\(/g) ?? [];
     expect(guards.length, file).toBe(handlers.length);
     expect(source, file).toContain("export const dynamic = 'force-dynamic'");

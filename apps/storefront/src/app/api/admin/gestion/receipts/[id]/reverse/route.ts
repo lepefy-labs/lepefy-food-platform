@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireBusinessManagementApi } from '@/lib/gestion/featureGate';
 import { badRequest, callGestionRpc, revalidateGestion } from '@/lib/gestion/rpc';
 import { firstIssue, reasonSchema } from '@/lib/gestion/schemas';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+async function handlePOST(req: NextRequest, { params }: { params: { id: string } }) {
   const gate = await requireBusinessManagementApi();
   if (!gate.ok) return gate.response;
   const parsed = reasonSchema.safeParse(await req.json().catch(() => null));
@@ -19,3 +20,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   revalidateGestion();
   return NextResponse.json({ reversed: result.row.out_reversed, purchaseStatus: result.row.out_purchase_status });
 }
+
+// Le stock affiché par les fiches produit (ISR) change : invalidation du catalogue.
+export const POST = withStorefrontInvalidation(['catalog'], handlePOST);

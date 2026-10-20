@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getTenant } from '@/lib/tenant/getTenant';
+import { getDisplayTenant } from '@/lib/tenant/getTenant';
 import { createPublicClient } from '@/lib/supabase/public';
 import { ProductDetail } from '@/components/product/ProductDetail';
 import { RelatedProducts } from '@/components/product/RelatedProducts';
@@ -11,9 +11,11 @@ import { getAiCapabilities } from '@/lib/ai/aiSettings';
 
 // ISR : ni cette page ni generateMetadata ne lisent de donnée personnalisée
 // (pas de panier/session ici — ProductDetail lit le panier côté client via
-// Zustand/localStorage). Stock et prix peuvent donc rester à 5 minutes de
-// fraîcheur ; le re-contrôle réel se fait au checkout (cf. résumé du prompt).
-export const revalidate = 300;
+// Zustand/localStorage). Régénérée au plus une fois par heure : l'admin
+// catalogue, le tick des promotions et chaque commande qui touche le stock
+// (revalidateProductAvailability) l'invalident tout de suite ; prix et stock
+// sont de toute façon revérifiés au checkout (validateCheckoutItems).
+export const revalidate = 3600; // = SHOP_DISPLAY_TTL_SECONDS (lib/cache/storefrontCache.ts) : littéral exigé par Next
 
 interface ProductPageProps { params: { slug: string } }
 
@@ -21,7 +23,7 @@ export async function generateStaticParams() {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   try {
     const supabase = createPublicClient();
-    const tenant = await getTenant(tenantSlug);
+    const tenant = await getDisplayTenant(tenantSlug);
     const { data } = await supabase
       .from('products')
       .select('slug')
@@ -43,7 +45,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(tenantSlug);
+  const tenant = await getDisplayTenant(tenantSlug);
   const supabase = createPublicClient();
   const { data } = await supabase.from('products').select('name, description')
     .eq('slug', params.slug).eq('tenant_id', tenant.id).single();
@@ -53,7 +55,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(tenantSlug);
+  const tenant = await getDisplayTenant(tenantSlug);
   const supabase = createPublicClient();
 
   const { data: product } = await supabase

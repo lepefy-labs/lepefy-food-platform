@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter, Bricolage_Grotesque } from 'next/font/google';
-import { getTenant } from '@/lib/tenant/getTenant';
+import { getDisplayTenant } from '@/lib/tenant/getTenant';
 import { toPublicTenant } from '@/lib/tenant/publicTenant';
 import { TenantProvider } from '@/providers/TenantProvider';
 import { ProductImageDeliveryProvider } from '@/providers/ProductImageDeliveryProvider';
@@ -21,7 +21,7 @@ const bricolage = Bricolage_Grotesque({
 
 export async function generateMetadata(): Promise<Metadata> {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(slug);
+  const tenant = await getDisplayTenant(slug);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
   return {
     ...(appUrl ? { metadataBase: new URL(appUrl) } : {}),
@@ -55,7 +55,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(slug);
+  const tenant = await getDisplayTenant(slug);
   const appIconRevision = getAppIconRevision(tenant.app_icon_url);
 
   // Client Components receive only the explicit public projection: provider

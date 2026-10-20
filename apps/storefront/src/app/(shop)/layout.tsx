@@ -12,9 +12,9 @@ import { CookieConsentBanner } from '@/components/consent/CookieConsentBanner';
 import { CartSyncProvider } from '@/components/cart/CartSyncProvider';
 import { AddToCartConfirmation } from '@/components/cart/AddToCartConfirmation';
 import { CartDrawer } from '@/components/cart/CartDrawer';
-import { getTenant } from '@/lib/tenant/getTenant';
+import { getDisplayTenant } from '@/lib/tenant/getTenant';
 import { getShopShellData } from '@/lib/tenant/getShopShellData';
-import { getTenantServiceState, isModuleAvailable } from '@/lib/billing/tenantServiceState';
+import { getDisplayTenantServiceState, isModuleAvailable } from '@/lib/billing/tenantServiceState';
 import { ServiceSuspendedPage } from '@/components/billing/ServiceSuspendedPage';
 
 // Ce layout ne lit ni cookies ni session : tout ce qui dépend du client
@@ -22,9 +22,9 @@ import { ServiceSuspendedPage } from '@/components/billing/ServiceSuspendedPage'
 // client. Sinon chaque page boutique redevient dynamique et l'ISR des fiches
 // produit / de /accueil ne sert plus jamais depuis le CDN.
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
-  const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+  const tenant = await getDisplayTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
   // Tenant-level read only (cached, no cookies): keeps the shop ISR.
-  if (!isModuleAvailable(await getTenantServiceState(tenant.id), 'shop')) {
+  if (!isModuleAvailable(await getDisplayTenantServiceState(tenant.id), 'shop')) {
     return <ServiceSuspendedPage tenantName={tenant.name} logoUrl={tenant.logo_url} />;
   }
   const { socialLinks, nalaEnabled, reviewsAvailable } = await getShopShellData(tenant.id);

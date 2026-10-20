@@ -303,3 +303,48 @@ Metriche disponibili subito dopo il deploy (16/10, ~09:20 UTC):
 4. **Tick n8n** con pre-controllo su Supabase (8 %).
 
 Il passaggio a Pro resta necessario: anche con −19 % il ritmo attuale (≈ 18–20 min/giorno per chloefood) vale ≈ 9–10 h/mese contro 4 h incluse.
+
+---
+
+## 12. Ciclo 2 — rigenerazioni ISR (20/10/2026)
+
+**Causa verificata nel codice.** In Next 14.2.35 una pagina ISR viene rigenerata secondo la durata **più corta** tra il suo `export const revalidate` e ogni `unstable_cache` letto durante il rendering (`next/dist/server/web/spec-extension/unstable-cache.js`: `store.revalidate = options.revalidate` se più corto). Il root layout e `(shop)/layout` leggono `getTenant()` (60 s) e `getTenantServiceState()` (60 s): tutte le pagine dichiarate «ISR 300 s» erano in realtà rigenerate dopo 60 s di traffico. Lo confermava l'header `s-maxage=60` della CGV (§7). Alzare solo `revalidate` non sarebbe servito.
+
+**Interventi.**
+- `SHOP_DISPLAY_TTL_SECONDS = 3600` (`lib/cache/storefrontCache.ts`) e `export const revalidate = 3600` su `/products/[slug]`, `/accueil`, `/card`, `/avis`, `/politique-confidentialite`, `/conditions-generales-vente` (valore letterale, verificato da un test).
+- Varianti «affichage» con gli **stessi tag** (l'invalidazione colpisce entrambe): `getDisplayTenant` (`lib/tenant/getTenant.ts`), `getDisplayTenantServiceState` (`lib/billing/tenantServiceState.ts`), `canUseReviews(id, { display: true })` (`lib/entitlements/tenantEntitlements.ts`), usate solo da root layout, `(shop)/layout`, `card/layout` e dalle pagine ISR. Checkout, pagamenti, API e guard di scrittura (`guardModule`) restano sulle varianti a 60 s.
+- `getShopShellData` e categorie/visuali del catalogo (`catalogCache.ts`) passano da 300 s a 1 h (solo affichage; ogni scrittura admin invalida i tag). Il classement del catalogo resta a 60 s (solo `/`, dinamico).
+- Stock cambiato da un ordine: `revalidateProductAvailability` / `revalidateOrderProductAvailability` invalidano soltanto le schede dei prodotti interessati più `/accueil` e `/card`; mai bloccanti (errore registrato, ordine invariato). Chiamati da `/api/checkout` (vendita in negozio), webhook Stripe (percorso storico) e `convertCheckoutSessionToOrder` (quando `created = true`, dipendenza iniettabile `refreshProductAvailability`).
+- Ricevimenti fornitore, storni e rettifiche d'inventario di Gestion: `withStorefrontInvalidation(['catalog'])`.
+- Prefetch delle card prodotto: **invariato**. Con l'ISR a 1 h un prefetch è quasi sempre una lettura dal CDN; da rivalutare solo se la misura lo giustifica.
+
+**Freschezza dopo l'intervento.**
+
+| Dato mostrato | Prima | Dopo |
+|---|---|---|
+| Prezzo, promo, nouveautés (admin, tick promo) | immediato (invalidazione) | immediato (invariato) |
+| Stock dopo un ordine pagato | ≤ 60 s | immediato sulle schede comprate, `/accueil`, `/card` |
+| Stock da Gestion (ricevimento, rettifica) | ≤ 60 s | immediato (catalogo invalidato) |
+| Branding / impostazioni tenant da `/api/admin/tenant` e altre route con invalidazione | immediato | immediato |
+| Scritture su `tenants` senza invalidazione (alcune route piattaforma, worker) | ≤ 60 s | ≤ 1 h sulle pagine ISR, ≤ 60 s altrove |
+| Override di entitlement piattaforma (pulsante Nala, link Avis) | ≤ 5 min | ≤ 1 h |
+| Nuova versione di CGV (scritta fuori dall'app) | ≤ 60 s | ≤ 1 h (il consenso legge sempre la versione corrente) |
+| Nuovo evento su `/accueil` (creazione senza invalidazione) | ≤ 60 s | ≤ 1 h (la pagina evento è dinamica) |
+
+Il checkout resta autorevole su prezzo, stock, minimi e gruppi (`validateCheckoutItems`).
+
+**Test.** `tests/unit/isrDisplayCache.spec.ts` (durata letterale = costante; nessuna variante corta nell'albero ISR; percorsi invalidati; lettura tenant-scoped, nessuna eccezione, limite di 100 prodotti); `assistedOrders.spec.ts` (invalidazione una sola volta per conversione vincente, mai su replay); `gestion.spec.ts` (guard contati anche sugli handler esportati come costante); suite locale `requestBudget.spec.ts`: ogni pagina ISR risponde con `s-maxage=3600`. Esiti locali (20/10): `tsc` ok, unit 1642/1642, `next build` ok (pagine ISR `○`/`●`), suite di conferma su `next start` 50/50.
+
+**Procedura prima/dopo (≥ 3 giorni interi dopo il deploy).**
+1. Observability → ISR (12 h): scritture per route (prima ~30 per `/accueil`, `/avis`, `/card`, `/politique-confidentialite` e prodotti più visti; atteso ≤ 12) e rivalidazioni time-based (prima 2,1K / 12 h).
+2. Observability → Functions (12 h): CPU delle categorie del §11 (prima: prodotti 574 s, altre pagine ISR 149 s).
+3. Usage: CPU giornaliera chloefood (prima 18,5 min/giorno, media 17–19/10) e invocazioni (8.348/giorno).
+4. `curl -sI https://shop.chloefood.com/accueil` → `cache-control` con `s-maxage=3600`.
+
+| Metrica | Prima (12 h al 20/10) | Dopo |
+|---|---:|---:|
+| Scritture ISR `/accueil` / 12 h | 30 | DA MISURARE |
+| Rivalidazioni time-based / 12 h | 2,1K | DA MISURARE |
+| CPU schede prodotto / 12 h | 574 s | DA MISURARE |
+| CPU altre pagine ISR / 12 h | 149 s | DA MISURARE |
+| CPU chloefood / giorno | 18,5 min | DA MISURARE |

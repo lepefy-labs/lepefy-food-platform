@@ -14,6 +14,7 @@ import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttributio
 import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 import { recordAssistedOrderEvent } from '@/lib/orders/assisted/assistedOrderEvents';
 import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
+import { revalidateOrderProductAvailability } from '@/lib/cache/storefrontCache';
 import type { OrderService } from '@/lib/orders/orderTransitionService';
 import { notifyOrderCreated, notifyOrderStockConflict } from '@/lib/notifications/staff/orderEvents';
 import type { RefundState } from '@/lib/notifications/staff/staffMessages';
@@ -137,6 +138,8 @@ export interface ConversionSideEffectDependencies {
   refundPaymentIntent: (paymentIntentId: string) => Promise<{ id: string }>;
   /** Defaults to the shipment-draft queue (trigger « order_created »); never throws. */
   requestShipmentDraft?: (supabase: SupabaseClient, tenantId: string, orderId: string) => Promise<unknown>;
+  /** Defaults to the targeted product-page invalidation (stock changed); never throws. */
+  refreshProductAvailability?: (supabase: SupabaseClient, tenantId: string, orderId: string) => Promise<unknown>;
   /** Defaults to the products selling-format lookup; never throws. */
   loadOrderEmailItems?: typeof loadOrderEmailItems;
   /** Defaults to the staff dispatcher (lib/notifications/staff/orderEvents.ts); never throws. */
@@ -316,6 +319,9 @@ export async function convertCheckoutSessionToOrder(
       ?? ((db, tenantId, orderId) => requestShipmentDraft(db as unknown as OrderService, tenantId, orderId, 'order_created')))(
       supabase, input.tenantId, order.id);
   }
+
+  // Stock décrémenté dans la RPC : les fiches ISR de ces produits se régénèrent à la prochaine visite.
+  await (deps.refreshProductAvailability ?? revalidateOrderProductAvailability)(supabase, input.tenantId, order.id);
 
   // Notification interne « Nouvelle commande » : même règle que la boutique (une fois, par la conversion gagnante).
   await (deps.notifyStaff ?? defaultStaffNotifications).orderCreated(input.tenantId, order.id);

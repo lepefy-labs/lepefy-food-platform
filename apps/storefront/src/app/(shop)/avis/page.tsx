@@ -2,23 +2,23 @@
 import Link from 'next/link';
 import { IconRosetteDiscountCheck, IconStar } from '@tabler/icons-react';
 import { createServiceClient } from '@/lib/supabase/server';
-import { getTenant } from '@/lib/tenant/getTenant';
+import { getDisplayTenant } from '@/lib/tenant/getTenant';
 import { canUseReviews } from '@/lib/entitlements/tenantEntitlements';
 import { getReviewSettings } from '@/lib/reviews/reviewSettings';
 
 // ISR : la page est identique pour tous les visiteurs (aucune session lue).
 // Sans cache, ~6 allers-retours Supabase en série à chaque visite (>1 s).
 // Modération et réglages d'affichage l'invalident immédiatement via
-// withStorefrontInvalidation(['reviews']) ; 5 min au plus sinon.
-export const revalidate = 300;
+// withStorefrontInvalidation(['reviews']) ; une heure au plus sinon.
+export const revalidate = 3600; // = SHOP_DISPLAY_TTL_SECONDS (lib/cache/storefrontCache.ts) : littéral exigé par Next
 
 function Stars({ rating }: { rating: number }) {
   return <span className="inline-flex" aria-label={`${rating} sur 5`}>{[1,2,3,4,5].map((value) => <IconStar key={value} size={16} fill={value <= Math.round(rating) ? 'currentColor' : 'none'} className={value <= Math.round(rating) ? 'text-amber-500' : 'text-gray-300'} />)}</span>;
 }
 
 export default async function ReviewsPage() {
-  const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
-  if (!(await canUseReviews(tenant.id))) return <div className="mx-auto max-w-2xl px-4 py-16 text-center"><h1 className="text-2xl font-bold text-gray-950">Avis indisponibles</h1><p className="mt-2 text-sm text-gray-500">Cette fonctionnalité n’est pas activée pour le moment.</p></div>;
+  const tenant = await getDisplayTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+  if (!(await canUseReviews(tenant.id, { display: true }))) return <div className="mx-auto max-w-2xl px-4 py-16 text-center"><h1 className="text-2xl font-bold text-gray-950">Avis indisponibles</h1><p className="mt-2 text-sm text-gray-500">Cette fonctionnalité n’est pas activée pour le moment.</p></div>;
   const settings = await getReviewSettings(tenant.id);
   if (!settings.publicDisplay) return <div className="mx-auto max-w-2xl px-4 py-16 text-center"><h1 className="text-2xl font-bold text-gray-950">Avis non publiés</h1><p className="mt-2 text-sm text-gray-500">La collecte est active, mais l’affichage public est désactivé.</p></div>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -82,6 +82,7 @@ function effects() {
   const crm: Array<Record<string, unknown>> = [];
   const nala: string[] = [];
   const staff: string[] = [];
+  const refreshed: string[] = [];
   const deps: ConversionSideEffectDependencies = {
     notifyN8n: async (path, payload) => { messages.push({ path, payload }); return true; },
     getTenantNotificationContext: async () => ({ tenantId: TENANT, tenantName: 'Chloé', storefrontUrl: 'https://shop.example' } as TenantNotificationContext),
@@ -94,8 +95,9 @@ function effects() {
       orderCreated: async (_tenantId, orderId) => { staff.push(`created:${orderId}`); },
       stockConflict: async (_tenantId, orderId, refund) => { staff.push(`conflict:${orderId}:${refund}`); },
     },
+    refreshProductAvailability: async (_db, tenantId, orderId) => { refreshed.push(`${tenantId}:${orderId}`); },
   };
-  return { deps, messages, refunds, crm, nala, staff };
+  return { deps, messages, refunds, crm, nala, staff, refreshed };
 }
 
 const ORDER_ID = '99999999-8888-4777-8666-555555555555';
@@ -252,6 +254,8 @@ test('Stripe-paid WhatsApp preorder converts once and emits one confirmation', a
   expect(fx.crm[0]).toMatchObject({ source: 'assisted_order', orderMetadata: { order_origin: 'assisted', sales_channel: 'whatsapp' } });
   const eventTypes = fake.inserts.filter((i) => i.table === 'assisted_order_events').map((i) => i.row.event_type);
   expect(eventTypes).toEqual(['payment_confirmed', 'order_created', 'notification_sent']);
+  // Stock décrémenté par la RPC : les fiches ISR des produits commandés sont invalidées, pour ce tenant.
+  expect(fx.refreshed).toEqual([`${TENANT}:${ORDER_ID}`]);
 });
 
 test('duplicate Stripe webhook: no second order, no side effect', async () => {
@@ -264,6 +268,7 @@ test('duplicate Stripe webhook: no second order, no side effect', async () => {
   expect(fx.messages).toEqual([]);
   expect(fx.crm).toEqual([]);
   expect(fx.staff).toEqual([]);
+  expect(fx.refreshed).toEqual([]);
   expect(fake.inserts).toEqual([]);
 });
 
@@ -283,6 +288,7 @@ test('two simultaneous admin confirmations create a single order and a single no
   expect(fx.crm).toHaveLength(1);
   // Staff « Nouvelle commande »: once, from the winning conversion only.
   expect(fx.staff).toEqual([`created:${ORDER_ID}`]);
+  expect(fx.refreshed).toHaveLength(1);
 });
 
 test('declared bank transfer verified by an admin is traced as admin_verified', async () => {
