@@ -36,7 +36,7 @@ import { carrierDisplayName, shipmentEventsNewestFirst } from '@/lib/shipping/sh
 import { getCurrentAdminAccessContext, canAdmin } from '@/lib/auth/adminRbac'
 import { dailyDigestModule, DAILY_DIGEST_DEFAULTS } from '@/lib/notifications/dailyDigestConfig'
 import { readModuleConfig } from '@/lib/tenantConfig/moduleConfig'
-import { DIGITAL_PREPARATION, orderPreparationMode, preparationBlockers, preparationState, PREPARATION_MODE_LABELS } from '@/lib/orders/preparation/preparationPolicy'
+import { DIGITAL_PREPARATION, effectivePreparationMode, preparationBlockers, preparationState, PREPARATION_MODE_LABELS } from '@/lib/orders/preparation/preparationPolicy'
 import { readOrderPreparationSettings, toPreparationMode } from '@/lib/orders/preparation/settings'
 import PaperPreparationPanel from '../../../orders/[id]/PaperPreparationPanel'
 import PreparationStepBadge from '../../../_components/ui/PreparationStepBadge'
@@ -230,8 +230,10 @@ export default async function AdminOrderPage({ params }: PageProps) {
   const coldChecked = coldItems.filter(item => item.cold_chain_checked_at).length
   // Preparation rules of this order's mode (snapshot; a new order shows the tenant's current mode).
   const tenantPreparationMode = preparationSettings.available ? toPreparationMode(preparationSettings.config) : DIGITAL_PREPARATION
-  const preparation = preparationState(order, items)
-  const displayMode = order.preparation_mode ? orderPreparationMode(order) : order.status === 'new' ? tenantPreparationMode : DIGITAL_PREPARATION
+  // No snapshot: the tenant's current mode while nothing digital was recorded (e.g. paid storefront orders, created « En préparation »).
+  const scopedOrder = { ...order, tenantPreparationMode }
+  const preparation = preparationState(scopedOrder, items)
+  const displayMode = effectivePreparationMode(scopedOrder, items).mode
   const digitalPicking = displayMode.picking === 'digital'
   const pickingComplete = preparation.pickingDone
   const pickingProgress = { total: items.length, picked: pickedCount, coldRequired: coldItems.length, coldChecked, complete: pickingComplete }
@@ -240,7 +242,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
     coldMode: preparation.mode.cold_chain_packing,
     pickingDone: preparation.pickingDone,
     packingDone: preparation.packingDone,
-    blockers: order.status === 'preparing' ? preparationBlockers(order, items, !isPickup) : [],
+    blockers: order.status === 'preparing' ? preparationBlockers(scopedOrder, items, !isPickup) : [],
   }
 
   // Same classifier as the work queue: group, reliable anomaly, contextual urgency, next action.

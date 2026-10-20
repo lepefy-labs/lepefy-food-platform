@@ -3,7 +3,8 @@ import {
   loadWorkflowOrder, OrderWorkflowError, updateWorkflowOrder, type OrderService,
 } from '@/lib/orders/orderTransitionService';
 import { MAX_BULK_ORDER_DOCUMENTS } from '@/lib/orders/documents/formats';
-import { modeOnStart, orderPreparationMode, preparationState, type OrderPreparationMode, type PreparationItem, type StartResult } from './preparationPolicy';
+import { effectivePreparationMode, modeOnStart, preparationState, type OrderPreparationMode, type PreparationItem, type StartResult } from './preparationPolicy';
+import { readTenantPreparationMode } from './settings';
 
 /**
  * Server writes of the paper flow (migration 160). Every write is
@@ -57,7 +58,7 @@ export async function startPreparation(input: {
     const nowIso = (input.now?.() ?? new Date()).toISOString();
     const items = await loadItems(service, order);
     const adopted = tenantMode ? modeOnStart(order, items, tenantMode) : null;
-    const mode = adopted ?? orderPreparationMode(order);
+    const mode = adopted ?? effectivePreparationMode(order).mode;
     const patch: Record<string, unknown> = {};
     if (adopted) patch.preparation_mode = adopted;
     if (tenantMode && !order.picking_list_printed_at) patch.picking_list_printed_at = nowIso;
@@ -103,7 +104,8 @@ export async function completePaperPreparation(input: PaperCompletionInput): Pro
   const { service, tenantId, orderId, actorId } = input;
   const order = await loadWorkflowOrder(service, tenantId, orderId);
   if (order.status !== 'preparing') throw new OrderWorkflowError('La préparation peut être confirmée uniquement pendant la préparation.');
-  const mode = orderPreparationMode(order);
+  const scopedOrder = order.preparation_mode ? order : { ...order, tenantPreparationMode: await readTenantPreparationMode(service as never, tenantId) };
+  const { mode, source: modeSource } = effectivePreparationMode(scopedOrder);
   if (mode.picking !== 'paper') throw new OrderWorkflowError('Cette commande est préparée dans Lepefy : utilisez la checklist.');
   if (order.payment_status !== 'paid') throw new OrderWorkflowError('Paiement à vérifier avant de terminer la préparation.');
   if (order.paper_preparation_completed_at) return order;
@@ -112,7 +114,7 @@ export async function completePaperPreparation(input: PaperCompletionInput): Pro
   const items = await loadItems(service, order);
   if (items.length === 0) throw new OrderWorkflowError('La commande ne contient aucun article à préparer.');
   const delivery = order.fulfillment_type === 'delivery';
-  const state = preparationState(order, items);
+  const state = preparationState(scopedOrder, items);
   const patch: Record<string, unknown> = {};
   const nowIso = (input.now?.() ?? new Date()).toISOString();
   if (delivery) {
@@ -127,6 +129,7 @@ export async function completePaperPreparation(input: PaperCompletionInput): Pro
       patch.cold_chain_packing_declared_at = order.cold_chain_packing_declared_at ?? nowIso;
     }
   }
+  if (modeSource === 'tenant') patch.preparation_mode = mode;
   patch.paper_preparation_completed_at = nowIso;
   patch.paper_preparation_completed_by = actorId;
 

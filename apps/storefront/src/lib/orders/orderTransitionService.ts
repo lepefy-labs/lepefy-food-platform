@@ -35,9 +35,12 @@ export async function assertPreparationComplete(service: OrderService, order: Or
     .eq('order_id', order.id).eq('tenant_id', order.tenant_id);
   if (error) throw new OrderWorkflowError('Impossible de vérifier la préparation.', 503);
   const items = (data ?? []) as PickingItemRow[];
-  const blockers = preparationBlockers(order, items, packing);
+  // No snapshot (e.g. paid storefront orders, created directly in preparation): the tenant's current mode applies while nothing digital was recorded.
+  const scoped = order.preparation_mode ? order
+    : { ...order, tenantPreparationMode: (await tenantPreparationSnapshot(service, order.tenant_id).catch(() => null)) ?? undefined };
+  const blockers = preparationBlockers(scoped, items, packing);
   if (blockers.length > 0) throw new PreparationIncompleteError(blockers.join(' '));
-  return preparationState(order, items);
+  return preparationState(scoped, items);
 }
 
 /** Tenant mode to snapshot when preparation starts; null when migration 160 is absent. */
@@ -96,6 +99,8 @@ export async function updateWorkflowOrder({ service, order, nextStatus, patch = 
   }
   // « Sans confirmation »: the final transition is the only declaration — stamped, never a check.
   if (preparation?.unverified && !order.preparation_unverified_at) update.preparation_unverified_at = new Date().toISOString();
+  // The tenant mode that allowed this transition becomes the order's snapshot (same write, same CAS).
+  if (preparation?.modeSource === 'tenant' && !order.preparation_mode && update.preparation_mode === undefined) update.preparation_mode = preparation.mode;
   if ((next === 'shipped' || catchupDelivered) && !order.shipped_at) update.shipped_at = shippedAt ?? new Date().toISOString();
   if (Object.keys(update).length === 0) return order;
   const { data, error } = await service.from('orders').update(update)

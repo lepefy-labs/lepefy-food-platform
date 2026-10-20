@@ -55,7 +55,14 @@ export interface PreparationOrder {
   paper_preparation_started_at?: string | null;
   paper_preparation_completed_at?: string | null;
   cold_chain_packing_declared_at?: string | null;
+  packing_started_at?: string | null;
   order_items?: PreparationItem[] | null;
+  /**
+   * Tenant's current mode. Applies to an order without snapshot as long as no
+   * digital preparation work exists on it — e.g. paid storefront orders, which
+   * are created directly « En préparation » and never go through new → preparing.
+   */
+  tenantPreparationMode?: OrderPreparationMode;
 }
 
 function isMode(value: unknown): value is PreparationModeValue {
@@ -75,10 +82,34 @@ export function orderPreparationMode(order: Pick<PreparationOrder, 'preparation_
 
 const isCold = (item: PreparationItem) => item.storage_type === 'fresh' || item.storage_type === 'frozen';
 
+/** Any digital preparation record (a ticked line, a packing write): the order is then bound to the digital mode. */
+export function hasDigitalPreparationWork(order: PreparationOrder, items: PreparationItem[] | null = null): boolean {
+  const lines = items ?? order.order_items ?? [];
+  return lines.some((item) => item.picked_at || item.cold_chain_checked_at)
+    || Boolean(order.picking_completed_at || order.packing_started_at || order.packing_completed_at || order.cold_chain_packing_checked_at);
+}
+
+export type PreparationModeSource = 'snapshot' | 'tenant' | 'default';
+
+/**
+ * Mode that rules this order: its snapshot; otherwise the tenant's current
+ * mode while nothing digital was recorded on it (`source = 'tenant'`: callers
+ * that write persist it as the snapshot); otherwise the strict digital mode.
+ */
+export function effectivePreparationMode(order: PreparationOrder, items: PreparationItem[] | null = null): { mode: OrderPreparationMode; source: PreparationModeSource } {
+  if (order.preparation_mode) return { mode: orderPreparationMode(order), source: 'snapshot' };
+  const tenant = order.tenantPreparationMode;
+  if (!tenant || (order.status !== 'new' && order.status !== 'preparing')) return { mode: DIGITAL_PREPARATION, source: 'default' };
+  if (order.status === 'new' || !hasDigitalPreparationWork(order, items)) return { mode: tenant, source: 'tenant' };
+  return { mode: DIGITAL_PREPARATION, source: 'default' };
+}
+
 export type PreparationSource = 'digital' | 'paper' | 'none';
 
 export interface PreparationState {
   mode: OrderPreparationMode;
+  /** 'tenant': mode adopted from the tenant setting, to be saved on the order by the next write. */
+  modeSource: PreparationModeSource;
   hasColdChain: boolean;
   /** Line-level digital progress (only meaningful when line data is known). */
   lines: { total: number; picked: number; coldRequired: number; coldChecked: number } | null;
@@ -102,7 +133,7 @@ export interface PreparationState {
  * picking route under the same rule — stands in.
  */
 export function preparationState(order: PreparationOrder, items: PreparationItem[] | null = null): PreparationState {
-  const mode = orderPreparationMode(order);
+  const { mode, source: modeSource } = effectivePreparationMode(order, items);
   const lineSource = items ?? order.order_items ?? [];
   const hasColdChain = lineSource.some(isCold);
   const delivery = order.fulfillment_type === 'delivery';
@@ -142,7 +173,7 @@ export function preparationState(order: PreparationOrder, items: PreparationItem
   const paperInProgress = mode.picking === 'paper' && order.status === 'preparing' && !order.paper_preparation_completed_at;
   const unverified = mode.picking === 'none' || (coldApplies && mode.cold_chain_packing === 'none');
 
-  return { mode, hasColdChain, lines, pickingDone, coldPackingDone, parcelsKnown, packingDone, readyForFinal, paperInProgress, unverified };
+  return { mode, modeSource, hasColdChain, lines, pickingDone, coldPackingDone, parcelsKnown, packingDone, readyForFinal, paperInProgress, unverified };
 }
 
 /**
@@ -197,10 +228,9 @@ const STEP_LABELS: Record<PreparationStepKey, string> = {
 export function preparationStep(order: PreparationOrder, tenantMode: OrderPreparationMode = DIGITAL_PREPARATION): PreparationStep | null {
   if (order.status !== 'new' && order.status !== 'preparing') return null;
   const step = (key: PreparationStepKey): PreparationStep => ({ key, label: key === 'ready' && order.fulfillment_type === 'pickup' ? 'Prête au retrait' : STEP_LABELS[key] });
-  const snapshot = order.preparation_mode ? orderPreparationMode(order) : null;
-  const mode = snapshot ?? (order.status === 'new' ? tenantMode : DIGITAL_PREPARATION);
+  const { mode } = effectivePreparationMode({ ...order, tenantPreparationMode: order.tenantPreparationMode ?? tenantMode });
   if (order.status === 'new') return step(mode.picking === 'paper' && !order.picking_list_printed_at ? 'to_print' : 'to_prepare');
-  const state = preparationState(order);
+  const state = preparationState({ ...order, tenantPreparationMode: order.tenantPreparationMode ?? tenantMode });
   if (state.readyForFinal) return step('ready');
   if (state.pickingDone) return step('prepared');
   if (mode.picking === 'paper') return step(order.paper_preparation_started_at || order.picking_list_printed_at ? 'printed' : 'to_print');

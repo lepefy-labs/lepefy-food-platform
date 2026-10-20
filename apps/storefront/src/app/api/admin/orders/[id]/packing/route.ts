@@ -4,8 +4,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { preparationState, type PreparationOrder } from '@/lib/orders/preparation/preparationPolicy';
 import { isMissingPreparationColumn, withoutPreparationColumns } from '@/lib/orders/preparation/compat';
+import { readTenantPreparationMode } from '@/lib/orders/preparation/settings';
 
-const PACKING_COLUMNS = 'id, status, fulfillment_type, packing_started_at, picking_completed_at, preparation_mode, paper_preparation_completed_at';
+const PACKING_COLUMNS = 'id, status, fulfillment_type, packing_started_at, packing_completed_at, cold_chain_packing_checked_at, picking_completed_at, preparation_mode, paper_preparation_completed_at';
 
 interface PackingBody {
   parcel_count?: number | null;
@@ -65,6 +66,8 @@ export async function POST(
 
   const items = (itemsRaw ?? []) as ItemRow[];
   // Same rule as the transition: digital checklist, paper declaration or « sans confirmation ».
+  // No snapshot: the tenant's current mode applies while nothing digital was recorded (saved below with the packing).
+  if (!order.preparation_mode) order.tenantPreparationMode = await readTenantPreparationMode(supabase, tenant.id);
   const state = preparationState(order, items);
   if (!state.pickingDone) {
     return NextResponse.json({
@@ -95,6 +98,7 @@ export async function POST(
     ...(coldMode === 'paper' ? { cold_chain_packing_declared_at: coldDeclaredAt } : {}),
     // packing_completed_at = emballage validé dans Lepefy (colis + contrôle froid numérique ou sans objet).
     packing_completed_at: complete && coldDeclaredAt === null ? now : null,
+    ...(state.modeSource === 'tenant' ? { preparation_mode: state.mode } : {}),
   };
 
   const { error: updateError } = await supabase

@@ -275,7 +275,7 @@ export function classifyOrderOperation(order: OperationalOrder, thresholds: Oper
   }
   // Chaîne du froid: only checks the order's mode expects in Lepefy (digital lines / digital packing check).
   if (['new', 'preparing', 'ready_for_pickup'].includes(order.status) && preparation.hasColdChain) {
-    const lineMode = order.preparation_mode ? preparation.mode.picking : order.status === 'new' ? (order.tenantPreparationMode ?? DIGITAL_PREPARATION).picking : 'digital';
+    const lineMode = preparation.mode.picking;
     const linesPending = lineMode === 'digital' && (order.order_items ?? [])
       .some((item) => (item.storage_type === 'fresh' || item.storage_type === 'frozen') && !item.cold_chain_checked_at);
     const packingPending = order.fulfillment_type === 'delivery' && order.status === 'preparing' && preparation.pickingDone

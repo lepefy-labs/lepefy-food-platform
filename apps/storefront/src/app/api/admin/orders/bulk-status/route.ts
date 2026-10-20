@@ -10,9 +10,10 @@ import {
 import type { OrderStatus } from '@lepefy/types';
 import { preparationBlockers, preparationState, type PreparationOrder } from '@/lib/orders/preparation/preparationPolicy';
 import { isMissingPreparationColumn, withoutPreparationColumns } from '@/lib/orders/preparation/compat';
+import { readTenantPreparationMode } from '@/lib/orders/preparation/settings';
 
 const BULK_COLUMNS = 'id, status, fulfillment_type, tracking_code, tracking_carrier, email, full_name, packing_completed_at, packing_parcel_count, '
-  + 'cold_chain_packing_checked_at, preparation_mode, cold_chain_packing_declared_at, paper_preparation_completed_at, preparation_unverified_at';
+  + 'packing_started_at, picking_completed_at, cold_chain_packing_checked_at, preparation_mode, cold_chain_packing_declared_at, paper_preparation_completed_at, preparation_unverified_at';
 
 type SkipReason = 'wrong_status' | 'missing_tracking';
 
@@ -66,7 +67,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: fetchError.message }, { status: 500 });
   }
 
-  const orders = (ordersRaw ?? []) as unknown as BulkOrderRow[];
+  const tenantMode = await readTenantPreparationMode(admin, tenant.id);
+  // Orders without snapshot follow the tenant's current mode while nothing digital was recorded on them.
+  const orders = ((ordersRaw ?? []) as unknown as BulkOrderRow[]).map(order => ({ ...order, tenantPreparationMode: tenantMode }));
   const preparingIds = orders.filter(order => order.status === 'preparing').map(order => order.id);
   const itemsByOrder = new Map<string, PickingItemRow[]>();
 
@@ -117,7 +120,17 @@ export async function POST(req: NextRequest) {
     .map(order => order.id));
 
   // « Sans confirmation »: the transition is recorded as made without any check (audited, best-effort).
+  const adoptedIds = new Set(preparing
+    .filter(order => !order.preparation_mode && preparationState(order, itemsByOrder.get(order.id) ?? []).modeSource === 'tenant')
+    .map(order => order.id));
+
   async function stampUnverified(moved: BulkOrderRow[]) {
+    const adopted = moved.filter(order => adoptedIds.has(order.id)).map(order => order.id);
+    if (adopted.length > 0) {
+      const { error: modeError } = await admin.from('orders').update({ preparation_mode: tenantMode })
+        .in('id', adopted).eq('tenant_id', tenant.id).is('preparation_mode', null);
+      if (modeError) console.error('[admin/orders/bulk-status] mode snapshot failed:', modeError.message);
+    }
     const ids = moved.filter(order => unverifiedIds.has(order.id)).map(order => order.id);
     if (ids.length === 0) return;
     const { error } = await admin.from('orders').update({ preparation_unverified_at: new Date().toISOString() })

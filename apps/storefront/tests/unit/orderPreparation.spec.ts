@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Order } from '@lepefy/types';
 import {
-  DIGITAL_PREPARATION, modeOnStart, orderPreparationMode, preparationBlockers, preparationState, preparationStep,
+  DIGITAL_PREPARATION, effectivePreparationMode, modeOnStart, orderPreparationMode, preparationBlockers, preparationState, preparationStep,
   type OrderPreparationMode,
 } from '../../src/lib/orders/preparation/preparationPolicy';
 import {
@@ -182,6 +182,36 @@ test.describe('preparation policy', () => {
 });
 
 // ─── Transitions ────────────────────────────────────────────────────────────
+
+test.describe('orders created directly in preparation (paid storefront orders)', () => {
+  test('without snapshot nor digital work they follow the tenant mode; one ticked line keeps them digital', () => {
+    const storefront = baseOrder({ preparation_mode: null, picking_started_at: null, tenantPreparationMode: NONE } as Partial<Order>);
+    expect(effectivePreparationMode(storefront, [{ ...dry }])).toEqual({ mode: NONE, source: 'tenant' });
+    expect(preparationBlockers(storefront, [{ ...dry }], false)).toEqual([]);
+    expect(preparationBlockers(storefront, [{ ...dry }], true)).toEqual(['Nombre de colis à renseigner avant l’expédition.']);
+    expect(effectivePreparationMode(storefront, [{ ...dry, picked_at: 'x' }]).source).toBe('default');
+    expect(effectivePreparationMode({ ...storefront, packing_started_at: 'x' }, [{ ...dry }]).mode).toEqual(DIGITAL_PREPARATION);
+    expect(effectivePreparationMode({ ...storefront, tenantPreparationMode: undefined }, [{ ...dry }]).mode).toEqual(DIGITAL_PREPARATION);
+    // A snapshot always wins over the current setting.
+    expect(effectivePreparationMode({ ...storefront, preparation_mode: PAPER }, [{ ...dry }])).toEqual({ mode: PAPER, source: 'snapshot' });
+  });
+
+  test('the carrier sync is not blocked by digital ticks, and the transition saves the tenant mode on the order', async () => {
+    const db = fakeDb([baseOrder({ preparation_mode: null, packing_parcel_count: 1 })], [{ ...dry }]);
+    db.rows.tenant_feature_settings = [{ tenant_id: 'tenant-a', feature_key: 'order_preparation', enabled: true, config: { version: 1, picking_mode: 'none', cold_chain_packing_mode: 'none' } }];
+    const saved = await updateWorkflowOrder({ service: db.service, order: db.order(), nextStatus: 'shipped', patch: { tracking_code: 'TRK1' }, source: 'provider', ...quiet });
+    expect(saved.status).toBe('shipped');
+    expect(saved.preparation_mode).toEqual(NONE);
+    expect(saved.preparation_unverified_at).toBeTruthy();
+    expect(db.rows.order_items![0]!.picked_at).toBeNull();
+  });
+
+  test('the classifier shows them as the tenant mode (no « Préparation incomplète »)', () => {
+    const op = classifyOrderOperation({ ...(baseOrder({ preparation_mode: null }) as unknown as OperationalOrder), order_items: [{ storage_type: 'dry', picked_at: null }], tenantPreparationMode: NONE }, thresholds, now);
+    expect(op.flags.has('picking_incomplete')).toBe(false);
+    expect(op.action.label).toBe('Terminer l’emballage');
+  });
+});
 
 test.describe('state machine', () => {
   test('new → preparing snapshots the tenant mode once; a setting change later never rewrites it', async () => {
