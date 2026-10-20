@@ -1,6 +1,6 @@
 # Admin Operations V3 — Aujourd'hui, Commandes, préparation groupée et mode papier
 
-> Stato: implementato su `main` (base analizzata `13124c67`, 20/10/2026). Migration `160_order_preparation_modes.sql` **da applicare** (additiva, nessun backfill). Il codice funziona anche prima della 160: tutti gli ordini seguono allora le regole digitali storiche.
+> Stato: implementato su `main` (base analizzata `13124c67`, 20/10/2026). Migration `160_order_preparation_modes.sql` applicata in produzione il 20/10/2026, dopo il deploy di `b859d95d` (verificata: modulo `order_preparation` registrato, 8 colonne su `orders`, 3 tipi `orders.preparation.*`, nessuna riga tenant ⇒ tutti i tenant in modalità digitale).
 > Proposta approvata (audit, mockup PRE/POST, decisioni D1–D4): artifact «Admin Operations V3».
 
 ## 1. Mappa
@@ -68,11 +68,11 @@ Registry `lib/admin/navigation.ts`: gruppo **Essentiel** sempre aperto e senza t
 ## 6. Prestazioni
 La dashboard riusa la lettura leggera degli ordini attivi di `loadOrderWorkQueue` (vista `to_prepare`, 8 righe complete), due `count head` (pagamenti per link, précommandes), un `count head` del giorno e 8 righe recenti; nessun provider, nessuno storico. La sessione legge al massimo 50 ordini, i loro articoli e i fatti catalogo dei prodotti coinvolti. Polling invariato.
 
-## 7. Prima della migration
+## 7. Ambienti senza la migration 160
 `lib/orders/preparation/compat.ts`: le letture che selezionano le colonne 160 riprovano senza di esse su errore `42703` (work queue, bulk-status, packing, sessione). Le scritture delle colonne 160 avvengono solo se il modulo `order_preparation` è registrato (stessa migration). Le impostazioni rispondono 409 «La migration 160 doit être appliquée…».
 
 ## 8. Attivazione Chloe Food (D4 — da eseguire dal tenant o su richiesta esplicita)
-Dopo aver applicato la 160: Paramètres → Commandes → Préparation et emballage → «Préparation sur papier» + «Contrôle sur papier» → Enregistrer. Equivalente SQL (Supabase SQL editor):
+Con la 160 applicata: Paramètres → Commandes → Préparation et emballage → «Préparation sur papier» + «Contrôle sur papier» → Enregistrer. Equivalente SQL (Supabase SQL editor):
 
 ```sql
 insert into public.tenant_feature_settings (tenant_id, feature_key, enabled, config)
