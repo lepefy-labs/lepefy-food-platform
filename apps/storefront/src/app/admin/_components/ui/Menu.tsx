@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { cn } from '@/lib/utils/cn';
 
@@ -18,11 +19,15 @@ interface MenuProps {
 }
 
 const ITEM_SELECTOR = '[role="menuitem"]:not([aria-disabled="true"])';
+/** Gap between the trigger and the menu, and minimum margin to the viewport edges. */
+const GAP = 8;
 
 /**
  * Dropdown menu button (WAI-ARIA menu button pattern): Enter/Space/ArrowDown
  * open on the first item, ArrowUp/ArrowDown/Home/End move, Escape and Tab
  * close (Escape returns focus to the trigger), click outside closes.
+ * The menu is portaled with fixed coordinates, so a scrolling or clipped parent
+ * (table wrapper, card) never cuts it; it opens upwards when there is no room below.
  */
 export default function Menu({ trigger, label, align = 'end', header, children, triggerClassName, menuClassName }: MenuProps) {
   const [open, setOpen] = useState(false);
@@ -30,12 +35,40 @@ export default function Menu({ trigger, label, align = 'end', header, children, 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+  const [position, setPosition] = useState<CSSProperties | null>(null);
+
+  // Placed before paint: below the trigger, or above it when the viewport is too short.
+  useLayoutEffect(() => {
+    if (!open) { setPosition(null); return; }
+    const place = () => {
+      const trigger = triggerRef.current?.getBoundingClientRect();
+      const menu = menuRef.current;
+      if (!trigger || !menu) return;
+      const height = menu.offsetHeight;
+      const below = window.innerHeight - trigger.bottom - GAP;
+      const top = below >= height || trigger.top - GAP < height
+        ? Math.min(trigger.bottom + GAP, Math.max(GAP, window.innerHeight - height - GAP))
+        : trigger.top - GAP - height;
+      setPosition(align === 'end'
+        ? { top, right: Math.max(GAP, document.documentElement.clientWidth - trigger.right) }
+        : { top, left: Math.max(GAP, trigger.left) });
+    };
+    place();
+    // A scroll would leave the menu away from its trigger: close it, like a native select.
+    const close = (event: Event) => { if (!menuRef.current?.contains(event.target as Node)) setOpen(false); };
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', close, true);
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', close, true); };
+  }, [open, align]);
 
   useEffect(() => {
     if (!open) return;
-    const onPointer = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false); };
+    const onPointer = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!rootRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
+    };
     document.addEventListener('mousedown', onPointer);
-    menuRef.current?.querySelector<HTMLElement>(ITEM_SELECTOR)?.focus();
+    menuRef.current?.querySelector<HTMLElement>(ITEM_SELECTOR)?.focus({ preventScroll: true });
     return () => document.removeEventListener('mousedown', onPointer);
   }, [open]);
 
@@ -48,7 +81,8 @@ export default function Menu({ trigger, label, align = 'end', header, children, 
     else if (event.key === 'Home') focus(0);
     else if (event.key === 'End') focus(items.length - 1);
     else if (event.key === 'Escape') { event.preventDefault(); setOpen(false); triggerRef.current?.focus(); }
-    else if (event.key === 'Tab') setOpen(false);
+    // The menu lives at the end of <body>: Tab closes it and returns to the trigger.
+    else if (event.key === 'Tab') { event.preventDefault(); setOpen(false); triggerRef.current?.focus(); }
   }
 
   return (
@@ -66,7 +100,7 @@ export default function Menu({ trigger, label, align = 'end', header, children, 
       >
         {trigger}
       </button>
-      {open && (
+      {open && createPortal(
         <div
           ref={menuRef}
           id={menuId}
@@ -74,16 +108,18 @@ export default function Menu({ trigger, label, align = 'end', header, children, 
           onKeyDown={move}
           // Selecting an item closes the menu.
           onClick={(event) => { if ((event.target as HTMLElement).closest('[role="menuitem"]')) setOpen(false); }}
+          style={position ?? { top: 0, left: 0, opacity: 0 }}
           className={cn(
-            'absolute z-50 mt-2 min-w-[14rem] rounded-xl border border-a-border bg-a-surface p-1.5 shadow-lg',
-            align === 'end' ? 'right-0' : 'left-0',
+            'fixed z-50 max-h-[calc(100dvh-1rem)] min-w-[14rem] overflow-y-auto rounded-xl border border-a-border bg-a-surface p-1.5 shadow-lg',
             menuClassName,
           )}
         >
           {header && <div className="px-2.5 py-2">{header}</div>}
           {header && <div role="separator" className="my-1 border-t border-a-border" />}
           {children}
-        </div>
+        </div>,
+        // Inside a modal <dialog> (top layer) the menu must stay in it to be visible.
+        triggerRef.current?.closest('dialog') ?? document.body,
       )}
     </div>
   );

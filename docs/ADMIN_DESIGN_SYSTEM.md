@@ -84,7 +84,7 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 - **Registry** `ADMIN_NAV` (voci) e `ADMIN_QUICK_ACTIONS` (azioni della palette): `id`, `label`, `href`, `icon`, `group`, `workspace`, `anyOf` (capability), `flag` (`gestion`, `whatsapp`), `match`/`alsoActive`, `badge` (chiave + tono), `mobile` (posizione nella barra), `keywords`. Aggiungere un modulo = una voce; il gruppo appare se ha almeno una voce visibile.
 - **Risoluzione** `resolveAdminNavigation()` nel layout protetto (permessi già ristretti dalla sospensione, flag letti sul server): il client riceve solo gli id visibili, i badge e gli scope di ricerca.
 - **`AdminShell`**: rail desktop 240 px comprimibile a 64 px (pallino al posto del contatore), drawer mobile `Dialog placement="left"`, barra mobile in basso, palette comandi (`Dialog bare placement="top"`, combobox + listbox, ↑ ↓ Entrée, ricerca remota con debounce), link « Aller au contenu ».
-- **`Menu`** (`ui/Menu.tsx`): menu a tendina accessibile (frecce, Home/End, Esc riporta il focus, click esterno) per workspace e account.
+- **`Menu`** (`ui/Menu.tsx`): menu a tendina accessibile (frecce, Home/End, Esc e Tab riportano il focus, click esterno) per workspace, account e azioni di riga. Reso in portal con posizione fissa (si apre verso l'alto se sotto non c'è spazio, si chiude allo scroll): un contenitore con `overflow` (tabella, card) non lo taglia mai.
 - La piattaforma resta in `platformNavConfig.ts` (gruppi espandibili), resa dalla stessa shell.
 
 ### Aujourd'hui e Commandes
