@@ -63,6 +63,20 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .pl-notes { height: 24mm; background: repeating-linear-gradient(transparent 0 7.7mm, #999 7.7mm 8mm); }
 .pl-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
 .pl-address { margin-top: 1mm; line-height: 1.35; }
+.pl-destination { display: block; white-space: nowrap; font-weight: 800; line-height: 1.05; letter-spacing: -0.015em; }
+.pl-destination-postal { font-size: 18pt; }
+.pl-destination-city { font-size: 15pt; }
+.pl-destination-country { font-size: 10pt; font-weight: 600; letter-spacing: 0; }
+.pl-destination--long .pl-destination-postal { font-size: 15pt; }
+.pl-destination--long .pl-destination-city { font-size: 12pt; }
+.pl-destination--very-long .pl-destination-postal { font-size: 12pt; }
+.pl-destination--very-long .pl-destination-city { font-size: 10pt; }
+.format-a4 .pl-destination-postal { font-size: 20pt; }
+.format-a4 .pl-destination-city { font-size: 17pt; }
+.format-a4 .pl-destination--long .pl-destination-postal { font-size: 17pt; }
+.format-a4 .pl-destination--long .pl-destination-city { font-size: 14pt; }
+.format-a4 .pl-destination--very-long .pl-destination-postal { font-size: 13pt; }
+.format-a4 .pl-destination--very-long .pl-destination-city { font-size: 11pt; }
 
 /* A5 : compact, une colonne d'information par ligne */
 .format-a5 { font-size: 10.5pt; }
@@ -200,12 +214,30 @@ function summaryParts(vm: InternalOrderDocumentViewModel): string[] {
   ].filter((part): part is string => Boolean(part));
 }
 
+/** Emphasize the existing CP + city line, without introducing another line. */
+function destinationLine(value: string): string {
+  const match = /^(\\S+)\\s+(.+?)(?:,\\s*([^,]+))?$/.exec(value.trim());
+  if (!match || !/\\d/.test(match[1] ?? '')) return escapeHtml(value);
+  const postal = match[1]!;
+  const city = match[2]!;
+  const country = match[3];
+  const length = postal.length + city.length + (country?.length ?? 0);
+  const sizing = length > 33 ? ' pl-destination--very-long' : length > 23 ? ' pl-destination--long' : '';
+  return `<span class="pl-destination${sizing}"><span class="pl-destination-postal">${escapeHtml(postal)}</span> <span class="pl-destination-city">${escapeHtml(city)}</span>${country ? ` <span class="pl-destination-country">${escapeHtml(country)}</span>` : ''}</span>`;
+}
+
 function addressBlock(vm: InternalOrderDocumentViewModel): string {
-  return vm.deliveryAddress ? `<div class="pl-address">${vm.deliveryAddress.map(escapeHtml).join('<br>')}</div>` : '';
+  if (!vm.deliveryAddress) return '';
+  const lines = vm.deliveryAddress.map((line, index) =>
+    index === vm.deliveryAddress!.length - 1 ? destinationLine(line) : escapeHtml(line));
+  return `<div class="pl-address">${lines.join('<br>')}</div>`;
 }
 
 function customerLine(vm: InternalOrderDocumentViewModel): string {
-  return `<b>${escapeHtml(vm.customerName)}</b> · ${vm.destination ? escapeHtml(vm.destination) : vm.fulfillment === 'pickup' ? 'Retrait en boutique' : 'Destination non renseignée'}`;
+  if (vm.fulfillment === 'delivery' && vm.destination) {
+    return `<b>${escapeHtml(vm.customerName)}</b> · ${destinationLine(vm.destination)}`;
+  }
+  return `<b>${escapeHtml(vm.customerName)}</b> · ${vm.fulfillment === 'pickup' ? 'Retrait en boutique' : 'Destination non renseignée'}`;
 }
 
 export function pickingListSectionHtml(vm: InternalOrderDocumentViewModel, format: OrderDocumentFormat): string {
