@@ -216,8 +216,8 @@ function summaryParts(vm: InternalOrderDocumentViewModel): string[] {
 
 /** Emphasize the existing CP + city line, without introducing another line. */
 function destinationLine(value: string): string {
-  const match = /^(\\S+)\\s+(.+?)(?:,\\s*([^,]+))?$/.exec(value.trim());
-  if (!match || !/\\d/.test(match[1] ?? '')) return escapeHtml(value);
+  const match = /^(\S+)\s+(.+?)(?:,\s*([^,]+))?$/.exec(value.trim());
+  if (!match || !/\d/.test(match[1] ?? '')) return escapeHtml(value);
   const postal = match[1]!;
   const city = match[2]!;
   const country = match[3];
