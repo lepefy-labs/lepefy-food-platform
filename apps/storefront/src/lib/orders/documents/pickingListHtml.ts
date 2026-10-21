@@ -8,6 +8,12 @@ import type { InternalOrderDocumentViewModel, PickingItemVM } from './viewModels
  * Le `thead` du tableau se répète sur les pages suivantes : il porte la
  * référence de la commande et sert d'en-tête réduit de continuation.
  * Aucun texte informatif sous 10 pt ; cases dessinées de 6/7 mm.
+ *
+ * En-tête sur deux colonnes : à gauche l'identification (titre, réf., date,
+ * client, rue/complément) ; à droite, pour une livraison, l'encadré de
+ * destination (CP très grand, ville en gras, code pays en petit) lisible d'un
+ * coup d'œil pour trier les colis. La ville n'est jamais tronquée : sa taille
+ * baisse par paliers selon sa longueur, puis elle passe à la ligne.
  */
 
 const STORAGE_LABEL: Record<NonNullable<PickingItemVM['storage']>, string> = {
@@ -16,12 +22,24 @@ const STORAGE_LABEL: Record<NonNullable<PickingItemVM['storage']>, string> = {
 };
 
 const CSS = `
-.pl-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 4mm; border-bottom: 0.6mm solid #111; padding-bottom: 2.5mm; margin-bottom: 2.5mm; }
+.pl-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 4mm; border-bottom: 0.6mm solid #111; padding-bottom: 2.5mm; margin-bottom: 2.5mm; }
+.pl-id { min-width: 0; overflow-wrap: anywhere; }
 .pl-title { font-weight: 900; letter-spacing: 0.08em; margin: 0; }
-.pl-ref { font-family: 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace; font-weight: 700; letter-spacing: 0.02em; }
+.pl-ref { font-family: 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace; font-weight: 700; letter-spacing: 0.02em; line-height: 1.15; }
 .pl-badge { display: inline-block; border: 0.4mm solid #111; font-weight: 700; letter-spacing: 0.06em; padding: 0.6mm 2mm; }
 .pl-meta { line-height: 1.4; }
-.pl-right { text-align: right; }
+.pl-when { color: #333; }
+.pl-customer { font-weight: 700; line-height: 1.25; margin-top: 0.8mm; }
+.pl-address { line-height: 1.3; }
+.pl-dest { border: 0.6mm solid #111; padding: 1.4mm 2.2mm 1.6mm; min-width: 0; }
+.pl-dest-top { display: flex; justify-content: space-between; align-items: center; gap: 2mm; }
+.pl-dest .pl-badge { background: #111; color: #fff; border-color: #111; }
+.pl-dest-country { font-size: 9.5pt; font-weight: 700; letter-spacing: 0.08em; }
+.pl-dest-postal { font-weight: 700; line-height: 1; letter-spacing: 0.01em; white-space: nowrap; margin-top: 1mm; }
+.pl-dest-city { font-weight: 700; line-height: 1.12; margin-top: 0.8mm; overflow-wrap: break-word; word-break: normal; }
+.pl-dest-missing { font-size: 10pt; font-weight: 700; margin-top: 1.2mm; }
+.pl-pickup { text-align: right; }
+.pl-pickup .pl-meta { margin-top: 1mm; }
 .pl-section { font-weight: 800; letter-spacing: 0.1em; margin: 3.5mm 0 1.5mm; }
 table.pl-items { width: 100%; border-collapse: collapse; }
 .pl-items thead th { text-align: left; font-weight: 700; letter-spacing: 0.06em; border-bottom: 0.4mm solid #111; padding: 1mm 1mm 1mm 0; }
@@ -61,22 +79,6 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .pl-sign span { flex: 1; border-bottom: 0.3mm solid #111; padding-bottom: 6mm; }
 .pl-follow-sign span { padding-bottom: 5mm; }
 .pl-notes { height: 24mm; background: repeating-linear-gradient(transparent 0 7.7mm, #999 7.7mm 8mm); }
-.pl-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
-.pl-address { margin-top: 1mm; line-height: 1.35; }
-.pl-destination { display: block; white-space: nowrap; font-weight: 800; line-height: 1.05; letter-spacing: -0.015em; }
-.pl-destination-postal { font-size: 18pt; }
-.pl-destination-city { font-size: 15pt; }
-.pl-destination-country { font-size: 10pt; font-weight: 600; letter-spacing: 0; }
-.pl-destination--long .pl-destination-postal { font-size: 15pt; }
-.pl-destination--long .pl-destination-city { font-size: 12pt; }
-.pl-destination--very-long .pl-destination-postal { font-size: 12pt; }
-.pl-destination--very-long .pl-destination-city { font-size: 10pt; }
-.format-a4 .pl-destination-postal { font-size: 20pt; }
-.format-a4 .pl-destination-city { font-size: 17pt; }
-.format-a4 .pl-destination--long .pl-destination-postal { font-size: 17pt; }
-.format-a4 .pl-destination--long .pl-destination-city { font-size: 14pt; }
-.format-a4 .pl-destination--very-long .pl-destination-postal { font-size: 13pt; }
-.format-a4 .pl-destination--very-long .pl-destination-city { font-size: 11pt; }
 
 /* A5 : compact, une colonne d'information par ligne */
 .format-a5 { font-size: 10.5pt; }
@@ -90,6 +92,16 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .format-a5 .pl-name { font-size: 11pt; }
 .format-a5 .pl-alt, .format-a5 .pl-chip, .format-a5 .pl-meta, .format-a5 .pl-carton, .format-a5 .pl-sign { font-size: 10pt; }
 .format-a5 .pl-loc { font-size: 11pt; }
+.format-a5 .pl-customer { font-size: 11pt; }
+.format-a5 .pl-address { font-size: 10pt; }
+.format-a5 .pl-dest { width: 52mm; }
+.format-a5 .pl-dest-postal { font-size: 26pt; }
+.format-a5 .pl-dest-postal--long { font-size: 22pt; }
+.format-a5 .pl-dest-postal--very-long { font-size: 18pt; }
+.format-a5 .pl-dest-city { font-size: 17pt; }
+.format-a5 .pl-dest-city--long { font-size: 15pt; }
+.format-a5 .pl-dest-city--very-long { font-size: 14pt; }
+.format-a5 .pl-dest-city--extra-long { font-size: 12.5pt; }
 /* A5: recupero spazio verticale senza sacrificare il carattere di 10pt
    o le caselle degli articoli (6 mm). In caso di contenuto lungo,
    Chromium continua a impaginare su più fogli. */
@@ -125,6 +137,17 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .format-a4 .pl-name { font-size: 12pt; }
 .format-a4 .pl-alt, .format-a4 .pl-chip, .format-a4 .pl-meta, .format-a4 .pl-carton, .format-a4 .pl-sign { font-size: 10.5pt; }
 .format-a4 .pl-loc { font-size: 12pt; }
+.format-a4 .pl-customer { font-size: 12.5pt; }
+.format-a4 .pl-address { font-size: 11pt; }
+.format-a4 .pl-dest { width: 72mm; padding: 2mm 3mm 2.2mm; }
+.format-a4 .pl-dest-postal { font-size: 32pt; }
+.format-a4 .pl-dest-postal--long { font-size: 27pt; }
+.format-a4 .pl-dest-postal--very-long { font-size: 22pt; }
+.format-a4 .pl-dest-city { font-size: 20pt; }
+.format-a4 .pl-dest-city--long { font-size: 18pt; }
+.format-a4 .pl-dest-city--very-long { font-size: 16pt; }
+.format-a4 .pl-dest-city--extra-long { font-size: 14pt; }
+.format-a4 .pl-dest-country { font-size: 10pt; }
 `;
 
 function weightHint(item: PickingItemVM): string {
@@ -198,10 +221,48 @@ function followUpBlock(vm: InternalOrderDocumentViewModel): string {
   return `<div class="pl-follow avoid"><div class="pl-follow-title">SUIVI DE PRÉPARATION</div><div class="pl-follow-head"><span>ÉTAPE</span><span>DATE</span><span>HEURE</span></div>${rows}<div class="pl-sign pl-follow-sign"><span>Préparé par</span><span>Contrôlé par</span></div></div>`;
 }
 
+/** Palier de taille du CP : jamais coupé, plus petit seulement s'il est long (alphanumérique). */
+function postalSizeClass(postalCode: string): string {
+  const length = postalCode.length;
+  return length > 8 ? ' pl-dest-postal--very-long' : length > 6 ? ' pl-dest-postal--long' : '';
+}
+
+/**
+ * Palier de taille de la ville selon sa longueur (A5 17 → 12,5 pt) : réduite
+ * seulement si nécessaire, jamais tronquée. Une ville longue garde au moins
+ * 14 pt et passe à la ligne entre les mots plutôt que de devenir illisible.
+ */
+export function citySizeClass(city: string): string {
+  const length = city.length;
+  if (length > 26) return ' pl-dest-city--extra-long';
+  if (length > 17) return ' pl-dest-city--very-long';
+  if (length > 12) return ' pl-dest-city--long';
+  return '';
+}
+
+function destinationBox(vm: InternalOrderDocumentViewModel): string {
+  const parts = vm.destinationParts;
+  const country = parts?.country ? `<span class="pl-dest-country">${escapeHtml(parts.country)}</span>` : '';
+  const postal = parts?.postalCode
+    ? `<div class="pl-dest-postal${postalSizeClass(parts.postalCode)}">${escapeHtml(parts.postalCode)}</div>` : '';
+  const city = parts?.city
+    ? `<div class="pl-dest-city${citySizeClass(parts.city)}">${escapeHtml(parts.city)}</div>` : '';
+  const missing = !postal && !city ? '<div class="pl-dest-missing">Destination non renseignée</div>' : '';
+  return `<div class="pl-dest"><div class="pl-dest-top"><span class="pl-badge">${vm.fulfillmentLabel}</span>${country}</div>${postal}${city}${missing}</div>`;
+}
+
 function header(vm: InternalOrderDocumentViewModel): string {
+  const address = vm.deliveryAddress?.length
+    ? `<div class="pl-address">${vm.deliveryAddress.map(escapeHtml).join('<br>')}</div>` : '';
+  const identity = `<div class="pl-id"><p class="pl-title">LISTE DE PRÉPARATION</p><div class="pl-ref">#${escapeHtml(vm.ref)}</div>
+<div class="pl-meta pl-when">${escapeHtml([vm.createdAt, vm.tenantName].filter(Boolean).join(' · '))}</div>
+<div class="pl-customer">${escapeHtml(vm.customerName)}</div>${address}</div>`;
+  const side = vm.fulfillment === 'delivery'
+    ? destinationBox(vm)
+    : `<div class="pl-pickup"><span class="pl-badge">${vm.fulfillmentLabel}</span><div class="pl-meta">Retrait en boutique</div></div>`;
   return `<div class="pl-head">
-<div><p class="pl-title">LISTE DE PRÉPARATION</p><div class="pl-ref">#${escapeHtml(vm.ref)}</div></div>
-<div class="pl-right"><span class="pl-badge">${vm.fulfillmentLabel}</span><div class="pl-meta" style="margin-top:1.5mm">${escapeHtml(vm.createdAt)}<br>${escapeHtml(vm.tenantName)}</div></div>
+${identity}
+${side}
 </div>`;
 }
 
@@ -214,48 +275,11 @@ function summaryParts(vm: InternalOrderDocumentViewModel): string[] {
   ].filter((part): part is string => Boolean(part));
 }
 
-/** Emphasize the existing CP + city line, without introducing another line. */
-function destinationLine(value: string): string {
-  const match = /^(\S+)\s+(.+?)(?:,\s*([^,]+))?$/.exec(value.trim());
-  if (!match || !/\d/.test(match[1] ?? '')) return escapeHtml(value);
-  const postal = match[1]!;
-  const city = match[2]!;
-  const country = match[3];
-  const length = postal.length + city.length + (country?.length ?? 0);
-  const sizing = length > 33 ? ' pl-destination--very-long' : length > 23 ? ' pl-destination--long' : '';
-  return `<span class="pl-destination${sizing}"><span class="pl-destination-postal">${escapeHtml(postal)}</span> <span class="pl-destination-city">${escapeHtml(city)}</span>${country ? ` <span class="pl-destination-country">${escapeHtml(country)}</span>` : ''}</span>`;
-}
-
-function addressBlock(vm: InternalOrderDocumentViewModel): string {
-  if (!vm.deliveryAddress) return '';
-  const lines = vm.deliveryAddress.map((line, index) =>
-    index === vm.deliveryAddress!.length - 1 ? destinationLine(line) : escapeHtml(line));
-  return `<div class="pl-address">${lines.join('<br>')}</div>`;
-}
-
-function customerLine(vm: InternalOrderDocumentViewModel): string {
-  if (vm.fulfillment === 'delivery' && vm.destination) {
-    return `<b>${escapeHtml(vm.customerName)}</b> · ${destinationLine(vm.destination)}`;
-  }
-  return `<b>${escapeHtml(vm.customerName)}</b> · ${vm.fulfillment === 'pickup' ? 'Retrait en boutique' : 'Destination non renseignée'}`;
-}
-
 export function pickingListSectionHtml(vm: InternalOrderDocumentViewModel, format: OrderDocumentFormat): string {
-  if (format === 'a4') {
-    return `<section class="doc">
-${header(vm)}
-<div class="pl-grid2 pl-meta"><div><b>Client</b><br>${vm.deliveryAddress ? `<b>${escapeHtml(vm.customerName)}</b>${addressBlock(vm)}` : customerLine(vm)}</div><div><b>Résumé</b><br>${escapeHtml(summaryParts(vm).join(' · '))}</div></div>
-<div class="pl-section keep-next">ARTICLES</div>
-${itemsTableA4(vm)}
-${packagingAndCost(vm, format)}
-${followUpBlock(vm)}
-</section>`;
-  }
   return `<section class="doc">
 ${header(vm)}
-<div class="pl-meta">${vm.deliveryAddress ? `<b>${escapeHtml(vm.customerName)}</b>${addressBlock(vm)}` : customerLine(vm)}</div>
 <div class="pl-section keep-next">${escapeHtml(summaryParts(vm).join(' · ').toUpperCase())}</div>
-${itemsTableA5(vm)}
+${format === 'a4' ? itemsTableA4(vm) : itemsTableA5(vm)}
 ${packagingAndCost(vm, format)}
 ${followUpBlock(vm)}
 </section>`;

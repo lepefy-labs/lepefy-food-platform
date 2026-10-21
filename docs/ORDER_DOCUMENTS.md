@@ -1,4 +1,4 @@
-# Documenti delle commande e portale QR (migration 145, applicata in produzione)
+# Documenti delle commande e portale QR (migration 145, applicata in produzione; 162 da applicare)
 
 Documento di riferimento per la liste de préparation, il bon de colis, il portale cliente `/o/[token]` e le preferenze tenant. Il codice resta la source of truth. Lato Shipping Intelligence (carton suggestion, file map, invarianti): `docs/SHIPPING_INTELLIGENCE.md` §3.1–3.2.
 
@@ -9,12 +9,42 @@ Order
   → loadOrderDocumentData (lotto, tenant-scoped, colonne esplicite)
       ├── buildPickingListViewModel  → InternalOrderDocumentViewModel  → pickingListHtml (A5 | A4)
       └── buildPackingSlipViewModel  → CustomerOrderDocumentViewModel  → packingSlipHtml (A5 | A4)
+                                          (formato: order_items.format_snapshot → itemFormat.ts)
                                                                             → htmlToPdf (Gotenberg) → PDF
 ```
 
-- **Liste de préparation** (interna): confronto spedizione in due colonne accanto a `EMBALLAGE SUGGÉRÉ` (importo storico `orders.shipping_cost` pagato dal cliente, `Non renseigné` se assente, costo cliente e riga manoscritta per costo reale allineati ciascuno alla propria etichetta (due righe totali, senza riga aggiuntiva per il valore); solo consegna, anche se nessun cartone suggerito; A5 compatto, A4 con note conservate), peso unitario indicativo da `products.weight_grams` per le righe il cui nome non contiene già un peso (etichetta «Poids catalogue», non snapshot storico; omissione se dato assente/non valido; caricato in lotto per tenant anche per ritiro), ordinamento fisico di picking per conservazione (secchi/nessuna tipologia, poi freschi, infine surgelati; per ogni gruppo emplacements in ordine naturale), chaîne du froid, riepilogo unità/peso/colli, emballage suggéré (solo consegna), suivi di preparazione cartaceo (PRÉPARATION, EMBALLAGE, EXPÉDITION o REMISE AU CLIENT per ritiro, con caselle, data e ora) e firme (un'unica coppia). Di default solo nome + CAP/città; indirizzo completo (via, complemento, «CAP città, paese», «Destinataire : …» se diverso dal cliente) solo con `picking_list_show_delivery_address`.
-- **Bon de colis** (cliente, nel pacco; titolo stampato «RÉCAPITULATIF DE COMMANDE»): marca, «Merci <prénom> !», réf. courte e data, articoli, QR del portale, ringraziamento, contatti. Il view-model cliente è costruito campo per campo: non riceve mai la riga `orders` né item grezzi. Il loader non legge `notes`, `email`, telefono o pagamento.
+- **Liste de préparation** (interna): confronto spedizione in due colonne accanto a `EMBALLAGE SUGGÉRÉ` (importo storico `orders.shipping_cost` pagato dal cliente, `Non renseigné` se assente, costo cliente e riga manoscritta per costo reale allineati ciascuno alla propria etichetta (due righe totali, senza riga aggiuntiva per il valore); solo consegna, anche se nessun cartone suggerito; A5 compatto, A4 con note conservate), peso unitario indicativo da `products.weight_grams` per le righe il cui nome non contiene già un peso (etichetta «Poids catalogue», non snapshot storico; omissione se dato assente/non valido; caricato in lotto per tenant anche per ritiro), ordinamento fisico di picking per conservazione (secchi/nessuna tipologia, poi freschi, infine surgelati; per ogni gruppo emplacements in ordine naturale), chaîne du froid, riepilogo unità/peso/colli, emballage suggéré (solo consegna), suivi di preparazione cartaceo (PRÉPARATION, EMBALLAGE, EXPÉDITION o REMISE AU CLIENT per ritiro, con caselle, data e ora) e firme (un'unica coppia). Intestazione a due colonne (§1.1): nome cliente sempre, via/complemento/«Destinataire : …» (se diverso dal cliente) solo con `picking_list_show_delivery_address`; CP, città e paese sempre nell'encadré di destinazione per le consegne.
+- **Bon de colis** (cliente, nel pacco; titolo stampato «RÉCAPITULATIF DE COMMANDE»): marca, «Merci <prénom> !», réf. courte e data, articoli (con il formato acquistato quando è figé sulla riga, §1.2), QR del portale, ringraziamento, contatti. Il view-model cliente è costruito campo per campo: non riceve mai la riga `orders` né item grezzi. Il loader non legge `notes`, `email`, telefono o pagamento.
 - File: `apps/storefront/src/lib/orders/documents/*`.
+
+### 1.1 Intestazione della liste de préparation
+
+```text
+┌──────────────────────────────────────┬──────────────────────┐
+│ LISTE DE PRÉPARATION                 │ ┌──────────────────┐ │
+│ #CC4314FE                            │ │▌LIVRAISON▐    IT │ │
+│ 21/10/2026 10:14 · Chloe Food        │ │ 20051            │ │  CP 26 pt (A5) / 32 pt (A4)
+│ Jean-Baptiste Mbuyi                  │ │ CASSINA DE'      │ │  città 17→12,5 pt (A5), a capo, mai troncata
+│ Destinataire : … / via / complemento │ │ PECCHI           │ │
+└──────────────────────────────────────┴─┴──────────────────┴─┘
+```
+
+- Griglia `minmax(0, 1fr) auto` (Chromium di Gotenberg), encadré di larghezza fissa: 52 mm in A5, 72 mm in A4. A sinistra: titolo, réf., data · tenant, nome cliente e, solo con l'opzione indirizzo, destinatario se diverso, via e complemento. Nessuna informazione precedente persa; CP e città non sono mai ripetuti a sinistra.
+- Encadré (solo `delivery`): bordo nero, badge `LIVRAISON` in negativo, codice paese 9,5–10 pt a destra del badge, CP molto grande in una riga (`white-space: nowrap`; 6 caratteri → 26 pt A5, 7–8 caratteri alfanumerici → 22 pt, oltre → 18 pt), città in grassetto per paliers di lunghezza (A5: ≤ 12 car. 17 pt, ≤ 17 15 pt, ≤ 26 14 pt, oltre 12,5 pt; A4 20/18/16/14 pt) che va a capo tra le parole e non viene mai troncata.
+- Valori stampati come salvati (`destinationParts` del view-model): zeri iniziali (`00132`) e CP alfanumerici (`SW1A 2AA`) conservati, accenti e apostrofi escapati (`CASSINA DE&#39; PECCHI`). Un CP salvato come numero JSON resta leggibile ma i suoi zeri persi non vengono inventati.
+- Indirizzo incompleto: si stampa solo ciò che esiste; senza CP né città l'encadré mostra «Destination non renseignée».
+- `pickup`: nessun encadré né CP; a destra badge `RETRAIT` + «Retrait en boutique», a sinistra la stessa identificazione.
+- Altezza: l'intestazione sostituisce il blocco cliente che prima stava sotto la riga titolo (e in A4 la griglia «Client / Résumé»; il riepilogo è ora la riga di sezione comune). Verifica Chromium (oct. 2026, 1–22 articoli, con e senza indirizzo, A5/A4): mai una pagina in più rispetto alla versione precedente.
+
+### 1.2 Formato acquistato sul récapitulatif
+
+- **Flusso**: scheda prodotto (un prodotto = un formato: `sale_unit`, `net_content_value/unit`, `pack_count` della 154, `net_quantity_display` della 018) → carrello (quantità secondo minimo/incremento, non un altro formato) → checkout (`validateCheckoutItems` fissa nome e prezzo nella sessione) → `order_items` → documento. Prima della 162 `order_items` non conservava alcun formato. `products.weight_grams` è il peso logistico (imballo incluso) e non è mai usato come formato; la quantità ordinata e la regola minimo/incremento non sono formati.
+- **Fonte unica**: `order_items.format_snapshot` (migration 162), copia v1 dei campi di formato della scheda presa da un trigger BEFORE INSERT nella stessa transazione della riga, quindi per tutti i percorsi di creazione: webhook Stripe storefront, RPC `convert_checkout_session_to_order` (commandes assistées / manuali, «Déjà payé»), paiement en boutique. Nessun codice di checkout o pagamento modificato; prezzi, quantità e stock non letti né scritti.
+- **Garanzie**: snapshot solo se la scheda del **medesimo tenant** esiste, ha ancora lo stesso nome della riga (altrimenti il prodotto può essere cambiato tra panier e commande ⇒ nessun formato) e almeno un campo di formato; fail-open (la riga è sempre inserita); immutabile (trigger BEFORE UPDATE: modifica, cancellazione o aggiunta tardiva rifiutate); uno snapshot fornito esplicitamente da chi inserisce è conservato.
+- **Etichetta** (`itemFormat.ts`, `orderItemFormatLabel`): contenuto strutturato con l'unità più leggibile (`150 g`, `1 kg`, `500 ml`, `1 L`, `12 × 33 cl`), `Vendu au kilo` per le unità a peso, altrimenti la quantità netta testuale della scheda (≤ 40 caratteri, es. `Sachet de 5 pièces`). Nulla se il nome contiene già lo stesso contenuto (anche in un'altra unità: `Huile 1 L` per 1000 ml) o la stessa descrizione.
+- **Rendering**: A5 a seguito del nome, insécable, 10 pt (`Kaolin · 150 g`); A4 sotto il nome, 10,5 pt (`Format : 150 g`). Nessuna colonna aggiunta. In A5 una riga in più per articolo faceva passare su due pagine i récapitulatifs da 6 a 8 articoli (misura Chromium); in linea il numero di pagine resta quello di prima.
+- **Ordini precedenti alla 162** (e righe senza scheda o con scheda rinominata): nessun formato, documento identico a prima; nessun backfill dal catalogo attuale. La liste de préparation non legge lo snapshot (continua a mostrare «Poids catalogue» indicativo).
+- Senza la 162 applicata il loader rilegge `order_items` senza la colonna (`42703`/`PGRST204`) e il récapitulatif si stampa senza formati.
 
 ## 2. Formati
 
@@ -95,6 +125,14 @@ supabase db push
 
 In un ambiente senza la 145: preferenze = default (non salvabili, avviso in Paramètres), bon de colis generato senza QR (avviso nel dettaglio ordine), portale 404. Rollback: vedi l'intestazione della migration.
 
+### Migration 162 (formato acquistato sulle righe d'ordine)
+
+**Stato:** da applicare in produzione, con approvazione esplicita (trigger nella transazione di creazione delle righe d'ordine). Il codice può essere deployato prima.
+
+`supabase/migrations/162_order_item_format_snapshot.sql` — additiva, rieseguibile, senza backfill: colonna nullable `order_items.format_snapshot` (jsonb), funzione `order_items_capture_format_snapshot()` (security definer, `search_path` fissato, execute revocato) + trigger BEFORE INSERT, funzione `order_items_keep_format_snapshot()` + trigger BEFORE UPDATE OF `format_snapshot`. Rollback nell'intestazione. Test CI: `supabase/tests/162_order_item_format_snapshot.{fixture,test}.sql` (doppia applicazione, cattura strutturata/testuale/pack, nessuno snapshot senza formato, con nome cambiato o da altro tenant, prezzi invariati, prodotto modificato dopo l'acquisto, immutabilità, nessun backfill).
+
+Verifica dopo l'applicazione: una nuova commande di un prodotto con formato ha `format_snapshot` valorizzato; le righe esistenti restano `null`.
+
 ### Migration 146 (opzione indirizzo sulla liste de préparation)
 
 **Stato:** applicata in produzione il 05/10/2026 e verificata.
@@ -103,4 +141,6 @@ In un ambiente senza la 145: preferenze = default (non salvabili, avviso in Para
 
 ## 8. Test
 
-`apps/storefront/tests/unit/orderDocuments.spec.ts` (formati, settings per tenant, view-model, HTML/escape, lotto, Gotenberg simulato, permessi) e `orderPortal.spec.ts` (token, risoluzione/revoca, portale per stato, supporto, riordino).
+`apps/storefront/tests/unit/orderDocuments.spec.ts` (formati, settings per tenant, view-model, HTML/escape, lotto, Gotenberg simulato, permessi), `orderDocumentsHeaderFormat.spec.ts` (encadré CP/città, zeri iniziali e CP alfanumerici, città lunghe, escaping, ritiro senza encadré, indirizzo incompleto, A5/A4, stampa singola e in lotto; etichetta del formato g/kg, ml/L, pack, testuale, senza duplicazione, legacy, prodotto modificato dopo l'acquisto, righe manuali senza prodotto, prezzi invariati, isolamento tenant, assenza della 162) e `orderPortal.spec.ts` (token, risoluzione/revoca, portale per stato, supporto, riordino).
+
+Limiti: i test unitari controllano l'HTML, non l'impaginazione. L'impaginazione è stata verificata con Chromium locale (Playwright `page.pdf`, stessi formati e margini di Gotenberg) ma con Arial al posto di Liberation Sans (metricamente compatibile): il primo PDF reale da Gotenberg va comunque guardato.

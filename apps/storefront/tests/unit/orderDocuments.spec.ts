@@ -154,9 +154,9 @@ test('picking list: full delivery address only when the tenant enables it, never
   expect(hidden.deliveryAddress).toBeNull();
   expect(pickingListHtml([hidden], 'a5')).not.toContain('Oberkampf');
   const shown = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'T' }, carton: null, showDeliveryAddress: true });
-  expect(shown.deliveryAddress).toEqual(['12 rue Oberkampf', '75011 Paris, FR']);
+  expect(shown.deliveryAddress).toEqual(['12 rue Oberkampf']);
   const gift = buildPickingListViewModel({ order: order(ORDER_A, { shipping_address: { full_name: 'Moussa Traoré', line1: '3 rue Lepic', postal_code: '75018', city: 'Paris', country: 'FR' } }), items: ITEMS, tenant: { name: 'T' }, carton: null, showDeliveryAddress: true });
-  expect(gift.deliveryAddress).toEqual(['Destinataire : Moussa Traoré', '3 rue Lepic', '75018 Paris, FR']);
+  expect(gift.deliveryAddress).toEqual(['Destinataire : Moussa Traoré', '3 rue Lepic']);
   for (const format of ['a5', 'a4'] as const) expect(pickingListHtml([shown], format)).toContain('12 rue Oberkampf');
   const pickup = buildPickingListViewModel({ order: order(ORDER_A, { fulfillment_type: 'pickup' }), items: ITEMS, tenant: { name: 'T' }, carton: null, showDeliveryAddress: true });
   expect(pickup.deliveryAddress).toBeNull();

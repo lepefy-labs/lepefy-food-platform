@@ -15,6 +15,27 @@ export type OrderDocumentMode = 'picking' | 'packing';
 
 const ORDER_COLUMNS = 'id, created_at, status, fulfillment_type, full_name, shipping_address, shipping_details, shipping_cost, total';
 const ITEM_COLUMNS = 'order_id, product_id, name, name_alt, price, quantity, subtotal, storage_type, warehouse_location';
+/** Format figé à la commande (migration 162), lu seulement pour le récapitulatif client. */
+const FORMAT_SNAPSHOT_COLUMN = 'format_snapshot';
+
+/** Colonne absente (migration 162 pas encore appliquée) : PostgREST 42703 / PGRST204. */
+function isMissingFormatSnapshotColumn(error: unknown): boolean {
+  const { code, message } = (error ?? {}) as { code?: string; message?: string };
+  return code === '42703' || code === 'PGRST204' || Boolean(message?.includes(FORMAT_SNAPSHOT_COLUMN));
+}
+
+/**
+ * Lignes de commande du lot. Pour le récapitulatif client, essaie d'abord
+ * avec le snapshot de format ; sans la 162, relit sans (pas de format affiché,
+ * comportement historique) au lieu d'empêcher l'impression.
+ */
+async function loadItems(db: ServiceClient, tenantId: string, ids: string[], mode: OrderDocumentMode) {
+  if (mode === 'packing') {
+    const result = await db.from('order_items').select(`${ITEM_COLUMNS}, ${FORMAT_SNAPSHOT_COLUMN}`).eq('tenant_id', tenantId).in('order_id', ids);
+    if (!result.error || !isMissingFormatSnapshotColumn(result.error)) return result;
+  }
+  return db.from('order_items').select(ITEM_COLUMNS).eq('tenant_id', tenantId).in('order_id', ids);
+}
 
 export interface LoadedDocumentOrder {
   order: DocumentOrderRow;
@@ -46,7 +67,7 @@ export async function loadOrderDocumentData(
 
   const [ordersResult, itemsResult] = await Promise.all([
     db.from('orders').select(ORDER_COLUMNS).eq('tenant_id', tenantId).in('id', ids),
-    db.from('order_items').select(ITEM_COLUMNS).eq('tenant_id', tenantId).in('order_id', ids),
+    loadItems(db, tenantId, ids, mode),
   ]);
   if (ordersResult.error) throw new OrderDocumentDataError('orders_unavailable');
   if (itemsResult.error) throw new OrderDocumentDataError('items_unavailable');

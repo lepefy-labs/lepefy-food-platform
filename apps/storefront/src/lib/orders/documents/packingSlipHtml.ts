@@ -7,6 +7,12 @@ import type { CustomerOrderDocumentViewModel } from './viewModels';
  * de la liste de préparation : il ne reçoit que le view-model client assaini.
  * Couleur de marque avec parcimonie (bandeau + titre lisible), mise en page
  * neutre sans logo ni couleur.
+ *
+ * Format acheté, seulement s'il est figé sur la commande
+ * (`order_items.format_snapshot`), sans colonne supplémentaire : en A4 sous le
+ * nom (« Format : 500 g ») ; en A5 à la suite du nom (« Kaolin · 500 g »,
+ * insécable, passe à la ligne d'un bloc). Une ligne sous chaque nom en A5
+ * renvoyait sur une deuxième page les commandes de 6 à 8 articles.
  */
 
 const CSS = `
@@ -24,6 +30,8 @@ table.ps-items { width: 100%; border-collapse: collapse; }
 .ps-items tr { break-inside: avoid; page-break-inside: avoid; }
 .ps-qty { font-weight: 700; white-space: nowrap; width: 12mm; }
 .ps-alt { display: block; color: #444; }
+.ps-format { display: block; color: #222; margin-top: 0.3mm; }
+.ps-format-inline { color: #222; white-space: nowrap; }
 .ps-price { text-align: right; white-space: nowrap; }
 .ps-totals { margin-top: 2mm; margin-left: auto; width: 60%; border-collapse: collapse; }
 .ps-totals td { padding: 0.8mm 0; }
@@ -45,7 +53,7 @@ table.ps-items { width: 100%; border-collapse: collapse; }
 .format-a5 .ps-merci { font-size: 19pt; }
 .format-a5 .ps-qr-code { width: 32mm; height: 32mm; }
 .format-a5 .ps-qr-text b { font-size: 11pt; }
-.format-a5 .ps-url, .format-a5 .ps-contact, .format-a5 .ps-alt { font-size: 10pt; }
+.format-a5 .ps-url, .format-a5 .ps-contact, .format-a5 .ps-alt, .format-a5 .ps-format-inline { font-size: 10pt; }
 
 .format-a4 { font-size: 11.5pt; }
 .format-a4 .ps-brand { font-size: 16pt; }
@@ -54,7 +62,7 @@ table.ps-items { width: 100%; border-collapse: collapse; }
 .format-a4 .ps-items td { padding-top: 2.4mm; padding-bottom: 2.4mm; }
 .format-a4 .ps-qr-code { width: 38mm; height: 38mm; }
 .format-a4 .ps-qr-text b { font-size: 12.5pt; }
-.format-a4 .ps-url, .format-a4 .ps-contact, .format-a4 .ps-alt { font-size: 10.5pt; }
+.format-a4 .ps-url, .format-a4 .ps-contact, .format-a4 .ps-alt, .format-a4 .ps-format { font-size: 10.5pt; }
 .format-a4 .ps-logo { max-height: 18mm; max-width: 60mm; }
 `;
 
@@ -65,10 +73,17 @@ function brand(vm: CustomerOrderDocumentViewModel): string {
     : `<span class="ps-brand">${name}</span>`;
 }
 
-function itemsTable(vm: CustomerOrderDocumentViewModel): string {
+function itemFormat(format: string | null, layout: OrderDocumentFormat): string {
+  if (!format) return '';
+  return layout === 'a4'
+    ? `<span class="ps-format">Format : ${escapeHtml(format)}</span>`
+    : ` <span class="ps-format-inline">· ${escapeHtml(format)}</span>`;
+}
+
+function itemsTable(vm: CustomerOrderDocumentViewModel, format: OrderDocumentFormat): string {
   const rows = vm.items.map((item) => `<tr>
 <td class="ps-qty">${item.quantity} ×</td>
-<td>${escapeHtml(item.name)}${item.nameAlt ? `<span class="ps-alt">${escapeHtml(item.nameAlt)}</span>` : ''}</td>
+<td>${escapeHtml(item.name)}${itemFormat(item.format, format)}${item.nameAlt ? `<span class="ps-alt">${escapeHtml(item.nameAlt)}</span>` : ''}</td>
 ${vm.prices ? `<td class="ps-price">${escapeHtml(item.lineTotal ?? '')}</td>` : ''}
 </tr>`).join('');
   return `<table class="ps-items"><tbody>${rows}</tbody></table>`;
@@ -112,14 +127,14 @@ function contactBlock(vm: CustomerOrderDocumentViewModel): string {
   return parts.length ? `<div class="ps-contact avoid">${parts.map((part) => `<span>${escapeHtml(part)}</span>`).join('')}</div>` : '';
 }
 
-export function packingSlipSectionHtml(vm: CustomerOrderDocumentViewModel): string {
+export function packingSlipSectionHtml(vm: CustomerOrderDocumentViewModel, format: OrderDocumentFormat): string {
   return `<section class="doc ps">
 <div class="ps-band" style="background:${escapeAttr(vm.tenant.bandColor)}"></div>
 <div class="ps-head">${brand(vm)}<span class="ps-kicker">RÉCAPITULATIF DE COMMANDE</span></div>
 <div class="ps-merci">${escapeHtml(vm.greeting)}</div>
 <div class="ps-meta">Commande <b>#${escapeHtml(vm.ref)}</b> du ${escapeHtml(vm.date)}</div>
 <div class="ps-section keep-next">VOTRE COLIS CONTIENT</div>
-${itemsTable(vm)}
+${itemsTable(vm, format)}
 ${totals(vm)}
 ${vm.deliveryAddress ? `<div class="avoid"><div class="ps-section keep-next">LIVRAISON</div><div class="ps-address">${vm.deliveryAddress.map(escapeHtml).join('<br>')}</div></div>` : ''}
 ${qrBlock(vm)}
@@ -130,5 +145,5 @@ ${contactBlock(vm)}
 
 export function packingSlipHtml(vms: CustomerOrderDocumentViewModel[], format: OrderDocumentFormat): string {
   const title = vms.length === 1 ? `Récapitulatif de commande #${vms[0]!.ref}` : `Bons de colis (${vms.length})`;
-  return documentShell({ format, title, css: CSS, body: vms.map(packingSlipSectionHtml).join('\n') });
+  return documentShell({ format, title, css: CSS, body: vms.map((vm) => packingSlipSectionHtml(vm, format)).join('\n') });
 }

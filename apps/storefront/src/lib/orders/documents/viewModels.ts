@@ -4,6 +4,7 @@ import { formatDocumentDate, formatKg, orderShortRef, readableBrandColor, safeCo
 import { androidAppStatus } from '@/lib/mobileApp/androidApp';
 import { formatWhatsappDisplay } from '@/lib/orders/portal/supportChannels';
 import type { OrderDocumentsConfig } from './settings';
+import { orderItemFormatLabel } from './itemFormat';
 
 /**
  * View-models des documents de commande, construits champ par champ.
@@ -38,6 +39,8 @@ export interface DocumentItemRow {
   subtotal: number | null;
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
   warehouse_location: string | null;
+  /** Format figé à la commande (migration 162) ; absent/null pour les commandes antérieures. */
+  format_snapshot?: unknown;
 }
 
 export interface DocumentTenant {
@@ -81,7 +84,17 @@ export interface InternalOrderDocumentViewModel {
   tenantName: string;
   customerName: string;
   destination: string | null;
-  /** Adresse complète (livraison uniquement), seulement si le tenant l'a activée. */
+  /**
+   * Destination de l'en-tête (livraison uniquement) : CP et ville en grand dans
+   * l'encadré de droite, code pays en petit. Valeurs telles que saisies (zéros
+   * initiaux et CP alphanumériques conservés), null si absentes.
+   */
+  destinationParts: { postalCode: string | null; city: string | null; country: string | null } | null;
+  /**
+   * Rue, complément et destinataire s'il diffère (livraison uniquement),
+   * seulement si le tenant l'a activé. CP et ville n'y figurent pas : ils sont
+   * dans l'encadré de destination.
+   */
   deliveryAddress: string[] | null;
   items: PickingItemVM[];
   totalUnits: number;
@@ -124,7 +137,8 @@ function addressLines(order: DocumentOrderRow): string[] | null {
 
 /**
  * Liste interne : le nom du client est déjà imprimé au-dessus, on ne répète le
- * destinataire que s'il diffère (cadeau). CP, ville et pays sur une ligne (A5).
+ * destinataire que s'il diffère (cadeau). CP, ville et pays sont dans
+ * l'encadré de destination, jamais répétés ici.
  */
 function pickingAddressLines(order: DocumentOrderRow): string[] | null {
   const a = address(order);
@@ -133,9 +147,15 @@ function pickingAddressLines(order: DocumentOrderRow): string[] | null {
   const lines = [
     recipient && recipient.toLowerCase() !== customer?.toLowerCase() ? `Destinataire : ${recipient}` : '',
     a.line1 ?? '', a.line2 ?? '',
-    [[a.postal_code, a.city].filter(Boolean).join(' '), a.country].filter(Boolean).join(', '),
-  ].map((line) => String(line).trim()).filter(Boolean);
+  ].map((line) => String(line ?? '').trim()).filter(Boolean);
   return lines.length > 0 ? lines : null;
+}
+
+/** Valeur d'adresse en texte (un CP numérique en JSON reste lisible), vide → null. */
+function addressText(value: unknown): string | null {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const text = String(value).replace(/\s+/g, ' ').trim();
+  return text || null;
 }
 
 function dims(carton: { box_length_cm: number; box_width_cm: number; box_height_cm: number } | null): string | null {
@@ -167,6 +187,7 @@ export function buildPickingListViewModel(input: {
     })(),
   }));
   const a = address(order);
+  const parts = { postalCode: addressText(a.postal_code), city: addressText(a.city), country: addressText(a.country) };
   const destination = isPickup ? null : [[a.postal_code, a.city].filter(Boolean).join(' '), a.country].filter(Boolean).join(', ') || null;
   const suggestion = !isPickup ? carton?.suggestion ?? null : null;
   const checkoutWeight = Number((order.shipping_details as { totalWeightG?: unknown } | null)?.totalWeightG);
@@ -200,6 +221,7 @@ export function buildPickingListViewModel(input: {
     tenantName: tenant.name,
     customerName: order.full_name?.trim() || 'Client',
     destination,
+    destinationParts: isPickup ? null : parts,
     deliveryAddress: input.showDeliveryAddress && !isPickup ? pickingAddressLines(order) : null,
     items,
     totalUnits: items.reduce((sum, item) => sum + item.quantity, 0),
@@ -218,6 +240,8 @@ export function buildPickingListViewModel(input: {
 export interface PackingSlipItemVM {
   name: string;
   nameAlt: string | null;
+  /** Format acheté (« 500 g »), seulement depuis le snapshot de la commande ; null sinon. */
+  format: string | null;
   quantity: number;
   unitPrice: string | null;
   lineTotal: string | null;
@@ -275,6 +299,7 @@ export function buildPackingSlipViewModel(input: {
   const items = input.items.map<PackingSlipItemVM>((item) => ({
     name: item.name,
     nameAlt: item.name_alt,
+    format: orderItemFormatLabel(item.format_snapshot, item.name),
     quantity: item.quantity,
     // Prix historiques de la commande (order_items), jamais le catalogue actuel.
     unitPrice: showPrices && item.price != null ? formatPrice(Number(item.price), currency) : null,
