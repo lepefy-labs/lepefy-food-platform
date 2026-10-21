@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { ADMIN_NAV } from '../../src/lib/admin/navigation';
 import { join, relative } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
@@ -59,7 +60,8 @@ test('platform navigation exposes the technical shipping tools', () => {
 });
 
 test('tenant Livraison tabs no longer link to the moved tools and old URLs redirect', () => {
-  const tabs = readFileSync(join(SRC, 'app/admin/(protected)/livraison/LivraisonTabs.tsx'), 'utf8');
+  // The Livraison sub-pages live in the navigation registry (sidebar + tab strip).
+  const tabs = JSON.stringify(ADMIN_NAV.find((item) => item.id === 'shipping')?.children ?? []);
   expect(tabs).not.toContain('laboratoire');
   expect(tabs).not.toContain('diagnostic-packlink');
   expect(tabs).not.toContain('analyse-tarifaire');

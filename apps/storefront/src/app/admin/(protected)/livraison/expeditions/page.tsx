@@ -5,7 +5,6 @@ import { getShippingProvider } from '@/lib/shipping/providers/registry';
 import { readShippingAutomationSettings } from '@/lib/shipping/shipmentDraft/settings';
 import AdminBlockAccent from '../../../_components/ui/AdminBlockAccent';
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
-import { LivraisonTabs } from '../LivraisonTabs';
 import { ShipmentCreationSection } from './ShipmentCreationSection';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +27,6 @@ export default async function AdminShipmentCreationPage() {
         title="Livraison"
         description="Création des brouillons d’expédition chez le transporteur à partir des commandes."
       />
-      <LivraisonTabs active="expeditions" />
       <AdminBlockAccent tone="info">
         <ShipmentCreationSection initial={settings} provider={provider} canManage={canManage} />
       </AdminBlockAccent>

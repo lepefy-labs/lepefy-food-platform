@@ -77,11 +77,15 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     : access.permissions;
 
   const adminClient = createServiceClient();
-  const [pendingPaymentsResult, pendingEventRequestsResult, pendingRentalRequestsResult, newInquiriesResult] = await Promise.all([
+  const [pendingPaymentsResult, pendingEventRequestsResult, pendingRentalRequestsResult, newInquiriesResult, preordersToVerifyResult] = await Promise.all([
     adminClient.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('payment_method', 'external_link').in('status', ['open', 'expired', 'awaiting_verification']).is('order_id', null),
     adminClient.from('event_reservation_requests').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'pending'),
     adminClient.from('rental_reservation_requests').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'pending'),
     adminClient.from('service_inquiries').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'nouveau'),
+    // Précommandes (assisted) with a payment to verify: badge of the Commandes sub-page.
+    workspace === 'shop' && canAdmin(access, 'orders.view')
+      ? adminClient.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('origin', 'assisted').eq('status', 'awaiting_verification')
+      : Promise.resolve({ count: 0 }),
   ]);
   // Gestion: il flag viene letto solo se l'admin potrebbe vedere la sezione.
   const gestionEnabled = workspace === 'shop' && GESTION_VIEW_PERMISSIONS.some((permission) => canAdmin(access, permission))
@@ -111,6 +115,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
       pendingEventRequests: pendingEventRequestsResult.count ?? 0,
       newInquiries: newInquiriesResult.count ?? 0,
       pendingRentalRequests: pendingRentalRequestsResult.count ?? 0,
+      preordersToVerify: preordersToVerifyResult.count ?? 0,
     },
   };
   const canShop = canSee(navContext, ['orders.view', 'catalog.view', 'customers.view', 'shipping.view', 'loyalty.scan']);

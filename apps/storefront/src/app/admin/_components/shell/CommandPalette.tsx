@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   IconArrowRight, IconBuildingWarehouse, IconCalendarEvent, IconPackage, IconSearch, IconShoppingBag, IconTruckLoading, IconUsers, type Icon,
 } from '@tabler/icons-react';
-import { ADMIN_QUICK_ACTIONS, navItemsById } from '@/lib/admin/navigation';
+import { ADMIN_QUICK_ACTIONS, navItemsById, visibleNavChildren } from '@/lib/admin/navigation';
 import { cn } from '@/lib/utils/cn';
 import Dialog from '../ui/Dialog';
 import { PLATFORM_NAV } from '../platformNavConfig';
@@ -33,7 +33,7 @@ function localEntries(nav: AdminShellNav): PaletteEntry[] {
   const pages: PaletteEntry[] = navItemsById(nav.items).flatMap((item) => [
     { id: `page-${item.id}`, group: 'Pages', label: item.label, sublabel: item.group, href: item.href, icon: item.icon, terms: [item.group, ...(item.keywords ?? [])].join(' ') },
     // Module sub-pages (the one sharing the entry's href is the entry itself).
-    ...(item.children ?? []).filter((child) => child.href !== item.href).map((child) => ({
+    ...visibleNavChildren(item, nav.children).filter((child) => child.href !== item.href).map((child) => ({
       id: `page-${item.id}-${child.href}`, group: 'Pages', label: child.label, sublabel: item.label, href: child.href, icon: item.icon,
       terms: [item.label, ...(child.keywords ?? [])].join(' '),
     })),

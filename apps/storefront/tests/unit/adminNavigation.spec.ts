@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
-  ADMIN_NAV, ADMIN_QUICK_ACTIONS, activeNavChild, isNavItemActive, mobileNavItems, navItemsById, resolveAdminNavigation, type AdminNavContext, ADMIN_NAV_PRIMARY_GROUPS, ADMIN_NAV_GROUPS, isPrimaryNavGroup } from '../../src/lib/admin/navigation';
+  ADMIN_NAV, ADMIN_QUICK_ACTIONS, activeNavChild, visibleNavChildren, isNavItemActive, mobileNavItems, navItemsById, resolveAdminNavigation, type AdminNavContext, ADMIN_NAV_PRIMARY_GROUPS, ADMIN_NAV_GROUPS, isPrimaryNavGroup } from '../../src/lib/admin/navigation';
 import { defaultAdminDestination, permissionsForAdminPath } from '../../src/lib/auth/adminRoutePermissions';
 
 const NO_FLAGS = { gestion: false, whatsapp: false, activity: false };
@@ -146,7 +146,7 @@ test('module sub-pages: same permissions as their entry, inside it, longest matc
       const workspaces = item.workspace === 'all' ? (['shop', 'events'] as const) : [item.workspace];
       for (const workspace of workspaces) {
         const routePermissions = permissionsForAdminPath(child.href, workspace);
-        for (const permission of item.anyOf) expect(routePermissions, `${child.href} requires ${routePermissions}`).toContain(permission);
+        for (const permission of child.anyOf ?? item.anyOf) expect(routePermissions, `${child.href} requires ${routePermissions}`).toContain(permission);
       }
     }
   }
@@ -156,4 +156,14 @@ test('module sub-pages: same permissions as their entry, inside it, longest matc
   expect(activeNavChild('/admin/catalogue/campagnes/x', children)?.href).toBe('/admin/catalogue/campagnes');
   expect(activeNavChild('/admin/catalogue/categories', children)?.href).toBe('/admin/catalogue/categories');
   expect(activeNavChild('/admin/orders', children)).toBeNull();
+});
+
+test('sub-pages are resolved per capability: a sub-page with its own capability stays hidden without it', () => {
+  const customers = ADMIN_NAV.find((item) => item.id === 'customers')!;
+  const viewer = resolveAdminNavigation(ctx({ permissions: ['customers.view'] }));
+  expect(visibleNavChildren(customers, viewer.children).map((child) => child.href)).toEqual(['/admin/clients', '/admin/clients/segments']);
+  const marketer = resolveAdminNavigation(ctx({ permissions: ['customers.view', 'campaigns.view'] }));
+  expect(visibleNavChildren(customers, marketer.children).map((child) => child.href)).toContain('/admin/clients/campagnes');
+  // Entries outside the workspace resolve no children.
+  expect(resolveAdminNavigation(ctx({ workspace: 'events', permissions: ['*'] })).children.customers).toBeUndefined();
 });

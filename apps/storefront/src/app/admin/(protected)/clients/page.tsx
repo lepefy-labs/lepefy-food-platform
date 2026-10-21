@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { IconAlertTriangle, IconSpeakerphone, IconUserCheck, IconUserPlus, IconUsers, IconUsersGroup } from '@tabler/icons-react';
+import { IconAlertTriangle, IconUserCheck, IconUserPlus, IconUsers } from '@tabler/icons-react';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getCrmKpis, getCustomers, RFM_LABELS, SYSTEM_SEGMENTS } from '@/lib/admin/crm';
 import { CUSTOMER_SORT_OPTIONS, CUSTOMER_SOURCE_OPTIONS, parseCustomerSort } from '@/lib/admin/crmLabels';
@@ -11,7 +11,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import AdminStatCard from '../../_components/ui/AdminStatCard';
 import Badge from '../../_components/ui/Badge';
-import { ButtonLink, buttonClasses } from '../../_components/ui/Button';
+import { buttonClasses } from '../../_components/ui/Button';
 import { Card } from '../../_components/ui/Panel';
 import { EmptyState } from '../../_components/ui/States';
 import DataTable, { type DataColumn } from '../../_components/data/DataTable';
@@ -117,8 +117,6 @@ export default async function ClientsPage({ searchParams = {} }: { searchParams?
         meta={pluralize(kpis.total, 'client')}
         description="Comprendre et fidéliser votre clientèle."
         actions={<>
-          <ButtonLink href="/admin/clients/segments"><IconUsersGroup size={17} aria-hidden="true" />Segments</ButtonLink>
-          <ButtonLink href="/admin/clients/campagnes"><IconSpeakerphone size={17} aria-hidden="true" />Campagnes</ButtonLink>
           <Suspense fallback={null}><ClientsToolbar canManage={canManage} /></Suspense>
         </>}
       />

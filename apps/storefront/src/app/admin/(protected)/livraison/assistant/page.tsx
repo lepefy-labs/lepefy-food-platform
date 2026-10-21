@@ -1,5 +1,4 @@
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
-import { LivraisonTabs } from '../LivraisonTabs';
 import { AssistantClient } from './AssistantClient';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +12,6 @@ export default function AdminShippingAssistantPage() {
         description="Estimation basée sur l'historique — jamais un devis garanti. Demandez toujours un devis Packlink à jour avant une expédition réelle."
       />
 
-      <LivraisonTabs active="assistant" />
 
       <AssistantClient />
     </div>

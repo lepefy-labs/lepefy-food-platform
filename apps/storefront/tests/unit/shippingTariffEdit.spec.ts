@@ -1,4 +1,5 @@
 import { readFileSync } from 'fs';
+import { ADMIN_NAV } from '../../src/lib/admin/navigation';
 import { join } from 'path';
 import { expect, test } from '@playwright/test';
 import type { ShippingTariffVersionRow } from '@lepefy/types';
@@ -248,7 +249,8 @@ test.describe('séparation tenant / platform owner', () => {
     }
     expect(readFileSync(join(admin, 'livraison/forfait-shadow/page.tsx'), 'utf8')).toContain("redirect('/admin/livraison/forfait')");
     expect(readFileSync(join(admin, 'livraison/analyse-tarifaire/page.tsx'), 'utf8')).toContain("redirect('/admin/platform/livraison/analyse-tarifaire')");
-    const tabs = readFileSync(join(admin, 'livraison/LivraisonTabs.tsx'), 'utf8');
+    // The Livraison sub-pages live in the navigation registry (sidebar + tab strip).
+    const tabs = JSON.stringify(ADMIN_NAV.find((item) => item.id === 'shipping')?.children ?? []).replace(/"/g, "'");
     expect(tabs).not.toContain('analyse-tarifaire');
     expect(tabs).not.toContain('forfait-shadow');
     expect(tabs).toContain("'/admin/livraison/forfait'");

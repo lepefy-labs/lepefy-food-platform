@@ -2,7 +2,6 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import AdminBlockAccent from '../../../_components/ui/AdminBlockAccent';
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
-import { LivraisonTabs } from '../LivraisonTabs';
 import { PackagingProfilesSection } from './PackagingProfilesSection';
 import type { ShippingPackagingProfileRow } from '@lepefy/types';
 
@@ -28,7 +27,6 @@ export default async function AdminPackagingProfilesPage() {
         meta={`${(profiles ?? []).length} profil${(profiles ?? []).length !== 1 ? 's' : ''}`}
       />
 
-      <LivraisonTabs active="packaging" />
 
       <AdminBlockAccent tone="info">
         <PackagingProfilesSection initialProfiles={profiles ?? []} />

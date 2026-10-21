@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { IconChevronDown } from '@tabler/icons-react';
-import { ADMIN_NAV_GROUPS, activeNavChild, isHrefActive, isNavItemActive, isPrimaryNavGroup, navItemsById, type AdminNavGroup, type AdminNavItem } from '@/lib/admin/navigation';
+import { ADMIN_NAV_GROUPS, activeNavChild, isHrefActive, visibleNavChildren, isNavItemActive, isPrimaryNavGroup, navItemsById, type AdminNavGroup, type AdminNavItem } from '@/lib/admin/navigation';
 import { cn } from '@/lib/utils/cn';
 import { CountBadge } from '../ui/Badge';
 import { PLATFORM_NAV, isGroupActive } from '../platformNavConfig';
@@ -21,11 +21,12 @@ const itemClass = (active: boolean) => cn(
     : 'text-a-text-2 hover:bg-a-hover hover:text-a-text',
 );
 
-function NavLink({ item, pathname, badge }: { item: AdminNavItem; pathname: string; badge: number }) {
+function NavLink({ item, pathname, nav }: { item: AdminNavItem; pathname: string; nav: AdminShellNav }) {
+  const badge = item.badge ? nav.badges[item.badge.key] : 0;
   const active = isNavItemActive(pathname, item);
   const Icon = item.icon;
   const link = (
-    <Link href={item.href} aria-current={active && !item.children ? 'page' : undefined} title={item.label} className={itemClass(active)}>
+    <Link href={item.href} aria-current={active && visibleNavChildren(item, nav.children).length < 2 ? 'page' : undefined} title={item.label} className={itemClass(active)}>
       <Icon size={18} stroke={1.8} aria-hidden="true" className="shrink-0" />
       <span className="admin-nav-label min-w-0 flex-1 truncate">{item.label}</span>
       {item.badge && badge > 0 && (
@@ -33,16 +34,23 @@ function NavLink({ item, pathname, badge }: { item: AdminNavItem; pathname: stri
       )}
     </Link>
   );
-  if (!item.children || !active) return link;
+  const children = visibleNavChildren(item, nav.children);
+  if (children.length < 2 || !active) return link;
   // Sub-pages of the active module; hidden in the collapsed rail (admin-nav-children).
-  const current = activeNavChild(pathname, item.children);
+  const current = activeNavChild(pathname, children);
   return (
     <div>
       {link}
       <div className="admin-nav-children mb-1 ml-5 mt-0.5 space-y-0.5 border-l border-a-border pl-2">
-        {item.children.map((child) => {
+        {children.map((child) => {
           const childActive = child === current;
-          return <Link key={child.href} href={child.href} aria-current={childActive ? 'page' : undefined} className={itemClass(childActive)}>{child.label}</Link>;
+          const childBadge = child.badge ? nav.badges[child.badge.key] : 0;
+          return (
+            <Link key={child.href} href={child.href} aria-current={childActive ? 'page' : undefined} className={itemClass(childActive)}>
+              <span className="min-w-0 flex-1">{child.label}</span>
+              {child.badge && childBadge > 0 && <CountBadge tone={child.badge.tone} count={childBadge} label={`${childBadge} ${child.badge.label}`} />}
+            </Link>
+          );
         })}
       </div>
     </div>
@@ -145,7 +153,7 @@ function FoldingGroup({ group, groupId, items, pathname, nav, opened, onToggle }
       </button>
       <span aria-hidden="true" className="admin-nav-separator mx-2 my-2 hidden border-t border-a-border" />
       <div id={panelId} className={cn('admin-nav-folded space-y-0.5', !open && 'hidden')}>
-        {items.map((item) => <NavLink key={item.id} item={item} pathname={pathname} badge={item.badge ? nav.badges[item.badge.key] : 0} />)}
+        {items.map((item) => <NavLink key={item.id} item={item} pathname={pathname} nav={nav} />)}
       </div>
     </div>
   );
@@ -178,7 +186,7 @@ export default function AdminNav({ nav }: { nav: AdminShellNav }) {
             {/* « Essentiel » is the shop's daily work: named for assistive tech only. */}
             <p id={groupId} className={cn('admin-nav-group px-2.5 pb-1 pt-4 text-xs font-semibold text-a-text-3', group === 'Essentiel' && 'sr-only')}>{group}</p>
             <span aria-hidden="true" className="admin-nav-separator mx-2 my-2 hidden border-t border-a-border" />
-            {groupItems.map((item) => <NavLink key={item.id} item={item} pathname={pathname} badge={item.badge ? nav.badges[item.badge.key] : 0} />)}
+            {groupItems.map((item) => <NavLink key={item.id} item={item} pathname={pathname} nav={nav} />)}
           </div>
         );
       })}

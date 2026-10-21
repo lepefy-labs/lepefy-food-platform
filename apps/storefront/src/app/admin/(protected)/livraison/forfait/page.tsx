@@ -6,7 +6,6 @@ import { describeCountryRule } from '@/lib/shipping/tariff/activationChecklist';
 import { loadForfaitShadowAdminData } from '@/lib/shipping/tariff/adminData';
 import { buildCountryTariffViews, buildTariffHistory, countryFlag, countryLabel } from '@/lib/shipping/tariff/tariffEdit';
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
-import { LivraisonTabs } from '../LivraisonTabs';
 import { ForfaitClient, type ForfaitCountryCard, type ForfaitHistoryItem } from './ForfaitClient';
 
 export const dynamic = 'force-dynamic';
@@ -51,7 +50,6 @@ export default async function AdminForfaitPage() {
         description="Frais de livraison facturés aux clients, par pays."
       />
 
-      <LivraisonTabs active="forfait" />
 
       <ForfaitClient
         countries={countries}

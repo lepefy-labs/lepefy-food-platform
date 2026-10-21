@@ -2,7 +2,6 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
-import { LivraisonTabs } from './LivraisonTabs';
 import { ShippingCountryRulesSection } from './ShippingCountryRulesSection';
 import { ZonesSection } from './ZonesSection';
 import type { ShippingCountryRuleRow, ShippingZoneRow } from '@lepefy/types';
@@ -53,7 +52,6 @@ export default async function AdminLivraisonPage() {
         meta={`${(rules ?? []).length} règle${(rules ?? []).length !== 1 ? 's' : ''}`}
       />
 
-      <LivraisonTabs active="rules" />
 
       <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-a-border bg-a-surface px-4 py-3 text-sm">
         <span className="rounded-full bg-a-brand-soft px-2.5 py-1 text-xs font-semibold text-a-brand-fg">

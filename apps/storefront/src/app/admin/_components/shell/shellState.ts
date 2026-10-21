@@ -9,6 +9,8 @@ export interface AdminShellNav {
   items: string[];
   actions: string[];
   platform: boolean;
+  /** Visible sub-page hrefs per entry id (ResolvedAdminNavigation.children). */
+  children: Record<string, string[]>;
   badges: Record<AdminNavBadgeKey, number>;
   searchScopes: AdminSearchScope[];
 }
@@ -42,6 +44,8 @@ export const SHELL_CSS = `
   html[data-admin-sidebar="collapsed"] .admin-sidebar .admin-nav-rail-only { display: flex; }
   html[data-admin-sidebar="collapsed"] .admin-sidebar .admin-nav-full-only { display: none; }
   html[data-admin-sidebar="collapsed"] .admin-sidebar .admin-nav-folded { display: block; }
+  /* Folded rail: module sub-pages move to the tab strip above the page (ModuleSubNav). */
+  html[data-admin-sidebar="collapsed"] .admin-subnav { display: block; }
 }
 /*
  * Side filter column of a list page. It needs the room of the page itself, not of

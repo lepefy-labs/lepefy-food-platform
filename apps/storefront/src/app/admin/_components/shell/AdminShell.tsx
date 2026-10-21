@@ -4,10 +4,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { IconDots, IconLayoutSidebarLeftCollapse } from '@tabler/icons-react';
-import { isNavItemActive, mobileNavItems } from '@/lib/admin/navigation';
+import { isNavItemActive, mobileNavItems, navItemsById, visibleNavChildren } from '@/lib/admin/navigation';
 import { cn } from '@/lib/utils/cn';
 import { CountBadge } from '../ui/Badge';
 import Dialog from '../ui/Dialog';
+import AdminTabs from '../ui/Tabs';
 import AdminNav from './AdminNav';
 import CommandPalette from './CommandPalette';
 import { SIDEBAR_NO_FLASH_SCRIPT, SIDEBAR_STORAGE_KEY, type AdminShellNav } from './shellState';
@@ -53,6 +54,29 @@ function BottomNav({ nav, onMore }: { nav: AdminShellNav; onMore: () => void }) 
         <IconDots size={22} stroke={1.8} aria-hidden="true" />Plus
       </button>
     </nav>
+  );
+}
+
+/**
+ * Sub-pages of the current module as tabs, where the sidebar does not list
+ * them: phones (no sidebar) and the folded desktop rail (.admin-subnav, see
+ * SHELL_CSS). Same registry children as the sidebar; only on the sub-pages
+ * themselves, detail pages keep their breadcrumb.
+ */
+function ModuleSubNav({ nav, pathname }: { nav: AdminShellNav; pathname: string }) {
+  const item = navItemsById(nav.items).find((entry) => isNavItemActive(pathname, entry) && visibleNavChildren(entry, nav.children).length > 1);
+  if (!item) return null;
+  const children = visibleNavChildren(item, nav.children);
+  if (!children.some((child) => child.href === pathname)) return null;
+  return (
+    <AdminTabs label={`Navigation ${item.label}`} className="admin-subnav mb-3 md:hidden"
+      tabs={children.map((child) => {
+        const badge = child.badge ? nav.badges[child.badge.key] : 0;
+        return {
+          href: child.href, label: child.label, active: child.href === pathname,
+          badge: child.badge && badge > 0 ? <CountBadge tone={child.badge.tone} count={badge} label={`${badge} ${child.badge.label}`} /> : undefined,
+        };
+      })} />
   );
 }
 
@@ -103,7 +127,10 @@ export default function AdminShell({ nav, workspaceLabel, tenantName, header, ch
             </button>
           </div>
         </aside>
-        <main id="admin-main" className="min-w-0 flex-1 px-3 pb-24 pt-4 sm:px-5 md:pb-10 lg:px-6 xl:px-8">{children}</main>
+        <main id="admin-main" className="min-w-0 flex-1 px-3 pb-24 pt-4 sm:px-5 md:pb-10 lg:px-6 xl:px-8">
+          <ModuleSubNav nav={nav} pathname={pathname ?? '/admin'} />
+          {children}
+        </main>
       </div>
       <BottomNav nav={nav} onMore={openNav} />
       <Dialog open={navOpen} onClose={() => setNavOpen(false)} placement="left" title={workspaceLabel} description={tenantName} bodyClassName="px-2 py-2">

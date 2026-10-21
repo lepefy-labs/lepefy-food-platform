@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { IconClipboardList, IconDownload, IconPlus, IconSnowflake } from '@tabler/icons-react'
+import { IconDownload, IconPlus, IconSnowflake } from '@tabler/icons-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenant } from '@/lib/tenant/getTenant'
 import { getCurrentAdminAccessContext, canAdmin } from '@/lib/auth/adminRbac'
@@ -18,7 +18,7 @@ import OrdersTable, { type ListOrder } from './OrdersTable'
 import PendingPaymentsBanner, { type PendingPaymentSession } from './PendingPaymentsBanner'
 import AdminPageHeader from '../../_components/ui/AdminPageHeader'
 import AdminStatCard from '../../_components/ui/AdminStatCard'
-import { CountBadge, TONE_BADGE_CLASS } from '../../_components/ui/Badge'
+import { TONE_BADGE_CLASS } from '../../_components/ui/Badge'
 import { ButtonAnchor, ButtonLink } from '../../_components/ui/Button'
 import InlineAlert from '../../_components/ui/InlineAlert'
 import { Card } from '../../_components/ui/Panel'
@@ -69,7 +69,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
   const canManage = Boolean(access && canAdmin(access, 'orders.manage'))
   const now = new Date()
 
-  const [{ data: stats, error: statsError }, { data: carriersRaw }, { data: pendingPaymentsRaw }, { count: activePreordersCount }, { count: preordersToVerifyCount }, queue] = await Promise.all([
+  const [{ data: stats, error: statsError }, { data: carriersRaw }, { data: pendingPaymentsRaw }, { count: preordersToVerifyCount }, queue] = await Promise.all([
     supabase.from('admin_order_dashboard_stats').select('*').eq('tenant_id', tenant.id).maybeSingle(),
     supabase.from('carriers').select('name').eq('tenant_id', tenant.id).eq('active', true).order('position', { ascending: true }),
     supabase
@@ -82,7 +82,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
       .in('status', ['open', 'expired', 'awaiting_verification'])
       .is('order_id', null)
       .order('created_at', { ascending: true }),
-    supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('origin', 'assisted').in('status', ['draft', 'open', 'awaiting_verification']),
     supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('origin', 'assisted').eq('status', 'awaiting_verification'),
     loadOrderWorkQueue(supabase, tenant.id, { filters, sort, page: values.page, pageSize: values.pageSize, thresholds: operational.thresholds, now, managedProviderAvailable: operational.managedProviderAvailable, originCountry: tenant.country, tenantPreparationMode: operational.preparationMode })
       .catch((error: unknown): WorkQueueResult | null => { console.error('[admin/orders] work queue unavailable', error); return null }),
@@ -151,10 +150,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
         meta={pluralize(totalCount, 'commande')}
         description="Traitez d’abord les commandes qui demandent votre attention."
         actions={<>
-          <ButtonLink href="/admin/orders/precommandes">
-            <IconClipboardList size={17} aria-hidden="true" /> Précommandes
-            <CountBadge tone="warning" count={activePreordersCount ?? 0} label={`${activePreordersCount ?? 0} précommandes actives`} />
-          </ButtonLink>
           <ButtonAnchor href={`/api/admin/orders/export${exportQuery ? `?${exportQuery}` : ''}`} variant="secondary" title="Exporter la liste filtrée (CSV, 2 000 commandes max.)">
             <IconDownload size={17} aria-hidden="true" /> Exporter
           </ButtonAnchor>

@@ -1,7 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
-import { LivraisonTabs } from '../LivraisonTabs';
 import { buildObservationsSummary } from '@/lib/shipping/intelligence/observationsSummary';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +25,6 @@ export default async function AdminShippingHistoryPage() {
         meta={`${summary.scenariosMeasured} scénario${summary.scenariosMeasured !== 1 ? 's' : ''} mesuré${summary.scenariosMeasured !== 1 ? 's' : ''} · ${summary.totalObservations} offre${summary.totalObservations !== 1 ? 's' : ''} provider enregistrée${summary.totalObservations !== 1 ? 's' : ''}`}
       />
 
-      <LivraisonTabs active="historique" />
 
       <section className="bg-a-surface rounded-xl border border-a-border p-5">
         <p className="text-xs text-a-text-3 mb-3">

@@ -22,7 +22,7 @@ export type AdminNavGroup =
   | 'Essentiel' | 'Ventes' | 'Croissance' | 'Canaux' | 'Gestion' | 'Contenu & outils' | 'Administration'
   | 'Événementiel' | 'Service sur place';
 export type AdminNavFlag = 'gestion' | 'whatsapp' | 'activity';
-export type AdminNavBadgeKey = 'pendingPayments' | 'pendingEventRequests' | 'newInquiries' | 'pendingRentalRequests';
+export type AdminNavBadgeKey = 'pendingPayments' | 'pendingEventRequests' | 'newInquiries' | 'pendingRentalRequests' | 'preordersToVerify';
 
 export interface AdminNavItem {
   id: string;
@@ -43,13 +43,19 @@ export interface AdminNavItem {
   mobile?: number;
   /** Extra words for the command palette. */
   keywords?: string[];
-  /** Sub-pages of the module, listed under the entry while it is active (same permissions). */
+  /**
+   * Sub-pages of the module: listed under the entry while it is active (sidebar),
+   * as a tab strip on small screens and in the command palette.
+   */
   children?: AdminNavChild[];
 }
 
 export interface AdminNavChild {
   label: string;
   href: string;
+  /** Narrower than the entry's (e.g. a sub-page with its own capability); default: the entry's anyOf. */
+  anyOf?: string[];
+  badge?: { key: AdminNavBadgeKey; tone: AdminTone; label: string };
   keywords?: string[];
 }
 
@@ -81,7 +87,12 @@ export function isPrimaryNavGroup(group: AdminNavGroup): boolean {
 export const ADMIN_NAV: AdminNavItem[] = [
   // Essentiel — the shop's daily work (Aujourd'hui, Commandes, Produits, Livraisons, Clients)
   { id: 'today', label: 'Aujourd’hui', href: '/admin', icon: IconHome, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], match: 'exact', mobile: 1, keywords: ['accueil', 'tableau de bord', 'priorités', 'dashboard'] },
-  { id: 'orders', label: 'Commandes', href: '/admin/orders', icon: IconShoppingBag, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], alsoActive: [{ href: '/admin/paiements-en-attente' }], badge: { key: 'pendingPayments', tone: 'warning', label: 'paiements à vérifier' }, mobile: 2, keywords: ['ordres', 'préparation', 'expédition', 'précommandes', 'session de préparation'] },
+  { id: 'orders', label: 'Commandes', href: '/admin/orders', icon: IconShoppingBag, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], alsoActive: [{ href: '/admin/paiements-en-attente' }], badge: { key: 'pendingPayments', tone: 'warning', label: 'paiements à vérifier' }, mobile: 2, keywords: ['ordres', 'préparation', 'expédition', 'précommandes', 'session de préparation'],
+    children: [
+      { label: 'Toutes les commandes', href: '/admin/orders' },
+      { label: 'Session de préparation', href: '/admin/orders/preparation', keywords: ['liste groupée', 'imprimer'] },
+      { label: 'Précommandes', href: '/admin/orders/precommandes', badge: { key: 'preordersToVerify', tone: 'warning', label: 'précommandes à vérifier' }, keywords: ['whatsapp', 'téléphone', 'assistée'] },
+    ] },
   { id: 'catalogue', label: 'Produits', href: '/admin/catalogue', icon: IconPackage, group: 'Essentiel', workspace: 'shop', anyOf: ['catalog.view'], alsoActive: [{ href: '/admin/products' }], mobile: 3, keywords: ['catalogue', 'stock', 'prix', 'catégories'],
     children: [
       { label: 'Tous les produits', href: '/admin/catalogue' },
@@ -89,8 +100,21 @@ export const ADMIN_NAV: AdminNavItem[] = [
       { label: 'Catégories', href: '/admin/catalogue/categories' },
       { label: 'Règles de quantité', href: '/admin/catalogue/quantity-groups', keywords: ['minimum', 'groupe'] },
     ] },
-  { id: 'shipping', label: 'Livraisons', href: '/admin/livraison', icon: IconTruck, group: 'Essentiel', workspace: 'shop', anyOf: ['shipping.view'], keywords: ['packlink', 'zones', 'tarifs', 'expéditions', 'emballages', 'forfait'] },
-  { id: 'customers', label: 'Clients', href: '/admin/clients', icon: IconUsers, group: 'Essentiel', workspace: 'shop', anyOf: ['customers.view'], keywords: ['crm', 'segments', 'campagnes'] },
+  { id: 'shipping', label: 'Livraisons', href: '/admin/livraison', icon: IconTruck, group: 'Essentiel', workspace: 'shop', anyOf: ['shipping.view'], keywords: ['packlink', 'zones', 'tarifs', 'expéditions', 'emballages', 'forfait'],
+    children: [
+      { label: 'Tarification', href: '/admin/livraison', keywords: ['zones', 'tarifs'] },
+      { label: 'Emballages', href: '/admin/livraison/emballages', keywords: ['cartons'] },
+      { label: 'Expéditions', href: '/admin/livraison/expeditions', keywords: ['packlink', 'brouillons'] },
+      { label: 'Assistant expédition', href: '/admin/livraison/assistant' },
+      { label: 'Historique des coûts', href: '/admin/livraison/historique' },
+      { label: 'Forfait', href: '/admin/livraison/forfait', keywords: ['grille', 'prix'] },
+    ] },
+  { id: 'customers', label: 'Clients', href: '/admin/clients', icon: IconUsers, group: 'Essentiel', workspace: 'shop', anyOf: ['customers.view'], keywords: ['crm', 'segments', 'campagnes'],
+    children: [
+      { label: 'Liste des clients', href: '/admin/clients' },
+      { label: 'Segments', href: '/admin/clients/segments' },
+      { label: 'Campagnes', href: '/admin/clients/campagnes', anyOf: ['campaigns.view'], keywords: ['e-mail', 'marketing'] },
+    ] },
   // Ventes
   { id: 'card-payments', label: 'Paiements carte', href: '/admin/paiements-carte', icon: IconCreditCard, group: 'Ventes', workspace: 'shop', anyOf: ['orders.view'], keywords: ['stripe', 'cp-'] },
   { id: 'checkout-funnel', label: 'Funnel checkout', href: '/admin/checkout-funnel', icon: IconChartBar, group: 'Ventes', workspace: 'shop', anyOf: ['orders.view'], match: 'exact', keywords: ['conversion', 'abandon', 'paniers à relancer'] },
@@ -151,6 +175,8 @@ export interface ResolvedAdminNavigation {
   actions: string[];
   /** Platform owner block (PLATFORM_NAV). */
   platform: boolean;
+  /** Visible sub-page hrefs per entry id (entries with children only). */
+  children: Record<string, string[]>;
 }
 
 export function canSee(context: Pick<AdminNavContext, 'permissions' | 'isPlatformOwner'>, anyOf: string[]): boolean {
@@ -167,6 +193,9 @@ export function resolveAdminNavigation(context: AdminNavContext): ResolvedAdminN
       .map((item) => item.id),
     actions: ADMIN_QUICK_ACTIONS.filter((action) => inWorkspace(action.workspace) && canSee(context, action.anyOf)).map((action) => action.id),
     platform: context.isPlatformOwner,
+    children: Object.fromEntries(ADMIN_NAV
+      .filter((item) => item.children && inWorkspace(item.workspace))
+      .map((item) => [item.id, item.children!.filter((child) => canSee(context, child.anyOf ?? item.anyOf)).map((child) => child.href)])),
   };
 }
 
@@ -184,6 +213,12 @@ export function activeNavChild(pathname: string, children: AdminNavChild[]): Adm
   return children
     .filter((child) => isHrefActive(pathname, child.href))
     .sort((a, b) => b.href.length - a.href.length)[0] ?? null;
+}
+
+/** The entry's sub-pages this admin may see (resolved on the server, see ResolvedAdminNavigation.children). */
+export function visibleNavChildren(item: AdminNavItem, visible: Record<string, string[]>): AdminNavChild[] {
+  const hrefs = new Set(visible[item.id] ?? []);
+  return (item.children ?? []).filter((child) => hrefs.has(child.href));
 }
 
 export function navItemsById(ids: string[]): AdminNavItem[] {
