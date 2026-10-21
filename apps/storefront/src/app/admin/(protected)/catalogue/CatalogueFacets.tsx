@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { IconCategory, IconEye, IconTag, type Icon } from '@tabler/icons-react';
+import { IconCategory, IconEye, IconTag, IconX, type Icon } from '@tabler/icons-react';
 import { formatNumber } from '@/lib/admin/format';
 import { cn } from '@/lib/utils/cn';
 import FacetsToggle from '../../_components/data/FacetsToggle';
@@ -13,8 +13,9 @@ export interface FacetLink {
 }
 
 function FacetSection({ id, title, icon: SectionIcon, links }: { id: string; title: string; icon: Icon; links: FacetLink[] }) {
-  // A section « is open » only when a real filter is applied: that entry gets the solid brand pill,
-  // the section a tinted background and an « Effacer » link; the default entry stays quiet.
+  // A section « is open » only when a real filter is applied: that entry gets the solid brand pill
+  // (a second click on it, or its ×, removes the filter), the section a tinted background and an
+  // « Effacer » link; the default entry stays quiet.
   const applied = links.find((link) => link.active && !link.isDefault);
   const reset = links.find((link) => link.isDefault);
   return (
@@ -36,7 +37,8 @@ function FacetSection({ id, title, icon: SectionIcon, links }: { id: string; tit
           const strong = link.active && !link.isDefault;
           return (
             <li key={link.key}>
-              <Link href={link.href} scroll={false} aria-current={link.active ? 'true' : undefined}
+              <Link href={strong && reset ? reset.href : link.href} scroll={false} aria-current={link.active ? 'true' : undefined}
+                title={strong ? `Retirer le filtre ${link.label}` : undefined}
                 className={cn('flex min-h-8 items-center gap-2 rounded-lg px-2.5 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-a-focus',
                   strong ? 'bg-a-brand font-semibold text-a-on-brand shadow-sm'
                     : link.active ? 'font-semibold text-a-text hover:bg-a-hover'
@@ -44,11 +46,13 @@ function FacetSection({ id, title, icon: SectionIcon, links }: { id: string; tit
                 <span className="min-w-0 flex-1 truncate">
                   {link.label}
                   {link.hint && <span className="sr-only"> ({link.hint})</span>}
+                  {strong && <span className="sr-only"> — retirer ce filtre</span>}
                 </span>
                 {link.hint && <span aria-hidden="true" className={cn('shrink-0 rounded px-1 text-[0.6875rem]', strong ? 'bg-white/20' : 'bg-a-surface-2 text-a-text-3')}>{link.hint}</span>}
                 {link.count != null && (
                   <span className={cn('shrink-0 text-xs tabular-nums', strong ? 'font-semibold' : link.warn && link.count > 0 ? 'font-semibold text-tone-warning-fg' : 'text-a-text-3')}>{formatNumber(link.count)}</span>
                 )}
+                {strong && <IconX size={14} stroke={2.25} aria-hidden="true" className="-mr-1 shrink-0" />}
               </Link>
             </li>
           );
