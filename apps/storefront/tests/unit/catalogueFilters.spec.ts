@@ -30,10 +30,10 @@ test('status filters map to the right product conditions', () => {
 test('list state round-trips through the URL, defaults omitted, junk rejected', () => {
   const params = (query: string) => new URLSearchParams(query);
   expect(catalogueQueryString(parseCatalogueState(params('')))).toBe('');
-  const state = parseCatalogueState(params('q=garri&status=no_weight&category=farines&sort=stock_asc&page=3'));
-  expect(state).toEqual({ q: 'garri', status: 'no_weight', category: 'farines', sort: 'stock_asc', page: 3, reception: '' });
+  const state = parseCatalogueState(params('q=garri&status=out&highlight=promo&issue=no_weight&category=farines&sort=stock_asc&page=3'));
+  expect(state).toEqual({ q: 'garri', status: 'out', highlight: 'promo', issue: 'no_weight', category: 'farines', sort: 'stock_asc', page: 3, reception: '' });
   expect(parseCatalogueState(params(catalogueQueryString(state)))).toEqual(state);
-  expect(parseCatalogueState(params('status=drop&sort=evil&page=-1'))).toMatchObject({ status: 'all', sort: 'position_asc', page: 1 });
+  expect(parseCatalogueState(params('status=drop&highlight=out&issue=promo&sort=evil&page=-1'))).toMatchObject({ status: 'all', highlight: '', issue: '', sort: 'position_asc', page: 1 });
 });
 
 test('stock tone and completeness badges only flag real gaps', () => {
@@ -49,4 +49,13 @@ test('reception filter: known fulfillment policies only, round-trips through the
   expect(catalogueQueryString(state)).toBe('status=active&reception=pickup_only');
   expect(parseCatalogueState(params(catalogueQueryString(state)))).toEqual(state);
   expect(parseCatalogueState(params('reception=teleport')).reception).toBe('');
+});
+
+test('legacy ?status= links for highlights and issues land on their own dimension', () => {
+  const params = (query: string) => new URLSearchParams(query);
+  expect(parseCatalogueState(params('status=no_weight'))).toMatchObject({ status: 'all', highlight: '', issue: 'no_weight' });
+  expect(parseCatalogueState(params('status=novelty'))).toMatchObject({ status: 'all', highlight: 'novelty', issue: '' });
+  expect(catalogueQueryString(parseCatalogueState(params('status=promo_scheduled')))).toBe('highlight=promo_scheduled');
+  // An explicit param wins over the legacy one.
+  expect(parseCatalogueState(params('status=no_image&issue=no_category')).issue).toBe('no_category');
 });

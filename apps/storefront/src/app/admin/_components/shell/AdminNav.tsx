@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { IconChevronDown } from '@tabler/icons-react';
-import { ADMIN_NAV_GROUPS, isHrefActive, isNavItemActive, isPrimaryNavGroup, navItemsById, type AdminNavGroup, type AdminNavItem } from '@/lib/admin/navigation';
+import { ADMIN_NAV_GROUPS, activeNavChild, isHrefActive, isNavItemActive, isPrimaryNavGroup, navItemsById, type AdminNavGroup, type AdminNavItem } from '@/lib/admin/navigation';
 import { cn } from '@/lib/utils/cn';
 import { CountBadge } from '../ui/Badge';
 import { PLATFORM_NAV, isGroupActive } from '../platformNavConfig';
@@ -24,14 +24,28 @@ const itemClass = (active: boolean) => cn(
 function NavLink({ item, pathname, badge }: { item: AdminNavItem; pathname: string; badge: number }) {
   const active = isNavItemActive(pathname, item);
   const Icon = item.icon;
-  return (
-    <Link href={item.href} aria-current={active ? 'page' : undefined} title={item.label} className={itemClass(active)}>
+  const link = (
+    <Link href={item.href} aria-current={active && !item.children ? 'page' : undefined} title={item.label} className={itemClass(active)}>
       <Icon size={18} stroke={1.8} aria-hidden="true" className="shrink-0" />
       <span className="admin-nav-label min-w-0 flex-1 truncate">{item.label}</span>
       {item.badge && badge > 0 && (
         <span className="admin-nav-count"><CountBadge tone={item.badge.tone} count={badge} label={`${badge} ${item.badge.label}`} /></span>
       )}
     </Link>
+  );
+  if (!item.children || !active) return link;
+  // Sub-pages of the active module; hidden in the collapsed rail (admin-nav-children).
+  const current = activeNavChild(pathname, item.children);
+  return (
+    <div>
+      {link}
+      <div className="admin-nav-children mb-1 ml-5 mt-0.5 space-y-0.5 border-l border-a-border pl-2">
+        {item.children.map((child) => {
+          const childActive = child === current;
+          return <Link key={child.href} href={child.href} aria-current={childActive ? 'page' : undefined} className={itemClass(childActive)}>{child.label}</Link>;
+        })}
+      </div>
+    </div>
   );
 }
 

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { applyCatalogueStatus, CATALOGUE_STATUS_OPTIONS, type CatalogueListState, type CatalogueStatus } from './catalogueFilters';
+import { applyCatalogueStatus, CATALOGUE_HIGHLIGHT_OPTIONS, CATALOGUE_ISSUE_OPTIONS, CATALOGUE_VIEW_OPTIONS, type CatalogueListState, type CatalogueStatus } from './catalogueFilters';
 
 export const CATALOGUE_PAGE_SIZE = 25;
 
@@ -42,19 +42,32 @@ export interface CatalogueListResult {
   total: number;
   page: number;
   limit: number;
-  /** Tenant-wide counters per status (null when a count failed). */
+  /**
+   * Faceted counters (null when a count failed): each one applies every filter
+   * of the list except its own dimension (view, highlight or issue).
+   */
   counts: Partial<Record<CatalogueStatus, number | null>>;
+  /** Products per category_id ('' = sans catégorie) with every filter but the category; null when unavailable. */
+  categoryCounts: Record<string, number> | null;
+  /** Whole catalogue, no filter (page header). */
+  catalogueTotal: number | null;
 }
+
+type ListFilters = Pick<CatalogueListState, 'q' | 'status' | 'category' | 'sort' | 'page'> & Partial<Pick<CatalogueListState, 'reception' | 'highlight' | 'issue'>>;
+
+type Facet = 'status' | 'highlight' | 'issue';
+
+/** Upper bound of the category facet scan (pages of 1000 rows, PostgREST max-rows). */
+const CATEGORY_SCAN_PAGES = 10;
 
 /**
  * Admin catalogue page: one page of products for the list state plus the
- * per-status counters of the whole catalogue (search, category and reception
- * mode do not narrow the counters). Shared by the Server Component and GET /api/admin/catalogue.
+ * faceted counters. Shared by the Server Component and GET /api/admin/catalogue.
  */
 export async function loadCatalogueList(
   db: SupabaseClient,
   tenantId: string,
-  state: Pick<CatalogueListState, 'q' | 'status' | 'category' | 'sort' | 'page'> & Partial<Pick<CatalogueListState, 'reception'>>,
+  state: ListFilters,
   limit = CATALOGUE_PAGE_SIZE,
 ): Promise<CatalogueListResult> {
   const page = Math.max(1, state.page);
@@ -65,40 +78,64 @@ export async function loadCatalogueList(
     const { data: category } = await db.from('categories').select('id').eq('tenant_id', tenantId).eq('slug', state.category).maybeSingle();
     categoryId = (category as { id: string } | null)?.id ?? '__missing__';
   }
+  const q = state.q.trim().replace(/[%_,()]/g, ' ').trim();
 
-  let query = db
+  /** Every filter of the list state, minus the facet being counted. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function narrow<Q extends Record<string, any>>(query: Q, skip?: Facet | 'category'): Q {
+    let next = query.eq('tenant_id', tenantId);
+    if (categoryId && skip !== 'category') next = next.eq('category_id', categoryId);
+    if (state.reception) next = next.eq('fulfillment_policy', state.reception);
+    if (q) next = next.or(`name.ilike.%${q}%,slug.ilike.%${q}%,barcode_value.ilike.%${q}%`);
+    if (skip !== 'status') next = applyCatalogueStatus(next, state.status);
+    if (state.highlight && skip !== 'highlight') next = applyCatalogueStatus(next, state.highlight);
+    if (state.issue && skip !== 'issue') next = applyCatalogueStatus(next, state.issue);
+    return next;
+  }
+
+  const query = narrow(db
     .from('products')
     .select(`
       id, name, slug, price, stock, active, weight_grams, category_id,
       image_url, storage_type, fulfillment_policy, warehouse_location, description_source,
       compare_at_price, promo_price, promo_applied, promo_ends_at, new_until,
       barcode_value, categories(name, slug)
-    `, { count: 'exact' })
-    .eq('tenant_id', tenantId);
-
-  if (categoryId) query = query.eq('category_id', categoryId);
-  if (state.reception) query = query.eq('fulfillment_policy', state.reception);
-  const q = state.q.trim();
-  if (q) {
-    const safe = q.replace(/[%_,()]/g, ' ').trim();
-    query = query.or(`name.ilike.%${safe}%,slug.ilike.%${safe}%,barcode_value.ilike.%${safe}%`);
-  }
-  query = applyCatalogueStatus(query, state.status);
+    `, { count: 'exact' }));
 
   const from = (page - 1) * limit;
-  const countFor = (key: CatalogueStatus) =>
-    applyCatalogueStatus(db.from('products').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId), key);
-  const [{ data, count, error }, ...countResults] = await Promise.all([
+  const head = () => db.from('products').select('id', { count: 'exact', head: true });
+  const facets: Array<{ key: CatalogueStatus; skip: Facet }> = [
+    ...CATALOGUE_VIEW_OPTIONS.map((option) => ({ key: option.key, skip: 'status' as const })),
+    ...CATALOGUE_HIGHLIGHT_OPTIONS.map((option) => ({ key: option.key, skip: 'highlight' as const })),
+    ...CATALOGUE_ISSUE_OPTIONS.map((option) => ({ key: option.key, skip: 'issue' as const })),
+  ];
+  const [{ data, count, error }, totalResult, categoryCounts, ...countResults] = await Promise.all([
     query.order(sort.column, { ascending: sort.ascending }).order('id', { ascending: true }).range(from, from + limit - 1),
-    ...CATALOGUE_STATUS_OPTIONS.map((option) => countFor(option.key)),
+    head().eq('tenant_id', tenantId),
+    countByCategory(),
+    ...facets.map((facet) => applyCatalogueStatus(narrow(head(), facet.skip), facet.key)),
   ]);
   if (error) throw new Error(error.message);
+
+  async function countByCategory(): Promise<Record<string, number> | null> {
+    const counts: Record<string, number> = {};
+    for (let index = 0; index < CATEGORY_SCAN_PAGES; index += 1) {
+      const { data: rows, error: scanError } = await narrow(db.from('products').select('category_id'), 'category')
+        .order('id', { ascending: true }).range(index * 1000, index * 1000 + 999);
+      if (scanError) return null;
+      for (const row of (rows ?? []) as { category_id: string | null }[]) counts[row.category_id ?? ''] = (counts[row.category_id ?? ''] ?? 0) + 1;
+      if ((rows ?? []).length < 1000) return counts;
+    }
+    return counts;
+  }
 
   return {
     products: (data ?? []) as unknown as CatalogueListProduct[],
     total: count ?? 0,
     page,
     limit,
-    counts: Object.fromEntries(CATALOGUE_STATUS_OPTIONS.map((option, index) => [option.key, countResults[index]?.error ? null : countResults[index]?.count ?? 0])),
+    counts: Object.fromEntries(facets.map((facet, index) => [facet.key, countResults[index]?.error ? null : countResults[index]?.count ?? 0])),
+    categoryCounts,
+    catalogueTotal: totalResult.error ? null : totalResult.count ?? 0,
   };
 }

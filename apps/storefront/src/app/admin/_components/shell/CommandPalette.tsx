@@ -30,10 +30,14 @@ export function normalizeSearch(value: string): string {
 function localEntries(nav: AdminShellNav): PaletteEntry[] {
   const actions = ADMIN_QUICK_ACTIONS.filter((action) => nav.actions.includes(action.id))
     .map((action) => ({ id: `action-${action.id}`, group: 'Actions', label: action.label, href: action.href, icon: action.icon, terms: (action.keywords ?? []).join(' ') }));
-  const pages = navItemsById(nav.items).map((item) => ({
-    id: `page-${item.id}`, group: 'Pages', label: item.label, sublabel: item.group, href: item.href, icon: item.icon,
-    terms: [item.group, ...(item.keywords ?? [])].join(' '),
-  }));
+  const pages: PaletteEntry[] = navItemsById(nav.items).flatMap((item) => [
+    { id: `page-${item.id}`, group: 'Pages', label: item.label, sublabel: item.group, href: item.href, icon: item.icon, terms: [item.group, ...(item.keywords ?? [])].join(' ') },
+    // Module sub-pages (the one sharing the entry's href is the entry itself).
+    ...(item.children ?? []).filter((child) => child.href !== item.href).map((child) => ({
+      id: `page-${item.id}-${child.href}`, group: 'Pages', label: child.label, sublabel: item.label, href: child.href, icon: item.icon,
+      terms: [item.label, ...(child.keywords ?? [])].join(' '),
+    })),
+  ]);
   const platform = nav.platform
     ? PLATFORM_NAV.flatMap((group) => (group.children ?? [{ label: group.label, href: group.href ?? '/admin/platform' }])
       .map((child) => ({ id: `platform-${child.href}`, group: 'Plateforme', label: child.label, sublabel: group.label, href: child.href, icon: group.icon, terms: group.label })))

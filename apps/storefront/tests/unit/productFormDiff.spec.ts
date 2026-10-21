@@ -29,6 +29,6 @@ test('changed field labels are readable and de-duplicated', () => {
 
 test('the editor back link only keeps known catalogue list params', () => {
   const state = parseCatalogueState(readFromParam('status=no_weight&page=2&evil=<script>&sort=drop'));
-  expect(catalogueQueryString(state)).toBe('status=no_weight&page=2');
+  expect(catalogueQueryString(state)).toBe('issue=no_weight&page=2');
   expect(catalogueQueryString(parseCatalogueState(readFromParam(undefined)))).toBe('');
 });

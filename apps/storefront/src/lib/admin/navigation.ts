@@ -43,6 +43,14 @@ export interface AdminNavItem {
   mobile?: number;
   /** Extra words for the command palette. */
   keywords?: string[];
+  /** Sub-pages of the module, listed under the entry while it is active (same permissions). */
+  children?: AdminNavChild[];
+}
+
+export interface AdminNavChild {
+  label: string;
+  href: string;
+  keywords?: string[];
 }
 
 export interface AdminQuickAction {
@@ -74,7 +82,13 @@ export const ADMIN_NAV: AdminNavItem[] = [
   // Essentiel — the shop's daily work (Aujourd'hui, Commandes, Produits, Livraisons, Clients)
   { id: 'today', label: 'Aujourd’hui', href: '/admin', icon: IconHome, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], match: 'exact', mobile: 1, keywords: ['accueil', 'tableau de bord', 'priorités', 'dashboard'] },
   { id: 'orders', label: 'Commandes', href: '/admin/orders', icon: IconShoppingBag, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], alsoActive: [{ href: '/admin/paiements-en-attente' }], badge: { key: 'pendingPayments', tone: 'warning', label: 'paiements à vérifier' }, mobile: 2, keywords: ['ordres', 'préparation', 'expédition', 'précommandes', 'session de préparation'] },
-  { id: 'catalogue', label: 'Produits', href: '/admin/catalogue', icon: IconPackage, group: 'Essentiel', workspace: 'shop', anyOf: ['catalog.view'], alsoActive: [{ href: '/admin/products' }], mobile: 3, keywords: ['catalogue', 'stock', 'prix', 'catégories'] },
+  { id: 'catalogue', label: 'Produits', href: '/admin/catalogue', icon: IconPackage, group: 'Essentiel', workspace: 'shop', anyOf: ['catalog.view'], alsoActive: [{ href: '/admin/products' }], mobile: 3, keywords: ['catalogue', 'stock', 'prix', 'catégories'],
+    children: [
+      { label: 'Tous les produits', href: '/admin/catalogue' },
+      { label: 'Promotions & Nouveautés', href: '/admin/catalogue/campagnes', keywords: ['campagne', 'promo'] },
+      { label: 'Catégories', href: '/admin/catalogue/categories' },
+      { label: 'Règles de quantité', href: '/admin/catalogue/quantity-groups', keywords: ['minimum', 'groupe'] },
+    ] },
   { id: 'shipping', label: 'Livraisons', href: '/admin/livraison', icon: IconTruck, group: 'Essentiel', workspace: 'shop', anyOf: ['shipping.view'], keywords: ['packlink', 'zones', 'tarifs', 'expéditions', 'emballages', 'forfait'] },
   { id: 'customers', label: 'Clients', href: '/admin/clients', icon: IconUsers, group: 'Essentiel', workspace: 'shop', anyOf: ['customers.view'], keywords: ['crm', 'segments', 'campagnes'] },
   // Ventes
@@ -163,6 +177,13 @@ export function isHrefActive(pathname: string, href: string, match: 'exact' | 'p
 export function isNavItemActive(pathname: string, item: Pick<AdminNavItem, 'href' | 'match' | 'alsoActive'>): boolean {
   return isHrefActive(pathname, item.href, item.match)
     || (item.alsoActive ?? []).some((extra) => isHrefActive(pathname, extra.href, extra.match));
+}
+
+/** The child whose href is the longest segment prefix of the path (the product editor stays under « Tous les produits »). */
+export function activeNavChild(pathname: string, children: AdminNavChild[]): AdminNavChild | null {
+  return children
+    .filter((child) => isHrefActive(pathname, child.href))
+    .sort((a, b) => b.href.length - a.href.length)[0] ?? null;
 }
 
 export function navItemsById(ids: string[]): AdminNavItem[] {

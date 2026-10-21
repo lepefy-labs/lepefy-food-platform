@@ -23,6 +23,8 @@ interface FilterBarProps {
   /** Quick views (links computed on the server, filters kept). */
   views?: FilterView[];
   viewsLabel?: string;
+  /** Extra classes of the views strip (e.g. `admin-facets-views` when the page can show them in a side column). */
+  viewsClassName?: string;
   search?: { param?: string; placeholder: string; label: string };
   /** Fields of the « Filtres » panel. */
   filters?: FilterDef[];
@@ -33,6 +35,8 @@ interface FilterBarProps {
   resultLabel?: string;
   /** Extra controls on the right (export, density…). */
   trailing?: ReactNode;
+  /** Control before the search field (e.g. the side filter column toggle). */
+  leading?: ReactNode;
   /** URL keys removed when a panel select changes (e.g. a quick view that the new filter replaces). */
   panelClears?: string[];
 }
@@ -42,7 +46,7 @@ interface FilterBarProps {
  * to 1) and the Server Component re-renders with the new data; the URL is the
  * only state.
  */
-export default function FilterBar({ views, viewsLabel = 'Vues', search, filters, activeChips = [], resetHref, sort, resultLabel, trailing, panelClears = [] }: FilterBarProps) {
+export default function FilterBar({ views, viewsLabel = 'Vues', viewsClassName, search, filters, activeChips = [], resetHref, sort, resultLabel, trailing, leading, panelClears = [] }: FilterBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -94,7 +98,7 @@ export default function FilterBar({ views, viewsLabel = 'Vues', search, filters,
       {pending && <span aria-hidden="true" className="absolute inset-x-0 top-0 h-0.5 animate-pulse bg-a-brand" />}
       <div className="flex flex-col gap-2 p-2.5 lg:flex-row lg:items-center">
         {views && views.length > 0 && (
-          <nav aria-label={viewsLabel} className="-mx-1 flex shrink-0 gap-0.5 overflow-x-auto px-1 [scrollbar-width:none]">
+          <nav aria-label={viewsLabel} className={cn('-mx-1 flex shrink-0 gap-0.5 overflow-x-auto px-1 [scrollbar-width:none]', viewsClassName)}>
             <div className="flex gap-0.5 rounded-lg border border-a-border bg-a-surface-2 p-0.5">
               {views.map((view) => (
                 <Link key={view.key} href={view.href} aria-current={view.active ? 'true' : undefined} scroll={false}
@@ -108,6 +112,7 @@ export default function FilterBar({ views, viewsLabel = 'Vues', search, filters,
           </nav>
         )}
         <div className="flex min-w-0 flex-1 items-center gap-2">
+          {leading}
           {search && (
             <div className="relative min-w-0 flex-1">
               <IconSearch size={16} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" />

@@ -24,6 +24,7 @@ import { EmptyState } from '../../_components/ui/States';
 import DataTable, { type DataColumn } from '../../_components/data/DataTable';
 import { BulkBar, RowSelectionProvider } from '../../_components/data/RowSelection';
 import CampaignBulkAction from './CampaignBulkAction';
+import CategoryBulkAction, { type BulkCategoryOption } from './CategoryBulkAction';
 
 interface Props {
   products: Product[];
@@ -36,6 +37,8 @@ interface Props {
   resetHref: string;
   /** Retrait désactivé pour la boutique : un produit « retrait uniquement » ne peut pas être commandé. */
   pickupDisabled?: boolean;
+  /** Tenant categories, for the bulk « Changer de catégorie ». */
+  categories: BulkCategoryOption[];
 }
 
 const STOCK_INPUT_TONE = {
@@ -44,7 +47,7 @@ const STOCK_INPUT_TONE = {
   ok: 'border-a-border-strong bg-a-surface text-a-text',
 } as const;
 
-export default function CatalogueTable({ products, tenantCurrency, canManage, listQuery, hasFilters, resetHref, pickupDisabled = false }: Props) {
+export default function CatalogueTable({ products, tenantCurrency, canManage, listQuery, hasFilters, resetHref, pickupDisabled = false, categories }: Props) {
   const router = useRouter();
   const toast = useAdminToast();
   const [stockValues, setStockValues] = useState<Record<string, string>>({});
@@ -210,8 +213,9 @@ export default function CatalogueTable({ products, tenantCurrency, canManage, li
       <div className="flex items-center gap-3">
         {thumbnail(product, 'sm')}
         <div className="min-w-0">
-          <Link href={editorHref(product.id)} className="block truncate font-semibold hover:underline">{product.name}</Link>
-          <p className="truncate font-mono text-xs text-a-text-3">{product.slug}</p>
+          {/* Wrapping (not nowrap/truncate) keeps the column from growing to the longest name. */}
+          <Link href={editorHref(product.id)} className="line-clamp-2 break-words font-semibold hover:underline">{product.name}</Link>
+          <p className="line-clamp-1 break-all font-mono text-xs text-a-text-2">{product.slug}</p>
           {issues(product)}
         </div>
       </div>
@@ -261,6 +265,7 @@ export default function CatalogueTable({ products, tenantCurrency, canManage, li
       {canManage && (
         <BulkBar rowIds={rowIds} noun="produit sélectionné" nounPlural="produits sélectionnés">
           {(ids, clear) => <>
+            <CategoryBulkAction ids={ids} clear={clear} categories={categories} />
             <CampaignBulkAction ids={ids} clear={clear} />
             <Button variant="secondary" size="sm" onClick={() => void bulkSetActive(ids, true, clear)}>Activer</Button>
             <Button variant="secondary" size="sm" onClick={() => void bulkSetActive(ids, false, clear)}>Désactiver</Button>

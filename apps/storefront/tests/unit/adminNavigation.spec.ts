@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
-  ADMIN_NAV, ADMIN_QUICK_ACTIONS, isNavItemActive, mobileNavItems, navItemsById, resolveAdminNavigation, type AdminNavContext, ADMIN_NAV_PRIMARY_GROUPS, ADMIN_NAV_GROUPS, isPrimaryNavGroup } from '../../src/lib/admin/navigation';
+  ADMIN_NAV, ADMIN_QUICK_ACTIONS, activeNavChild, isNavItemActive, mobileNavItems, navItemsById, resolveAdminNavigation, type AdminNavContext, ADMIN_NAV_PRIMARY_GROUPS, ADMIN_NAV_GROUPS, isPrimaryNavGroup } from '../../src/lib/admin/navigation';
 import { defaultAdminDestination, permissionsForAdminPath } from '../../src/lib/auth/adminRoutePermissions';
 
 const NO_FLAGS = { gestion: false, whatsapp: false, activity: false };
@@ -137,4 +137,23 @@ test('daily groups stay open, every other module folds without disappearing', ()
   const shopPrimary = ADMIN_NAV.filter((item) => item.workspace === 'shop' && isPrimaryNavGroup(item.group)).map((item) => item.id);
   expect(shopPrimary).toEqual(['today', 'orders', 'catalogue', 'shipping', 'customers']);
   for (const item of ADMIN_NAV) expect(ADMIN_NAV_GROUPS, item.id).toContain(item.group);
+});
+
+test('module sub-pages: same permissions as their entry, inside it, longest match active', () => {
+  for (const item of ADMIN_NAV) {
+    for (const child of item.children ?? []) {
+      expect(isNavItemActive(child.href, item), `${item.id}: ${child.href} is outside the entry`).toBe(true);
+      const workspaces = item.workspace === 'all' ? (['shop', 'events'] as const) : [item.workspace];
+      for (const workspace of workspaces) {
+        const routePermissions = permissionsForAdminPath(child.href, workspace);
+        for (const permission of item.anyOf) expect(routePermissions, `${child.href} requires ${routePermissions}`).toContain(permission);
+      }
+    }
+  }
+  const children = ADMIN_NAV.find((item) => item.id === 'catalogue')!.children!;
+  expect(activeNavChild('/admin/catalogue', children)?.href).toBe('/admin/catalogue');
+  expect(activeNavChild('/admin/catalogue/1f2e', children)?.href).toBe('/admin/catalogue');
+  expect(activeNavChild('/admin/catalogue/campagnes/x', children)?.href).toBe('/admin/catalogue/campagnes');
+  expect(activeNavChild('/admin/catalogue/categories', children)?.href).toBe('/admin/catalogue/categories');
+  expect(activeNavChild('/admin/orders', children)).toBeNull();
 });

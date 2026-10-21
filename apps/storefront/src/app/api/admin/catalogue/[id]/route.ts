@@ -138,7 +138,15 @@ async function handlePATCH(
   if ('active'             in body) updatePayload.active             = Boolean(body.active);
   if ('featured'           in body) updatePayload.featured           = Boolean(body.featured);
   if ('storage_type'       in body) updatePayload.storage_type       = body.storage_type;
-  if ('category_id'        in body) updatePayload.category_id        = body.category_id;
+  if ('category_id' in body) {
+    // Only a category of this tenant (the bulk « Changer de catégorie » sends ids from the client).
+    const categoryId = body.category_id ? String(body.category_id) : null;
+    if (categoryId) {
+      const { data: category } = await supabase.from('categories').select('id').eq('tenant_id', tenant.id).eq('id', categoryId).maybeSingle();
+      if (!category) return NextResponse.json({ error: 'Catégorie introuvable.' }, { status: 400 });
+    }
+    updatePayload.category_id = categoryId;
+  }
   if ('warehouse_location' in body) updatePayload.warehouse_location = body.warehouse_location ? String(body.warehouse_location).trim() : null;
   if ('image_url'          in body) updatePayload.image_url          = body.image_url ?? null;
   if ('images'             in body) {
