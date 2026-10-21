@@ -78,19 +78,21 @@ export default async function AdminCataloguePage({ searchParams }: { searchParam
 
   // Side column (xl and up): every link keeps the other filters.
   const viewLinks: FacetLink[] = CATALOGUE_VIEW_OPTIONS.map((option) => ({
-    key: option.key, label: option.label, href: href({ status: option.key }), active: state.status === option.key, count: counts[option.key], warn: warn(option.key),
+    key: option.key, label: option.label, href: href({ status: option.key }), active: state.status === option.key, count: counts[option.key], warn: warn(option.key), isDefault: option.key === 'all',
   }));
   const highlightLinks: FacetLink[] = [
-    { key: 'all', label: 'Tous', href: href({ highlight: '' }), active: !state.highlight },
+    { key: 'all', label: 'Tous', href: href({ highlight: '' }), active: !state.highlight, isDefault: true },
     ...CATALOGUE_HIGHLIGHT_OPTIONS.map((option) => ({
       key: option.key, label: option.label, href: href({ highlight: option.key }), active: state.highlight === option.key, count: counts[option.key],
     })),
   ];
   const categoryLinks: FacetLink[] = [
-    { key: 'all', label: 'Toutes', href: href({ category: '' }), active: !state.category, count: categoryCounts ? Object.values(categoryCounts).reduce((sum, count) => sum + count, 0) : null },
+    { key: 'all', label: 'Toutes', href: href({ category: '' }), active: !state.category, isDefault: true, count: categoryCounts ? Object.values(categoryCounts).reduce((sum, count) => sum + count, 0) : null },
     ...categoryList.map((category) => ({
       key: category.id, label: category.name, href: href({ category: category.slug }), active: state.category === category.slug,
-      count: categoryCount(category.id), hint: category.catalog_scope === 'gadgets' ? 'Goodies' : undefined,
+      count: categoryCount(category.id),
+      // The Goodies tag is left out when the name already says it.
+      hint: category.catalog_scope === 'gadgets' && !/goodies/i.test(category.name) ? 'Goodies' : undefined,
     })),
   ];
   // « À compléter » appears when something is missing in the current selection, or while one of its filters is on.
