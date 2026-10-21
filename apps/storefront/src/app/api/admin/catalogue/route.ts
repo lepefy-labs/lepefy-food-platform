@@ -13,6 +13,10 @@ import { parseNoveltyUntil } from '@/lib/catalog/novelties';
 import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 import { parseCatalogueState } from '@/lib/catalog/catalogueFilters';
 import { loadCatalogueList } from '@/lib/catalog/catalogueList';
+import {
+  DUPLICATE_SOURCE_SELECT, duplicateGallery, labelBackgroundStoragePath, nextAvailableSlug, parseDuplicateSourceId,
+  productSlugBase, type DuplicateSourceRow,
+} from '@/lib/catalog/productDuplication';
 
 export const runtime = 'nodejs';
 
@@ -95,13 +99,22 @@ async function handlePOST(req: NextRequest) {
   const fulfillmentPolicy = body.fulfillment_policy ?? DEFAULT_FULFILLMENT_POLICY;
   if (!isFulfillmentPolicy(fulfillmentPolicy)) return NextResponse.json({ error: FULFILLMENT_POLICY_INVALID }, { status: 400 });
 
-  const slugProd = (body.name as string)
-    .toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
+  // Duplication : la source est relue ici, dans ce tenant. Les médias viennent d'elle, jamais du corps.
+  let duplicateSource: DuplicateSourceRow | null = null;
+  if (body.duplicate_from != null) {
+    const sourceId = parseDuplicateSourceId(body.duplicate_from);
+    if (!sourceId) return NextResponse.json({ error: 'Produit d’origine invalide.' }, { status: 400 });
+    const { data: source } = await supabase
+      .from('products')
+      .select(DUPLICATE_SOURCE_SELECT)
+      .eq('id', sourceId)
+      .eq('tenant_id', tenant.id)
+      .maybeSingle();
+    if (!source) return NextResponse.json({ error: 'Produit d’origine introuvable.' }, { status: 404 });
+    duplicateSource = source as unknown as DuplicateSourceRow;
+  }
+  const keepImages = Boolean(duplicateSource) && body.duplicate_images !== false;
+  const sourceLabelBackground = duplicateSource ? labelBackgroundStoragePath(duplicateSource.label_background_image_url) : null;
 
   const descriptions = cleanDescriptions(body.descriptions);
   const firstLocale = tenant.locales?.[0];
@@ -109,58 +122,79 @@ async function handlePOST(req: NextRequest) {
     ? descriptions[firstLocale]
     : (body.description || null);
 
-  const { data, error } = await supabase
-    .from('products')
-    .insert({
-      tenant_id: tenant.id,
-      name: String(body.name ?? '').trim(),
-      name_alt: body.name_alt ? String(body.name_alt).trim() : null,
-      slug: slugProd,
-      description: legacyDescription,
-      descriptions,
-      description_source: body.description_source === 'ai' || body.description_source === 'human' ? body.description_source : null,
-      price: parseFloat(body.price) || 0,
-      weight_grams: body.weight_grams ? parseInt(body.weight_grams, 10) : null,
-      stock: parseInt(body.stock, 10) || 0,
-      min_order_quantity: Number(body.min_order_quantity ?? 1),
-      order_quantity_step: Number(body.order_quantity_step ?? 1),
-      active: Boolean(body.active),
-      featured: Boolean(body.featured),
-      storage_type: body.storage_type ?? 'dry',
-      category_id: body.category_id,
-      warehouse_location: body.warehouse_location || null,
-      position,
-      compare_at_price: compareAtPrice,
-      ...(pricingColumns ?? {}),
-      new_until: novelty.value,
-      manual_new_until: novelty.value,
-      producer_id: body.producer_id || null,
-      importer_id: body.importer_id || null,
-      ingredients_text: body.ingredients_text ? String(body.ingredients_text).trim() : null,
-      allergens_text: body.allergens_text ? String(body.allergens_text).trim() : null,
-      gluten_free_certified: Boolean(body.gluten_free_certified),
-      usage_instructions: body.usage_instructions ? String(body.usage_instructions).trim() : null,
-      conservation_instructions: body.conservation_instructions ? String(body.conservation_instructions).trim() : null,
-      conservation_after_opening: body.conservation_after_opening ? String(body.conservation_after_opening).trim() : null,
-      country_of_origin: body.country_of_origin ? String(body.country_of_origin).trim() : null,
-      durability_type: body.durability_type || null,
-      quid_ingredient: body.quid_ingredient ? String(body.quid_ingredient).trim() : null,
-      quid_percentage: body.quid_percentage !== '' && body.quid_percentage != null ? parseFloat(body.quid_percentage) : null,
-      alcohol_pct: body.alcohol_pct !== '' && body.alcohol_pct != null ? parseFloat(body.alcohol_pct) : null,
-      net_quantity_display: body.net_quantity_display ? String(body.net_quantity_display).trim() : null,
-      ...sellingFormat.values,
-      fulfillment_policy: fulfillmentPolicy,
-      packaging_material: body.packaging_material ? String(body.packaging_material).trim() : null,
-      recycling_note: body.recycling_note ? String(body.recycling_note).trim() : null,
-      nutrition_basis: body.nutrition_basis === '100ml' ? '100ml' : '100g',
-      nutrition: cleanNutrition(body.nutrition),
-      label_background_image_url: body.label_background_image_url ?? null,
-      label_background_color: body.label_background_color ? String(body.label_background_color).trim() : null,
-    })
-    .select('id')
-    .single();
+  const row = {
+    tenant_id: tenant.id,
+    name: String(body.name ?? '').trim(),
+    name_alt: body.name_alt ? String(body.name_alt).trim() : null,
+    description: legacyDescription,
+    descriptions,
+    description_source: body.description_source === 'ai' || body.description_source === 'human' ? body.description_source : null,
+    price: parseFloat(body.price) || 0,
+    weight_grams: body.weight_grams ? parseInt(body.weight_grams, 10) : null,
+    stock: parseInt(body.stock, 10) || 0,
+    min_order_quantity: Number(body.min_order_quantity ?? 1),
+    order_quantity_step: Number(body.order_quantity_step ?? 1),
+    active: Boolean(body.active),
+    featured: Boolean(body.featured),
+    storage_type: body.storage_type ?? 'dry',
+    category_id: body.category_id,
+    warehouse_location: body.warehouse_location || null,
+    position,
+    compare_at_price: compareAtPrice,
+    ...(pricingColumns ?? {}),
+    new_until: novelty.value,
+    manual_new_until: novelty.value,
+    producer_id: body.producer_id || null,
+    importer_id: body.importer_id || null,
+    ingredients_text: body.ingredients_text ? String(body.ingredients_text).trim() : null,
+    allergens_text: body.allergens_text ? String(body.allergens_text).trim() : null,
+    gluten_free_certified: Boolean(body.gluten_free_certified),
+    usage_instructions: body.usage_instructions ? String(body.usage_instructions).trim() : null,
+    conservation_instructions: body.conservation_instructions ? String(body.conservation_instructions).trim() : null,
+    conservation_after_opening: body.conservation_after_opening ? String(body.conservation_after_opening).trim() : null,
+    country_of_origin: body.country_of_origin ? String(body.country_of_origin).trim() : null,
+    durability_type: body.durability_type || null,
+    quid_ingredient: body.quid_ingredient ? String(body.quid_ingredient).trim() : null,
+    quid_percentage: body.quid_percentage !== '' && body.quid_percentage != null ? parseFloat(body.quid_percentage) : null,
+    alcohol_pct: body.alcohol_pct !== '' && body.alcohol_pct != null ? parseFloat(body.alcohol_pct) : null,
+    net_quantity_display: body.net_quantity_display ? String(body.net_quantity_display).trim() : null,
+    ...sellingFormat.values,
+    fulfillment_policy: fulfillmentPolicy,
+    packaging_material: body.packaging_material ? String(body.packaging_material).trim() : null,
+    recycling_note: body.recycling_note ? String(body.recycling_note).trim() : null,
+    nutrition_basis: body.nutrition_basis === '100ml' ? '100ml' : '100g',
+    nutrition: cleanNutrition(body.nutrition),
+    ...(keepImages && duplicateSource ? duplicateGallery(duplicateSource) : {}),
+    // Fond lié à l'id du source : copié après l'insertion ; une autre URL est partagée telle quelle.
+    label_background_image_url: duplicateSource
+      ? (sourceLabelBackground ? null : duplicateSource.label_background_image_url)
+      : body.label_background_image_url ?? null,
+    label_background_color: body.label_background_color ? String(body.label_background_color).trim() : null,
+  };
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Slug unique dans le tenant (nom identique autorisé) : base, base-2, base-3…
+  // Une création concurrente sur le même slug (23505) relit les slugs pris et réessaie.
+  const slugBase = productSlugBase(String(body.name ?? ''));
+  let data: { id: string } | null = null;
+  let error: { code?: string; message: string } | null = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const { data: taken } = await supabase.from('products').select('slug').eq('tenant_id', tenant.id).like('slug', `${slugBase}%`);
+    const slug = nextAvailableSlug(slugBase, (taken ?? []).map((product: { slug: string }) => product.slug));
+    ({ data, error } = await supabase.from('products').insert({ ...row, slug }).select('id').single());
+    if (!error || error.code !== '23505' || !/slug/i.test(error.message)) break;
+  }
+
+  if (error || !data) return NextResponse.json({ error: error?.message ?? 'Création impossible.' }, { status: 500 });
+
+  if (sourceLabelBackground) {
+    // Copie du fichier (aucun traitement) : chaque fiche garde son propre fond.
+    const path = `labels/product-background-${data.id}.${sourceLabelBackground.ext}`;
+    const { error: copyError } = await supabase.storage.from('assets').copy(sourceLabelBackground.path, path);
+    if (copyError) console.error('[catalogue] Copie du fond d’étiquette échouée:', copyError.message);
+    else await supabase.from('products')
+      .update({ label_background_image_url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/${path}?v=${Date.now()}` })
+      .eq('id', data.id).eq('tenant_id', tenant.id);
+  }
 
   await syncProductEmbedding(tenant.id, data.id);
 

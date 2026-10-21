@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconCopy, IconDotsVertical, IconPhoto, IconSparkles } from '@tabler/icons-react';
+import { IconCopy, IconCopyPlus, IconDotsVertical, IconPhoto, IconSparkles } from '@tabler/icons-react';
 import { completenessIssues, stockTone } from '@/lib/catalog/catalogueFilters';
 import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { FULFILLMENT_POLICY_ADMIN_LABELS } from '@/lib/storefrontCopy/fulfillmentCopy';
@@ -18,7 +18,7 @@ import { useProductImageDelivery } from '@/providers/ProductImageDeliveryProvide
 import { cn } from '@/lib/utils/cn';
 import Badge from '../../_components/ui/Badge';
 import Button, { buttonClasses } from '../../_components/ui/Button';
-import Menu, { MenuButton } from '../../_components/ui/Menu';
+import Menu, { MenuButton, MenuLink } from '../../_components/ui/Menu';
 import { useAdminToast } from '../../_components/ui/Toaster';
 import { EmptyState } from '../../_components/ui/States';
 import DataTable, { type DataColumn } from '../../_components/data/DataTable';
@@ -166,6 +166,8 @@ export default function CatalogueTable({ products, tenantCurrency, canManage, li
         <Link href={editorHref(product.id)} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>{canManage ? 'Modifier' : 'Voir'}<span className="sr-only"> {product.name}</span></Link>
         <Menu label={`Plus d’actions pour ${product.name}`} triggerClassName={buttonClasses({ variant: 'ghost', size: 'sm' })} trigger={<IconDotsVertical size={16} aria-hidden="true" />}>
           {canManage && <MenuButton onSelect={() => void toggleActive(product)}>{active ? 'Désactiver' : 'Activer'}</MenuButton>}
+          {/* Ouvre la création pré-remplie : rien n'est créé avant « Créer le produit ». */}
+          {canManage && <MenuLink href={`/admin/catalogue/nouveau?duplicateFrom=${product.id}`}><IconCopyPlus size={16} aria-hidden="true" />Dupliquer le produit</MenuLink>}
           <MenuButton onSelect={() => void copySlug(product.slug)}><IconCopy size={16} aria-hidden="true" />Copier le slug</MenuButton>
         </Menu>
       </div>

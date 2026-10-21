@@ -12,10 +12,12 @@ import {
   IconX,
   IconTrash,
   IconTag,
+  IconCopyPlus,
 } from '@tabler/icons-react';
 import type { Producer, Importer, NutritionInfo, DurabilityType, CatalogCategoryOption, ProductFulfillmentPolicy, ProductImage } from '@lepefy/types';
 import { formatBarcodeDisplay } from '@/lib/barcodeFormat';
 import Button from '../../../_components/ui/Button';
+import Badge from '../../../_components/ui/Badge';
 import ConfirmDialog, { useUnsavedChangesGuard } from '../../../_components/ui/ConfirmDialog';
 import ProductRelationshipsEditor from './ProductRelationshipsEditor';
 import ProductMediaManager from './ProductMediaManager';
@@ -110,6 +112,8 @@ interface ProductEditProps {
   canManage?: boolean;
   /** Retrait en boutique activé pour la boutique (Paramètres → Retrait). */
   clickCollectEnabled?: boolean;
+  /** Création à partir d'un produit existant (brouillon de `toDuplicateDraft`) ; le serveur relit la source. */
+  duplicateFrom?: { id: string; name: string } | null;
 }
 
 interface FormState {
@@ -334,6 +338,7 @@ export default function ProductEditClient({
   fromCategory,
   canManage = true,
   clickCollectEnabled = true,
+  duplicateFrom = null,
 }: ProductEditProps) {
   const router = useRouter();
   const [activeTab, setActiveTab]       = useState<'generale' | 'etichetta' | 'associations'>('generale');
@@ -360,6 +365,8 @@ export default function ProductEditClient({
     : null;
   const [isGeneratingDescriptions, setIsGeneratingDescriptions] = useState(false);
   const [isSaving, setIsSaving]         = useState(false);
+  // Duplication : reprendre la galerie du produit d'origine (copiée côté serveur depuis la source).
+  const [keepSourceImages, setKeepSourceImages] = useState(true);
   const [isDraggingLabelBg, setIsDraggingLabelBg]   = useState(false);
   const [isUploadingLabelBg, setIsUploadingLabelBg] = useState(false);
   const [isRegeneratingBarcode, setIsRegeneratingBarcode] = useState(false);
@@ -382,6 +389,11 @@ export default function ProductEditClient({
   function showToast(msg: string, type: 'success' | 'error') {
     setToast({ msg, type });
   }
+
+  // Duplication : champs qui changent presque toujours d'une variante à l'autre (forme, jamais couleur seule).
+  const reviewHint = isNew && duplicateFrom
+    ? <span className="ml-2 inline-flex align-middle"><Badge tone="warning">à vérifier</Badge></span>
+    : null;
 
   // Unsaved changes: confirm before leaving (browser navigation and in-app links).
   const unsavedGuard = useUnsavedChangesGuard(dirty, 'Vos modifications seront perdues.');
@@ -416,7 +428,9 @@ export default function ProductEditClient({
     }
     // Creation sends everything; an edit sends only the changed fields so a
     // stock or price changed elsewhere since opening is never overwritten.
-    const body = isNew ? currentBody : productPatchPayload(baselineBody, currentBody);
+    const body = isNew
+      ? { ...currentBody, ...(duplicateFrom ? { duplicate_from: duplicateFrom.id, duplicate_images: keepSourceImages } : {}) }
+      : productPatchPayload(baselineBody, currentBody);
     if (!isNew && Object.keys(body).length === 0) { showToast('Aucune modification à enregistrer', 'success'); return; }
     setIsSaving(true);
     try {
@@ -585,13 +599,24 @@ export default function ProductEditClient({
         {!isNew && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-a-text-3">slug : <span className="font-mono">{product.slug}</span></p>
-            <Link
-              href={`/admin/products/${product.id}/etichetta`}
-              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-a-border px-4 text-sm font-medium text-a-text-2 transition-colors hover:bg-a-surface-2"
-            >
-              <IconTag size={16} aria-hidden="true" />
-              Étiquette
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              {canManage && (
+                <Link
+                  href={`/admin/catalogue/nouveau?duplicateFrom=${product.id}`}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-a-border px-4 text-sm font-medium text-a-text-2 transition-colors hover:bg-a-surface-2"
+                >
+                  <IconCopyPlus size={16} aria-hidden="true" />
+                  Dupliquer
+                </Link>
+              )}
+              <Link
+                href={`/admin/products/${product.id}/etichetta`}
+                className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-a-border px-4 text-sm font-medium text-a-text-2 transition-colors hover:bg-a-surface-2"
+              >
+                <IconTag size={16} aria-hidden="true" />
+                Étiquette
+              </Link>
+            </div>
           </div>
         )}
 
@@ -641,7 +666,7 @@ export default function ProductEditClient({
               <h2 className={SECTION_TITLE_CLS}>Informations</h2>
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="product-name" className={LABEL_CLS}>Nom du produit</label>
+                  <label htmlFor="product-name" className={LABEL_CLS}>Nom du produit{reviewHint}</label>
                   <input
                     id="product-name"
                     type="text"
@@ -734,7 +759,7 @@ export default function ProductEditClient({
               </div>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label htmlFor="product-price" className={LABEL_CLS}>Prix normal (€)</label>
+                  <label htmlFor="product-price" className={LABEL_CLS}>Prix normal (€){reviewHint}</label>
                   <input
                     id="product-price"
                     type="number"
@@ -833,6 +858,11 @@ export default function ProductEditClient({
               initialImages={formData.images}
               aiEnabled={aiEnabled}
               isNew={isNew}
+              inherited={isNew && duplicateFrom ? {
+                sourceName: duplicateFrom.name,
+                keep: keepSourceImages,
+                onKeepChange: setKeepSourceImages,
+              } : undefined}
               onChange={(imageUrl, images) => {
                 // Gallery changes are persisted by the media routes themselves.
                 setFormData((previous) => ({ ...previous, image_url: imageUrl, images }));
@@ -892,7 +922,7 @@ export default function ProductEditClient({
             <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h2 className={SECTION_TITLE_CLS}>Stock</h2>
               <div>
-                <label htmlFor="product-stock" className={LABEL_CLS}>Quantité disponible</label>
+                <label htmlFor="product-stock" className={LABEL_CLS}>Quantité disponible{reviewHint}</label>
                 <input
                   id="product-stock"
                   type="number"
@@ -909,7 +939,7 @@ export default function ProductEditClient({
               <h2 className={SECTION_TITLE_CLS}>Règles de vente</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="product-min-qty" className={LABEL_CLS}>Quantité minimale</label>
+                  <label htmlFor="product-min-qty" className={LABEL_CLS}>Quantité minimale{reviewHint}</label>
                   <input
                     id="product-min-qty"
                     type="number"
@@ -982,7 +1012,7 @@ export default function ProductEditClient({
             </section>
 
             <section className="bg-a-surface rounded-xl border border-a-border p-5">
-              <h2 className={SECTION_TITLE_CLS}>Format de vente</h2>
+              <h2 className={SECTION_TITLE_CLS}>Format de vente{reviewHint}</h2>
               <p className="-mt-2 mb-4 text-xs text-a-text-3">
                 Ce que le client achète pour ce prix. Le poids d’expédition n’est jamais utilisé ici.
               </p>
@@ -1339,9 +1369,21 @@ export default function ProductEditClient({
             <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h3 className={SECTION_TITLE_CLS}>Fond d&apos;étiquette</h3>
               {isNew ? (
-                <p className="text-xs text-a-text-3">
-                  Enregistrez d&apos;abord le produit pour ajouter un fond d&apos;étiquette.
-                </p>
+                duplicateFrom && formData.label_background_image_url ? (
+                  <>
+                    <div className="relative mb-2 aspect-[4/3] w-full overflow-hidden rounded-lg bg-a-hover">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={formData.label_background_image_url} alt="Fond étiquette repris" className="h-full w-full object-cover" />
+                    </div>
+                    <p className="mb-4 text-xs text-a-text-3">
+                      Repris de « {duplicateFrom.name} » : une copie propre à ce produit est créée avec lui.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-a-text-3">
+                    Enregistrez d&apos;abord le produit pour ajouter un fond d&apos;étiquette.
+                  </p>
+                )
               ) : (
                 <>
                   <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-a-hover mb-4">
@@ -1456,7 +1498,9 @@ export default function ProductEditClient({
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
             <p className="min-w-0 text-sm text-a-text-2" aria-live="polite">
               {isNew
-                ? 'Nouveau produit : complétez l’essentiel puis créez-le.'
+                ? duplicateFrom
+                  ? `Copie de « ${duplicateFrom.name} » : vérifiez nom, format et prix puis créez-le.`
+                  : 'Nouveau produit : complétez l’essentiel puis créez-le.'
                 : dirty
                   ? <><span className="text-tone-warning-fg" aria-hidden="true">● </span>{changedKeys.length} modification{changedKeys.length > 1 ? 's' : ''} non enregistrée{changedKeys.length > 1 ? 's' : ''} · <span className="text-a-text-3">{changedFieldLabels(changedKeys).join(', ')}</span></>
                   : 'Aucune modification'}

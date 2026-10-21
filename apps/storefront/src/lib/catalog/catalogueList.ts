@@ -28,6 +28,8 @@ export interface CatalogueListProduct {
   warehouse_location: string | null;
   description_source: 'ai' | 'human' | null;
   barcode_value: string | null;
+  /** Format affiché (« 500 g ») : aperçu du sélecteur de duplication. */
+  net_quantity_display: string | null;
   // Mise en avant (migration 156).
   compare_at_price: number | null;
   promo_price: number | null;
@@ -99,7 +101,7 @@ export async function loadCatalogueList(
       id, name, slug, price, stock, active, weight_grams, category_id,
       image_url, storage_type, fulfillment_policy, warehouse_location, description_source,
       compare_at_price, promo_price, promo_applied, promo_ends_at, new_until,
-      barcode_value, categories(name, slug)
+      barcode_value, net_quantity_display, categories(name, slug)
     `, { count: 'exact' }));
 
   const from = (page - 1) * limit;

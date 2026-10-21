@@ -65,6 +65,8 @@ interface ProductMediaManagerProps {
   initialImages: ProductImage[];
   aiEnabled: boolean;
   isNew: boolean;
+  /** Création par duplication : aperçu de la galerie d'origine, reprise (ou non) à la création. */
+  inherited?: { sourceName: string; keep: boolean; onKeepChange: (keep: boolean) => void };
   onChange: (imageUrl: string | null, images: ProductImage[]) => void;
   onToast: (message: string, type: 'success' | 'error') => void;
 }
@@ -79,6 +81,7 @@ export default function ProductMediaManager({
   initialImages,
   aiEnabled,
   isNew,
+  inherited,
   onChange,
   onToast,
 }: ProductMediaManagerProps) {
@@ -228,6 +231,50 @@ export default function ProductMediaManager({
     } finally {
       setIsDeleting(false);
     }
+  }
+
+  if (isNew && inherited && images.length > 0) {
+    return (
+      <section className="rounded-xl border border-a-border bg-a-surface p-5">
+        <h2 className="text-sm font-semibold text-a-text-2">Médias</h2>
+        <p className="mt-1 text-xs text-a-text-3">
+          {images.length} image{images.length > 1 ? 's' : ''} de « {inherited.sourceName} » · la première est la couverture
+        </p>
+        <ul className={'mt-4 grid grid-cols-3 gap-2 transition-opacity' + (inherited.keep ? '' : ' opacity-40')} aria-label="Images du produit d’origine">
+          {images.map((image, index) => (
+            <li key={image.url} className="relative aspect-square overflow-hidden rounded-lg border border-a-border bg-a-hover">
+              <LepefyImage
+                src={image.url}
+                variant="thumbnail"
+                alt={image.alt || productName}
+                fill
+                className="object-cover"
+                sizes="96px"
+              />
+              {index === 0 && (
+                <span className="absolute left-1 top-1 rounded-full bg-a-surface px-1.5 py-0.5 text-xs font-semibold text-a-text shadow-sm">
+                  Principale
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+        <label className="mt-4 flex min-h-10 cursor-pointer items-start gap-2 text-sm text-a-text-2">
+          <input
+            type="checkbox"
+            checked={inherited.keep}
+            onChange={(event) => inherited.onKeepChange(event.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-a-field"
+          />
+          <span>
+            Reprendre ces images
+            <span className="block text-xs text-a-text-3">
+              Réorganisables ou supprimables après la création, sans toucher au produit d’origine.
+            </span>
+          </span>
+        </label>
+      </section>
+    );
   }
 
   if (isNew) {

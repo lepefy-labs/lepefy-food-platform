@@ -1,9 +1,15 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getAiCapabilities } from '@/lib/ai/aiSettings';
 import ProductEditClient from '../[id]/ProductEditClient';
 import ProductEditWorkspace from '../[id]/ProductEditWorkspace';
+import DuplicateSourceBar from './DuplicateSourceBar';
+import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
+import {
+  DUPLICATE_SOURCE_SELECT, emptyProductDraft, parseDuplicateSourceId, toDuplicateDraft, type DuplicateSourceRow,
+} from '@/lib/catalog/productDuplication';
 
 // Surface admin — reste dynamique (cf. audit Prompt 4, classification
 // "/admin/**"). Explicite depuis que getTenant() n'utilise plus cookies() :
@@ -12,11 +18,25 @@ import ProductEditWorkspace from '../[id]/ProductEditWorkspace';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-export default async function AdminNouveauProduitPage() {
+export default async function AdminNouveauProduitPage({
+  searchParams,
+}: {
+  searchParams: { duplicateFrom?: string | string[] };
+}) {
   const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant   = await getTenant(slug);
   const supabase = createServiceClient();
-  const ai = await getAiCapabilities(supabase, tenant.id, tenant);
+  const [ai, access] = await Promise.all([getAiCapabilities(supabase, tenant.id, tenant), getCurrentAdminAccessContext(tenant.id)]);
+  // Créer (et donc dupliquer) demande catalog.manage ; POST /api/admin/catalogue le revérifie.
+  if (!access || !canAdmin(access, 'catalog.manage')) redirect('/admin/catalogue');
+
+  // Duplication : seul l'id voyage dans l'URL ; la source est relue ici, dans ce tenant uniquement.
+  const rawSourceId = Array.isArray(searchParams.duplicateFrom) ? searchParams.duplicateFrom[0] : searchParams.duplicateFrom;
+  const sourceId = parseDuplicateSourceId(rawSourceId);
+  const { data: sourceRow } = sourceId
+    ? await supabase.from('products').select(DUPLICATE_SOURCE_SELECT).eq('id', sourceId).eq('tenant_id', tenant.id).maybeSingle()
+    : { data: null };
+  const source = (sourceRow as unknown as DuplicateSourceRow | null) ?? null;
 
   const { data: categories } = await supabase
     .from('categories')
@@ -38,62 +58,8 @@ export default async function AdminNouveauProduitPage() {
     .eq('active', true)
     .order('name');
 
-  const emptyProduct = {
-    id:                          '',
-    name:                        '',
-    name_alt:                    null,
-    slug:                        '',
-    description:                 null,
-    descriptions:                null,
-    description_source:          null,
-    price:                       0,
-    compare_at_price:             null,
-    promo_price:                 null,
-    promo_starts_at:             null,
-    promo_ends_at:               null,
-    promo_until_sold_out:        false,
-    promo_applied:               false,
-    new_until:                   null,
-    manual_new_until:            null,
-    position:                    9999,
-    weight_grams:                null,
-    stock:                       0,
-    min_order_quantity:          1,
-    order_quantity_step:         1,
-    active:                      false,
-    featured:                    false,
-    storage_type:                'dry',
-    image_url:                   null,
-    images:                      [],
-    warehouse_location:          null,
-    category_id:                 categories?.[0]?.id ?? '',
-    producer_id:                 null,
-    importer_id:                 null,
-    ingredients_text:            null,
-    allergens_text:              null,
-    gluten_free_certified:       false,
-    usage_instructions:          null,
-    conservation_instructions:   null,
-    conservation_after_opening:  null,
-    country_of_origin:           null,
-    durability_type:             null,
-    quid_ingredient:              null,
-    quid_percentage:              null,
-    alcohol_pct:                  null,
-    net_quantity_display:         null,
-    sale_unit:                    null,
-    net_content_value:            null,
-    net_content_unit:             null,
-    pack_count:                   null,
-    fulfillment_policy:           'delivery_or_pickup' as const,
-    packaging_material:           null,
-    recycling_note:               null,
-    nutrition_basis:              '100g' as const,
-    nutrition:                    null,
-    label_background_image_url:   null,
-    label_background_color:       null,
-    barcode_value:                null,
-  };
+  const draft = source ? toDuplicateDraft(source) : emptyProductDraft(categories?.[0]?.id ?? '');
+  const categoryName = categories?.find((category: { id: string; name: string }) => category.id === draft.category_id)?.name ?? null;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -103,17 +69,26 @@ export default async function AdminNouveauProduitPage() {
       >
         ← Catalogue
       </Link>
+      <DuplicateSourceBar
+        source={source ? { id: source.id, name: source.name } : null}
+        sourceMissing={rawSourceId != null && !source}
+        tenantCurrency={tenant.currency}
+      />
       <ProductEditWorkspace
         isNew={true}
         productName="Nouveau produit"
-        categoryName={categories?.[0]?.name ?? null}
+        categoryName={categoryName}
         active={false}
         stock={0}
-        hasImage={false}
-        descriptionSource={null}
+        hasImage={Boolean(draft.image_url)}
+        descriptionSource={draft.description_source}
+        fulfillmentPolicy={draft.fulfillment_policy}
+        pickupDisabled={!tenant.click_collect_enabled}
       >
         <ProductEditClient
-          product={emptyProduct}
+          // Un autre produit source (ou « Repartir de zéro ») réinitialise tout le formulaire.
+          key={source?.id ?? 'new'}
+          product={draft}
           categories={categories ?? []}
           producers={producers ?? []}
           importers={importers ?? []}
@@ -124,6 +99,7 @@ export default async function AdminNouveauProduitPage() {
           aiDescriptionsEnabled={ai.descriptionGeneration}
           isNew={true}
           clickCollectEnabled={Boolean(tenant.click_collect_enabled)}
+          duplicateFrom={source ? { id: source.id, name: source.name } : null}
         />
       </ProductEditWorkspace>
     </div>
