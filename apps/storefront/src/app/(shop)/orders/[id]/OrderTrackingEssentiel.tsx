@@ -16,7 +16,7 @@ export interface TrackingSummary {
   total: string;
 }
 
-export interface TrackingAddress { place: string; country: string | null }
+export interface TrackingAddress { lines: string[] }
 
 const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2';
 
@@ -212,7 +212,9 @@ export default function OrderTrackingEssentiel({ view, summary, address, support
 
           {view.fulfillment === 'delivery' ? (
             <Disclosure icon={<IconMapPin size={18} />} title="Adresse de livraison">
-              {address ? <p>{address.place}{address.country ? <><br />{address.country}</> : null}</p> : <p>Adresse non disponible sur cette page.</p>}
+              {address
+                ? <address className="not-italic">{address.lines.map((line, index) => <span key={index} className={`block ${index === 0 ? 'font-semibold text-gray-900' : ''}`}>{line}</span>)}</address>
+                : <p>Adresse non renseignée.</p>}
             </Disclosure>
           ) : (
             <Disclosure icon={<IconBuildingStore size={18} />} title="Retrait en boutique">

@@ -145,10 +145,13 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
     total: formatPrice(total, currency),
   };
 
-  // Postal code, city and country only (the page opens from a shareable link), as on the order confirmation.
+  // Full delivery address with the recipient's name, as on the previous version of this page.
   const address = order.shipping_address;
-  const place = [address?.postal_code, address?.city].filter(Boolean).join(' ').trim();
-  const trackingAddress: TrackingAddress | null = place ? { place, country: countryName(address?.country) } : null;
+  const cityLine = [address?.postal_code, address?.city].filter(Boolean).join(' ').trim();
+  const addressLines = [address?.full_name, address?.line1, address?.line2, cityLine, countryName(address?.country)]
+    .map((line) => line?.trim())
+    .filter((line): line is string => Boolean(line));
+  const trackingAddress: TrackingAddress | null = addressLines.length ? { lines: addressLines } : null;
 
   return (
     <OrderTrackingEssentiel
