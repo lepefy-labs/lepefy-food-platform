@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 import type { Order } from '@lepefy/types';
 import {
-  buildPacklinkDraftPayload, classifyPacklinkDraftStatus, packlinkAdapter, selectPacklinkWarehouse,
+  buildPacklinkDraftPayload, classifyPacklinkDraftStatus, packlinkAdapter, packlinkPostalZoneName, selectPacklinkPostalCode,
+  selectPacklinkWarehouse,
 } from '../../src/lib/shipping/providers/packlink';
 import { getShippingProvider } from '../../src/lib/shipping/providers/registry';
 import { ShippingProviderError, type ShippingProviderAdapter } from '../../src/lib/shipping/providers/types';
@@ -105,9 +106,15 @@ const WAREHOUSES = [
   { id: 'w1', alias: 'Dépôt', name: 'Chloé', surname: 'Food', company: 'Chloe Food', address: 'Via Emilia 10',
     postal_code: '42122 - Reggio Emilia', country: 'IT', phone: '+39 0522 000000', email: 'depot@example.invalid', default_selection: true },
 ];
+/** Shapes of GET locations/postalcodes/{country}/{zip} and locations/postalzones/destinations (observed 20/10/2026). */
+const POSTAL_CODES: Record<string, unknown[]> = {
+  'IT/42122': [{ id: 'zc-42122', zipcode: '42122', zipcodeCity: "42122 - Reggio nell'Emilia", postalZoneId: 113, city: { name: "Reggio nell'Emilia" } }],
+  'IT/42121': [{ id: 'zc-42121', zipcode: '42121', zipcodeCity: "42121 - Reggio nell'Emilia", postalZoneId: 113, city: { name: "Reggio nell'Emilia" } }],
+};
+const POSTAL_ZONES = [{ id: '113', name: 'Italia', isoCode: 'IT' }, { id: '115', name: 'Sicilia- Italia', isoCode: 'IT' }, { id: '76', name: 'Francia', isoCode: 'FR' }];
 type DraftReply = { status: number; body?: unknown } | 'timeout' | 'network';
 /** Stubs global fetch for the Packlink API only; any other host fails the test (no email, no network). */
-function packlink(reply: DraftReply = { status: 200, body: { reference: 'IT2026PRO0006415025' } }) {
+function packlink(reply: DraftReply = { status: 200, body: { reference: 'IT2026PRO0006415025' } }, lookups: 'ok' | 'down' = 'ok') {
   const calls: { method: string; url: string; body: Record<string, unknown> | null; auth: string | null }[] = [];
   const original = globalThis.fetch;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -117,6 +124,12 @@ function packlink(reply: DraftReply = { status: 200, body: { reference: 'IT2026P
     await new Promise(resolve => setTimeout(resolve, 1));
     if (!url.startsWith('https://api.packlink.com/v1/')) throw new Error('unexpected host ' + url);
     if (url.endsWith('/clients/warehouses')) return new Response(JSON.stringify(WAREHOUSES), { status: 200 });
+    if (url.includes('/v1/locations/')) {
+      if (lookups === 'down') return new Response('{}', { status: 500 });
+      if (url.includes('/locations/postalzones/destinations?')) return new Response(JSON.stringify(POSTAL_ZONES), { status: 200 });
+      const codes = POSTAL_CODES[url.split('/locations/postalcodes/')[1] ?? ''];
+      return new Response(JSON.stringify(codes ?? []), { status: 200 });
+    }
     if (url.endsWith('/shipments') && method === 'POST') {
       if (reply === 'timeout') throw Object.assign(new Error('timeout'), { name: 'TimeoutError' });
       if (reply === 'network') throw new TypeError('fetch failed');
@@ -135,7 +148,7 @@ function packlink(reply: DraftReply = { status: 200, body: { reference: 'IT2026P
 }
 
 let api: ReturnType<typeof packlink> | null = null;
-const mock = (reply?: DraftReply) => (api = packlink(reply));
+const mock = (reply?: DraftReply, lookups?: 'ok' | 'down') => (api = packlink(reply, lookups));
 test.afterEach(() => { api?.restore(); api = null; });
 
 // ─── Pure building blocks ──────────────────────────────────────────────────────
@@ -432,6 +445,111 @@ test('14-16. incomplete address, missing weight or box size: explicit error, Pac
   // Not retryable automatically.
   expect(await runShipmentDraftBatch(noPhone.service, deps(undefined, undefined, new Date('2026-10-10T10:00:00Z')))).toMatchObject({ processed: 0 });
   expect(http.calls).toHaveLength(0);
+});
+
+// ─── Recipient CAP and Packlink PRO location (draft editor keeps the CAP) ───────
+const draftFor = (address: Record<string, unknown>, weightG = 12_500) => buildShipmentDraftInput({
+  order: baseOrder({ shipping_address: { full_name: 'Awa Marie Diallo', line1: 'Via Roma 1', ...address } as unknown as Order['shipping_address'],
+    shipping_details: { totalWeightG: weightG } }),
+  items: [], productWeights: new Map(), profiles: PROFILES, packaging: PACKAGING, content: 'Alimenti Non Deperibili', currency: 'EUR',
+});
+
+test('CAP: leading zeros and short codes survive as strings up to the serialized payload (IT, FR, BE, DE)', () => {
+  const warehouse = selectPacklinkWarehouse(WAREHOUSES)!;
+  for (const [country, zip, city] of [['IT', '00144', 'Roma'], ['IT', '42122', 'Reggio Emilia'], ['FR', '75001', 'Paris'], ['BE', '1000', 'Bruxelles'], ['DE', '01067', 'Dresden']]) {
+    const built = draftFor({ postal_code: ` ${zip} `, city, country });
+    expect(built.ok).toBe(true);
+    if (!built.ok) continue;
+    expect(built.input.recipient).toMatchObject({ postalCode: zip, city, country });
+    const json = JSON.stringify(buildPacklinkDraftPayload(warehouse, built.input));
+    expect(json).toContain(`"zip_code":"${zip}"`);
+  }
+});
+
+test('CAP, city or country missing/invalid: controlled error before any provider call', () => {
+  expect(draftFor({ city: 'Roma', country: 'IT' })).toMatchObject({ ok: false, code: 'invalid_recipient', detail: 'code postal' });
+  expect(draftFor({ postal_code: '00144', country: 'IT' })).toMatchObject({ ok: false, code: 'invalid_recipient', detail: 'ville' });
+  for (const country of ['', 'I', 'ITA', '1T']) {
+    expect(draftFor({ postal_code: '00144', city: 'Roma', country })).toMatchObject({ ok: false, code: 'invalid_recipient', detail: 'pays' });
+  }
+});
+
+test('changing the parcels never touches the recipient address in the Lepefy model', () => {
+  const light = draftFor({ postal_code: '00144', city: 'Roma', country: 'IT' }, 2_000);
+  const heavy = draftFor({ postal_code: '00144', city: 'Roma', country: 'IT' }, 27_000);
+  expect(light.ok && heavy.ok).toBe(true);
+  if (!light.ok || !heavy.ok) return;
+  expect(heavy.input.parcels.length).toBeGreaterThan(light.input.parcels.length);
+  expect(heavy.input.recipient).toEqual(light.input.recipient);
+});
+
+test('Packlink location: city disambiguates a shared CAP, a single record wins, ambiguity is never guessed', () => {
+  const roma = [
+    { id: 'acilia', zipcode: '00132', postalZoneId: 113, city: { name: 'Acilia-Castel Fusano-Ostia Antica' } },
+    { id: 'roma', zipcode: '00132', postalZoneId: 113, city: { name: 'Roma' } },
+  ];
+  expect(selectPacklinkPostalCode(roma, '00132', ' ROMA ')).toEqual({ zipCodeId: 'roma', postalZoneId: '113' });
+  expect(selectPacklinkPostalCode(roma, '00132', 'Ostia')).toBeNull();
+  expect(selectPacklinkPostalCode(POSTAL_CODES['IT/42122'], '42122', 'Reggio Emilia')).toEqual({ zipCodeId: 'zc-42122', postalZoneId: '113' });
+  expect(selectPacklinkPostalCode([{ id: 'x', zipcode: '00144', postalZoneId: 113, city: { name: 'Roma' } }], '144', 'Roma')).toBeNull();
+  expect(selectPacklinkPostalCode({ messages: ['not found'] }, '00144', 'Roma')).toBeNull();
+  expect(selectPacklinkPostalCode([{ id: 'x', zipcode: '00144', postalZoneId: 'Italia', city: { name: 'Roma' } }], '00144', 'Roma')).toBeNull();
+  expect(packlinkPostalZoneName(POSTAL_ZONES, '113')).toBe('Italia');
+  expect(packlinkPostalZoneName(POSTAL_ZONES, '999')).toBeNull();
+});
+
+test('payload with locations: additional_data and state as Packlink PRO stores them, warehouse id, zip_code kept', () => {
+  const built = draftFor({ postal_code: '00144', city: 'Roma', country: 'IT' });
+  if (!built.ok) throw new Error('draft input');
+  const warehouse = selectPacklinkWarehouse(WAREHOUSES)!;
+  expect(warehouse.id).toBe('w1');
+  const payload = buildPacklinkDraftPayload(warehouse, built.input, {
+    from: { zipCodeId: 'zc-42122', postalZoneId: '113', postalZoneName: 'Italia' },
+    to: { zipCodeId: 'zc-00144', postalZoneId: '113', postalZoneName: 'Italia' },
+  });
+  expect(payload).toMatchObject({
+    from: { zip_code: '42122', city: 'Reggio Emilia', country: 'IT', state: 'Italia' },
+    to: { zip_code: '00144', city: 'Roma', country: 'IT', state: 'Italia' },
+    additional_data: {
+      postal_zone_id_from: '113', postal_zone_name_from: 'Italia', zip_code_id_from: 'zc-42122',
+      postal_zone_id_to: '113', postal_zone_name_to: 'Italia', zip_code_id_to: 'zc-00144', selectedWarehouseId: 'w1',
+    },
+  });
+  // The warehouse id is never sent as an address field.
+  expect(payload.from).not.toHaveProperty('id');
+  // Unresolved side: only zip_code, no state, no ids (pre-fix payload for that side).
+  const partial = buildPacklinkDraftPayload(warehouse, built.input, { from: null, to: null });
+  expect(partial.to).not.toHaveProperty('state');
+  expect(partial.additional_data).toEqual({ selectedWarehouseId: 'w1' });
+});
+
+test('adapter: locations are read before the single POST; a lookup outage still creates the draft with zip_code', async () => {
+  const http = mock();
+  const db = fakeDb(baseOrder({ shipping_creation_status: 'pending' }));
+  await createShipmentDraftForOrder(db.service, 'tenant-a', ORDER_ID, { mode: 'manual' }, deps());
+  expect(db.order().shipping_creation_status).toBe('draft_created');
+  const lookups = http.calls.filter(call => call.url.includes('/locations/'));
+  expect(lookups.map(call => call.method)).toEqual(['GET', 'GET', 'GET']);
+  expect(lookups.some(call => call.url.endsWith('/locations/postalcodes/IT/42121'))).toBe(true);
+  expect(lookups.some(call => call.url.includes('platform_country=IT') && call.url.includes('language=it_IT'))).toBe(true);
+  const postIndex = http.calls.findIndex(call => call.method === 'POST');
+  expect(http.calls.slice(postIndex + 1).some(call => call.url.includes('/locations/'))).toBe(false);
+  expect(http.posts()).toHaveLength(1);
+  expect(http.posts()[0]!.body).toMatchObject({
+    to: { zip_code: '42121', city: 'Reggio Emilia', state: 'Italia' },
+    additional_data: { zip_code_id_to: 'zc-42121', postal_zone_id_to: '113', zip_code_id_from: 'zc-42122', selectedWarehouseId: 'w1' },
+  });
+  http.restore();
+
+  const down = mock(undefined, 'down');
+  const db2 = fakeDb(baseOrder({ shipping_creation_status: 'pending' }));
+  await createShipmentDraftForOrder(db2.service, 'tenant-a', ORDER_ID, { mode: 'manual' }, deps());
+  expect(db2.order().shipping_creation_status).toBe('draft_created');
+  expect(down.posts()).toHaveLength(1);
+  const body = down.posts()[0]!.body!;
+  expect(body.to).toMatchObject({ zip_code: '42121', city: 'Reggio Emilia', country: 'IT' });
+  expect(body.to).not.toHaveProperty('state');
+  expect(body.additional_data).toEqual({ selectedWarehouseId: 'w1' });
 });
 
 test('missing Packlink key or default warehouse: missing_configuration before any draft POST', async () => {

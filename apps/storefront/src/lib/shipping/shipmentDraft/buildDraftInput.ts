@@ -83,7 +83,8 @@ export function buildShipmentDraftInput({ order, items, productWeights, profiles
   const street1 = clean(address.line1, 120);
   const postalCode = clean(address.postal_code, 20);
   const city = clean(address.city, 80);
-  const country = clean(address.country, 2).toUpperCase();
+  // Validated whole, never truncated: "ITA" is refused, not silently sent as "IT".
+  const country = clean(address.country, 8).toUpperCase();
   const phone = orderContactPhone(order.notes);
   const missing = [
     !fullName && 'nom', !street1 && 'adresse', !postalCode && 'code postal', !city && 'ville',

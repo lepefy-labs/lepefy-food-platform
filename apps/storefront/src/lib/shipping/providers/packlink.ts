@@ -151,13 +151,49 @@ export interface PacklinkAddress {
   name: string; surname: string | null; company: string | null; street1: string; street2: string | null;
   zip_code: string; city: string; country: string; phone: string | null; email: string | null;
 }
+export interface PacklinkWarehouse extends PacklinkAddress { id: string | null }
+
+/**
+ * Packlink PRO location of an address: its postal-code record and postal zone.
+ * Packlink PRO binds the CAP field of its draft editor to these ids, not to
+ * `zip_code`: a draft posted without them shows an empty CAP as soon as the
+ * team edits weight or dimensions (verified on IT2026PRO0007024556, 20/10/2026).
+ */
+export interface PacklinkLocation { zipCodeId: string; postalZoneId: string; postalZoneName: string | null }
+
+const placeKey = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Pure: picks the record of `GET locations/postalcodes/{country}/{zip}` for an
+ * address. One CAP can list several localities (00132 → 25): the one named
+ * like the address city wins; a single record is taken whatever its spelling
+ * ("Reggio Emilia" vs "Reggio nell'Emilia"). Ambiguous or unknown → null, the
+ * draft keeps only `zip_code` (never a guessed locality).
+ */
+export function selectPacklinkPostalCode(payload: unknown, zip: string, city: string): Omit<PacklinkLocation, 'postalZoneName'> | null {
+  const records = (Array.isArray(payload) ? payload : []).map(object).flatMap(row => {
+    const id = text(row.id, 64);
+    const zone = typeof row.postalZoneId === 'number' || typeof row.postalZoneId === 'string' ? String(row.postalZoneId).trim() : '';
+    if (!id || !/^\d{1,6}$/.test(zone) || text(row.zipcode, 40) !== zip) return [];
+    return [{ zipCodeId: id, postalZoneId: zone, city: placeKey(text(object(row.city).name) ?? '') }];
+  });
+  const named = records.filter(record => record.city && record.city === placeKey(city));
+  const chosen = named.length === 1 ? named[0] : records.length === 1 ? records[0] : undefined;
+  return chosen ? { zipCodeId: chosen.zipCodeId, postalZoneId: chosen.postalZoneId } : null;
+}
+
+/** Pure: name of a postal zone in `GET locations/postalzones/destinations` (e.g. 113 → "Italia"). */
+export function packlinkPostalZoneName(payload: unknown, postalZoneId: string): string | null {
+  const zone = (Array.isArray(payload) ? payload : []).map(object).find(row => String(row.id ?? '') === postalZoneId);
+  return zone ? text(zone.name, 80) : null;
+}
 
 /**
  * Sender = the account's default Packlink PRO warehouse (official connector:
  * GET clients/warehouses, `default_selection`). A single warehouse counts as
  * default. `postal_code` may be "<code> - <city>" (Warehouse::fromArray).
  */
-export function selectPacklinkWarehouse(payload: unknown): PacklinkAddress | null {
+export function selectPacklinkWarehouse(payload: unknown): PacklinkWarehouse | null {
   const list = Array.isArray(payload) ? payload : Array.isArray(object(payload).warehouses) ? object(payload).warehouses as unknown[] : [];
   const warehouses = list.map(object);
   const chosen = warehouses.find(row => row.default_selection === true) ?? (warehouses.length === 1 ? warehouses[0] : undefined);
@@ -171,21 +207,42 @@ export function selectPacklinkWarehouse(payload: unknown): PacklinkAddress | nul
   const name = text(chosen.name, 80) ?? text(chosen.company, 80);
   if (!zip || !city || !country || !street1 || !name) return null;
   return {
-    name, surname: text(chosen.surname, 80), company: text(chosen.company, 80), street1, street2: null,
+    id: text(chosen.id, 64), name, surname: text(chosen.surname, 80), company: text(chosen.company, 80), street1, street2: null,
     zip_code: zip, city, country, phone: text(chosen.phone, 40), email: text(chosen.email, 160),
   };
 }
 
-/** Pure payload builder (Draft.php keys); no service_id: the service is chosen and purchased in Packlink PRO. */
-export function buildPacklinkDraftPayload(from: PacklinkAddress, input: ProviderShipmentDraftInput): Record<string, unknown> {
+export interface PacklinkDraftLocations { from: PacklinkLocation | null; to: PacklinkLocation | null }
+
+/**
+ * Pure payload builder (Draft.php keys); no service_id: the service is chosen and purchased in Packlink PRO.
+ * `additional_data` carries what Packlink PRO itself stores when the CAP is picked in its editor
+ * (postal zone, postal-code record, `state` = zone name) plus the warehouse id (official connector).
+ * A side without a resolved location keeps only `zip_code`, as before.
+ */
+export function buildPacklinkDraftPayload(
+  from: PacklinkWarehouse, input: ProviderShipmentDraftInput, locations: PacklinkDraftLocations = { from: null, to: null },
+): Record<string, unknown> {
   const r = input.recipient;
-  const compact = (value: Record<string, unknown>) => Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== ''));
+  const compact = (value: Record<string, unknown>) => Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== undefined && v !== ''));
+  const additional = compact({
+    postal_zone_id_from: locations.from?.postalZoneId, postal_zone_name_from: locations.from?.postalZoneName,
+    zip_code_id_from: locations.from?.zipCodeId,
+    postal_zone_id_to: locations.to?.postalZoneId, postal_zone_name_to: locations.to?.postalZoneName,
+    zip_code_id_to: locations.to?.zipCodeId,
+    selectedWarehouseId: from.id,
+  });
   return {
-    from: compact({ ...from }),
+    from: compact({
+      name: from.name, surname: from.surname, company: from.company, street1: from.street1, street2: from.street2,
+      zip_code: from.zip_code, city: from.city, country: from.country, state: locations.from?.postalZoneName,
+      phone: from.phone, email: from.email,
+    }),
     to: compact({
       name: r.firstName, surname: r.lastName, street1: r.street1, street2: r.street2,
-      zip_code: r.postalCode, city: r.city, country: r.country, phone: r.phone, email: r.email,
+      zip_code: r.postalCode, city: r.city, country: r.country, state: locations.to?.postalZoneName, phone: r.phone, email: r.email,
     }),
+    ...(Object.keys(additional).length ? { additional_data: additional } : {}),
     packages: input.parcels.map(parcel => ({
       weight: Math.round(parcel.weightKg * 100) / 100,
       width: Math.ceil(parcel.widthCm), height: Math.ceil(parcel.heightCm), length: Math.ceil(parcel.lengthCm),
@@ -210,7 +267,41 @@ export function classifyPacklinkDraftStatus(status: number): ShipmentDraftError[
   return 'ambiguous_creation';
 }
 
-async function loadDefaultWarehouse(apiKey: string): Promise<PacklinkAddress> {
+/** Read-only lookup for the draft enrichment: any failure is `null`, never an error (the draft stays possible). */
+async function optionalGet(apiKey: string, path: string): Promise<unknown> {
+  try {
+    const response = await fetch(BASE + path, {
+      headers: { Authorization: apiKey, Accept: 'application/json' },
+      cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) { await response.body?.cancel(); return null; }
+    return await readBoundedJson(response);
+  } catch { return null; }
+}
+
+/**
+ * Resolves the Packlink PRO location of both addresses (3 GETs in parallel,
+ * before the POST). Zone names come in the account language (`it_IT` for an
+ * Italian account: "Italia", as Packlink PRO stores them).
+ */
+async function loadDraftLocations(apiKey: string, from: PacklinkAddress, to: { postalCode: string; city: string; country: string }): Promise<PacklinkDraftLocations> {
+  const platform = from.country;
+  const postalCodes = (country: string, zip: string) =>
+    optionalGet(apiKey, `/locations/postalcodes/${encodeURIComponent(country)}/${encodeURIComponent(zip)}`);
+  const [fromCodes, toCodes, zones] = await Promise.all([
+    postalCodes(from.country, from.zip_code), postalCodes(to.country, to.postalCode),
+    optionalGet(apiKey, '/locations/postalzones/destinations?' + new URLSearchParams({
+      platform: 'PRO', platform_country: platform, language: `${platform.toLowerCase()}_${platform}`,
+    })),
+  ]);
+  const locate = (payload: unknown, zip: string, city: string): PacklinkLocation | null => {
+    const record = selectPacklinkPostalCode(payload, zip, city);
+    return record ? { ...record, postalZoneName: packlinkPostalZoneName(zones, record.postalZoneId) } : null;
+  };
+  return { from: locate(fromCodes, from.zip_code, from.city), to: locate(toCodes, to.postalCode, to.city) };
+}
+
+async function loadDefaultWarehouse(apiKey: string): Promise<PacklinkWarehouse> {
   let response: Response;
   try {
     response = await fetch(BASE + '/clients/warehouses', {
@@ -235,12 +326,16 @@ export const packlinkAdapter: ShippingProviderAdapter = {
     if (!key) throw new ShipmentDraftError('missing_configuration');
     // Read-only and before any POST: a failure here can never leave a draft behind.
     const from = await loadDefaultWarehouse(key);
+    const locations = await loadDraftLocations(key, from, input.recipient);
+    if (!locations.from || !locations.to) {
+      console.info('[shipping/draft] location_unresolved', { tenantId: context.tenantId, from: Boolean(locations.from), to: Boolean(locations.to) });
+    }
     let response: Response;
     try {
       response = await fetch(BASE + '/shipments', {
         method: 'POST',
         headers: { Authorization: key, Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPacklinkDraftPayload(from, input)),
+        body: JSON.stringify(buildPacklinkDraftPayload(from, input, locations)),
         cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(12_000),
       });
     } catch (error) {
