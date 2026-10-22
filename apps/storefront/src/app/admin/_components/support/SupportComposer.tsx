@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { IconAlertTriangle, IconBulb, IconCircleCheck, IconHelpCircle, IconLifebuoy, IconMapPin, IconSparkles, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconBulb, IconCheck, IconCircleCheck, IconHelpCircle, IconLifebuoy, IconMapPin, IconSparkles, IconX } from '@tabler/icons-react';
 import { SUPPORT_CATEGORY_CHOICES, SUPPORT_LIMITS, supportReference, type SupportCategory } from '@/lib/support/domain';
 import { isMeaningfulText, pageLabelForPath, resourceFromPath } from '@/lib/support/rules';
 import { SUPPORT_TENANT_STATUS_META } from '@/lib/admin/statusRegistry';
@@ -170,19 +170,27 @@ export default function SupportComposer({ open, onClose, pathname, initialCatego
         onDragOver={(event) => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDragging(true); } }}
         onDragLeave={(event) => { if (event.currentTarget === event.target) setDragging(false); }}
         onDrop={(event) => { event.preventDefault(); setDragging(false); uploads.add(event.dataTransfer.files); }}>
-        {readOnly && <InlineAlert tone="info">Vous êtes connecté avec un compte Lepefy : répondez aux boutiques depuis la console « Assistance tenants ».</InlineAlert>}
+        {readOnly && <InlineAlert tone="info">Vous êtes connecté avec un compte Lepefy : ce formulaire est réservé à l’équipe de la boutique. Répondez aux boutiques depuis la console « Assistance tenants ».</InlineAlert>}
 
+        {/* A Lepefy account only previews the panel: every control is disabled (and looks it). */}
+        <fieldset disabled={readOnly} className="min-w-0 space-y-4 disabled:opacity-50">
         <fieldset>
-          <legend className="sr-only">Type de demande (facultatif)</legend>
+          <legend className={labelClasses}>De quoi s’agit-il ? <span className="font-normal text-a-text-3">(facultatif)</span></legend>
           <div className="grid gap-2">
             {SUPPORT_CATEGORY_CHOICES.map((choice) => {
               const Icon = CHOICE_ICON[choice.key];
               const active = category === choice.key;
               return (
                 <button key={choice.key} type="button" aria-pressed={active} onClick={() => setCategory(active ? null : choice.key)}
-                  className={cn('flex min-h-11 items-center gap-3 rounded-xl border px-3 text-left text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus',
-                    active ? 'border-a-brand bg-a-brand-soft text-a-brand-fg' : 'border-a-border-strong bg-a-surface text-a-text hover:bg-a-hover')}>
-                  <Icon size={20} aria-hidden="true" className="shrink-0" />{choice.label}
+                  className={cn('group flex min-h-12 items-center gap-3 rounded-xl border-2 px-3 text-left text-sm font-semibold shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-a-focus disabled:cursor-not-allowed disabled:shadow-none',
+                    active ? 'border-a-brand bg-a-brand-soft text-a-brand-fg' : 'border-a-border-strong bg-a-surface text-a-text hover:border-a-brand hover:bg-a-hover disabled:hover:border-a-border-strong disabled:hover:bg-a-surface')}>
+                  <span aria-hidden="true" className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', active ? 'bg-a-brand text-a-on-brand' : 'bg-a-surface-2 text-a-text-2 group-hover:text-a-brand-fg')}>
+                    <Icon size={20} />
+                  </span>
+                  <span className="min-w-0 flex-1">{choice.label}</span>
+                  <span aria-hidden="true" className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2', active ? 'border-a-brand bg-a-brand text-a-on-brand' : 'border-a-field bg-a-surface')}>
+                    {active && <IconCheck size={12} stroke={3} />}
+                  </span>
                 </button>
               );
             })}
@@ -238,13 +246,14 @@ export default function SupportComposer({ open, onClose, pathname, initialCatego
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <label className="flex min-h-10 cursor-pointer items-center gap-2.5 text-sm font-semibold text-a-text">
-            <input type="checkbox" checked={urgent} onChange={(event) => setUrgent(event.target.checked)} className="h-5 w-5 rounded border-a-field accent-a-brand" />
+            <input type="checkbox" checked={urgent} disabled={readOnly} onChange={(event) => setUrgent(event.target.checked)} className="h-5 w-5 rounded border-a-field accent-a-brand" />
             C’est urgent
           </label>
           {canImprove && text.trim().length >= SUPPORT_LIMITS.improveMinChars && !suggestion && (
             <Button variant="ghost" size="sm" onClick={() => void improve()} loading={improving}><IconSparkles size={16} aria-hidden="true" />Améliorer mon message</Button>
           )}
         </div>
+        </fieldset>
         {improveError && <p className="text-sm text-a-text-2" role="status">{improveError}</p>}
         {suggestion && (
           <div className="rounded-xl border border-a-brand bg-a-brand-soft p-3" role="region" aria-label="Message proposé">
