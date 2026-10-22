@@ -1,5 +1,5 @@
-import { isHrefActive } from '@/lib/admin/navigation';
-import { IconBell, IconBrandWhatsapp, IconBriefcase, IconReceipt, IconDeviceMobile, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
+import { isHrefActive, type AdminNavBadgeKey } from '@/lib/admin/navigation';
+import { IconBell, IconBrandWhatsapp, IconBriefcase, IconReceipt, IconDeviceMobile, IconLifebuoy, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
 
 /**
  * Platform-owner navigation, single source of truth for the sidebar groups and
@@ -20,10 +20,13 @@ export interface PlatformNavGroup {
   href?: string;
   match?: 'exact' | 'prefix';
   children?: PlatformNavItem[];
+  /** Count shown on a single-link entry (layout badges). */
+  badge?: { key: AdminNavBadgeKey; label: string };
 }
 
 export const PLATFORM_NAV: PlatformNavGroup[] = [
   { id: 'console', label: 'Console Lepefy', icon: IconSettings, href: '/admin/platform', match: 'exact' },
+  { id: 'support', label: 'Assistance tenants', icon: IconLifebuoy, href: '/admin/platform/assistance', badge: { key: 'platformSupportAwaiting', label: 'demandes à répondre' } },
   { id: 'subscriptions', label: 'Abonnements', icon: IconReceipt, href: '/admin/platform/abonnements' },
   {
     id: 'access', label: 'Accès', icon: IconShieldLock, children: [

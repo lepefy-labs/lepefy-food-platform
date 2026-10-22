@@ -3,7 +3,7 @@ import {
   ADMIN_NAV, ADMIN_QUICK_ACTIONS, activeNavChild, visibleNavChildren, isNavItemActive, mobileNavItems, navItemsById, resolveAdminNavigation, type AdminNavContext, ADMIN_NAV_PRIMARY_GROUPS, ADMIN_NAV_GROUPS, isPrimaryNavGroup } from '../../src/lib/admin/navigation';
 import { defaultAdminDestination, permissionsForAdminPath } from '../../src/lib/auth/adminRoutePermissions';
 
-const NO_FLAGS = { gestion: false, whatsapp: false, activity: false };
+const NO_FLAGS = { gestion: false, whatsapp: false, activity: false, support: false };
 const ctx = (patch: Partial<AdminNavContext>): AdminNavContext => ({ workspace: 'shop', permissions: [], isPlatformOwner: false, flags: NO_FLAGS, ...patch });
 
 test('entry ids are unique', () => {
@@ -74,19 +74,34 @@ test('full shop admin sees the shop and common entries, flagged modules only wit
   expect(full.actions).toEqual(['new-order', 'prepare-orders', 'new-product', 'new-catalog-campaign', 'new-customer']);
   expect(full.platform).toBe(false);
 
-  const withFlags = resolveAdminNavigation(ctx({ permissions: ['*'], flags: { gestion: true, whatsapp: true, activity: true } }));
-  expect(withFlags.items).toEqual(expect.arrayContaining(['whatsapp', 'gestion', 'suppliers', 'purchases', 'inventory', 'treasury', 'activity']));
+  const withFlags = resolveAdminNavigation(ctx({ permissions: ['*'], flags: { gestion: true, whatsapp: true, activity: true, support: true } }));
+  expect(withFlags.items).toEqual(expect.arrayContaining(['whatsapp', 'gestion', 'suppliers', 'purchases', 'inventory', 'treasury', 'activity', 'assistance']));
+  expect(withFlags.actions).toContain('support-request');
+});
+
+test('assistance: hidden until the platform enables it, and only with support.use', () => {
+  const on = { gestion: false, whatsapp: false, activity: false, support: true };
+  expect(resolveAdminNavigation(ctx({ permissions: ['support.use'] })).items).not.toContain('assistance');
+  expect(resolveAdminNavigation(ctx({ permissions: ['support.use'] })).actions).not.toContain('support-request');
+  expect(resolveAdminNavigation(ctx({ permissions: ['orders.view'], flags: on })).items).not.toContain('assistance');
+  const user = resolveAdminNavigation(ctx({ permissions: ['support.use'], flags: on }));
+  expect(user.items).toEqual(['assistance']);
+  expect(user.actions).toEqual(['support-request']);
+  expect(resolveAdminNavigation(ctx({ workspace: 'events', permissions: ['support.use'], flags: on })).items).toEqual(['assistance']);
+  expect(permissionsForAdminPath('/admin/assistance/0f8c2b36-5a3d-4c41-9f2e-6c1b8c0a1d11', 'shop')).toEqual(['support.use']);
+  // The cashier keeps the scanner only: support.use is not in its default capabilities.
+  expect(resolveAdminNavigation(ctx({ permissions: ['loyalty.scan'], flags: on })).items).toEqual(['loyalty-scan']);
 });
 
 test('activity journal: hidden until the platform enables it, and only with audit.view', () => {
   expect(resolveAdminNavigation(ctx({ permissions: ['audit.view'] })).items).not.toContain('activity');
-  expect(resolveAdminNavigation(ctx({ permissions: ['orders.view'], flags: { gestion: false, whatsapp: false, activity: true } })).items).not.toContain('activity');
-  expect(resolveAdminNavigation(ctx({ permissions: ['audit.view'], flags: { gestion: false, whatsapp: false, activity: true } })).items).toContain('activity');
+  expect(resolveAdminNavigation(ctx({ permissions: ['orders.view'], flags: { gestion: false, whatsapp: false, activity: true, support: false } })).items).not.toContain('activity');
+  expect(resolveAdminNavigation(ctx({ permissions: ['audit.view'], flags: { gestion: false, whatsapp: false, activity: true, support: false } })).items).toContain('activity');
 });
 
 test('a cashier only sees the loyalty scanner; a stock clerk only sees Stocks', () => {
   expect(resolveAdminNavigation(ctx({ permissions: ['loyalty.scan'] })).items).toEqual(['loyalty-scan']);
-  const clerk = resolveAdminNavigation(ctx({ permissions: ['inventory.view'], flags: { gestion: true, whatsapp: false, activity: false } }));
+  const clerk = resolveAdminNavigation(ctx({ permissions: ['inventory.view'], flags: { gestion: true, whatsapp: false, activity: false, support: false } }));
   expect(clerk.items).toEqual(['gestion', 'inventory']);
 });
 
@@ -100,7 +115,7 @@ test('events workspace shows events entries, never shop ones', () => {
 });
 
 test('platform owner sees everything of the workspace plus the platform block', () => {
-  const owner = resolveAdminNavigation(ctx({ isPlatformOwner: true, flags: { gestion: true, whatsapp: true, activity: true } }));
+  const owner = resolveAdminNavigation(ctx({ isPlatformOwner: true, flags: { gestion: true, whatsapp: true, activity: true, support: true } }));
   expect(owner.platform).toBe(true);
   expect(owner.items).toContain('treasury');
 });

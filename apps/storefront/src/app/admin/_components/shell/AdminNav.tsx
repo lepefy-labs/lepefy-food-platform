@@ -67,7 +67,7 @@ function readOpenGroups(key = PLATFORM_OPEN_KEY): string[] {
 }
 
 /** Platform-owner block from PLATFORM_NAV; the group of the current page is always open. */
-function PlatformSection({ pathname }: { pathname: string }) {
+function PlatformSection({ pathname, badges }: { pathname: string; badges: AdminShellNav['badges'] }) {
   const [opened, setOpened] = useState<string[]>([]);
   useEffect(() => { setOpened(readOpenGroups()); }, []);
   function toggle(id: string) {
@@ -88,6 +88,9 @@ function PlatformSection({ pathname }: { pathname: string }) {
             <Link key={group.id} href={group.href} title={group.label} aria-current={active ? 'page' : undefined} className={itemClass(active)}>
               <Icon size={18} stroke={1.8} aria-hidden="true" className="shrink-0" />
               <span className="admin-nav-label min-w-0 flex-1 truncate">{group.label}</span>
+              {group.badge && (badges[group.badge.key] ?? 0) > 0 && (
+                <span className="admin-nav-count"><CountBadge tone="warning" count={badges[group.badge.key]} label={`${badges[group.badge.key]} ${group.badge.label}`} /></span>
+              )}
             </Link>
           );
         }
@@ -190,7 +193,7 @@ export default function AdminNav({ nav }: { nav: AdminShellNav }) {
           </div>
         );
       })}
-      {nav.platform && <PlatformSection pathname={pathname} />}
+      {nav.platform && <PlatformSection pathname={pathname} badges={nav.badges} />}
     </nav>
   );
 }

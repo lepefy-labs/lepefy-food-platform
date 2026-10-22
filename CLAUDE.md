@@ -196,6 +196,12 @@ The shipping logic is the most complex part of the codebase:
 
 - Staff WhatsApp and the dispatcher (migration 158): new internal alerts go through `dispatchTenantNotification` (`lib/notifications/staff/dispatcher.ts`) with a `StaffAlert` (`staffMessages.ts`): one immutable event per transition, one `notification_deliveries` row per recipient × channel (`notif:<event>:<recipient>:<channel>`), never throws. Existing email senders keep their email; the dispatcher adds WhatsApp only (`channels: ['whatsapp']`). WhatsApp goes to confirmed recipient numbers only (`whatsapp_verified_at`), behind flag `staff_whatsapp_notifications`, via Green API (`providers/greenApiOutbound.ts`, never the read-only catalog connector); `unknown` deliveries are never retried automatically. The platform-owner catch-up `/admin/platform/notifications/rattrapage` is preview → explicit confirmation only. Runbook: `docs/STAFF_NOTIFICATIONS_RUNBOOK.md`.
 
+### Assistance & suggestions (shop ↔ Lepefy) — `docs/SMART_ASSISTANCE.md`
+
+- Release flag `support_assistance` (platform-only) + capability `support.use` (migration 163). Shop APIs `/api/admin/assistance/**` call `supportTenantApi()` (tenant from `getTenant()`, never the browser; writes refuse the platform owner); console APIs `/api/admin/platform/assistance/**` call `supportPlatformApi()` (`requirePlatformOwner`), absent from `adminApiPermissions.ts`.
+- Tables `support_*` are RLS-forced with no policy and read-only for the service role: every write goes through a `support_*` RPC (idempotent `client_key`, anti-abuse limits, state machine mirrored in `lib/support/rules.ts`, parity-tested). Shop reads only through the projection RPCs (`support_tenant_thread`, `support_tenant_ticket_page`, …): internal notes, internal files, private events, priority, assignee and GitHub links never reach a shop — never add a direct `support_*` select to shop code.
+- One quick panel for every admin page (`SupportProvider` in the protected layout → `useSupport().open()`); a message relayed from WhatsApp/phone is stored as `relayed_from` by Lepefy, never as written by the shop. Screenshots: private bucket `support-attachments`, type from bytes, read through the authorized route (60 s signed URL). Notifications: type `support_reply` via the dispatcher; Lepefy e-mail only through `SUPPORT_NOTIFY_EMAILS`.
+
 ### Subscription lifecycle and suspension — `docs/SUBSCRIPTION_LIFECYCLE.md`
 
 - One engine: `lib/billing/tenantServiceState.ts` (`getTenantServiceState`, `isModuleAvailable`, `guardModule`). Suspended = manual (`tenant_subscriptions.status = 'suspended'`) or automatic past `paid_until + grace_days`, computed at read time; per-module suspension in `tenant_module_suspensions`. Fail-open without migration 144.
@@ -296,6 +302,9 @@ WHATSAPP_TEST_RECIPIENTS=            # test tenants only: allowed recipients, di
 
 # Scheduled promotions and novelties (migration 156)
 CATALOG_SCHEDULE_SCHEDULER_TOKEN=    # bearer of the n8n tick POST /api/internal/catalog-schedule
+
+# Assistance (migration 163, optional)
+SUPPORT_NOTIFY_EMAILS=               # Lepefy addresses notified of new requests / shop messages, comma-separated
 ```
 
 ## Conventions

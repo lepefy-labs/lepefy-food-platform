@@ -66,6 +66,13 @@ export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
     description: 'Envoie les notifications internes choisies (nouvelle commande, paiement à vérifier, conflit de stock, expéditions…) sur le WhatsApp des destinataires confirmés, depuis le numéro Lepefy. Activation réservée à Lepefy.',
     platformOnly: true,
   },
+  {
+    // Assistance & suggestions (migration 163, docs/SMART_ASSISTANCE.md).
+    key: 'support_assistance',
+    label: 'Assistance Lepefy',
+    description: 'Donne à l’équipe de la boutique le bouton « Assistance » : demandes avec captures et page concernée, conversation avec Lepefy, suivi des réponses. Activation réservée à Lepefy.',
+    platformOnly: true,
+  },
 ];
 
 export function featureFlagDefinition(key: string): FeatureFlagDefinition | undefined {

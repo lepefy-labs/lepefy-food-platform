@@ -11,10 +11,14 @@ import { isBusinessManagementEnabled } from '@/lib/gestion/featureGate';
 import { GESTION_VIEW_PERMISSIONS } from '@/lib/gestion/domain';
 import { isWhatsAppEnabled } from '@/lib/whatsapp/server/featureGate';
 import { isActivityJournalEnabled } from '@/lib/audit/access';
+import { isSupportEnabled } from '@/lib/support/server/access';
+import { tenantUnreadCount } from '@/lib/support/server/tenantService';
+import { platformAwaitingCount } from '@/lib/support/server/platformService';
+import SupportProvider from '../_components/support/SupportProvider';
 import AdminHeader from '../_components/AdminHeader';
 import AdminShell from '../_components/shell/AdminShell';
 import type { AdminSearchScope, AdminShellNav } from '../_components/shell/shellState';
-import { canSee, resolveAdminNavigation } from '@/lib/admin/navigation';
+import { canSee, navItemsById, resolveAdminNavigation } from '@/lib/admin/navigation';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
 import SubscriptionBanner from '../_components/SubscriptionBanner';
 import { AdminToaster } from '../_components/ui/Toaster';
@@ -98,7 +102,12 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   // Journal d'activité: always for the platform owner, otherwise flag activity_journal (platform-managed).
   const activityEnabled = access.isPlatformOwner
     || (canAdmin(access, 'audit.view') && !limitedBySuspension ? await isActivityJournalEnabled(tenant.id) : false);
-  const navContext = { workspace, permissions: navPermissions, isPlatformOwner: access.isPlatformOwner, flags: { gestion: gestionEnabled, whatsapp: whatsappEnabled, activity: activityEnabled } };
+  // Assistance (flag support_assistance): read only if the admin could use it; unread replies for the badge.
+  const supportEnabled = canAdmin(access, 'support.use') ? await isSupportEnabled(tenant.id) : false;
+  const supportUnread = supportEnabled && !access.isPlatformOwner ? await tenantUnreadCount(tenant.id, access.userId) : 0;
+  // Platform console: requests of every shop waiting for Lepefy (0 before migration 163).
+  const platformSupportAwaiting = access.isPlatformOwner ? await platformAwaitingCount() : 0;
+  const navContext = { workspace, permissions: navPermissions, isPlatformOwner: access.isPlatformOwner, flags: { gestion: gestionEnabled, whatsapp: whatsappEnabled, activity: activityEnabled, support: supportEnabled } };
   const resolvedNav = resolveAdminNavigation(navContext);
   const searchScopes: AdminSearchScope[] = workspace === 'events'
     ? (canSee(navContext, ['events.view']) ? ['events'] : [])
@@ -116,24 +125,32 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
       newInquiries: newInquiriesResult.count ?? 0,
       pendingRentalRequests: pendingRentalRequestsResult.count ?? 0,
       preordersToVerify: preordersToVerifyResult.count ?? 0,
+      supportUnread,
+      platformSupportAwaiting,
     },
   };
   const canShop = canSee(navContext, ['orders.view', 'catalog.view', 'customers.view', 'shipping.view', 'loyalty.scan']);
   const canEvents = canSee(navContext, ['events.view', 'event_reservations.view', 'event_payments.view', 'event_content.manage', 'scan.access']);
   const displayName = access.nickname || [access.firstName, access.lastName].filter(Boolean).join(' ') || user.email || '';
+  // Page names offered in the Assistance panel (« Changer »): the modules this admin sees.
+  const supportPageLabels = supportEnabled
+    ? Array.from(new Set(navItemsById(resolvedNav.items).filter((item) => item.id !== 'assistance').map((item) => item.label)))
+    : [];
 
   return (
     <AdminThemeProvider>
       <AdminToaster>
+        <SupportProvider enabled={supportEnabled} readOnly={access.isPlatformOwner} unread={supportUnread} pageLabels={supportPageLabels}>
         <AdminShell
           nav={shellNav}
           workspaceLabel={workspace === 'events' ? 'Événementiel' : 'Boutique'}
           tenantName={tenant.name}
-          header={<AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} canShop={canShop} canEvents={canEvents} adminEmail={user.email ?? ''} adminDisplayName={displayName} />}
+          header={<AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} canShop={canShop} canEvents={canEvents} adminEmail={user.email ?? ''} adminDisplayName={displayName} support={supportEnabled} />}
         >
           <SubscriptionBanner serviceState={serviceState} canViewBilling={canAdmin(access, 'billing.view')} />
           {children}
         </AdminShell>
+        </SupportProvider>
       </AdminToaster>
     </AdminThemeProvider>
   );

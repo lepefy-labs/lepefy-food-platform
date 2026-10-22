@@ -9,7 +9,7 @@ import { getNotificationRecipients } from '../../src/lib/notifications/getNotifi
 import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
 
 const R1 = '0f8c2b36-5a3d-4c41-9f2e-6c1b8c0a1d11';
-const withEvents = availableNotificationTypes(notificationTypeContext({ events_enabled: true }));
+const withEvents = availableNotificationTypes(notificationTypeContext({ events_enabled: true }, { support: true }));
 const shopOnly = availableNotificationTypes(notificationTypeContext({ events_enabled: false }));
 
 test.describe('notification type registry', () => {
@@ -30,11 +30,11 @@ test.describe('notification type registry', () => {
       'notify_event_booking_closed_reports', 'notify_daily_digest', 'notify_service_inquiries', 'notify_rental_reservations'];
     // Types added after 143 have no legacy column.
     const later = new Set(['subscription_billing', 'order_created', 'order_international', 'order_fresh_products', 'order_attention_required',
-      'shipment_creation_failed', 'shipment_action_required', 'shipment_delayed', 'event_reservation_created']);
+      'shipment_creation_failed', 'shipment_action_required', 'shipment_delayed', 'event_reservation_created', 'support_reply']);
     expect(legacy.map((flag) => flag.slice('notify_'.length)).sort()).toEqual(NOTIFICATION_TYPES.map((t) => t.key).filter((key) => !later.has(key)).sort());
   });
 
-  test('event types are hidden when the events module is off; empty groups dropped', () => {
+  test('event and assistance types are hidden when their module is off; empty groups dropped', () => {
     expect(withEvents).toHaveLength(NOTIFICATION_TYPES.length);
     expect(shopOnly.map((t) => t.key)).toEqual(['order_created', 'order_international', 'order_fresh_products', 'card_payment', 'external_payment_pending',
       'order_stock_conflict', 'order_attention_required', 'shipment_creation_failed', 'shipment_action_required', 'shipment_delayed', 'daily_digest', 'subscription_billing']);
@@ -44,7 +44,7 @@ test.describe('notification type registry', () => {
 
   test('defaults keep the historical behaviour of the add form', () => {
     // order_created (migration 158) is the only new type checked by default for a NEW recipient.
-    expect(defaultNotificationTypeKeys(withEvents)).toEqual(['order_created', 'card_payment', 'external_payment_pending', 'event_booking_closed_reports', 'subscription_billing']);
+    expect(defaultNotificationTypeKeys(withEvents)).toEqual(['order_created', 'card_payment', 'external_payment_pending', 'event_booking_closed_reports', 'support_reply', 'subscription_billing']);
     expect(defaultNotificationTypeKeys(shopOnly)).toEqual(['order_created', 'card_payment', 'external_payment_pending', 'subscription_billing']);
   });
 

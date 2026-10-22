@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { IconAlertOctagon, IconInbox, IconSearchOff } from '@tabler/icons-react';
 import { cn } from '@/lib/utils/cn';
+import { SupportHint } from '../support/SupportHeaderButton';
 
 interface EmptyStateProps {
   title: string;
@@ -25,13 +26,18 @@ export function EmptyState({ title, description, variant = 'empty', action, clas
 }
 
 /** Data that could not be loaded: what failed and a way to retry. */
-export function ErrorState({ title = 'Impossible de charger les données.', description, action, className }: { title?: string; description?: ReactNode; action?: ReactNode; className?: string }) {
+/**
+ * `supportHint`: « Signaler ce problème à Lepefy » under the error (Assistance,
+ * shown only when the module is on for this admin; never a popup).
+ */
+export function ErrorState({ title = 'Impossible de charger les données.', description, action, className, supportHint = true }: { title?: string; description?: ReactNode; action?: ReactNode; className?: string; supportHint?: boolean }) {
   return (
     <div role="alert" className={cn('flex flex-col items-center px-4 py-10 text-center', className)}>
       <span aria-hidden="true" className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-tone-danger-bg text-tone-danger-fg"><IconAlertOctagon size={22} stroke={1.6} /></span>
       <p className="text-sm font-semibold text-a-text">{title}</p>
       {description && <p className="mt-1 max-w-md text-sm text-a-text-2">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
+      {supportHint && <div className="mt-3"><SupportHint /></div>}
     </div>
   );
 }

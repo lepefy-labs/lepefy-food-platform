@@ -126,3 +126,29 @@ export const NOTIFICATION_BACKFILL_STATE_META: Record<string, AdminStatusMeta> =
   notified: { label: 'Déjà notifiée', tone: 'success' },
   no_target: { label: 'Aucun destinataire', tone: 'neutral' },
 };
+
+/** Assistance (docs/SMART_ASSISTANCE.md): what the shop sees (lib/support/rules.ts tenantStatus). */
+export const SUPPORT_TENANT_STATUS_META: Record<string, AdminStatusMeta> = {
+  sent: { label: 'Envoyée', tone: 'info' },
+  in_progress: { label: 'En cours', tone: 'info' },
+  waiting_you: { label: 'Nous attendons votre réponse', tone: 'warning' },
+  done: { label: 'Terminée', tone: 'success' },
+};
+
+/** Assistance: internal workflow, platform console only. */
+export const SUPPORT_STATUS_META: Record<string, AdminStatusMeta> = {
+  new: { label: 'Nouvelle', tone: 'info' },
+  triaged: { label: 'À traiter', tone: 'info' },
+  planned: { label: 'Planifiée', tone: 'neutral' },
+  in_progress: { label: 'En cours', tone: 'info' },
+  waiting_tenant: { label: 'Attente boutique', tone: 'warning' },
+  resolved: { label: 'Résolue', tone: 'success' },
+  closed: { label: 'Clôturée', tone: 'neutral' },
+};
+
+export const SUPPORT_PRIORITY_META: Record<string, AdminStatusMeta> = {
+  low: { label: 'Basse', tone: 'neutral' },
+  normal: { label: 'Normale', tone: 'neutral' },
+  high: { label: 'Haute', tone: 'urgent' },
+  critical: { label: 'Critique', tone: 'danger' },
+};

@@ -51,6 +51,12 @@ export const AUDIT_EVENT_TYPES = {
   'catalog.product.stock_adjusted': { label: 'Stock ajusté', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'catalog.product.updated': { label: 'Fiche produit modifiée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'notifications.backfill.confirmed': { label: 'Rattrapage de notifications confirmé', module: 'notifications', category: 'activity', severity: 'notice', retention: 'business' },
+  'support.ticket.created': { label: 'Demande d’assistance créée', module: 'support', category: 'activity', severity: 'info', retention: 'business' },
+  'support.ticket.status_changed': { label: 'Statut d’une demande d’assistance modifié', module: 'support', category: 'activity', severity: 'info', retention: 'business' },
+  'support.ticket.priority_changed': { label: 'Priorité d’une demande d’assistance modifiée', module: 'support', category: 'activity', severity: 'info', retention: 'business' },
+  'support.ticket.assigned': { label: 'Demande d’assistance assignée', module: 'support', category: 'activity', severity: 'info', retention: 'business' },
+  'support.ticket.merged': { label: 'Demandes d’assistance fusionnées', module: 'support', category: 'activity', severity: 'notice', retention: 'business' },
+  'support.ticket.linked': { label: 'Lien GitHub ajouté à une demande d’assistance', module: 'support', category: 'activity', severity: 'info', retention: 'business' },
   'catalog.campaign.created': { label: 'Campagne créée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'catalog.campaign.updated': { label: 'Campagne modifiée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'catalog.campaign.products_changed': { label: 'Produits de campagne modifiés', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
@@ -111,6 +117,8 @@ export const AUDIT_MODULES = {
   notifications: { label: 'Notifications', anyOf: ['tenant_settings.view'] },
   platform_billing: { label: 'Abonnement (plateforme)', anyOf: [], platformOnly: true },
   external_catalog: { label: 'Import de catalogues', anyOf: [], platformOnly: true },
+  // Assistance: platform-only (internal notes, priorities and assignments never reach the shop).
+  support: { label: 'Assistance', anyOf: [], platformOnly: true },
 } as const satisfies Record<string, AuditModuleDefinition>;
 
 export type AuditModule = keyof typeof AUDIT_MODULES;
@@ -299,6 +307,7 @@ export function auditResourceHref(resourceType: string | null, resourceId: strin
     case 'feature_flag': return '/admin/parametres/fonctionnalites';
     case 'payment_method': return '/admin/parametres/paiements';
     case 'admin_role': return '/admin/platform/access';
+    case 'support_ticket': return id && `/admin/platform/assistance/${id}`;
     default: return null;
   }
 }
@@ -309,4 +318,5 @@ export const AUDIT_RESOURCE_LABELS: Record<string, string> = {
   event: 'Événement', review: 'Avis', whatsapp_conversation: 'Conversation WhatsApp', tenant: 'Boutique', module_settings: 'Module',
   feature_flag: 'Fonctionnalité', payment_method: 'Moyen de paiement', admin_role: 'Rôle', admin_user: 'Administrateur',
   notification: 'Notification', tenant_subscription: 'Abonnement', external_catalog_item: 'Article de catalogue externe', audit_export: 'Export',
+  support_ticket: 'Demande d’assistance',
 };

@@ -1,6 +1,6 @@
 import {
   IconBrandWhatsapp, IconBriefcase, IconClipboardList, IconHome, IconBuildingWarehouse, IconCalendarEvent, IconCash, IconChartBar, IconCreditCard,
-  IconFileInvoice, IconFileText, IconGift, IconHistory, IconLayoutDashboard, IconMessageCircle, IconPackage, IconPackages, IconPhoto,
+  IconFileInvoice, IconFileText, IconGift, IconHistory, IconLayoutDashboard, IconLifebuoy, IconMessageCircle, IconPackage, IconPackages, IconPhoto,
   IconPlus, IconQrcode, IconScan, IconSettings, IconShoppingBag, IconSparkles, IconStar, IconToolsKitchen2, IconTruck,
   IconTruckDelivery, IconTruckLoading, IconUserPlus, IconUsers, type Icon,
 } from '@tabler/icons-react';
@@ -21,8 +21,8 @@ import type { AdminTone } from './tokens';
 export type AdminNavGroup =
   | 'Essentiel' | 'Ventes' | 'Croissance' | 'Canaux' | 'Gestion' | 'Contenu & outils' | 'Administration'
   | 'Événementiel' | 'Service sur place';
-export type AdminNavFlag = 'gestion' | 'whatsapp' | 'activity';
-export type AdminNavBadgeKey = 'pendingPayments' | 'pendingEventRequests' | 'newInquiries' | 'pendingRentalRequests' | 'preordersToVerify';
+export type AdminNavFlag = 'gestion' | 'whatsapp' | 'activity' | 'support';
+export type AdminNavBadgeKey = 'pendingPayments' | 'pendingEventRequests' | 'newInquiries' | 'pendingRentalRequests' | 'preordersToVerify' | 'supportUnread' | 'platformSupportAwaiting';
 
 export interface AdminNavItem {
   id: string;
@@ -66,6 +66,7 @@ export interface AdminQuickAction {
   icon: Icon;
   workspace: AdminWorkspace | 'all';
   anyOf: string[];
+  flag?: AdminNavFlag;
   keywords?: string[];
 }
 
@@ -150,6 +151,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   // Administration
   { id: 'settings', label: 'Paramètres', href: '/admin/parametres', icon: IconSettings, group: 'Administration', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['réglages', 'configuration', 'notifications', 'préparation papier'] },
   { id: 'activity', label: 'Journal d’activité', href: '/admin/activite', icon: IconHistory, group: 'Administration', workspace: 'all', anyOf: ['audit.view'], flag: 'activity', keywords: ['audit', 'historique', 'traçabilité', 'qui a modifié'] },
+  { id: 'assistance', label: 'Assistance', href: '/admin/assistance', icon: IconLifebuoy, group: 'Administration', workspace: 'all', anyOf: ['support.use'], flag: 'support', badge: { key: 'supportUnread', tone: 'info', label: 'réponses non lues' }, keywords: ['aide', 'support', 'problème', 'bug', 'suggestion', 'question', 'lepefy', 'contact'] },
   { id: 'billing', label: 'Abonnement', href: '/admin/billing', icon: IconCreditCard, group: 'Administration', workspace: 'all', anyOf: ['billing.view'], match: 'exact', keywords: ['facture'] },
   { id: 'ai-usage', label: 'Utilisation IA', href: '/admin/ai-usage', icon: IconChartBar, group: 'Administration', workspace: 'all', anyOf: ['ai_usage.view'], match: 'exact' },
 ];
@@ -159,6 +161,7 @@ export const ADMIN_QUICK_ACTIONS: AdminQuickAction[] = [
   { id: 'prepare-orders', label: 'Préparer les commandes', href: '/admin/orders/preparation', icon: IconClipboardList, workspace: 'shop', anyOf: ['orders.view'], keywords: ['session de préparation', 'liste groupée', 'imprimer', 'picking'] },
   { id: 'new-product', label: 'Nouveau produit', href: '/admin/catalogue/nouveau', icon: IconPlus, workspace: 'shop', anyOf: ['catalog.manage'] },
   { id: 'new-catalog-campaign', label: 'Nouvelle campagne catalogue', href: '/admin/catalogue/campagnes/nouvelle', icon: IconPlus, workspace: 'shop', anyOf: ['catalog.manage'], keywords: ['promotion', 'nouveauté'] },
+  { id: 'support-request', label: 'Contacter l’assistance Lepefy', href: '/admin/assistance?nouvelle=1', icon: IconLifebuoy, workspace: 'all', anyOf: ['support.use'], flag: 'support', keywords: ['aide', 'problème', 'signaler', 'suggestion', 'question'] },
   { id: 'new-customer', label: 'Ajouter un client', href: '/admin/clients?new=1', icon: IconUserPlus, workspace: 'shop', anyOf: ['customers.manage'] },
 ];
 
@@ -191,7 +194,7 @@ export function resolveAdminNavigation(context: AdminNavContext): ResolvedAdminN
     items: ADMIN_NAV
       .filter((item) => inWorkspace(item.workspace) && canSee(context, item.anyOf) && (!item.flag || context.flags[item.flag]))
       .map((item) => item.id),
-    actions: ADMIN_QUICK_ACTIONS.filter((action) => inWorkspace(action.workspace) && canSee(context, action.anyOf)).map((action) => action.id),
+    actions: ADMIN_QUICK_ACTIONS.filter((action) => inWorkspace(action.workspace) && canSee(context, action.anyOf) && (!action.flag || context.flags[action.flag])).map((action) => action.id),
     platform: context.isPlatformOwner,
     children: Object.fromEntries(ADMIN_NAV
       .filter((item) => item.children && inWorkspace(item.workspace))

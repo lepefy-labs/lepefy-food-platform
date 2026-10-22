@@ -34,6 +34,7 @@ Da non confondere: email del destinatario · **numero WhatsApp del destinatario*
 | `shipment_creation_failed` / `shipment_action_required` / `shipment_delayed` | Expéditions | email, WhatsApp | dispatcher: bozza Packlink fallita in modo definitivo / incerta / interrotta / creata ma non registrata; incidente o reso; data stimata del vettore superata di 24 h; colis in transito senza preparazione |
 | `event_reservation_created` | Événementiel | email, WhatsApp | dispatcher |
 | `service_inquiries`, `rental_reservations`, `subscription_billing` | … | email, WhatsApp | email invariata; WhatsApp: dispatcher |
+| `support_reply` Réponse de l’assistance Lepefy | Compte (modulo `support`: visibile solo con il flag `support_assistance`) | email, WhatsApp | dispatcher (risposta Lepefy, attesa della boutique, richiesta risolta; una per richiesta ogni 15 min) + e-mail diretta al richiedente non abbonato — `docs/SMART_ASSISTANCE.md` §7 |
 | `event_booking_closed_reports`, `daily_digest` | … | email | invariati (allegati / digest) |
 
 Gli eventi già esistenti mantengono l'email storica: il dispatcher aggiunge **solo** il canale WhatsApp (`channels: ['whatsapp']`), così la stessa transizione non produce due email.

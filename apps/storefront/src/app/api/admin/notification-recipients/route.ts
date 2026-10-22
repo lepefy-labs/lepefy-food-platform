@@ -8,6 +8,8 @@ import {
 } from '@/lib/notifications/notificationTypes';
 import { isTenantTeamMember, loadNotificationRecipients } from '@/lib/notifications/notificationSubscriptions';
 import { normalizeWhatsappPhone } from '@/lib/notifications/staff/staffWhatsapp';
+import { isFeatureEnabled } from '@/lib/featureFlags/featureFlags';
+import { SUPPORT_FLAG } from '@/lib/support/domain';
 
 export const runtime = 'nodejs';
 
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   // Omitted → catalogue defaults for the tenant's modules (email only).
   const emailSubscriptions = !email ? [] : body?.subscriptions === undefined
-    ? defaultNotificationTypeKeys(availableNotificationTypes(notificationTypeContext(tenant)))
+    ? defaultNotificationTypeKeys(availableNotificationTypes(notificationTypeContext(tenant, { support: await isFeatureEnabled(tenant.id, SUPPORT_FLAG) })))
     : parseTypeKeys(body.subscriptions);
   // WhatsApp starts empty unless explicitly chosen.
   const whatsappSubscriptions = !whatsappPhone || body?.whatsapp_subscriptions === undefined ? [] : parseTypeKeys(body.whatsapp_subscriptions);

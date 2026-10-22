@@ -58,6 +58,8 @@ Fonte: `audit_event_types` (SQL) = `AUDIT_EVENT_TYPES` (`lib/audit/eventCatalog.
 | `orders.order.tracking_updated` | activity | info | `tracking_code`, `tracking_carrier`, `shipping_tracking_mode` |
 | `orders.order.updated` | activity | info | `fulfillment_type`, importi (valori); `full_name`, `email`, `shipping_address`, `notes` (solo nome del campo) |
 | `payments.payment.manually_confirmed` | activity | notice | `payment_confirmation_source` ∈ `admin_verified`/`admin_recorded` (insert o update) |
+| `support.ticket.created`, `support.ticket.status_changed`, `support.ticket.priority_changed`, `support.ticket.assigned`, `support.ticket.linked` | activity | info | RPC Assistance della migration 163 (`audit_emit` fail-open, mai il testo dei messaggi); modulo `support` **platform-only** — `docs/SMART_ASSISTANCE.md` |
+| `support.ticket.merged` | activity | notice | `support_merge_ticket` (163) |
 | `payments.payment.status_changed` | activity | info | `orders.payment_status` |
 | `shipping.shipment.draft_requested` · `draft_created` · `creation_failed` · `creation_ambiguous` · `draft_detached` | automation | info → critical | `orders.shipping_creation_status` |
 | `shipping.shipment.status_changed` | automation | info/warning | `orders.shipping_normalized_status` (exception/returned/cancelled = échec) |
