@@ -1,6 +1,6 @@
 # Assistance & suggestions (Smart Assistance & Feedback Hub)
 
-> Stato: codice su `main` (base letta in DISCOVER: `a87e2d0e`, 22/10/2026). Migration `163_support_assistance.sql` **da applicare** (approvazione esplicita richiesta). Flag `support_assistance` spento ovunque.
+> Stato: codice su `main` dal commit `6fc23843` (base `a87e2d0e`, 22/10/2026). Migration `163_support_assistance.sql` **applicata in produzione il 22/10/2026** (verificata in sola lettura: 6 tabelle + vista, bucket privato 5 Mo JPEG/PNG/WebP, `support.use` a platform_owner/tenant_admin, 6 tipi audit, policy IA `support` attiva (timeout ≤ 12 s), RPC eseguibili dal service role, `anon` rifiutato su tabelle e RPC, update diretto del service role rifiutato, nessun flag acceso). Flag `support_assistance` spento ovunque: prossimo passo §10.3 (Lepefy Test).
 > Proposta approvata: artifact «Lepefy Assistance» (mockup PRE/POST e specifica).
 
 Obiettivo: segnalare un problema, chiedere una modifica o fare una domanda **più velocemente che su WhatsApp** e seguire la risposta senza uscire dall'admin. Non è un helpdesk per sviluppatori: una sola informazione obbligatoria (il testo), tutto il resto è facoltativo o automatico.
