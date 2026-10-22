@@ -24,6 +24,7 @@ import ProductMediaManager from './ProductMediaManager';
 import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import { changedFieldLabels, changedProductKeys, productPatchPayload, type ProductBody } from '@/lib/catalog/productFormDiff';
 import { parseSellingFormatInput } from '@/lib/catalog/sellingFormatInput';
+import { sellingFormatWeightWarning } from '@/lib/catalog/sellingFormatConsistency';
 import { listSaleUnits } from '@/lib/storefrontCopy/saleUnits';
 import { CONTENT_UNITS, describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { FULFILLMENT_POLICIES, normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
@@ -357,6 +358,10 @@ export default function ProductEditClient({
     pack_count: formData.pack_count,
   });
   const sellingFormatCheck = sellingFormatParse.ok ? null : sellingFormatParse.error;
+  // Format of ONE unit vs its shipping weight (e.g. « 2 kg » written for a 1 kg unit sold by 2): advice only.
+  const formatWeightWarning = sellingFormatParse.ok
+    ? sellingFormatWeightWarning({ ...sellingFormatParse.values, net_quantity_display: formData.net_quantity_display }, Number(formData.weight_grams), Number(formData.min_order_quantity))
+    : null;
   const customerPricePreview = sellingFormatParse.ok
     ? describePrice(Number(formData.price) || 0, resolveSellingFormat({
       ...sellingFormatParse.values,
@@ -773,21 +778,23 @@ export default function ProductEditClient({
                   <p id="product-price-hint" className="text-xs text-a-text-3 mt-1">Prix hors promotion. Une promotion se règle dans la section Promotion.</p>
                 </div>
                 <div>
-                  <label htmlFor="product-weight" className={LABEL_CLS}>Poids (grammes)</label>
+                  <label htmlFor="product-weight" className={LABEL_CLS}>Poids d’expédition d’une unité (g)</label>
                   <input
                     id="product-weight"
                     type="number"
                     min="0"
                     value={formData.weight_grams}
                     onChange={(e) => setField('weight_grams', e.target.value)}
-                    aria-describedby={missingWeight ? 'product-weight-hint' : undefined}
+                    aria-describedby="product-weight-hint"
                     className={`${INPUT_CLS} ${missingWeight ? 'border-tone-warning-border bg-tone-warning-bg' : ''}`}
                   />
-                  {missingWeight && (
+                  {missingWeight ? (
                     <p id="product-weight-hint" className="mt-1 flex items-start gap-1 text-xs font-medium text-tone-warning-fg">
                       <IconAlertTriangle size={13} aria-hidden="true" className="mt-px shrink-0" />
                       Requis pour les frais de livraison et le carton suggéré.
                     </p>
+                  ) : (
+                    <p id="product-weight-hint" className="mt-1 text-xs text-a-text-3">Emballage compris. Sert aux frais de livraison, jamais au format affiché au client.</p>
                   )}
                 </div>
               </div>
@@ -1071,6 +1078,22 @@ export default function ProductEditClient({
                   </select>
                 </div>
               </div>
+              <div className="mt-4">
+                  <label htmlFor="product-net-quantity" className={LABEL_CLS}>
+                    Quantité nette d’une unité vendue (ex. &quot;500 g&quot;, &quot;1 L&quot;)
+                  </label>
+                  <input
+                    id="product-net-quantity"
+                    type="text"
+                    value={formData.net_quantity_display}
+                    onChange={(e) => setField('net_quantity_display', e.target.value)}
+                    aria-describedby="product-net-quantity-help"
+                    className={`${INPUT_CLS} ${formatWeightWarning ? 'border-tone-warning-border bg-tone-warning-bg' : ''}`}
+                  />
+                  <p id="product-net-quantity-help" className={`mt-1 text-xs ${formatWeightWarning ? 'font-medium text-tone-warning-fg' : 'text-a-text-3'}`}>
+                    {formatWeightWarning ?? 'Une seule unité, au prix affiché : jamais le minimum d’achat. Copiée sur la commande et le récapitulatif client.'}
+                  </p>
+              </div>
               {sellingFormatCheck ? (
                 <p role="alert" className="mt-3 text-xs font-semibold text-tone-danger-fg">{sellingFormatCheck}</p>
               ) : (
@@ -1079,7 +1102,7 @@ export default function ProductEditClient({
                 </p>
               )}
               <p className="mt-1 text-xs text-a-text-3">
-                Sans unité de vente, le site utilise la quantité nette de l’étiquette si elle est simple (« 500 g »), sinon « l’article ».
+                Sans unité de vente, le site utilise la quantité nette si elle est simple (« 500 g »), sinon « l’article ». Elle est aussi imprimée sur l’étiquette.
               </p>
             </section>
           </div>
@@ -1336,16 +1359,17 @@ export default function ProductEditClient({
             <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h3 className={SECTION_TITLE_CLS}>Quantité et emballage</h3>
               <div className="space-y-4">
+                {/* The net quantity is the selling format: edited in Général › Format de vente, next to the shipping weight. */}
                 <div>
-                  <label className={LABEL_CLS}>
-                    Quantité nette à afficher (ex. &quot;1 L&quot;, laisser vide pour utiliser le poids)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.net_quantity_display}
-                    onChange={(e) => setField('net_quantity_display', e.target.value)}
-                    className={INPUT_CLS}
-                  />
+                  <p className={LABEL_CLS}>Quantité nette</p>
+                  <p className="text-sm text-a-text-2">
+                    <span className="font-semibold text-a-text">{formData.net_quantity_display.trim() || '—'}</span>
+                    {' · '}
+                    <button type="button" onClick={() => { setActiveTab('generale'); window.setTimeout(() => document.getElementById('product-net-quantity')?.focus(), 0); }}
+                      className="font-semibold text-a-brand-fg hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus">
+                      Modifier dans Format de vente
+                    </button>
+                  </p>
                 </div>
                 <div>
                   <label className={LABEL_CLS}>Matériau d&apos;emballage</label>

@@ -17,6 +17,7 @@ import {
   IconTruck,
 } from '@tabler/icons-react'
 import { formatPrice, formatDate } from '@/lib/utils/format'
+import { orderItemFormatLabel } from '@/lib/orders/documents/itemFormat'
 import OrderDetail, { type NextStepGuide } from '../../../orders/[id]/OrderDetail'
 import PickingChecklist from '../../../orders/[id]/PickingChecklist'
 import ShipmentTrackingCard from '../../../orders/[id]/ShipmentTrackingCard'
@@ -172,6 +173,8 @@ export default async function AdminOrderPage({ params }: PageProps) {
     if (!bLocation) return -1
     return aLocation.localeCompare(bLocation)
   })
+  // Récapitulatif: lines in name order (the picking order above follows warehouse locations).
+  const summaryItems = [...items].sort((a, b) => a.name.localeCompare(b.name, 'fr'))
   const carriers = (carriersRaw ?? []) as { name: string }[]
   const canManage = Boolean(access && canAdmin(access, 'orders.manage'))
   // Same tenant thresholds as the orders work queue and the daily digest.
@@ -575,8 +578,24 @@ export default async function AdminOrderPage({ params }: PageProps) {
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-a-hover text-a-text-2"><IconReceipt size={18} aria-hidden="true" /></span>
               <h2 id="order-summary-title" className="text-sm font-semibold text-a-text">Récapitulatif</h2>
             </div>
+            {/* Lines as sold (order_items snapshot: name, unit price, line total), never today's catalogue. */}
+            <ul aria-label="Articles et prix" className="mb-4 divide-y divide-a-border border-y border-a-border text-sm">
+              {summaryItems.map((item) => {
+                const format = orderItemFormatLabel((item as OrderItem & { format_snapshot?: unknown }).format_snapshot, item.name)
+                return (
+                  <li key={item.id} className="flex items-start justify-between gap-4 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-a-text"><span className="font-semibold tabular-nums">{item.quantity} ×</span> {item.name}</p>
+                      <p className="mt-0.5 text-xs text-a-text-3">{format ? `${format} · ` : ''}{formatPrice(item.price, tenant.currency)} l’unité</p>
+                    </div>
+                    <span className="shrink-0 font-semibold tabular-nums text-a-text">{formatPrice(item.subtotal, tenant.currency)}</span>
+                  </li>
+                )
+              })}
+            </ul>
             <div className="ml-auto max-w-sm space-y-2 text-sm">
               <div className="flex justify-between gap-4 text-a-text-3"><span>Sous-total</span><span>{formatPrice(order.subtotal, tenant.currency)}</span></div>
+              {(order.ambassador_discount_amount ?? 0) > 0 && <div className="flex justify-between gap-4 text-a-text-3"><span>Remise parrainage</span><span>−{formatPrice(order.ambassador_discount_amount, tenant.currency)}</span></div>}
               {!isPickup && <div className="flex justify-between gap-4 text-a-text-3"><span>Livraison</span><span>{order.shipping_cost === 0 ? 'Gratuite' : formatPrice(order.shipping_cost, tenant.currency)}</span></div>}
               <div className="flex justify-between gap-4 border-t border-a-border pt-2 text-base font-semibold text-a-text"><span>Total</span><span>{formatPrice(order.total, tenant.currency)}</span></div>
             </div>

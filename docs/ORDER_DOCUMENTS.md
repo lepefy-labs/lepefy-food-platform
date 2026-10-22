@@ -1,4 +1,4 @@
-# Documenti delle commande e portale QR (migration 145, applicata in produzione; 162 da applicare)
+# Documenti delle commande e portale QR (migrations 145 e 162, applicate in produzione)
 
 Documento di riferimento per la liste de préparation, il bon de colis, il portale cliente `/o/[token]` e le preferenze tenant. Il codice resta la source of truth. Lato Shipping Intelligence (carton suggestion, file map, invarianti): `docs/SHIPPING_INTELLIGENCE.md` §3.1–3.2.
 
