@@ -2,29 +2,13 @@ import Link from 'next/link';
 import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { formatDate, formatPrice } from '@/lib/utils/format';
-import {
-  IconArrowLeft,
-  IconBuildingStore,
-  IconCheck,
-  IconCircleCheck,
-  IconClipboardList,
-  IconHome,
-  IconLock,
-  IconMapPin,
-  IconPackage,
-  IconTruck,
-} from '@tabler/icons-react';
-import {
-  customerOrderStepIndex,
-  customerOrderSteps,
-  getCustomerOrderPresentation,
-  type CustomerOrderStage,
-  type FulfillmentKind,
-} from '@/lib/orders/orderStatus';
-import CopyButton from './CopyButton';
+import { formatPrice } from '@/lib/utils/format';
+import { IconLock } from '@tabler/icons-react';
+import type { FulfillmentKind } from '@/lib/orders/orderStatus';
 import type { NormalizedShipmentStatus, ShipmentTrackingEvent } from '@lepefy/types';
-import { carrierTrackingLink, shipmentDate, shipmentEventLabel, shipmentEventsNewestFirst, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
+import { buildOrderTrackingView } from '@/lib/orders/tracking/orderTrackingView';
+import { buildSupportChannels } from '@/lib/orders/portal/supportChannels';
+import OrderTrackingEssentiel, { type TrackingAddress, type TrackingSummary } from './OrderTrackingEssentiel';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -89,25 +73,15 @@ function isValidToken(orderId: string, email: string | null, token: string): boo
   }
 }
 
-type StepIcon = typeof IconCircleCheck;
-
-function stepMeta(stage: CustomerOrderStage, fulfillmentType: FulfillmentKind): { label: string; icon: StepIcon } {
-  if (stage === 'confirmed') return { label: 'Confirmée', icon: IconCircleCheck };
-  if (stage === 'preparing') return { label: 'En préparation', icon: IconPackage };
-  if (stage === 'ready_for_pickup') return { label: 'Prête au retrait', icon: IconBuildingStore };
-  if (stage === 'shipped') return { label: 'Expédiée', icon: IconTruck };
-  return { label: fulfillmentType === 'pickup' ? 'Retirée' : 'Livrée', icon: IconHome };
-}
-
-function stepTimestamp(stage: CustomerOrderStage, order: OrderRow) {
-  if (stage === 'confirmed') return order.created_at;
-  if (stage === 'preparing') return order.picking_started_at;
-  if (stage === 'shipped') return order.shipped_at;
-  if (stage === 'delivered' && order.status === 'delivered') {
-    return shipmentEventsNewestFirst(order.shipping_tracking_events).find(event => event.status === 'delivered')?.occurredAt ?? order.updated_at;
+function countryName(code: string | null | undefined): string | null {
+  const value = code?.trim();
+  if (!value) return null;
+  if (!/^[A-Za-z]{2}$/.test(value)) return value;
+  try {
+    return new Intl.DisplayNames(['fr'], { type: 'region' }).of(value.toUpperCase()) ?? value;
+  } catch {
+    return value;
   }
-  if (stage === 'ready_for_pickup' && order.status === 'ready_for_pickup') return order.updated_at;
-  return null;
 }
 
 interface PageProps {
@@ -156,186 +130,33 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
   }).from('order_items').select('name, quantity, subtotal').eq('order_id', order.id).eq('tenant_id', tenant.id);
 
   const orderItems = rawItems ?? [];
-  const presentation = getCustomerOrderPresentation(order.status, order.fulfillment_type);
-  const steps = customerOrderSteps(order.fulfillment_type);
-  const activeIdx = customerOrderStepIndex(presentation.stage, order.fulfillment_type);
-  const isCancelled = presentation.stage === 'cancelled';
-  const isPickup = order.fulfillment_type === 'pickup';
-  const sd = (order.shipping_details ?? {}) as ShippingDetails;
-  const trackingCode = order.tracking_code ?? sd.trackingCode ?? null;
-  const trackingCarrier = order.tracking_carrier ?? sd.trackingCarrier ?? sd.carrierName ?? null;
-  const carrierUrl = carrierTrackingLink({ carrier: trackingCarrier, trackingCode });
-  const managedTracking = order.shipping_tracking_mode === 'managed' && Boolean(order.shipping_provider_reference);
-  const events = shipmentEventsNewestFirst(order.shipping_tracking_events);
-  const externalUrl = carrierTrackingLink({ carrier: trackingCarrier, trackingCode, providerUrl: order.shipping_tracking_url });
-  const showTracking = !isPickup && !isCancelled && (managedTracking || ((presentation.stage === 'shipped' || presentation.stage === 'delivered') && Boolean(trackingCode)));
+  const view = buildOrderTrackingView(order, new Date());
+  const currency = tenant.currency || 'EUR';
+  const itemsTotal = orderItems.reduce((sum, item) => sum + Number(item.subtotal ?? 0), 0);
+  const shipping = order.fulfillment_type === 'delivery' ? Number(order.shipping_cost ?? 0) : 0;
+  const total = Number(order.total ?? itemsTotal + shipping);
+  const lines = [{ label: 'Articles', value: formatPrice(itemsTotal, currency) }];
+  if (order.fulfillment_type === 'delivery') lines.push({ label: 'Livraison', value: shipping === 0 ? 'Offerte' : formatPrice(shipping, currency) });
+  const reduction = Math.round((itemsTotal + shipping - total) * 100) / 100;
+  if (reduction > 0) lines.push({ label: 'Réductions', value: `−${formatPrice(reduction, currency)}` });
+  const summary: TrackingSummary = {
+    items: orderItems.map((item) => ({ name: item.name, quantity: item.quantity, amount: formatPrice(Number(item.subtotal), currency) })),
+    lines,
+    total: formatPrice(total, currency),
+  };
+
+  // Postal code, city and country only (the page opens from a shareable link), as on the order confirmation.
   const address = order.shipping_address;
+  const place = [address?.postal_code, address?.city].filter(Boolean).join(' ').trim();
+  const trackingAddress: TrackingAddress | null = place ? { place, country: countryName(address?.country) } : null;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 pb-10 pt-5 sm:px-6 sm:pt-8">
-      <Link href="/orders" className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900">
-        <IconArrowLeft size={17} /> Mes commandes
-      </Link>
-
-      <header className="mb-4 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="font-mono text-xs font-semibold text-gray-400">Commande #{order.id.slice(0, 8).toUpperCase()}</p>
-            <h1 className="mt-2 text-2xl font-bold tracking-tight text-gray-950">{presentation.title}</h1>
-            <p className="mt-2 max-w-lg text-sm leading-6 text-gray-500">{presentation.description}</p>
-          </div>
-          <span
-            className={`inline-flex rounded-full px-3 py-1.5 text-xs font-bold ${isCancelled ? 'bg-red-50 text-red-700' : ''}`}
-            style={isCancelled ? undefined : { background: 'var(--color-primary-light)', color: 'var(--color-primary-dark)' }}
-          >
-            {presentation.label}
-          </span>
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-gray-100 pt-4 text-xs text-gray-500 sm:text-sm">
-          <span>{formatDate(order.created_at)}</span>
-          <span className="inline-flex items-center gap-1.5">
-            {isPickup ? <IconBuildingStore size={15} /> : <IconTruck size={15} />}
-            {isPickup ? 'Retrait en boutique' : 'Livraison'}
-          </span>
-          <span className="font-semibold text-gray-900">{formatPrice(order.total, tenant.currency)}</span>
-        </div>
-      </header>
-
-      {!isCancelled && (
-        <section className="mb-4 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm sm:p-6">
-          <div className="mb-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">Avancement</p>
-            <h2 className="mt-1 text-base font-semibold text-gray-900">Où en est ma commande ?</h2>
-          </div>
-
-          <div className="space-y-0">
-            {steps.map((stage, index) => {
-              const meta = stepMeta(stage, order.fulfillment_type);
-              const done = activeIdx >= index;
-              const current = activeIdx === index;
-              const timestamp = stepTimestamp(stage, order);
-              const Icon = meta.icon;
-              return (
-                <div key={stage} className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <span
-                      className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2"
-                      style={{
-                        borderColor: done ? 'var(--color-primary)' : '#E5E7EB',
-                        background: current ? 'var(--color-primary)' : done ? 'var(--color-primary-light)' : '#F9FAFB',
-                        color: current ? 'white' : done ? 'var(--color-primary-dark)' : '#9CA3AF',
-                      }}
-                    >
-                      {done && !current ? <IconCheck size={18} /> : <Icon size={18} />}
-                    </span>
-                    {index < steps.length - 1 && <span className={`h-10 w-0.5 ${activeIdx > index ? 'bg-[var(--color-primary)]' : 'bg-gray-200'}`} />}
-                  </div>
-                  <div className="min-w-0 flex-1 pb-5 pt-1.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className={`text-sm font-semibold ${done ? 'text-gray-900' : 'text-gray-400'}`}>{meta.label}</p>
-                      {timestamp && <span className="text-xs text-gray-400">{formatDate(timestamp)}</span>}
-                    </div>
-                    {current && <p className="mt-1 text-xs leading-5 text-gray-500">{presentation.description}</p>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {showTracking && (
-        <section className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-emerald-700"><IconTruck size={18} /></span>
-            <div>
-              <h2 className="text-sm font-semibold text-gray-900">Suivre mon colis</h2>
-              <p className="text-xs text-gray-500">{trackingCarrier ?? 'Transporteur'}</p>
-            </div>
-          </div>
-          {trackingCode && <div className="flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3">
-            <p className="min-w-0 break-all font-mono text-sm font-semibold text-gray-900">{trackingCode}</p>
-            <CopyButton text={trackingCode} />
-          </div>}
-          {managedTracking && (
-            <div className="mt-4 space-y-3">
-              <div className="rounded-xl bg-white p-3">
-                <p className="text-sm font-semibold text-emerald-800">{shipmentStatusLabel(order.shipping_normalized_status)}</p>
-                {events[0] && <p className="mt-1 text-xs text-gray-500">{shipmentDate(events[0].occurredAt)}</p>}
-                {order.shipping_estimated_delivery_at && order.shipping_normalized_status !== 'delivered' && <p className="mt-2 text-xs text-gray-500">Livraison estimée : {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Rome' }).format(new Date(order.shipping_estimated_delivery_at))}</p>}
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900">Historique</h3>
-              {events.length ? <ol className="space-y-3 border-l-2 border-emerald-200 pl-4">
-                {events.map((event, index) => <li key={`${event.occurredAt}-${index}`}>
-                  <p className="text-sm font-medium text-gray-800">{shipmentEventLabel(event)}</p>
-                  <p className="mt-0.5 text-xs text-gray-500">{shipmentDate(event.occurredAt)}</p>
-                </li>)}
-              </ol> : <p className="text-xs text-gray-500">Le transporteur n’a pas encore publié d’événement de suivi.</p>}
-              {externalUrl && <a href={externalUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-xs font-medium text-gray-600 underline">Voir sur le site du transporteur</a>}
-            </div>
-          )}
-          {!managedTracking && carrierUrl && (
-            <a
-              href={carrierUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: 'var(--color-primary)' }}
-            >
-              Ouvrir le suivi {trackingCarrier ? `· ${trackingCarrier}` : ''}
-            </a>
-          )}
-          {!managedTracking && !carrierUrl && <p className="mt-3 text-xs text-gray-500">Copiez le numéro ci-dessus pour le consulter sur le site du transporteur.</p>}
-        </section>
-      )}
-
-      {isPickup && presentation.stage === 'ready_for_pickup' && (
-        <section className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-          <div className="flex gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-emerald-700"><IconBuildingStore size={19} /></span>
-            <div>
-              <h2 className="text-sm font-bold text-emerald-900">Votre commande vous attend</h2>
-              <p className="mt-1 text-sm leading-6 text-emerald-800">Elle est prête à être retirée en boutique. Présentez simplement votre numéro de commande.</p>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {orderItems.length > 0 && (
-        <section className="mb-4 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm">
-          <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900"><IconClipboardList size={17} /> Récapitulatif</h2>
-          <div className="space-y-3">
-            {orderItems.map((item, index) => (
-              <div key={`${item.name}-${index}`} className="flex items-start justify-between gap-4 text-sm">
-                <span className="min-w-0 text-gray-600"><span className="font-semibold text-gray-900">{item.quantity}×</span> {item.name}</span>
-                <span className="shrink-0 font-medium text-gray-900">{formatPrice(item.subtotal, tenant.currency)}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 space-y-2 border-t border-gray-100 pt-4">
-            {!isPickup && (
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>Livraison</span>
-                <span>{order.shipping_cost === 0 ? 'Gratuite' : formatPrice(order.shipping_cost, tenant.currency)}</span>
-              </div>
-            )}
-            <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-bold text-gray-950"><span>Total</span><span>{formatPrice(order.total, tenant.currency)}</span></div>
-          </div>
-        </section>
-      )}
-
-      {!isPickup && address && (
-        <section className="mb-4 rounded-2xl bg-gray-50 p-4">
-          <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-800"><IconMapPin size={17} /> Adresse de livraison</h2>
-          {address.full_name && <p className="text-sm text-gray-700">{address.full_name}</p>}
-          {address.line1 && <p className="text-sm text-gray-700">{address.line1}</p>}
-          {address.line2 && <p className="text-sm text-gray-700">{address.line2}</p>}
-          {(address.postal_code || address.city) && <p className="text-sm text-gray-700">{address.postal_code} {address.city}{address.country ? `, ${address.country}` : ''}</p>}
-        </section>
-      )}
-
-      <p className="mt-5 text-center text-xs leading-5 text-gray-400">Des questions ? Répondez à l&apos;email de confirmation ou contactez-nous en indiquant votre numéro de commande.</p>
-    </div>
+    <OrderTrackingEssentiel
+      view={view}
+      summary={summary}
+      address={trackingAddress}
+      support={buildSupportChannels(tenant, view.ref, null)}
+      tenantName={tenant.name}
+    />
   );
 }

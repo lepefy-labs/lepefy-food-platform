@@ -14,7 +14,7 @@ import { GlobalProductSearch } from '@/components/search/GlobalProductSearch';
 import { SearchFieldPlaceholder } from '@/components/search/ShopSearchBar';
 import { cartAriaLabel, formatCartBadge } from '@/lib/cart/cartBadge';
 import { useCartAddPulse } from '@/lib/cart/useCartAttention';
-import { isCartPath, shouldShowGlobalSearch } from '@/lib/storefront/shopChrome';
+import { isCartPath, isOrderTrackingPath, shouldShowGlobalSearch } from '@/lib/storefront/shopChrome';
 import { readableOn } from '@/lib/utils/color';
 // Sous-domaine événementiel quand il existe : ses liens courts (/services/…) n'existent pas sur la boutique.
 import { eventsHubHref } from '@/lib/events/eventsHubUrl';
@@ -159,8 +159,9 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
     <>
       {/* Mobile : l'header défile avec la page, seule la recherche reste fixée
           (ShopSearchBar) et la BottomNav porte panier et destinations. Sur le
-          panier mobile, l'en-tête contextuel de la page (CartPageHeader) le remplace. */}
-      <header className={`relative z-40 border-b border-gray-200 bg-white md:sticky md:top-0 ${isCartPath(pathname) ? 'max-md:hidden' : ''}`}>
+          panier mobile, l'en-tête contextuel de la page (CartPageHeader) le remplace ;
+          de même sur le suivi de commande (en-tête compact de la page). */}
+      <header className={`relative z-40 border-b border-gray-200 bg-white md:sticky md:top-0 ${isCartPath(pathname) || isOrderTrackingPath(pathname) ? 'max-md:hidden' : ''}`}>
         <div className="relative mx-auto flex h-24 max-w-7xl items-center gap-3 px-4 lg:gap-6">
           <button
             type="button"

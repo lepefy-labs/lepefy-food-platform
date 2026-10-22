@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { buildCatalogUrl, CATALOG_PROMOS_HREF, isPromoFilter } from '../../src/lib/catalog/catalogSearchUrl';
-import { isCartPath, shouldShowBottomNav, shouldShowGlobalSearch, shouldShowSearchBar } from '../../src/lib/storefront/shopChrome';
+import { isCartPath, isOrderTrackingPath, shouldShowBottomNav, shouldShowGlobalSearch, shouldShowSearchBar } from '../../src/lib/storefront/shopChrome';
 import {
   getShoppingReturn,
   markShoppingReturn,
@@ -23,6 +23,17 @@ test.describe('zones collantes du panier', () => {
     expect(shouldShowBottomNav('/checkout')).toBe(false);
     expect(shouldShowBottomNav('/checkout/en-attente')).toBe(false);
     expect(shouldShowBottomNav('/avis/donner')).toBe(false);
+  });
+
+  test('suivi de commande : ni recherche collante ni BottomNav, la liste des commandes garde la navigation', () => {
+    const tracking = '/orders/5ca23a93-1111-4222-8333-444455556666';
+    expect(isOrderTrackingPath(tracking)).toBe(true);
+    expect(shouldShowSearchBar(tracking)).toBe(false);
+    expect(shouldShowBottomNav(tracking)).toBe(false);
+    expect(isOrderTrackingPath('/orders')).toBe(false);
+    expect(isOrderTrackingPath('/orders/')).toBe(false);
+    expect(shouldShowBottomNav('/orders')).toBe(true);
+    expect(shouldShowSearchBar('/orders')).toBe(true);
   });
 
   test('ailleurs : inchangé', () => {

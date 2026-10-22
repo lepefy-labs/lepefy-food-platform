@@ -23,7 +23,7 @@ export function shouldShowGlobalSearch(pathname: string): boolean {
  * (`CartProductSearch`), et son haut d'écran est réservé à son en-tête.
  */
 export function shouldShowSearchBar(pathname: string): boolean {
-  return shouldShowGlobalSearch(pathname) && !isCartPath(pathname);
+  return shouldShowGlobalSearch(pathname) && !isCartPath(pathname) && !isOrderTrackingPath(pathname);
 }
 
 /**
@@ -32,7 +32,17 @@ export function shouldShowSearchBar(pathname: string): boolean {
  * « Livraison et paiement » se pose juste au-dessus d'elle.
  */
 export function shouldShowBottomNav(pathname: string): boolean {
-  return pathname !== '/avis/donner' && !isCheckoutPath(pathname);
+  return pathname !== '/avis/donner' && !isCheckoutPath(pathname) && !isOrderTrackingPath(pathname);
+}
+
+/**
+ * Suivi d'une commande (/orders/[id]) : sur mobile, l'en-tête compact de la
+ * page (← commandes, logo, aide) remplace l'en-tête commercial ; ni recherche
+ * collante, ni BottomNav, ni bouton de l'assistant : rien de fixe ne couvre
+ * le statut, la date ou le bouton de suivi. La liste /orders garde la navigation.
+ */
+export function isOrderTrackingPath(pathname: string): boolean {
+  return /^\/orders\/[^/]+\/?$/.test(pathname);
 }
 
 /**
