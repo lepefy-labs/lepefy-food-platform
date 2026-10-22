@@ -24,7 +24,7 @@ import {
 } from '@/lib/orders/orderStatus';
 import CopyButton from './CopyButton';
 import type { NormalizedShipmentStatus, ShipmentTrackingEvent } from '@lepefy/types';
-import { safeShipmentTrackingUrl, shipmentDate, shipmentEventLabel, shipmentEventsNewestFirst, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
+import { carrierTrackingLink, shipmentDate, shipmentEventLabel, shipmentEventsNewestFirst, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -74,23 +74,6 @@ interface OrderRow {
   shipping_tracking_url?: string | null;
   shipping_estimated_delivery_at?: string | null;
   shipping_tracking_events?: ShipmentTrackingEvent[] | null;
-}
-
-const CARRIER_URLS: Record<string, string> = {
-  'poste italiane': 'https://www.poste.it/cerca/index.html#/risultati-ricerca-spedizioni/',
-  poste: 'https://www.poste.it/cerca/index.html#/risultati-ricerca-spedizioni/',
-  brt: 'https://vas.brt.it/vas/sped_det_show.hsm?referer=sped_numsped_par.hsm&Nspediz=',
-  bartolini: 'https://vas.brt.it/vas/sped_det_show.hsm?referer=sped_numsped_par.hsm&Nspediz=',
-  fedex: 'https://www.fedex.com/fedextrack/?trknbr=',
-  tnt: 'https://www.tnt.com/express/it_it/site/tracking.html?searchType=CON&cons=',
-  dhl: 'https://www.dhl.com/it-it/home/tracking.html?tracking-id=',
-  sda: 'https://www.sda.it/wps/portal/Servizi-online/cerca-spedizione?barcode=',
-  ups: 'https://www.ups.com/track?tracknum=',
-};
-
-function trackingBaseUrl(carrier: string | null) {
-  if (!carrier) return null;
-  return CARRIER_URLS[carrier.toLowerCase().trim()] ?? null;
 }
 
 function isValidToken(orderId: string, email: string | null, token: string): boolean {
@@ -181,10 +164,10 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
   const sd = (order.shipping_details ?? {}) as ShippingDetails;
   const trackingCode = order.tracking_code ?? sd.trackingCode ?? null;
   const trackingCarrier = order.tracking_carrier ?? sd.trackingCarrier ?? sd.carrierName ?? null;
-  const carrierUrl = trackingBaseUrl(trackingCarrier);
+  const carrierUrl = carrierTrackingLink({ carrier: trackingCarrier, trackingCode });
   const managedTracking = order.shipping_tracking_mode === 'managed' && Boolean(order.shipping_provider_reference);
   const events = shipmentEventsNewestFirst(order.shipping_tracking_events);
-  const externalUrl = safeShipmentTrackingUrl(order.shipping_tracking_url);
+  const externalUrl = carrierTrackingLink({ carrier: trackingCarrier, trackingCode, providerUrl: order.shipping_tracking_url });
   const showTracking = !isPickup && !isCancelled && (managedTracking || ((presentation.stage === 'shipped' || presentation.stage === 'delivered') && Boolean(trackingCode)));
   const address = order.shipping_address;
 
@@ -292,9 +275,9 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
               {externalUrl && <a href={externalUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-xs font-medium text-gray-600 underline">Voir sur le site du transporteur</a>}
             </div>
           )}
-          {!managedTracking && carrierUrl && trackingCode && (
+          {!managedTracking && carrierUrl && (
             <a
-              href={`${carrierUrl}${encodeURIComponent(trackingCode)}`}
+              href={carrierUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"

@@ -41,6 +41,38 @@ const CARRIER_NAMES: Record<string, string> = {
   gls: 'GLS', ups: 'UPS', sda: 'SDA', poste: 'Poste Italiane',
   'poste italiane': 'Poste Italiane', poste_italiane: 'Poste Italiane', dpd: 'DPD', nexive: 'Nexive',
 };
+const POSTE_TRACKING_BASE = 'https://www.poste.it/cerca/index.html#/risultati-spedizioni/';
+/** Carrier pages that open directly on one shipment when the code is appended. */
+const CARRIER_TRACKING_BASES: Record<string, string> = {
+  'poste italiane': POSTE_TRACKING_BASE, poste: POSTE_TRACKING_BASE, poste_italiane: POSTE_TRACKING_BASE,
+  brt: 'https://vas.brt.it/vas/sped_det_show.hsm?referer=sped_numsped_par.hsm&Nspediz=',
+  bartolini: 'https://vas.brt.it/vas/sped_det_show.hsm?referer=sped_numsped_par.hsm&Nspediz=',
+  fedex: 'https://www.fedex.com/fedextrack/?trknbr=',
+  tnt: 'https://www.tnt.com/express/it_it/site/tracking.html?searchType=CON&cons=',
+  dhl: 'https://www.dhl.com/it-it/home/tracking.html?tracking-id=',
+  sda: 'https://www.sda.it/wps/portal/Servizi-online/cerca-spedizione?barcode=',
+  ups: 'https://www.ups.com/track?tracknum=',
+};
+
+/**
+ * One carrier link for the customer page, the QR portal and the admin order:
+ * it always opens on the shipment itself. The provider URL (Packlink) is kept
+ * when it already carries the tracking code; otherwise a known carrier gets
+ * its own page with the code appended (Poste Italiane: the old
+ * `risultati-ricerca-spedizioni` route drops the code and shows an empty search).
+ */
+export function carrierTrackingLink(input: {
+  carrier: string | null | undefined; trackingCode: string | null | undefined; providerUrl?: string | null;
+}): string | null {
+  const code = input.trackingCode?.trim() || null;
+  const provider = safeShipmentTrackingUrl(input.providerUrl);
+  const repairedProvider = provider?.replace('#/risultati-ricerca-spedizioni/', '#/risultati-spedizioni/') ?? null;
+  if (repairedProvider && (!code || repairedProvider.includes(code) || repairedProvider.includes(encodeURIComponent(code)))) return repairedProvider;
+  const base = input.carrier ? CARRIER_TRACKING_BASES[input.carrier.toLowerCase().trim()] : undefined;
+  if (base && code) return `${base}${encodeURIComponent(code)}`;
+  return repairedProvider;
+}
+
 /** Carrier name as staff expect to read it ("brt" → "BRT"); unknown names are kept as typed. */
 export function carrierDisplayName(raw: string | null | undefined): string | null {
   const value = raw?.trim();

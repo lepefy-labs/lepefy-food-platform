@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { IconExternalLink, IconRoute } from '@tabler/icons-react';
 import type { Order } from '@lepefy/types';
 import { formatSince, transportState } from '@/lib/orders/adminOrderOperations';
-import { safeShipmentTrackingUrl, shipmentDate, shipmentEventLabel, shipmentEventsNewestFirst } from '@/lib/shipping/shipmentPresentation';
+import { carrierTrackingLink, shipmentDate, shipmentEventLabel, shipmentEventsNewestFirst } from '@/lib/shipping/shipmentPresentation';
 import CopyableValue from '../../_components/ui/CopyableValue';
 
 const VISIBLE_EVENTS = 4;
@@ -28,7 +28,7 @@ export default function ShipmentTrackingCard({ order, carrier, service, parcels,
   const events = shipmentEventsNewestFirst(order.shipping_tracking_events);
   const visible = showAll ? events : events.slice(0, VISIBLE_EVENTS);
   const transport = transportState(order);
-  const trackingUrl = safeShipmentTrackingUrl(order.shipping_tracking_url);
+  const trackingUrl = carrierTrackingLink({ carrier, trackingCode: order.tracking_code, providerUrl: order.shipping_tracking_url });
   const eta = order.shipping_estimated_delivery_at && Number.isFinite(Date.parse(order.shipping_estimated_delivery_at))
     ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Rome' }).format(new Date(order.shipping_estimated_delivery_at)) : null;
   const meta = [carrier, service, parcels != null ? `${parcels} colis` : null, weight].filter(Boolean).join(' · ');

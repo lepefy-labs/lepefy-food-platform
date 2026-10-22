@@ -1,6 +1,6 @@
 import type { NormalizedShipmentStatus } from '@lepefy/types';
 import { getCustomerOrderPresentation, type CustomerOrderStage, type FulfillmentKind } from '@/lib/orders/orderStatus';
-import { carrierDisplayName, safeShipmentTrackingUrl, shipmentEventsNewestFirst, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
+import { carrierDisplayName, carrierTrackingLink, safeShipmentTrackingUrl, shipmentEventsNewestFirst, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
 import { androidAppStatus } from '@/lib/mobileApp/androidApp';
 import { orderShortRef, safeImageUrl } from '@/lib/orders/documents/documentHtml';
 import { buildSupportChannels, type SupportChannel } from './supportChannels';
@@ -84,16 +84,18 @@ export function buildOrderPortalViewModel(input: {
   const stage = presentation.stage;
   const sd = (order.shipping_details ?? {}) as { carrierName?: string; trackingCode?: string; trackingCarrier?: string };
 
-  // Lien transporteur : seulement l'URL persistée et validée (https, sans identifiants).
-  const trackingUrl = !isPickup ? safeShipmentTrackingUrl(order.shipping_tracking_url) : null;
+  // Lien transporteur : URL persistée validée (https, sans identifiants) ou page du transporteur avec le code.
+  const trackingCarrier = order.tracking_carrier ?? sd.trackingCarrier ?? sd.carrierName ?? null;
+  const trackingCode = order.tracking_code ?? sd.trackingCode ?? null;
+  const trackingUrl = !isPickup ? carrierTrackingLink({ carrier: trackingCarrier, trackingCode, providerUrl: order.shipping_tracking_url }) : null;
   const events = shipmentEventsNewestFirst(order.shipping_tracking_events);
   const delivered = stage === 'delivered';
   const shipment = !isPickup && (stage === 'shipped' || delivered || order.shipping_tracking_mode === 'managed') ? {
-    carrier: carrierDisplayName(order.tracking_carrier ?? sd.trackingCarrier ?? sd.carrierName),
+    carrier: carrierDisplayName(trackingCarrier),
     status: order.shipping_normalized_status ? shipmentStatusLabel(order.shipping_normalized_status) : null,
     eta: !delivered && validDate(order.shipping_estimated_delivery_at) ? SHORT_DATE(order.shipping_estimated_delivery_at) : null,
     lastUpdate: events[0] ? SHORT_DATE(events[0].occurredAt) : null,
-    trackingCode: order.tracking_code ?? sd.trackingCode ?? null,
+    trackingCode,
   } : null;
 
   const headline = stage === 'shipped' ? 'Votre livraison est en cours' : presentation.title;

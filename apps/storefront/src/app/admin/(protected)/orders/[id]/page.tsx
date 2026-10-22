@@ -208,7 +208,9 @@ export default async function AdminOrderPage({ params }: PageProps) {
   const confirmedByEmail = (confirmerResult.data as { email: string } | null)?.email ?? null
   const preparer = preparerResult.data as { email: string; nickname: string | null; first_name: string | null } | null
   const preparedBy = preparer ? preparer.nickname || preparer.first_name || preparer.email : null
-  const trackingLink = isAssisted ? buildOrderTrackingLink(order.id, order.email, shopBaseUrl(tenant)) : null
+  // Same signed page the customer opens (/orders/[id]?token=), for every order: staff see exactly what the customer sees.
+  const customerTrackingLink = buildOrderTrackingLink(order.id, order.email, shopBaseUrl(tenant))
+  const trackingLink = isAssisted ? customerTrackingLink : null
   const shippingDetails = (order.shipping_details ?? null) as ShippingDetails | null
   const isPickup = order.fulfillment_type === 'pickup'
 
@@ -425,6 +427,14 @@ export default async function AdminOrderPage({ params }: PageProps) {
           {order.status === 'stock_conflict' && <p className="mt-3 text-center text-xs font-medium text-tone-danger-fg">Workflow suspendu : conflit de stock.</p>}
           {order.status === 'shipped' && order.shipped_at && <p className="mt-3 text-center text-xs text-a-text-3">Expédiée {formatSince(order.shipped_at, now)}</p>}
           {order.status === 'delivered' && <p className="mt-3 text-center text-xs text-a-text-3">{isPickup ? 'Retirée' : 'Livrée'} · dernière mise à jour {formatSince(order.updated_at, now)}</p>}
+          {customerTrackingLink && (
+            <p className="mt-3 text-center">
+              <a href={customerTrackingLink} target="_blank" rel="noopener noreferrer"
+                className="inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-a-brand-fg hover:underline focus-visible:outline-2 focus-visible:outline-a-focus">
+                Voir le suivi client <IconExternalLink size={13} aria-hidden="true" /><span className="sr-only"> (nouvel onglet)</span>
+              </a>
+            </p>
+          )}
         </section>
       )}
 

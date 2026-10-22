@@ -228,7 +228,7 @@ export function buildPickingListViewModel(input: {
   return {
     kind: 'picking_list',
     ref: orderShortRef(order.id),
-    createdAt: formatDocumentDate(order.created_at, 'short'),
+    createdAt: formatDocumentDate(order.created_at, 'weekday'),
     fulfillment: isPickup ? 'pickup' : 'delivery',
     fulfillmentLabel: isPickup ? 'RETRAIT' : 'LIVRAISON',
     tenantName: tenant.name,
@@ -288,6 +288,13 @@ export function firstName(fullName: string | null | undefined): string | null {
   return first && first.length <= 40 ? first : null;
 }
 
+/** Nom complet de la salutation du bon de colis (demande boutique) ; prénom seul si le nom est démesuré. */
+export function greetingName(fullName: string | null | undefined): string | null {
+  const full = fullName?.trim().split(/\s+/).join(' ');
+  if (!full) return null;
+  return full.length <= 40 ? full : firstName(full);
+}
+
 export function websiteLabel(storefrontUrl: string | null | undefined): string | null {
   if (!storefrontUrl) return null;
   try {
@@ -333,7 +340,7 @@ export function buildPackingSlipViewModel(input: {
 
   const deliveryAddress = settings.packing_slip_show_delivery_address && order.fulfillment_type === 'delivery' ? addressLines(order) : null;
 
-  const name = firstName(order.full_name);
+  const name = greetingName(order.full_name);
   const contact = settings.packing_slip_show_contact
     ? { website: websiteLabel(tenant.storefront_url), whatsapp: formatWhatsappDisplay(tenant.whatsapp_number), email: tenant.legal_email?.trim() || null }
     : null;
@@ -341,7 +348,7 @@ export function buildPackingSlipViewModel(input: {
   return {
     kind: 'packing_slip',
     ref: orderShortRef(order.id),
-    date: formatDocumentDate(order.created_at, 'long'),
+    date: formatDocumentDate(order.created_at, 'weekday'),
     greeting: name ? `Merci ${name} !` : 'Merci !',
     tenant: {
       name: tenant.name,

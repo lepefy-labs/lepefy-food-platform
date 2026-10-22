@@ -25,10 +25,10 @@ const CSS = `
 .pl-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 4mm; border-bottom: 0.6mm solid #111; padding-bottom: 2.5mm; margin-bottom: 2.5mm; }
 .pl-id { min-width: 0; overflow-wrap: anywhere; }
 .pl-title { font-weight: 900; letter-spacing: 0.08em; margin: 0; }
-.pl-ref { font-family: 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace; font-weight: 700; letter-spacing: 0.02em; line-height: 1.15; }
 .pl-badge { display: inline-block; border: 0.4mm solid #111; font-weight: 700; letter-spacing: 0.06em; padding: 0.6mm 2mm; }
 .pl-meta { line-height: 1.4; }
 .pl-when { color: #333; }
+.pl-date { font-weight: 900; line-height: 1.1; color: #000; margin-bottom: 1mm; }
 .pl-customer { font-weight: 700; line-height: 1.25; margin-top: 0.8mm; }
 .pl-address { line-height: 1.3; }
 .pl-dest { border: 0.6mm solid #111; padding: 1.4mm 2.2mm 1.6mm; min-width: 0; }
@@ -84,7 +84,7 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 /* A5 : compact, une colonne d'information par ligne */
 .format-a5 { font-size: 10.5pt; }
 .format-a5 .pl-title { font-size: 12pt; }
-.format-a5 .pl-ref { font-size: 18pt; }
+.format-a5 .pl-date { font-size: 17pt; }
 .format-a5 .pl-badge { font-size: 10pt; }
 .format-a5 .pl-section, .format-a5 .pl-items thead th { font-size: 10pt; }
 .format-a5 .pl-items td { padding-top: 1.6mm; padding-bottom: 1.6mm; }
@@ -129,7 +129,7 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 /* A4 : lignes aérées, colonnes conservation/emplacement, notes */
 .format-a4 { font-size: 11pt; }
 .format-a4 .pl-title { font-size: 14pt; }
-.format-a4 .pl-ref { font-size: 24pt; }
+.format-a4 .pl-date { font-size: 22pt; }
 .format-a4 .pl-badge { font-size: 11pt; }
 .format-a4 .pl-section, .format-a4 .pl-items thead th { font-size: 10pt; }
 .format-a4 .pl-items td { padding-top: 2.6mm; padding-bottom: 2.6mm; vertical-align: middle; }
@@ -257,8 +257,10 @@ function destinationBox(vm: InternalOrderDocumentViewModel): string {
 function header(vm: InternalOrderDocumentViewModel): string {
   const address = vm.deliveryAddress?.length
     ? `<div class="pl-address">${vm.deliveryAddress.map(escapeHtml).join('<br>')}</div>` : '';
-  const identity = `<div class="pl-id"><p class="pl-title">LISTE DE PRÉPARATION</p><div class="pl-ref">#${escapeHtml(vm.ref)}</div>
-<div class="pl-meta pl-when">${escapeHtml([vm.createdAt, vm.tenantName].filter(Boolean).join(' · '))}</div>
+  // Date de commande en tête, en gros caractères gras, au-dessus du titre (demande boutique n° 1001).
+  const when = vm.createdAt ? `<div class="pl-date">${escapeHtml(vm.createdAt)}</div>` : '';
+  const identity = `<div class="pl-id">${when}<p class="pl-title">LISTE DE PRÉPARATION</p>
+<div class="pl-meta pl-when">${escapeHtml([`Commande #${vm.ref}`, vm.tenantName].filter(Boolean).join(' - '))}</div>
 <div class="pl-customer">${escapeHtml(vm.customerName)}</div>${address}</div>`;
   const side = vm.fulfillment === 'delivery'
     ? destinationBox(vm)

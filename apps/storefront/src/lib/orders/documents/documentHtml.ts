@@ -67,9 +67,20 @@ export function safeImageUrl(url: string | null | undefined): string | null {
   }
 }
 
-export function formatDocumentDate(iso: string, style: 'short' | 'long', timeZone = 'Europe/Paris'): string {
+/**
+ * `weekday` = « jeudi 22/10/2026 · 18:38 » : date d'en-tête des documents, le
+ * jour de la semaine écrit en toutes lettres (demandé par les boutiques pour
+ * repérer la commande au premier coup d'œil).
+ */
+export function formatDocumentDate(iso: string, style: 'short' | 'long' | 'weekday', timeZone = 'Europe/Paris'): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
+  if (style === 'weekday') {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('fr-FR', {
+      weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone,
+    }).formatToParts(date).map((part) => [part.type, part.value]));
+    return `${parts.weekday} ${parts.day}/${parts.month}/${parts.year} · ${parts.hour}:${parts.minute}`;
+  }
   return style === 'long'
     ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone }).format(date)
     : new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone }).format(date);

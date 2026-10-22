@@ -21,7 +21,9 @@ const CSS = `
 .ps-head { display: flex; justify-content: space-between; align-items: center; gap: 4mm; }
 .ps-brand { display: flex; align-items: center; gap: 2.5mm; font-weight: 800; }
 .ps-logo { max-height: 14mm; max-width: 45mm; object-fit: contain; }
+.ps-kicker-box { display: flex; flex-direction: column; align-items: flex-end; gap: 0.8mm; text-align: right; }
 .ps-kicker { font-weight: 700; letter-spacing: 0.1em; color: #333; text-align: right; }
+.ps-date { font-weight: 800; color: #111; white-space: nowrap; }
 .ps-merci { font-weight: 800; margin: 5mm 0 1mm; }
 .ps-meta { color: #222; }
 .ps-section { font-weight: 800; letter-spacing: 0.1em; margin: 5mm 0 1.5mm; }
@@ -50,6 +52,7 @@ table.ps-items { width: 100%; border-collapse: collapse; }
 .format-a5 { font-size: 10.5pt; }
 .format-a5 .ps-brand { font-size: 13pt; }
 .format-a5 .ps-kicker, .format-a5 .ps-section { font-size: 10pt; }
+.format-a5 .ps-date { font-size: 11pt; }
 .format-a5 .ps-merci { font-size: 19pt; }
 .format-a5 .ps-qr-code { width: 32mm; height: 32mm; }
 .format-a5 .ps-qr-text b { font-size: 11pt; }
@@ -58,6 +61,7 @@ table.ps-items { width: 100%; border-collapse: collapse; }
 .format-a4 { font-size: 11.5pt; }
 .format-a4 .ps-brand { font-size: 16pt; }
 .format-a4 .ps-kicker, .format-a4 .ps-section { font-size: 10.5pt; }
+.format-a4 .ps-date { font-size: 12.5pt; }
 .format-a4 .ps-merci { font-size: 24pt; }
 .format-a4 .ps-items td { padding-top: 2.4mm; padding-bottom: 2.4mm; }
 .format-a4 .ps-qr-code { width: 38mm; height: 38mm; }
@@ -130,9 +134,9 @@ function contactBlock(vm: CustomerOrderDocumentViewModel): string {
 export function packingSlipSectionHtml(vm: CustomerOrderDocumentViewModel, format: OrderDocumentFormat): string {
   return `<section class="doc ps">
 <div class="ps-band" style="background:${escapeAttr(vm.tenant.bandColor)}"></div>
-<div class="ps-head">${brand(vm)}<span class="ps-kicker">RÉCAPITULATIF DE COMMANDE</span></div>
+<div class="ps-head">${brand(vm)}<div class="ps-kicker-box"><span class="ps-kicker">RÉCAPITULATIF DE COMMANDE</span>${vm.date ? `<span class="ps-date">${escapeHtml(vm.date)}</span>` : ''}</div></div>
 <div class="ps-merci">${escapeHtml(vm.greeting)}</div>
-<div class="ps-meta">Commande <b>#${escapeHtml(vm.ref)}</b> du ${escapeHtml(vm.date)}</div>
+<div class="ps-meta">Commande <b>#${escapeHtml(vm.ref)}</b></div>
 <div class="ps-section keep-next">VOTRE COLIS CONTIENT</div>
 ${itemsTable(vm, format)}
 ${totals(vm)}

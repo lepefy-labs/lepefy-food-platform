@@ -6,9 +6,9 @@ import {
 import {
   ORDER_DOCUMENTS_DEFAULTS, orderDocumentsPatchSchema, readOrderDocumentSettings, resolveOrderDocumentSettings,
 } from '../../src/lib/orders/documents/settings';
-import { escapeHtml, orderShortRef, readableBrandColor, safeImageUrl } from '../../src/lib/orders/documents/documentHtml';
+import { escapeHtml, formatDocumentDate, orderShortRef, readableBrandColor, safeImageUrl } from '../../src/lib/orders/documents/documentHtml';
 import {
-  buildPackingSlipViewModel, buildPickingListViewModel, firstName,
+  buildPackingSlipViewModel, buildPickingListViewModel, firstName, greetingName,
   type DocumentItemRow, type DocumentOrderRow, type DocumentTenant,
 } from '../../src/lib/orders/documents/viewModels';
 import { pickingListHtml } from '../../src/lib/orders/documents/pickingListHtml';
@@ -183,7 +183,7 @@ test('packing slip view-model is customer-safe by construction and hides prices 
   expect(vm.prices).toBeNull();
   expect(vm.items.every((i) => i.unitPrice === null && i.lineTotal === null)).toBe(true);
   expect(vm.deliveryAddress).toBeNull();
-  expect(vm.greeting).toBe('Merci Awa !');
+  expect(vm.greeting).toBe('Merci Awa Diallo !');
 });
 
 test('packing slip shows historical order prices only when enabled', () => {
@@ -191,6 +191,32 @@ test('packing slip shows historical order prices only when enabled', () => {
   expect(vm.items.find((i) => i.name === 'Mitoumba')?.lineTotal).toContain('21,00');
   expect(vm.prices?.lines.map((l) => l.label)).toEqual(['Articles', 'Livraison']);
   expect(vm.prices?.total).toContain('64,40');
+});
+
+test('header date: weekday written out, Paris time, big above the picking title and under the slip title (shop requests 1001/1002)', () => {
+  expect(formatDocumentDate('2026-10-22T16:38:00Z', 'weekday')).toBe('jeudi 22/10/2026 · 18:38');
+  expect(formatDocumentDate('2026-10-05T07:14:00Z', 'weekday')).toBe('lundi 05/10/2026 · 09:14');
+  expect(formatDocumentDate('not a date', 'weekday')).toBe('');
+  const picking = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'T' }, carton: null });
+  const slip = buildPackingSlipViewModel({ order: order(ORDER_A), items: ITEMS, tenant: DOC_TENANT, settings: ORDER_DOCUMENTS_DEFAULTS, qr: null });
+  for (const format of ['a5', 'a4'] as const) {
+    const pickingHtml = pickingListHtml([picking], format);
+    expect(pickingHtml).toContain('<div class="pl-date">lundi 05/10/2026 · 09:14</div>');
+    expect(pickingHtml.indexOf('pl-date">')).toBeLessThan(pickingHtml.indexOf('LISTE DE PRÉPARATION'));
+    // Order number written small with the shop name, no big reference line any more.
+    expect(pickingHtml).toContain('<div class="pl-meta pl-when">Commande #163835B8 - T</div>');
+    expect(pickingHtml).not.toContain('pl-ref');
+    const slipHtml = packingSlipHtml([slip], format);
+    expect(slipHtml).toContain('RÉCAPITULATIF DE COMMANDE</span><span class="ps-date">lundi 05/10/2026 · 09:14</span>');
+    expect(slipHtml).not.toContain(' du lundi');
+  }
+});
+
+test('slip greeting: full name with spaces collapsed, first name only when the name is oversized', () => {
+  expect(greetingName('  Roselyne   DIKO ')).toBe('Roselyne DIKO');
+  expect(greetingName(`Awa ${'x'.repeat(60)}`)).toBe('Awa');
+  expect(greetingName('   ')).toBeNull();
+  expect(greetingName(null)).toBeNull();
 });
 
 test('helpers: short ref, first name, brand colour contrast fallback, https-only images', () => {
