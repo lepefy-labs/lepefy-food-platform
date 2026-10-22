@@ -41,6 +41,8 @@ Admin boutique (ogni pagina)                         Console Lepefy (/admin/plat
 | `support_read_states` | lettura per admin e per richiesta (`side` tenant/lepefy): niente booleano globale |
 | `support_links` | issue / PR / commit / release GitHub, URL verificato da CHECK, mai esposto alla boutique |
 
+Riapertura = una demande terminée (`resolved`/`closed`) che torna verso uno stato aperto (Lepefy « Rouvrir », messaggio o avis « non risolto » della boutique): evento `reopened`, `reopen_count` +1, `resolved_at` azzerato. `resolved → closed` è un semplice `status_changed` che conserva `resolved_at` (migration 164: in 163 era registrato come riapertura; la 164 ripara gli eventi e i contatori delle demandes toccate, es. n° 1001).
+
 Tutte le FK interne sono composite `(tenant_id, id)`: un messaggio, un allegato o un evento non può puntare alla richiesta di un altro tenant.
 
 Vista `support_ticket_queue` (`security_invoker`, solo service role): ticket + nome boutique + `awaiting_lepefy` (aperta, non in attesa della boutique, ultimo messaggio boutique più recente dell'ultima risposta) + `stale` (in attesa da più di 24 h) + `attention_rank` (0 urgente da rispondere · 1 nuova · 2 senza risposta > 24 h · 3 da rispondere · 4 in lavorazione · 5 attesa boutique · 6 terminata).
@@ -168,6 +170,8 @@ delete from support_attachments where message_id is null and created_at < now() 
 ```text
 supabase/migrations/163_support_assistance.sql        schema, RLS, bucket, RPC, vista coda, capability, audit, policy IA
 supabase/tests/163_support_assistance.{fixture,test}.sql
+supabase/migrations/164_support_close_is_not_reopen.sql  resolved → closed non è una riapertura + riparazione dati
+supabase/tests/164_support_close_is_not_reopen.{fixture,test}.sql
 apps/storefront/src/lib/support/
   domain.ts  rules.ts  files.ts  errors.ts  types.ts  platformList.ts
   server/access.ts  tenantService.ts  platformService.ts  attachments.ts  notify.ts  improve.ts  input.ts
