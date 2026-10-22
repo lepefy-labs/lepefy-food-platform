@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ShipmentCreationStatus } from '@lepefy/types';
+import { carrierTrackingLink } from '@/lib/shipping/shipmentPresentation';
 import { SHIPMENT_CREATION_STATUS_LABELS, shipmentOrderReference } from '@/lib/shipping/shipmentDraft/shipmentDraftPresentation';
 import { flagTypeKeys, type NotificationChannel } from '@/lib/notifications/notificationTypes';
 import { dispatchTenantNotification, defaultDispatchDeps, type DispatchDeps, type DispatchResult } from './dispatcher';
@@ -68,7 +69,7 @@ export function orderFactsFrom(order: OrderRow, lines: ReadonlyArray<{ quantity:
     draftStatus: creation ? SHIPMENT_CREATION_STATUS_LABELS[creation] : order.shipping_provider_reference ? null : 'envoi à créer',
     carrier: order.tracking_carrier ?? null,
     trackingCode: order.tracking_code ?? null,
-    trackingUrl: order.shipping_tracking_url ?? null,
+    trackingUrl: carrierTrackingLink({ carrier: order.tracking_carrier, trackingCode: order.tracking_code, providerUrl: order.shipping_tracking_url }),
     estimatedDelivery: order.shipping_estimated_delivery_at ?? null,
   } : null;
   const facts: OrderFacts = {

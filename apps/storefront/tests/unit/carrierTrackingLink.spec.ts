@@ -6,6 +6,9 @@ test('Poste Italiane: the link opens on the shipment (risultati-spedizioni + cod
     .toBe('https://www.poste.it/cerca/index.html#/risultati-spedizioni/ZA123456789IT');
   expect(carrierTrackingLink({ carrier: ' poste ', trackingCode: ' ZA123456789IT ' }))
     .toBe('https://www.poste.it/cerca/index.html#/risultati-spedizioni/ZA123456789IT');
+  // Real Packlink value for a Poste order (#5CA23A93): the base without the code.
+  expect(carrierTrackingLink({ carrier: 'Poste Italiane', trackingCode: '1UW1YZT056163', providerUrl: 'https://www.poste.it/cerca/index.html#/risultati-spedizioni/' }))
+    .toBe('https://www.poste.it/cerca/index.html#/risultati-spedizioni/1UW1YZT056163');
   // Old route kept by a provider: repaired so the code is not dropped.
   expect(carrierTrackingLink({ carrier: 'Poste Italiane', trackingCode: 'ZA1IT', providerUrl: 'https://www.poste.it/cerca/index.html#/risultati-ricerca-spedizioni/ZA1IT' }))
     .toBe('https://www.poste.it/cerca/index.html#/risultati-spedizioni/ZA1IT');

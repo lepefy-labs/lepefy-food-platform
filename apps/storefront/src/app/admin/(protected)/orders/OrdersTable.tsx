@@ -12,7 +12,7 @@ import {
   classifyOrderOperation, formatSince, lastTrackingEventAt, PRIORITY_GROUP_LABELS, transportState,
   type OperationalThresholds, type OrderOperation, type OrderSortKey,
 } from '@/lib/orders/adminOrderOperations';
-import { carrierDisplayName, safeShipmentTrackingUrl, shipmentDate } from '@/lib/shipping/shipmentPresentation';
+import { carrierDisplayName, carrierTrackingLink, shipmentDate } from '@/lib/shipping/shipmentPresentation';
 import type { CartonSuggestion } from '@/lib/shipping/cartonSuggestion';
 import type { NormalizedShipmentStatus, OrderStatus, ShipmentTrackingEvent } from '@lepefy/types';
 import { formatDate, formatMoney, formatWeight } from '@/lib/admin/format';
@@ -79,6 +79,7 @@ function weightLabel(order: ListOrder) {
   const weight = order.shipping_details?.totalWeightG;
   return typeof weight === 'number' && Number.isFinite(weight) && weight > 0 ? formatWeight(weight) : null;
 }
+function customerTrackingHref(orderId: string) { return `/api/admin/orders/${orderId}/customer-tracking`; }
 function carrierOf(order: ListOrder) { return carrierDisplayName(order.tracking_carrier ?? order.shipping_details?.carrierName); }
 function coldSummary(order: ListOrder) {
   return order.order_items.reduce((total, item) => {
@@ -240,18 +241,19 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
   function actionLink(order: ListOrder, operation: OrderOperation, full = false) {
     const { action } = operation;
     const label = canManage || action.intent === 'tracking' ? action.label : 'Voir la commande';
-    const trackingUrl = action.intent === 'tracking' ? safeShipmentTrackingUrl(order.shipping_tracking_url) : null;
+    // « Voir le suivi » opens what the customer sees (signed /orders/[id] page, built server-side).
+    const trackingUrl = action.intent === 'tracking' ? customerTrackingHref(order.id) : null;
     const variant = done(order) ? 'ghost' : action.primary && (canManage || action.intent === 'tracking') ? 'outline' : 'secondary';
     // In the table the label may wrap on two lines: a long action (« Poursuivre la préparation »)
     // must not push the row wider than the page and hide the button behind a horizontal scroll.
     const className = buttonClasses({ variant, size: 'sm', className: full ? 'w-full' : 'w-[9.5rem] !whitespace-normal py-1 text-center leading-tight' });
-    if (trackingUrl) return <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className={className}>{label}<IconExternalLink size={14} aria-hidden="true" /><span className="sr-only"> (suivi transporteur, nouvel onglet) — commande {shortId(order.id)}</span></a>;
+    if (trackingUrl) return <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className={className}>{label}<IconExternalLink size={14} aria-hidden="true" /><span className="sr-only"> (suivi client, nouvel onglet) — commande {shortId(order.id)}</span></a>;
     return <Link href={`/admin/orders/${order.id}`} className={className}>{label}<span className="sr-only"> — commande {shortId(order.id)}</span></Link>;
   }
 
   function detailPanel(order: ListOrder, operation: OrderOperation) {
     const loaded = detail[order.id];
-    const trackingUrl = safeShipmentTrackingUrl(order.shipping_tracking_url);
+    const trackingUrl = carrierTrackingLink({ carrier: carrierOf(order), trackingCode: order.tracking_code, providerUrl: order.shipping_tracking_url });
     const lastMove = lastTrackingEventAt(order);
     const eta = formatEta(order.shipping_estimated_delivery_at);
     const heading = 'mb-2 text-xs font-semibold text-a-text-2';
