@@ -23,6 +23,7 @@ table.ps-items { width: 100%; border-collapse: collapse; }
 .ps-qty { font-weight: 800; white-space: nowrap; }
 .ps-name { font-weight: 700; line-height: 1.25; }
 .ps-alt { display: block; color: #333; }
+.ps-format { color: #111; font-weight: 700; }
 .ps-split { display: block; font-family: 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace; }
 .ps-loc { font-family: 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace; font-weight: 700; white-space: nowrap; }
 .ps-check { display: inline-block; border: 0.3mm solid #111; font-weight: 700; padding: 0 1.2mm; margin-top: 0.6mm; }
@@ -47,7 +48,7 @@ function lineRow(line: SummaryLineVM): string {
   return `<tr>
 <td style="width:8mm"><span class="ps-box"></span></td>
 <td style="width:14mm" class="ps-qty">×${line.total}</td>
-<td><span class="ps-name">${escapeHtml(line.name)}</span>${line.nameAlt ? `<span class="ps-alt">↳ ${escapeHtml(line.nameAlt)}</span>` : ''}${line.catalogueWeight ? `<span class="ps-alt">Poids catalogue : ${escapeHtml(line.catalogueWeight)}</span>` : ''}<span class="ps-split">${split}</span>${line.check ? `<span class="ps-check">À VÉRIFIER : ${escapeHtml(line.check)}</span>` : ''}</td>
+<td><span class="ps-name">${escapeHtml(line.name)}</span>${line.nameAlt ? `<span class="ps-alt">↳ ${escapeHtml(line.nameAlt)}</span>` : ''}${line.format ? `<span class="ps-alt ps-format">Format : ${escapeHtml(line.format)}</span>` : line.catalogueWeight ? `<span class="ps-alt">Poids catalogue : ${escapeHtml(line.catalogueWeight)}</span>` : ''}<span class="ps-split">${split}</span>${line.check ? `<span class="ps-check">À VÉRIFIER : ${escapeHtml(line.check)}</span>` : ''}</td>
 <td style="width:20mm;text-align:right">${line.location ? `<span class="ps-loc">${escapeHtml(line.location)}</span>` : '<span class="ps-loc">—</span>'}</td>
 </tr>`;
 }

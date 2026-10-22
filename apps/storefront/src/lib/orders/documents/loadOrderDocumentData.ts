@@ -25,15 +25,13 @@ function isMissingFormatSnapshotColumn(error: unknown): boolean {
 }
 
 /**
- * Lignes de commande du lot. Pour le récapitulatif client, essaie d'abord
- * avec le snapshot de format ; sans la 162, relit sans (pas de format affiché,
- * comportement historique) au lieu d'empêcher l'impression.
+ * Lignes de commande du lot, avec le snapshot du format acheté (liste de
+ * préparation, liste groupée et récapitulatif client) ; sans la 162, relit sans
+ * (pas de format affiché, comportement historique) au lieu d'empêcher l'impression.
  */
-async function loadItems(db: ServiceClient, tenantId: string, ids: string[], mode: OrderDocumentMode) {
-  if (mode === 'packing') {
-    const result = await db.from('order_items').select(`${ITEM_COLUMNS}, ${FORMAT_SNAPSHOT_COLUMN}`).eq('tenant_id', tenantId).in('order_id', ids);
-    if (!result.error || !isMissingFormatSnapshotColumn(result.error)) return result;
-  }
+async function loadItems(db: ServiceClient, tenantId: string, ids: string[]) {
+  const result = await db.from('order_items').select(`${ITEM_COLUMNS}, ${FORMAT_SNAPSHOT_COLUMN}`).eq('tenant_id', tenantId).in('order_id', ids);
+  if (!result.error || !isMissingFormatSnapshotColumn(result.error)) return result;
   return db.from('order_items').select(ITEM_COLUMNS).eq('tenant_id', tenantId).in('order_id', ids);
 }
 
@@ -67,7 +65,7 @@ export async function loadOrderDocumentData(
 
   const [ordersResult, itemsResult] = await Promise.all([
     db.from('orders').select(ORDER_COLUMNS).eq('tenant_id', tenantId).in('id', ids),
-    loadItems(db, tenantId, ids, mode),
+    loadItems(db, tenantId, ids),
   ]);
   if (ordersResult.error) throw new OrderDocumentDataError('orders_unavailable');
   if (itemsResult.error) throw new OrderDocumentDataError('items_unavailable');

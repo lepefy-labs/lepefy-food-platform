@@ -1,13 +1,13 @@
 import { formatDocumentDate, orderShortRef } from '@/lib/orders/documents/documentHtml';
-import { sortPickingItems, type DocumentItemRow, type DocumentOrderRow } from '@/lib/orders/documents/viewModels';
+import { pickingLineFormat, sortPickingItems, type DocumentItemRow, type DocumentOrderRow } from '@/lib/orders/documents/viewModels';
 
 /**
  * « Session de préparation » : liste groupée par article de plusieurs
  * commandes (stateless, la sélection vit dans l'URL). Pure : partagée par la
  * page /admin/orders/preparation et le PDF `preparation-summary`.
  *
- * - une ligne = même produit, même libellé vendu (le format fait partie du
- *   nom de la ligne de commande) ; une ligne sans produit reste à part ;
+ * - une ligne = même produit, même libellé vendu et même format acheté
+ *   (snapshot de la ligne de commande) ; une ligne sans produit reste à part ;
  * - la répartition par commande est toujours conservée ;
  * - ordre de parcours = celui des listes individuelles (sortPickingItems) :
  *   secs d'abord, frais ensuite, surgelés en dernier, puis l'emplacement ;
@@ -33,6 +33,8 @@ export interface SummaryLineVM {
   nameAlt: string | null;
   storage: SummaryStorage;
   location: string | null;
+  /** Purchased format (order line snapshot); catalogueWeight only as a fallback without snapshot. */
+  format: string | null;
   catalogueWeight: string | null;
   total: number;
   /** picked: null when the order does not use the digital checklist (paper, not started…). */
@@ -72,16 +74,10 @@ function storageOf(value: string | null | undefined): SummaryStorage {
   return value === 'fresh' || value === 'frozen' ? value : 'dry';
 }
 
-function weightLabel(item: DocumentItemRow, weights?: ReadonlyMap<string, number>): string | null {
-  const grams = item.product_id ? weights?.get(item.product_id) : undefined;
-  if (grams == null || !Number.isFinite(grams) || grams <= 0) return null;
-  if (/\b\d+(?:[.,]\d+)?\s*(?:kg|g|gr|grammes?)\b/i.test(item.name)) return null;
-  return grams >= 1000 && grams % 1000 === 0 ? `${grams / 1000} kg` : `${grams.toLocaleString('fr-FR')} g`;
-}
-
-export function summaryLineKey(item: Pick<DocumentItemRow, 'product_id' | 'name' | 'name_alt' | 'storage_type'>, index: number, orderId: string): string {
+// Two orders of the same product bought in different formats stay on separate lines.
+export function summaryLineKey(item: Pick<DocumentItemRow, 'product_id' | 'name' | 'name_alt' | 'storage_type' | 'format_snapshot'>, index: number, orderId: string): string {
   return item.product_id
-    ? `${item.product_id}|${item.name.trim().toLowerCase()}|${(item.name_alt ?? '').trim().toLowerCase()}|${storageOf(item.storage_type)}`
+    ? `${item.product_id}|${item.name.trim().toLowerCase()}|${(item.name_alt ?? '').trim().toLowerCase()}|${storageOf(item.storage_type)}|${(pickingLineFormat(item).format ?? '').toLowerCase()}`
     : `free|${orderId}|${index}`;
 }
 
@@ -98,7 +94,7 @@ export function buildPreparationSummary(input: SummaryOrderInput[], catalogue: R
       let line = lines.get(key);
       if (!line) {
         line = {
-          key, name: item.name, nameAlt: item.name_alt, storage, location, catalogueWeight: weightLabel(item, productWeights),
+          key, name: item.name, nameAlt: item.name_alt, storage, location, ...pickingLineFormat(item, productWeights),
           total: 0, perOrder: [], check: null, warehouse_location: location, storage_type: storage, productId: item.product_id,
         };
         lines.set(key, line);
@@ -154,7 +150,7 @@ export function buildPreparationSummary(input: SummaryOrderInput[], catalogue: R
 function stripInternal(line: SummaryLineVM & { warehouse_location: string | null; storage_type: SummaryStorage; productId: string | null }): SummaryLineVM {
   return {
     key: line.key, name: line.name, nameAlt: line.nameAlt, storage: line.storage, location: line.location,
-    catalogueWeight: line.catalogueWeight, total: line.total, perOrder: line.perOrder, check: line.check,
+    format: line.format, catalogueWeight: line.catalogueWeight, total: line.total, perOrder: line.perOrder, check: line.check,
   };
 }
 

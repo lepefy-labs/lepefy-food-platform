@@ -198,7 +198,7 @@ export default async function PreparationSessionPage({ searchParams }: { searchP
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-a-text">{line.name}</p>
                         {line.nameAlt && <p className="text-xs text-a-text-3">{line.nameAlt}</p>}
-                        {line.catalogueWeight && <p className="text-xs text-a-text-3">Poids catalogue : {line.catalogueWeight}</p>}
+                        {line.format ? <p className="text-xs font-semibold text-a-text-2">Format : {line.format}</p> : line.catalogueWeight && <p className="text-xs text-a-text-3">Poids catalogue : {line.catalogueWeight}</p>}
                         <p className="mt-1 flex flex-wrap gap-1">
                           {line.perOrder.map((entry) => (
                             <Badge key={entry.orderId} tone={entry.picked ? 'success' : 'neutral'} icon={entry.picked ? <IconCheck size={12} aria-hidden="true" /> : undefined}>

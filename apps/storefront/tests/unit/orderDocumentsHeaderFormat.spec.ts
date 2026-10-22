@@ -329,10 +329,41 @@ test('loader: without migration 162 the slip is still printed, without format', 
   expect(selects[1]).not.toContain('format_snapshot');
   const html = await renderSlip(db, [ORDER_A]);
   expect(html).toContain('RÉCAPITULATIF DE COMMANDE');
-  // Picking : jamais de lecture du snapshot.
+  // Picking : même lecture (snapshot puis repli), la liste reste imprimable sans la 162.
   selects.length = 0;
   const picking = await loadOrderDocumentData(db as never, { tenantId: TENANT_A, orderIds: [ORDER_A], mode: 'picking' });
   expect(picking.orders[0]!.items).toHaveLength(2);
-  expect(selects).toHaveLength(1);
-  expect(selects[0]).not.toContain('format_snapshot');
+  expect(selects).toHaveLength(2);
+  expect(selects[0]).toContain('format_snapshot');
+  expect(selects[1]).not.toContain('format_snapshot');
+});
+
+test('picking list: purchased format from the order line, catalogue weight only without snapshot, never both', () => {
+  const weights = new Map([['p-Arachides frais', 1000], ['p-Mitoumba', 750], ['p-Kaolin 500 g', 500], ['p-Bissap', 300]]);
+  const items: DocumentItemRow[] = [
+    // Catalogue now says 1 kg, the customer bought what the line recorded.
+    item(ORDER_A, 'Arachides frais', { format_snapshot: snap({ net_quantity_display: '2 kg' }) }),
+    item(ORDER_A, 'Mitoumba', { format_snapshot: snap({ sale_unit: 'sachet', net_content_value: 150, net_content_unit: 'g' }) }),
+    // Format already in the name: neither format nor weight.
+    item(ORDER_A, 'Kaolin 500 g', { format_snapshot: snap({ net_quantity_display: '500 g' }) }),
+    // Legacy line / product without format: catalogue weight fallback.
+    item(ORDER_A, 'Bissap', { format_snapshot: null }),
+    item(ORDER_A, 'Épices <maison>', { product_id: null, format_snapshot: snap({ net_quantity_display: 'Pot <b>"200"</b>' }) }),
+  ];
+  const vm = buildPickingListViewModel({ order: order(ORDER_A), items, tenant: { name: 'T' }, carton: null, productWeights: weights });
+  const line = (name: string) => vm.items.find((i) => i.name === name)!;
+  expect(line('Arachides frais')).toMatchObject({ format: '2 kg', catalogueWeight: null });
+  expect(line('Mitoumba')).toMatchObject({ format: '150 g', catalogueWeight: null });
+  expect(line('Kaolin 500 g')).toMatchObject({ format: null, catalogueWeight: null });
+  expect(line('Bissap')).toMatchObject({ format: null, catalogueWeight: '300 g' });
+  for (const format of ['a5', 'a4'] as const) {
+    const html = pickingListHtml([vm], format);
+    expect(html).toContain('Format : 2 kg');
+    expect(html).toContain('Format : 150 g');
+    expect(html).toContain('Poids catalogue : 300 g');
+    expect(html).not.toContain('Poids catalogue : 1 kg');
+    expect(html).not.toContain('Poids catalogue : 750 g');
+    expect(html).toContain('Format : Pot &lt;b&gt;&quot;200&quot;&lt;/b&gt;');
+    expect(html).not.toContain('<b>"200"</b>');
+  }
 });

@@ -50,6 +50,7 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .pl-qty { font-weight: 800; white-space: nowrap; }
 .pl-name { font-weight: 700; line-height: 1.25; }
 .pl-alt { display: block; color: #333; }
+.pl-format { color: #111; font-weight: 700; }
 .pl-chip { display: inline-block; border: 0.3mm solid #111; font-weight: 700; letter-spacing: 0.05em; padding: 0 1.2mm; margin-top: 0.8mm; }
 .pl-loc { font-family: 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace; font-weight: 700; white-space: nowrap; }
 .pl-loc-empty { color: #555; }
@@ -150,7 +151,9 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .format-a4 .pl-dest-country { font-size: 10pt; }
 `;
 
+/** Format acheté (snapshot de la ligne) ; à défaut seulement, le poids du catalogue actuel. */
 function weightHint(item: PickingItemVM): string {
+  if (item.format) return `<span class="pl-alt pl-format">Format : ${escapeHtml(item.format)}</span>`;
   return item.catalogueWeight ? `<span class="pl-alt">Poids catalogue : ${escapeHtml(item.catalogueWeight)}</span>` : '';
 }
 

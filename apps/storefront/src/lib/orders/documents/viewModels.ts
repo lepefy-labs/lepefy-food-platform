@@ -4,7 +4,7 @@ import { formatDocumentDate, formatKg, orderShortRef, readableBrandColor, safeCo
 import { androidAppStatus } from '@/lib/mobileApp/androidApp';
 import { formatWhatsappDisplay } from '@/lib/orders/portal/supportChannels';
 import type { OrderDocumentsConfig } from './settings';
-import { orderItemFormatLabel } from './itemFormat';
+import { orderItemFormatLabel, parseFormatSnapshot } from './itemFormat';
 
 /**
  * View-models des documents de commande, construits champ par champ.
@@ -63,8 +63,27 @@ export interface PickingItemVM {
   quantity: number;
   storage: 'fresh' | 'frozen' | null;
   location: string | null;
-  /** Poids indicatif par unité du catalogue actuel, non garanti historique. */
+  /** Format acheté, figé sur la ligne de commande (migration 162) ; null s'il est déjà dans le nom. */
+  format: string | null;
+  /** Repli sans snapshot (commande ancienne, produit sans format) : poids d'expédition actuel du catalogue, indicatif. */
   catalogueWeight: string | null;
+}
+
+/**
+ * Indication de format d'une ligne à préparer : le format acheté (même source
+ * que le récapitulatif client) ; le poids du catalogue actuel seulement quand
+ * la ligne n'a pas de snapshot. Jamais les deux.
+ */
+export function pickingLineFormat(
+  item: Pick<DocumentItemRow, 'name' | 'product_id' | 'format_snapshot'>,
+  productWeights?: ReadonlyMap<string, number>,
+): { format: string | null; catalogueWeight: string | null } {
+  if (parseFormatSnapshot(item.format_snapshot)) return { format: orderItemFormatLabel(item.format_snapshot, item.name), catalogueWeight: null };
+  const grams = item.product_id ? productWeights?.get(item.product_id) : undefined;
+  if (grams == null || !Number.isFinite(grams) || grams <= 0) return { format: null, catalogueWeight: null };
+  // Le nom de l'article peut déjà contenir le format vendu.
+  if (/\b\d+(?:[.,]\d+)?\s*(?:kg|g|gr|grammes?)\b/i.test(item.name)) return { format: null, catalogueWeight: null };
+  return { format: null, catalogueWeight: grams >= 1000 && grams % 1000 === 0 ? `${grams / 1000} kg` : `${grams.toLocaleString('fr-FR')} g` };
 }
 
 export interface PickingCartonVM {
@@ -178,13 +197,7 @@ export function buildPickingListViewModel(input: {
     quantity: item.quantity,
     storage: item.storage_type === 'fresh' || item.storage_type === 'frozen' ? item.storage_type : null,
     location: item.warehouse_location?.trim() || null,
-    catalogueWeight: (() => {
-      const grams = item.product_id ? input.productWeights?.get(item.product_id) : undefined;
-      if (grams == null || !Number.isFinite(grams) || grams <= 0) return null;
-      // Le nom de l'article peut déjà contenir le format vendu.
-      if (/\b\d+(?:[.,]\d+)?\s*(?:kg|g|gr|grammes?)\b/i.test(item.name)) return null;
-      return grams >= 1000 && grams % 1000 === 0 ? `${grams / 1000} kg` : `${grams.toLocaleString('fr-FR')} g`;
-    })(),
+    ...pickingLineFormat(item, input.productWeights),
   }));
   const a = address(order);
   const parts = { postalCode: addressText(a.postal_code), city: addressText(a.city), country: addressText(a.country) };

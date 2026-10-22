@@ -477,6 +477,20 @@ test.describe('preparation session', () => {
     const untracked = buildPreparationSummary([{ order: order(ORDER_ID), items: [{ ...item(ORDER_ID, 'A'), picked_at: 'x' }] }]);
     expect(untracked.groups[0]!.lines[0]!.perOrder[0]!.picked).toBeNull();
   });
+
+  test('grouped list shows the purchased format; different formats of one product stay apart; weight only without snapshot', () => {
+    const snap = (net: string) => ({ v: 1, net_quantity_display: net });
+    const weights = new Map([['p-Arachides', 1000], ['p-Bissap', 300]]);
+    const summary = buildPreparationSummary([
+      { order: order(ORDER_ID), productWeights: weights, items: [item(ORDER_ID, 'Arachides', { quantity: 2, format_snapshot: snap('1 kg') }), item(ORDER_ID, 'Bissap', { format_snapshot: null })] },
+      { order: order(OTHER_ID), productWeights: weights, items: [item(OTHER_ID, 'Arachides', { quantity: 1, format_snapshot: snap('2 kg') }), item(OTHER_ID, 'Arachides', { quantity: 3, format_snapshot: snap('1 kg') })] },
+    ]);
+    const lines = summary.groups[0]!.lines;
+    const arachides = lines.filter((line) => line.name === 'Arachides').map((line) => [line.format, line.total, line.catalogueWeight]);
+    expect(arachides).toEqual(expect.arrayContaining([['1 kg', 5, null], ['2 kg', 1, null]]));
+    expect(arachides).toHaveLength(2);
+    expect(lines.find((line) => line.name === 'Bissap')).toMatchObject({ format: null, catalogueWeight: '300 g' });
+  });
 });
 
 // ─── Dashboard and URLs ─────────────────────────────────────────────────────
