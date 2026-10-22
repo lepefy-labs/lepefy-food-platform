@@ -95,6 +95,10 @@ test.describe('format de vente', () => {
     const cartonNoContent = resolveSellingFormat({ sale_unit: 'carton', pack_count: 12 });
     expect(unitPhrase(cartonNoContent)).toBe('le carton de 12');
 
+    expect(unitPhrase(resolveSellingFormat({ sale_unit: 'demi_carton', pack_count: 6 }))).toBe('le demi-carton de 6');
+    expect(unitPhrase(resolveSellingFormat({ sale_unit: 'pack', pack_count: 4, net_content_value: 33, net_content_unit: 'cl' }))).toBe('le pack de 4 × 33 cl');
+    expect(unitPhrase(resolveSellingFormat({ sale_unit: 'filet', net_content_value: 2, net_content_unit: 'kg' }))).toBe('le filet de 2 kg');
+
     const piece = resolveSellingFormat({ sale_unit: 'piece' });
     expect(unitPhrase(piece)).toBe('la pièce');
 
@@ -222,6 +226,12 @@ test.describe('format de vente : saisie admin (migration 154)', () => {
     expect(parseSellingFormatInput({ net_content_value: 33 })).toEqual({ ok: true, values: { net_content_value: 33 } });
   });
 
+  test('1 élément par lot = vendu seul (enregistré vide)', () => {
+    expect(parseSellingFormatInput({ pack_count: '1' })).toEqual({ ok: true, values: { pack_count: null } });
+    expect(parseSellingFormatInput({ pack_count: 1 })).toEqual({ ok: true, values: { pack_count: null } });
+    expect(parseSellingFormatInput({ pack_count: '2' })).toEqual({ ok: true, values: { pack_count: 2 } });
+  });
+
   test('refuse les valeurs que la base refuserait', () => {
     for (const body of [
       { sale_unit: 'bidule' },
@@ -229,7 +239,7 @@ test.describe('format de vente : saisie admin (migration 154)', () => {
       { net_content_value: '-2' },
       { net_content_value: '1.2345' },
       { net_content_unit: 'oz' },
-      { pack_count: '1' },
+      { pack_count: '0' },
       { pack_count: '2.5' },
       { pack_count: '1000' },
       { net_content_value: '500', net_content_unit: '' },

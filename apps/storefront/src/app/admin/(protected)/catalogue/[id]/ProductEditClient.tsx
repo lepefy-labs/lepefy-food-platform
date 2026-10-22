@@ -1036,13 +1036,15 @@ export default function ProductEditClient({
                   <input
                     id="product-pack-count"
                     type="number"
-                    min={2}
+                    min={1}
                     max={999}
                     placeholder="ex. 12"
+                    aria-describedby="product-pack-count-help"
                     value={formData.pack_count}
                     onChange={(e) => setField('pack_count', e.target.value)}
                     className={INPUT_CLS}
                   />
+                  <p id="product-pack-count-help" className="mt-1 text-xs text-a-text-3">Vide ou 1 : vendu seul.</p>
                 </div>
                 <div>
                   <label htmlFor="product-net-content" className={LABEL_CLS}>Contenu net</label>

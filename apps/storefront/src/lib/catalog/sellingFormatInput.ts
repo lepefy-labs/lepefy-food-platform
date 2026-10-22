@@ -65,10 +65,11 @@ export function parseSellingFormatInput(body: Record<string, unknown>): SellingF
     if (blank(body.pack_count)) values.pack_count = null;
     else {
       const count = Number(body.pack_count);
-      if (!Number.isInteger(count) || count < 2 || count > 999) {
-        return { ok: false, error: 'Le nombre d’éléments par lot doit être un entier entre 2 et 999.' };
+      if (!Number.isInteger(count) || count < 1 || count > 999) {
+        return { ok: false, error: 'Le nombre d’éléments par lot doit être un entier entre 1 et 999 (vide ou 1 : vendu seul).' };
       }
-      values.pack_count = count;
+      // 1 = un seul élément, pas un lot : enregistré comme « vide ».
+      values.pack_count = count === 1 ? null : count;
     }
   }
 

@@ -22,6 +22,7 @@ const UNITS: SaleUnit[] = [
   { key: 'paquet', singular: 'paquet', plural: 'paquets', feminine: false },
   { key: 'sachet', singular: 'sachet', plural: 'sachets', feminine: false },
   { key: 'sac', singular: 'sac', plural: 'sacs', feminine: false },
+  { key: 'filet', singular: 'filet', plural: 'filets', feminine: false },
   { key: 'boite', singular: 'boîte', plural: 'boîtes', feminine: true },
   { key: 'bouteille', singular: 'bouteille', plural: 'bouteilles', feminine: true },
   { key: 'canette', singular: 'canette', plural: 'canettes', feminine: true },
@@ -32,6 +33,8 @@ const UNITS: SaleUnit[] = [
   { key: 'botte', singular: 'botte', plural: 'bottes', feminine: true },
   { key: 'regime', singular: 'régime', plural: 'régimes', feminine: false },
   { key: 'lot', singular: 'lot', plural: 'lots', feminine: false },
+  { key: 'pack', singular: 'pack', plural: 'packs', feminine: false },
+  { key: 'demi_carton', singular: 'demi-carton', plural: 'demi-cartons', feminine: false },
   { key: 'carton', singular: 'carton', plural: 'cartons', feminine: false },
   { key: 'kg', singular: 'kilo', plural: 'kilos', feminine: false, byWeight: true },
 ];
