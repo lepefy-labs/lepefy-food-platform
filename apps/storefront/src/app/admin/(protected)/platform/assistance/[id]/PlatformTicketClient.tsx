@@ -234,12 +234,14 @@ export default function PlatformTicketClient({ initialDetail, owners, currentAdm
               const message = item.message;
               const note = message.kind === 'internal_note';
               const fromShop = message.author_type === 'tenant';
+              // A request relayed from WhatsApp/phone is the shop speaking (entered by Lepefy): shop side, like the shop's own view.
+              const shopVoice = fromShop || Boolean(message.relayed_from);
               const author = message.author_admin_id ? people[message.author_admin_id] ?? message.author_label : message.author_label;
               return (
-                <li key={message.id} className={cn('flex', fromShop ? 'justify-start' : 'justify-end', note && 'justify-stretch')}>
+                <li key={message.id} className={cn('flex', shopVoice ? 'justify-start' : 'justify-end', note && 'justify-stretch')}>
                   <article className={cn('space-y-1.5 rounded-2xl px-3.5 py-2.5',
                     note ? 'w-full border border-dashed border-tone-warning-border bg-tone-warning-bg'
-                      : fromShop ? 'max-w-[88%] rounded-bl-md border border-a-border bg-a-surface sm:max-w-[78%]'
+                      : shopVoice ? 'max-w-[88%] rounded-bl-md border border-a-border bg-a-surface sm:max-w-[78%]'
                         : 'max-w-[88%] rounded-br-md bg-a-brand-soft sm:max-w-[78%]')}>
                     <p className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-a-text-2">
                       {note && <><IconLock size={13} aria-hidden="true" />Note interne — invisible pour la boutique ·</>}
