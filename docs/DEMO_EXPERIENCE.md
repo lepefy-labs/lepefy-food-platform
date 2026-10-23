@@ -24,9 +24,13 @@ production (aucun fork), base Supabase et projet Vercel séparés.
 | Schéma de la base démo | `scripts/demo/build-demo-schema.mjs`, workflow `demo-database` |
 | Seed en SQL (premier chargement sans clé) | `scripts/demo/build-seed-sql.mjs` (lots `-- ─── lot` < 120 Ko) |
 
-**État (23/10/2026)** : projet Supabase `lepefy-demo` (`swthkhrjacdfpqksfdmi`, eu-central-1) créé, schéma appliqué
-(174 migrations, 178 tables, aucun tenant), via l'éditeur SQL en 11 lots (l'éditeur refuse une requête de 1,2 Mo).
-Restent : seed, projet Vercel, secrets.
+**État (23/10/2026)** : démo publique en service sur `demo.lepefy.com` et `evenements.demo.lepefy.com`
+(projet Vercel `lepefy-demo`, team robertinsmartinvestor-3745s-projects ; Ignored Build Step = production seulement).
+Base Supabase `lepefy-demo` (`swthkhrjacdfpqksfdmi`, eu-central-1) : schéma appliqué via l'éditeur SQL en 11 lots
+(l'éditeur refuse une requête de 1,2 Mo), seed `traiteur-africain` chargé par le workflow `Demo seed`
+(tenant `lepefy-demo`). Vérifié : accueil, boutique (promos, nouveautés, petits plus, retrait), Traiteur, visite
+admin lecture seule (écriture refusée `DEMO_READ_ONLY`, console et paramètres inaccessibles), Gestion, Devis.
+Restent : compte platform owner de la démo, routage IA de Nala, démo privée.
 
 Deux déploiements possibles, sur la même base démo :
 
