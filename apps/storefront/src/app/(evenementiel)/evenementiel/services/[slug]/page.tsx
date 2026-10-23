@@ -78,6 +78,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
     return (
       <CateringLanding
         serviceSlug={serviceOffering.slug}
+        tenantName={tenant.name}
         description={serviceOffering.description}
         heroImages={cateringHeroImages}
         photos={cateringPhotos.filter((photo) => photo.category === 'traiteur').map(({ id, image_url, caption }) => ({ id, image_url, caption }))}

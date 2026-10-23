@@ -30,14 +30,18 @@ Base Supabase `lepefy-demo` (`swthkhrjacdfpqksfdmi`, eu-central-1) : schéma app
 (l'éditeur refuse une requête de 1,2 Mo), seed `traiteur-africain` chargé par le workflow `Demo seed`
 (tenant `lepefy-demo`). Vérifié : accueil, boutique (promos, nouveautés, petits plus, retrait), Traiteur, visite
 admin lecture seule (écriture refusée `DEMO_READ_ONLY`, console et paramètres inaccessibles), Gestion, Devis.
-Restent : compte platform owner de la démo, routage IA de Nala, démo privée.
+Compte platform owner (`admin_users` + membership globale) créé par invitation ; routage IA de la démo
+(`nala` / `structured_chat`, Gemini, `credential_ref = GEMINI_API_KEY`) : Nala répond dès que la variable
+Vercel `GEMINI_API_KEY` est posée. Auth : Site URL = `https://demo.lepefy.com/admin/accept-invite` (lien
+d'invitation) ; la connexion admin se fait par mot de passe (le modèle d'e-mail OTP par défaut ne contient
+pas de code et ne se modifie qu'avec un SMTP personnalisé).
 
 Deux déploiements possibles, sur la même base démo :
 
 | Projet Vercel | Domaine | Tenant | Scénario | Accès |
 |---|---|---|---|---|
 | `lepefy-demo` | `demo.lepefy.com` (+ `evenements.demo.lepefy.com`) | `lepefy-demo` | `traiteur-africain` | public |
-| `lepefy-demo-prive` (au besoin) | ex. `prive.demo.lepefy.com` | `demo-tata-pao` | `tata-pao` | privé (lien signé) |
+| `lepefy-demo-prive` | `prive.demo.lepefy.com` | `demo-tata-pao` | `tata-pao` | privé (lien signé) |
 
 ## 2. Isolation
 
@@ -198,9 +202,12 @@ conservation annoncée : 12 mois — supprimer les demandes plus anciennes à la
    `/admin/platform/ai-routing` **de la démo** (registre vide au départ).
 8. Premier platform owner de la démo : Supabase Dashboard → Auth → Users + ligne
    `admin_users` (comme en production) ; puis les présentateurs via `/admin/team`.
-9. Démo privée : second projet Vercel, environnement GitHub `demo-private`
-   (`DEMO_TENANT_SLUG=demo-tata-pao`, `DEMO_SCENARIO=tata-pao`, `DEMO_ACCESS_MODE=private`),
-   liens créés depuis la console (« Lien d'accès privé », 1 à 7 jours).
+9. Démo privée : même base et mêmes secrets GitHub (environnement `demo`), variables
+   `DEMO_PRIVATE_TENANT_SLUG=demo-tata-pao`, `DEMO_PRIVATE_SCENARIO=tata-pao`, `DEMO_PRIVATE_APP_URL` ;
+   workflows `Demo seed` / `Demo reset` avec la cible `private` (jamais de repli sur les variables publiques).
+   Second projet Vercel (`lepefy-demo-prive`, `prive.demo.lepefy.com`) avec `DEMO_ACCESS_MODE=private`,
+   `NEXT_PUBLIC_TENANT_SLUG=demo-tata-pao` et les mêmes secrets que `lepefy-demo` ; liens créés depuis la
+   console (« Lien d'accès privé », 1 à 7 jours).
 
 **Nouvelle migration** : l'appliquer à la démo avec **Demo database**, mode
 `migration`, fichier = nom du fichier (même fichier que la production).

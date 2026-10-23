@@ -7,6 +7,7 @@ import InquiryStatusBadge from './InquiryStatusBadge';
 import type { InquiryWithService } from '../inquiryTypes';
 import { INQUIRY_STATUSES, STATUS_LABELS, elapsedLabel } from '../inquiryTypes';
 import type { ServiceInquiryStatus } from '@lepefy/types';
+import { useOptionalTenant } from '@/providers/TenantProvider';
 
 export default function InquiryDetail({
   inquiry,
@@ -36,7 +37,8 @@ export default function InquiryDetail({
   }, [inquiry.id, inquiry.internal_notes]);
 
   const noteDirty = noteDraft.trim() !== (inquiry.internal_notes ?? '').trim();
-  const mailSubject = encodeURIComponent(`Demande Chloe Food — ${inquiry.service_offerings?.title ?? 'Événementiel'}`);
+  const tenantName = useOptionalTenant()?.name ?? '';
+  const mailSubject = encodeURIComponent(`Demande${tenantName ? ` ${tenantName}` : ''} — ${inquiry.service_offerings?.title ?? 'Événementiel'}`);
   const phoneHref = inquiry.customer_phone?.replace(/[^+\d]/g, '') || null;
 
   async function saveNote() {

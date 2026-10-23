@@ -8,7 +8,7 @@ import DevisForm from './DevisForm';
 
 type CateringPhoto = { id: string; image_url: string; caption: string | null };
 const formats: { title: CateringFormat; description: string }[] = [
-  { title: 'Buffet convivial', description: 'Un buffet généreux pour réunir vos invités autour des saveurs africaines et camerounaises.' },
+  { title: 'Buffet convivial', description: 'Un buffet généreux pour réunir vos invités autour des saveurs africaines.' },
   { title: 'Réception privée', description: 'Une formule personnalisée pour vos fêtes, repas de famille et moments à partager.' },
   { title: 'Événement professionnel', description: 'Une proposition adaptée à votre réception d’entreprise et au nombre de participants.' },
 ];
@@ -19,8 +19,9 @@ const faqs = [
   { question: 'Puis-je signaler des préférences alimentaires ?', answer: 'Indiquez vos préférences ou besoins particuliers dans le champ « Votre projet ». Notre équipe échangera avec vous sur les possibilités adaptées à votre réception.' },
 ];
 
-export default function CateringLanding({ serviceSlug, description, heroImages, photos, whatsappHref }: {
+export default function CateringLanding({ serviceSlug, tenantName, description, heroImages, photos, whatsappHref }: {
   serviceSlug: string;
+  tenantName: string;
   description: string | null;
   heroImages: string[];
   photos: CateringPhoto[];
@@ -58,8 +59,8 @@ export default function CateringLanding({ serviceSlug, description, heroImages, 
             <EventImageFader images={heroImages} fallbackColor="var(--color-primary-dark)" className="absolute inset-0 h-full w-full" />
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(8,27,16,.92),rgba(8,27,16,.65),rgba(8,27,16,.25))]" />
             <div className="relative z-10">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-secondary)]">Chloe Food · Service traiteur</p>
-            <h1 className="mt-4 max-w-[680px] font-display text-4xl font-semibold leading-[1.05] sm:text-5xl lg:text-[3.4rem]">Traiteur africain &amp; camerounais pour vos réceptions</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-secondary)]">{tenantName} · Service traiteur</p>
+            <h1 className="mt-4 max-w-[680px] font-display text-4xl font-semibold leading-[1.05] sm:text-5xl lg:text-[3.4rem]">Traiteur africain pour vos réceptions</h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-white/90">Buffets, réceptions privées et événements professionnels : une formule personnalisée pour réunir vos invités autour de notre cuisine.</p>
             <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/90">
               {['Formules personnalisées', 'Privé & professionnel'].map((value) => <li key={value} className="inline-flex items-center gap-1.5"><IconCheck size={16} className="text-[var(--color-secondary)]" />{value}</li>)}

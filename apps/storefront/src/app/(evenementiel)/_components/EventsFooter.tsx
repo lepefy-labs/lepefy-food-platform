@@ -20,7 +20,7 @@ export function EventsFooter({ tenant, hasTraiteur, hasLocation }: EventsFooterP
       <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6 sm:py-10">
         <div className="rounded-3xl border border-white/15 bg-white/[0.06] p-6 sm:flex sm:items-center sm:justify-between sm:gap-8 sm:p-8">
           <div className="max-w-xl">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-secondary)]">Chloe Food Events</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-secondary)]">{tenant.name} Events</p>
             <h2 className="font-display text-3xl font-semibold leading-tight sm:text-4xl">Un projet en tête ? Parlons-en.</h2>
             <p className="mt-3 max-w-lg text-sm leading-relaxed text-white/70">
               Une question sur un événement, un besoin traiteur ou une location de matériel ? Notre équipe vous accompagne.
