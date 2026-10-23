@@ -90,6 +90,19 @@ test.describe('urgency and durations', () => {
     expect(classify({ ...pickup, updated_at: hoursAgo(5) }).group).toBe('pickup_ready');
   });
 
+  test('estimated delivery is overdue only from the next day, Paris time', () => {
+    // Packlink "2026/10/23" is stored as 00:00 UTC (02:00 in Paris).
+    const order = make({
+      ...moving(2), shipping_estimated_delivery_at: '2026-10-23T00:00:00.000Z',
+      shipping_tracking_events: [{ occurredAt: '2026-10-23T06:00:00Z', description: 'En transit', providerStatus: null, status: 'in_transit' }],
+    });
+    const at = (iso: string) => classifyOrderOperation(order, thresholds, new Date(iso)).anomaly?.code ?? null;
+    expect(at('2026-10-23T08:00:00Z')).toBeNull();
+    expect(at('2026-10-23T21:59:00Z')).toBeNull(); // 23:59 in Paris
+    expect(at('2026-10-23T22:00:00Z')).toBe('eta_overdue'); // 00:00 on the 24th in Paris
+    expect(at('2026-10-25T10:00:00Z')).toBe('eta_overdue');
+  });
+
   test('no warning on a normal state', () => {
     for (const order of [make(), make({ status: 'preparing', picking_started_at: hoursAgo(2) }), make(moving(5)), make({ status: 'ready_for_pickup', fulfillment_type: 'pickup' })]) {
       const operation = classify(order);

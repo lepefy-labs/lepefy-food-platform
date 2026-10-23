@@ -47,6 +47,11 @@ export function isoToShopLocal(iso: string | null | undefined, timeZone = SHOP_T
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
 }
 
+/** ISO → jour calendaire « 2026-10-23 » à l'heure de la boutique ('' si invalide) ; comparable en chaîne. */
+export function shopDay(iso: string | null | undefined, timeZone = SHOP_TIME_ZONE): string {
+  return isoToShopLocal(iso, timeZone).slice(0, 10);
+}
+
 /** « ven. 31 oct. » (court) ou « vendredi 31 octobre à 23:59 » (long), heure de la boutique. */
 export function formatShopDate(iso: string, style: 'short' | 'long' = 'short', timeZone = SHOP_TIME_ZONE): string {
   const date = new Date(iso);

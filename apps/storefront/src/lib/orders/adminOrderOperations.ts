@@ -1,5 +1,6 @@
 import type { NormalizedShipmentStatus, OrderStatus, ShipmentTrackingEvent } from '@lepefy/types';
 import { SHIPPING_SYNC_PREPARATION_INCOMPLETE, shipmentEventsNewestFirst, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
+import { shopDay } from '@/lib/time/shopTime';
 import {
   DIGITAL_PREPARATION, preparationState, preparationStep,
   type OrderPreparationMode, type PreparationOrder, type PreparationStep,
@@ -111,11 +112,16 @@ export function isTrackingStale(order: OperationalOrder, thresholds: Operational
   return age !== null && age >= thresholds.trackingStaleHours;
 }
 
+/**
+ * Carriers give a delivery DAY (Packlink: date only, stored as 00:00 UTC), so the
+ * ETA is overdue only from the next calendar day, Paris time — never on the day itself.
+ */
 function isEtaOverdue(order: OperationalOrder, now: Date): boolean {
+  const etaDay = shopDay(order.shipping_estimated_delivery_at);
   return order.status === 'shipped' && order.fulfillment_type === 'delivery'
-    && Boolean(order.shipping_provider_reference) && Boolean(order.shipping_estimated_delivery_at)
+    && Boolean(order.shipping_provider_reference) && etaDay !== ''
     && ['in_transit', 'out_for_delivery', 'ready_for_collection'].includes(order.shipping_normalized_status ?? '')
-    && Date.parse(order.shipping_estimated_delivery_at!) < now.getTime();
+    && etaDay < shopDay(now.toISOString());
 }
 
 /** Preparation and packing satisfied for the order's mode (preparationPolicy). */
