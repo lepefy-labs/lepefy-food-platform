@@ -41,6 +41,7 @@ import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import { useShippingEstimate } from '@/lib/cart/useShippingEstimate';
 import { shippingEstimateParts } from '@/components/cart/CartShippingEstimate';
+import { CheckoutAddOns } from '@/components/checkout/CheckoutAddOns';
 import { formatPrice } from '@/lib/utils/format';
 import { useCartStore } from '@/stores/cartStore';
 import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
@@ -877,6 +878,9 @@ export default function CheckoutFlow({
               </div>
             </section>
           )}
+
+          {/* Étape livraison seulement (jamais au paiement) : un ajout invalide le devis, recalculé avec le nouveau poids. */}
+          <CheckoutAddOns currency={tenant.currency} onCartChanged={() => { if (!isPickup) invalidateQuote(); }} />
 
           <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex items-start gap-3">

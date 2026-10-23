@@ -5,7 +5,7 @@ import { clientIp, createMemoryRateLimiter } from '@/lib/http/memoryRateLimit';
 
 export const dynamic = 'force-dynamic';
 
-const PLACEMENTS = new Set(['cart_suggestions', 'cart_fits', 'add_confirmation']);
+const PLACEMENTS = new Set(['cart_suggestions', 'cart_fits', 'add_confirmation', 'catalog_shelf', 'product_page', 'checkout_delivery']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const allow = createMemoryRateLimiter({ limit: 60, windowMs: 60_000 });
 const done = () => new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });

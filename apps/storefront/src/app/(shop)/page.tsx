@@ -8,6 +8,7 @@ import { getActiveQuantityGroupFilter } from '@/lib/catalog/quantityGroupFilter'
 import { getCategoryPreviewRows, getShopCategories } from '@/lib/catalog/catalogCache';
 import { getActivePromotions, PROMOTIONS_SHELF_LIMIT } from '@/lib/catalog/promotions';
 import { getActiveNovelties, NOVELTIES_SHELF_LIMIT } from '@/lib/catalog/novelties';
+import { ADD_ONS_SHELF_LIMIT, getAddOnProducts } from '@/lib/catalog/addOnShelf';
 import { isPromoFilter } from '@/lib/catalog/catalogSearchUrl';
 import type { ProductWithCategory } from '@lepefy/types';
 
@@ -65,18 +66,26 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     .catch(() => [] as ProductWithCategory[]);
   const noveltiesPromise = getActiveNovelties<ProductWithCategory>(supabase, tenant.id, shopCategoryIds)
     .catch(() => [] as ProductWithCategory[]);
+  // « Les petits plus » choisis par la boutique (migration 165), après Promos et Nouveautés.
+  const addOnsPromise = getAddOnProducts<ProductWithCategory>(supabase, tenant.id, shopCategoryIds)
+    .catch(() => [] as ProductWithCategory[]);
   // Catalogue non filtré : blocs « Nos promos » puis « Nouveautés » ; leurs
   // produits ne sont pas répétés dans « Tous les produits » (exclus avant la
   // découpe en pages, pour la page et pour /api/products).
   const showShelves = !promoView && !noveltyView && !searchQuery && !searchParams.category && !quantityGroupId;
-  const [previewRows, promotions, novelties] = await Promise.all([previewRowsPromise, promotionsPromise, noveltiesPromise]);
+  const [previewRows, promotions, novelties, addOns] = await Promise.all([previewRowsPromise, promotionsPromise, noveltiesPromise, addOnsPromise]);
   const promoShelf = showShelves ? promotions.slice(0, PROMOTIONS_SHELF_LIMIT) : [];
   const promoShelfIds = new Set(promoShelf.map(product => product.id));
   // Un produit en promo et nouveauté n'apparaît que dans le bloc Promos.
   const noveltyShelf = showShelves
     ? novelties.filter(product => !promoShelfIds.has(product.id)).slice(0, NOVELTIES_SHELF_LIMIT)
     : [];
-  const excludeIds = [...promoShelf, ...noveltyShelf].map(product => product.id);
+  // Un produit déjà dans Promos ou Nouveautés n'est pas répété dans les petits plus.
+  const shelvedIds = new Set([...promoShelf, ...noveltyShelf].map(product => product.id));
+  const addOnShelf = showShelves
+    ? addOns.filter(product => !shelvedIds.has(product.id)).slice(0, ADD_ONS_SHELF_LIMIT)
+    : [];
+  const excludeIds = [...promoShelf, ...noveltyShelf, ...addOnShelf].map(product => product.id);
   const { data: productsRaw, count } = promoView || noveltyView
     ? { data: null, count: null }
     : await getCatalogPage(supabase, tenant.id, categories, {
@@ -128,6 +137,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       promoCount={promotions.length}
       promoShelf={promoShelf}
       noveltyShelf={noveltyShelf}
+      addOnShelf={addOnShelf}
       excludeIds={excludeIds}
     />
   );

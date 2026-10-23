@@ -4,7 +4,10 @@
  * seulement le produit et l'emplacement. Ne bloque jamais l'ajout et
  * n'échoue jamais visiblement.
  */
-export type AddSourcePlacement = 'cart_suggestions' | 'cart_fits' | 'add_confirmation';
+export type AddSourcePlacement =
+  | 'cart_suggestions' | 'cart_fits' | 'add_confirmation'
+  // Phase 2 (migration 166).
+  | 'catalog_shelf' | 'product_page' | 'checkout_delivery';
 
 export function recordAddSource(productId: string, placement: AddSourcePlacement): void {
   if (typeof window === 'undefined') return;

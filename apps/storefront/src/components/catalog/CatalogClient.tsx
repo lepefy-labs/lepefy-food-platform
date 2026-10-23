@@ -8,6 +8,7 @@ import { CatalogCategoryRow } from '@/components/catalog/CatalogCategoryRow';
 import { semanticMatchToProductCardProduct } from '@/lib/catalog/productCardAdapters';
 import { buildCatalogUrl, CATALOG_NOVELTIES_HREF, CATALOG_PROMOS_HREF, type CatalogUrlOverrides } from '@/lib/catalog/catalogSearchUrl';
 import { CatalogShelf } from '@/components/catalog/CatalogShelf';
+import { recordAddSource } from '@/lib/cart/recordAddSource';
 import { IconLayoutGrid } from '@tabler/icons-react';
 
 const SEE_ALL_FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 motion-reduce:transition-none';
@@ -43,6 +44,8 @@ interface Props {
   noveltyCount?: number;
   /** Bloc « Nouveautés » du catalogue non filtré (vide = masqué). */
   noveltyShelf?: ProductWithCategory[];
+  /** « Les petits plus » de la boutique (catalogue non filtré). */
+  addOnShelf?: ProductWithCategory[];
   /** Produits déjà montrés dans les blocs : exclus des pages suivantes aussi. */
   excludeIds?: string[];
 }
@@ -67,6 +70,7 @@ export function CatalogClient({
   noveltyView = false,
   noveltyCount = 0,
   noveltyShelf = [],
+  addOnShelf = [],
   excludeIds = [],
 }: Props) {
   const pathname      = usePathname();
@@ -237,6 +241,8 @@ export function CatalogClient({
         count={promoCount} allLabel="Tout voir les promos" products={promoShelf} />
       <CatalogShelf id="novelty-shelf" title="Nouveautés" icon="✨" tone="novelty" href={CATALOG_NOVELTIES_HREF}
         count={noveltyCount} allLabel="Tout voir les nouveautés" products={noveltyShelf} />
+      <CatalogShelf id="add-ons-shelf" title="Les petits plus" icon="🛒" tone="novelty" products={addOnShelf}
+        onAdded={(product) => recordAddSource(product.id, 'catalog_shelf')} />
 
       {quantityGroupId && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 p-3 text-sm">

@@ -4,6 +4,7 @@ import { getDisplayTenant } from '@/lib/tenant/getTenant';
 import { createPublicClient } from '@/lib/supabase/public';
 import { ProductDetail } from '@/components/product/ProductDetail';
 import { RelatedProducts } from '@/components/product/RelatedProducts';
+import { ProductAddOns } from '@/components/product/ProductAddOns';
 import type { ProductWithCategory } from '@lepefy/types';
 import { getRelatedProducts } from '@/lib/catalog/getRelatedProducts';
 import { createServiceClient } from '@/lib/supabase/server';
@@ -82,6 +83,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
   return (
     <div className="max-w-7xl mx-auto px-4 pt-8 pb-20 md:py-8">
       <ProductDetail product={product as unknown as ProductWithCategory} />
+      {/* Boutique uniquement : complémentaires puis petits plus, lus côté client (la page reste ISR). */}
+      {!goodies && <ProductAddOns productId={product.id} excludeIds={related.map((item) => item.id)} />}
       <RelatedProducts products={related} catalogScope={goodies ? 'gadgets' : 'shop'} />
     </div>
   );
