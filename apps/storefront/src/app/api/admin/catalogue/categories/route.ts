@@ -49,8 +49,8 @@ async function saveCategory(req: NextRequest, update: boolean) {
   if (!data) return NextResponse.json({ error: 'Catégorie introuvable.' }, { status: 404 });
   revalidatePath('/');
   revalidatePath('/gadgets');
-  revalidatePath('/products/[slug]', 'page');
   revalidatePath('/admin/catalogue', 'layout');
+  // Product pages (PRODUCT_PAGE_ROUTE), /accueil, /gadgets, /card and the catalogue tag.
   revalidateCatalogCache(tenant.id);
   return NextResponse.json({ category: data }, { status: update ? 200 : 201 });
 }

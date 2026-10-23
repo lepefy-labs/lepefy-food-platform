@@ -24,6 +24,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  */
 export const SHOP_DISPLAY_TTL_SECONDS = 3600;
 
+/**
+ * Route of the product pages for `revalidatePath(…, 'page')`. Next.js derives a
+ * page's implicit tags from its file path WITH the route group
+ * (`/(shop)/products/[slug]/page`): `'/products/[slug]'` matches no page and
+ * purges nothing. Exact paths (`/products/<slug>`, `/accueil`) need no group.
+ */
+export const PRODUCT_PAGE_ROUTE = '/(shop)/products/[slug]';
+
 export const TENANT_CACHE_TAG = 'tenant';
 export const catalogCacheTag = (tenantId: string) => `catalog:${tenantId}`;
 export const shopShellCacheTag = (tenantId: string) => `shop-shell:${tenantId}`;
@@ -51,7 +59,7 @@ export function revalidateTenantCache() {
 export function revalidateCatalogCache(tenantId: string) {
   safely(() => {
     revalidateTag(catalogCacheTag(tenantId));
-    revalidatePath('/products/[slug]', 'page');
+    revalidatePath(PRODUCT_PAGE_ROUTE, 'page');
     revalidatePath('/accueil');
     revalidatePath('/gadgets');
     // Vitrine « Nos produits en vedette » de /card (ISR).

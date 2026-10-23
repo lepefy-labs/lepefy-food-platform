@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  PRODUCT_PAGE_ROUTE,
   productAvailabilityPaths,
   revalidateOrderProductAvailability,
   revalidateProductAvailability,
@@ -109,5 +110,35 @@ test.describe('targeted product invalidation', () => {
     const ids = many.queries[0]!.filters.find(([column]) => column === 'id')![1] as string[];
     expect(ids).toHaveLength(100);
     expect(new Set(ids).size).toBe(100);
+  });
+});
+
+// revalidatePath(pattern, 'page' | 'layout') matches the page's file path WITH
+// its route groups (Next.js implicit tags): '/products/[slug]' purged nothing
+// because the page lives in app/(shop)/.
+test.describe('revalidatePath patterns match real routes', () => {
+  const SRC = path.join(__dirname, '../../src');
+  const sourceFiles = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return sourceFiles(full);
+    return /\.(ts|tsx)$/.test(entry.name) ? [full] : [];
+  });
+  const routeFileExists = (pattern: string, type: string) =>
+    ['tsx', 'ts', 'jsx', 'js'].some((ext) => existsSync(path.join(SRC, 'app', `${pattern}/${type}.${ext}`)));
+
+  test('the product page route is the real file of the product pages', () => {
+    expect(PRODUCT_PAGE_ROUTE).toBe('/(shop)/products/[slug]');
+    expect(routeFileExists(PRODUCT_PAGE_ROUTE, 'page')).toBe(true);
+  });
+
+  test('every dynamic revalidatePath pattern points to an existing page or layout', () => {
+    // Literal patterns anywhere in src (a new route group or a moved page fails here).
+    for (const file of sourceFiles(SRC)) {
+      for (const match of readFileSync(file, 'utf8').matchAll(/revalidatePath\(\s*(['"`])([^'"`]*\[[^'"`]*)\1\s*,\s*'(page|layout)'/g)) {
+        expect(routeFileExists(match[2]!, match[3]!), `${path.relative(SRC, file)}: ${match[2]} matches no ${match[3]} file`).toBe(true);
+      }
+    }
+    // The catalogue invalidation goes through the checked constant.
+    expect(readFileSync(path.join(SRC, 'lib/cache/storefrontCache.ts'), 'utf8')).toContain("revalidatePath(PRODUCT_PAGE_ROUTE, 'page')");
   });
 });
