@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import type { PaymentModule } from '@lepefy/types';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
+import { isDemoDeployment, isStripeTestKey } from '@/lib/demo/demoEnvironment';
 
 // Fichier server-only (secret key + webhook secret) — jamais importé par un
 // composant client. Séparé volontairement de stripeClientConfig.ts (qui ne
@@ -36,6 +37,11 @@ export function getStripeSecretKey(module: PaymentModule): string {
   const specific = process.env[`STRIPE_SECRET_KEY_${MODULE_ENV_SUFFIX[module]}`];
   const key = specific || process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error(`[stripeServerConfig] Nessuna secret key configurata per il modulo "${module}".`);
+  // Démo (docs/DEMO_EXPERIENCE.md) : uniquement le mode test de Stripe, qui ne
+  // peut débiter personne. Une clé live sur ce déploiement bloque tout paiement.
+  if (isDemoDeployment() && !isStripeTestKey(key)) {
+    throw new Error('[stripeServerConfig] Démo : clé Stripe live refusée, seules les clés de test sont acceptées.');
+  }
   return key;
 }
 

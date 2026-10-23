@@ -8,6 +8,8 @@
  * Every other n8n webhook is unaffected.
  */
 
+import { isDemoDeployment } from '@/lib/demo/demoEnvironment';
+
 export type EmailTransportName = 'n8n' | 'brevo';
 
 export interface TransportResult {
@@ -104,6 +106,8 @@ export async function sendViaBrevo(
   payload: Record<string, unknown>,
   fetchImpl: typeof fetch = fetch,
 ): Promise<TransportResult> {
+  // Démo (docs/DEMO_EXPERIENCE.md) : aucun e-mail ne part, jamais.
+  if (isDemoDeployment()) return { ok: true, transport: 'brevo', skipped: true };
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) return { ok: false, transport: 'brevo', error: 'brevo_api_key_missing' };
   const message = toBrevoMessage(payload);

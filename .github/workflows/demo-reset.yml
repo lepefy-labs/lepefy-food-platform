@@ -1,0 +1,62 @@
+name: Demo reset (Demo Experience)
+
+# Remise à zéro des démos (docs/DEMO_EXPERIENCE.md §6) : un nouveau tenant de
+# démo est créé à partir du scénario, l'ancien est archivé. Chaque nuit, et à
+# la demande. Refusée pendant une présentation (bail), sauf « force ».
+# Base Supabase de la DÉMO uniquement : secrets de l'environnement GitHub
+# « demo » / « demo-private », jamais ceux de la production.
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # 04:00 Paris en été, 03:00 en hiver
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Démo visée'
+        required: true
+        default: demo
+        type: choice
+        options: [demo, demo-private]
+      force:
+        description: 'Forcer pendant une présentation en cours'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: demo-reset
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: ${{ github.event_name == 'schedule' && fromJSON('["demo","demo-private"]') || fromJSON(format('["{0}"]', github.event.inputs.environment)) }}
+    environment: ${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Reset demo
+        env:
+          DEMO_SUPABASE_URL: ${{ secrets.DEMO_SUPABASE_URL }}
+          DEMO_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEMO_SUPABASE_SERVICE_ROLE_KEY }}
+          DEMO_SUPABASE_PROJECT_REF: ${{ vars.DEMO_SUPABASE_PROJECT_REF }}
+          DEMO_TENANT_SLUG: ${{ vars.DEMO_TENANT_SLUG }}
+          DEMO_SCENARIO: ${{ vars.DEMO_SCENARIO }}
+          DEMO_ACCESS_MODE: ${{ vars.DEMO_ACCESS_MODE }}
+          DEMO_APP_URL: ${{ vars.DEMO_APP_URL }}
+          DEMO_INTERNAL_TOKEN: ${{ secrets.DEMO_INTERNAL_TOKEN }}
+          DEMO_PRESENTER_EMAILS: ${{ vars.DEMO_PRESENTER_EMAILS }}
+          DEMO_REQUESTED_BY: ${{ github.event_name == 'schedule' && 'Remise à zéro nocturne' || github.actor }}
+          FORCE: ${{ github.event.inputs.force == 'true' && '--force' || '' }}
+        run: |
+          if [ -z "$DEMO_SUPABASE_URL" ] || [ -z "$DEMO_TENANT_SLUG" ] || [ -z "$DEMO_SCENARIO" ]; then
+            echo "::notice::Environnement ${{ matrix.environment }} non configuré : rien à faire."
+            exit 0
+          fi
+          node scripts/demo/seed-demo.mjs --scenario "$DEMO_SCENARIO" --reset $FORCE

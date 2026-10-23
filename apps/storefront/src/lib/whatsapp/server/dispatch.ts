@@ -3,6 +3,7 @@ import { n8nWebhookUrl } from '@/lib/events/notifyN8n';
 import { internalSecret, processingMode } from '@/lib/whatsapp/config';
 import { whatsappLog } from '@/lib/whatsapp/log';
 import { processPendingWhatsAppMessages } from './processing';
+import { isDemoDeployment } from '@/lib/demo/demoEnvironment';
 
 /** Webhook n8n qui rappelle POST /api/internal/whatsapp/process (ops/n8n/whatsapp-inbound-dispatch.json). */
 export const WHATSAPP_N8N_DISPATCH_PATH = 'webhook/whatsapp-inbound';
@@ -17,7 +18,8 @@ export const WHATSAPP_INTERNAL_SECRET_HEADER = 'X-Lepefy-Webhook-Secret';
 export async function dispatchWhatsAppProcessing(messages: Array<{ messageId: string; tenantId: string }>): Promise<void> {
   if (messages.length === 0) return;
   const messageIds = messages.map((message) => message.messageId);
-  const mode = processingMode();
+  // Démo : jamais d'appel à n8n, traitement inline (les réponses sont bloquées par le provider).
+  const mode = isDemoDeployment() ? 'inline' : processingMode();
 
   if (mode === 'n8n') {
     const url = n8nWebhookUrl(WHATSAPP_N8N_DISPATCH_PATH);

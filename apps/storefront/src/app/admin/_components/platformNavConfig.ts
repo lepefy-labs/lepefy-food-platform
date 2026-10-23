@@ -63,6 +63,7 @@ export const PLATFORM_NAV: PlatformNavGroup[] = [
     id: 'development', label: 'Développement', icon: IconBriefcase, children: [
       { label: 'Prospects', href: '/admin/platform/prospects' },
       { label: 'Feedback testeurs', href: '/admin/platform/feedback' },
+      { label: 'Démo', href: '/admin/platform/demo' },
     ],
   },
 ];

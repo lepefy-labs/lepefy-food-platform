@@ -7,6 +7,7 @@ import {
   type WhatsAppSendResult,
   type WhatsAppTemplateComponent,
 } from './types';
+import { isDemoDeployment } from '@/lib/demo/demoEnvironment';
 
 const BSUID = /^[A-Z]{2}(\.ENT)?\.[A-Za-z0-9]{1,128}$/;
 
@@ -81,6 +82,8 @@ export function createMetaCloudProvider(options: MetaCloudProviderOptions): What
   const endpoint = `${(options.baseUrl ?? 'https://graph.facebook.com').replace(/\/$/, '')}/${options.apiVersion}/${options.phoneNumberId}/messages`;
 
   async function attempt(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+    // Démo (docs/DEMO_EXPERIENCE.md) : aucun message WhatsApp réel, jamais.
+    if (isDemoDeployment()) throw new WhatsAppProviderError({ kind: 'not_configured', message: 'demo_blocked' });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let response: Response;

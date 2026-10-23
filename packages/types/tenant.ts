@@ -45,6 +45,8 @@ export interface Tenant {
   active: boolean;
   /** Tenant di test (migration 138). Assente finché la 138 non è applicata. */
   is_test?: boolean;
+  /** Tenant de démonstration (migration 167), toujours is_test. Privé : jamais dans PUBLIC_TENANT_FIELDS. */
+  is_demo?: boolean;
   storefront_ready: boolean;
   ai_image_generation: boolean;
   locales: string[];

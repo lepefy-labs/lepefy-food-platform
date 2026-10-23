@@ -21,6 +21,8 @@ import type { AdminSearchScope, AdminShellNav } from '../_components/shell/shell
 import { canSee, navItemsById, resolveAdminNavigation } from '@/lib/admin/navigation';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
 import SubscriptionBanner from '../_components/SubscriptionBanner';
+import DemoVisitorBanner from '../_components/demo/DemoVisitorBanner';
+import { DEMO_VISITOR_ROLE } from '@/lib/demo/visitorPermissions';
 import { AdminToaster } from '../_components/ui/Toaster';
 import { getTenantServiceState } from '@/lib/billing/tenantServiceState';
 import { SUSPENDED_ADMIN_PERMISSIONS, isAdminPathAllowedWhenSuspended } from '@/lib/billing/subscriptionRules';
@@ -148,6 +150,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           header={<AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} canShop={canShop} canEvents={canEvents} adminEmail={user.email ?? ''} adminDisplayName={displayName} support={supportEnabled} />}
         >
           <SubscriptionBanner serviceState={serviceState} canViewBilling={canAdmin(access, 'billing.view')} />
+          {access.roleCode === DEMO_VISITOR_ROLE && <DemoVisitorBanner userId={access.userId} />}
           {children}
         </AdminShell>
         </SupportProvider>

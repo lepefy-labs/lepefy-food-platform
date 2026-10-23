@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { isDemoDeployment } from '@/lib/demo/demoEnvironment';
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { getEventsBaseUrl, getTicketUrl } from '@/lib/events/ticketUrl';
@@ -198,6 +199,10 @@ function isGooglePlayTestUrl(value: string) {
 export async function POST(req: NextRequest) {
   const denied = await requirePlatformOwner();
   if (denied) return denied;
+
+  if (isDemoDeployment()) {
+    return NextResponse.json({ error: 'Démo : aucune notification de test n’est envoyée depuis cet environnement.' }, { status: 409 });
+  }
 
   if (!process.env.N8N_WEBHOOK_URL) {
     return NextResponse.json({ error: 'N8N_WEBHOOK_URL non configuré.' }, { status: 503 });

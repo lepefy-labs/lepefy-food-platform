@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isDemoDeployment } from '@/lib/demo/demoEnvironment';
+import { demoBucket, demoRateAllowed } from '@/lib/demo/server/demoServices';
+import { clientIp } from '@/lib/http/memoryRateLimit';
 import { runAi } from '@/lib/ai/core/aiGateway';
 import { openConversation, finishConversation, releaseConversation, type ConversationContext } from '@/lib/ai/core/conversationContext';
 import { boundedContext, memoryFromDecision } from '@/lib/ai/core/contextPackage';
@@ -45,6 +48,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
+const DEMO_NALA_PER_HOUR = 20;
 const ENDPOINT = 'chatbox';
 const MAX_MESSAGE_LENGTH = 300;
 
@@ -88,6 +92,12 @@ export async function POST(req: NextRequest) {
     locale: body?.storefrontLocale,
     deviceType: body?.deviceType,
   });
+
+  // Démo (docs/DEMO_EXPERIENCE.md) : plafond par visiteur en plus des limites
+  // du tenant (ai_rate_limit_public_*), pour borner le coût de l'IA.
+  if (isDemoDeployment() && !(await demoRateAllowed(demoBucket('nala', clientIp(req.headers)), DEMO_NALA_PER_HOUR, 3600))) {
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
+  }
 
   const allowed = await checkRateLimit(tenant.id, ENDPOINT, true);
   if (!allowed) {

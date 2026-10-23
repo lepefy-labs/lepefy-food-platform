@@ -4,6 +4,8 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenantServiceState } from '@/lib/billing/tenantServiceState';
 import { isAdminApiAllowedWhenSuspended } from '@/lib/billing/subscriptionRules';
+import { DEMO_VISITOR_DENIED_MESSAGE, DEMO_VISITOR_ROLE } from '@/lib/demo/visitorPermissions';
+import { isVisitorAccountValid } from '@/lib/demo/server/visitorAccounts';
 import { adminActorLabel, registerRequestActor, REQUEST_ID_HEADER, routeRef } from '@/lib/audit/requestContext';
 
 export interface AdminAccessContext {
@@ -69,6 +71,8 @@ export async function getAdminAccessContext(userId: string, tenantId: string | n
       service.from('admin_roles').select('id, code, name, scope, active').eq('id', membership.role_id).eq('active', true).maybeSingle(),
       service.from('admin_role_permissions').select('permission_key').eq('role_id', membership.role_id),
     ]);
+    // Démo : une visite expirée n'ouvre plus rien (lib/demo/server/visitorAccounts.ts).
+    if (role?.code === DEMO_VISITOR_ROLE && !(await isVisitorAccountValid(admin.id, membership.tenant_id))) return null;
     if (role) return {
       userId: admin.id, email: admin.email, legacyRole: admin.role, tenantId: membership.tenant_id,
       roleId: role.id, roleCode: role.code, roleName: role.name, scope: role.scope === 'platform' ? 'platform' : 'tenant',
@@ -76,6 +80,7 @@ export async function getAdminAccessContext(userId: string, tenantId: string | n
       profileCompleted, firstName, lastName, nickname, rbacSource: 'dynamic',
     };
   }
+  if (admin.role === DEMO_VISITOR_ROLE) return null;
   if (admin.role !== 'platform_owner' && tenantId && admin.tenant_id !== tenantId) return null;
   return {
     userId: admin.id, email: admin.email, legacyRole: admin.role,
@@ -108,7 +113,10 @@ export async function requirePermission(tenantId: string | null, permission: str
   let context = await getAdminAccessContext(userId, tenantId);
   if (!context) context = await getAdminAccessContext(userId, null);
   if (!context) return NextResponse.json({ error: 'Accès refusé.' }, { status: 403 });
-  if (!canAdmin(context, permission)) return NextResponse.json({ error: 'Permission insuffisante.' }, { status: 403 });
+  if (!canAdmin(context, permission)) {
+    if (context.roleCode === DEMO_VISITOR_ROLE) return NextResponse.json({ error: DEMO_VISITOR_DENIED_MESSAGE, code: 'DEMO_READ_ONLY' }, { status: 403 });
+    return NextResponse.json({ error: 'Permission insuffisante.' }, { status: 403 });
+  }
   if (!context.isPlatformOwner && context.tenantId !== tenantId) return NextResponse.json({ error: 'Accès refusé pour ce tenant.' }, { status: 403 });
   // Verified actor of this request, read by the service client for the audit triggers.
   const requestHeaders = headers();

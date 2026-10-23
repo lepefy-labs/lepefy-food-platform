@@ -22,6 +22,7 @@
  *   - no idempotency at Green API: a timeout or a 2xx without id is
  *     `uncertain` and never retried automatically.
  */
+import { isDemoDeployment } from '@/lib/demo/demoEnvironment';
 
 export const GREEN_API_DELIVERY_PATH = '/whatsapp/send-message';
 export const WHATSAPP_MESSAGE_MAX_LENGTH = 4000;
@@ -135,6 +136,8 @@ export async function sendGreenApiText(
   input: { phone: string; message: string },
   deps: GreenApiDeps = {},
 ): Promise<GreenApiSendResult> {
+  // Démo (docs/DEMO_EXPERIENCE.md) : aucun message réel ; échec définitif, jamais réessayé.
+  if (isDemoDeployment()) return { ok: false, transport: 'green_api', definitive: true, error: 'demo_blocked' };
   const chatId = whatsappChatId(input.phone);
   if (!chatId) return { ok: false, transport: 'green_api', definitive: true, error: 'invalid_whatsapp_number' };
   const message = input.message.slice(0, WHATSAPP_MESSAGE_MAX_LENGTH);

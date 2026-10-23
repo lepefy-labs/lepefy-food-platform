@@ -15,6 +15,9 @@ import {
 // Import statiques (pas de import() dynamique) : chargés via le même transform partout, y compris Node 20 en CI.
 import { isTestTenantNotification, logTestTenantSkip, testTenantEmailRecipients } from '@/lib/tenant/testTenant';
 import { decideTestTenantDelivery } from '@/lib/notifications/testTenantGuard';
+import { isDemoDeployment } from '@/lib/demo/demoEnvironment';
+import { draftFromNotification } from '@/lib/demo/simulatedMessageFormat';
+import { recordSimulatedMessage } from '@/lib/demo/server/demoServices';
 
 export const N8N_WEBHOOK_SECRET_HEADER = 'X-Lepefy-Webhook-Secret';
 
@@ -91,6 +94,12 @@ export async function postToN8n(webhookPath: string, payload: Record<string, unk
  * goes to its n8n webhook.
  */
 export async function sendNotification(webhookPath: string, rawPayload: Record<string, unknown>): Promise<TransportResult> {
+  // Démo (docs/DEMO_EXPERIENCE.md) : rien ne part ; le message est gardé,
+  // destinataire masqué, pour « Messages simulés ». Accepté pour le ledger.
+  if (isDemoDeployment()) {
+    await recordSimulatedMessage(rawPayload.tenantId, draftFromNotification(webhookPath, rawPayload));
+    return { ok: true, transport: RENDERED_EMAIL_WEBHOOKS.has(webhookPath) ? configuredEmailTransport() : 'n8n', skipped: true };
+  }
   // Tenant di test (tenants.is_test): mai verso clienti reali.
   let payload = rawPayload;
   if (await isTestTenantNotification(payload)) {

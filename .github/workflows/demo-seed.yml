@@ -1,0 +1,47 @@
+name: Demo seed (Demo Experience)
+
+# Complète le tenant de démo sans rien effacer (idempotent) ou le crée la
+# première fois. Dry-run par défaut. docs/DEMO_EXPERIENCE.md §6.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Démo visée'
+        required: true
+        default: demo
+        type: choice
+        options: [demo, demo-private]
+      dry_run:
+        description: 'Dry-run (aucune écriture)'
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: demo-reset
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Seed demo
+        env:
+          DEMO_SUPABASE_URL: ${{ secrets.DEMO_SUPABASE_URL }}
+          DEMO_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEMO_SUPABASE_SERVICE_ROLE_KEY }}
+          DEMO_SUPABASE_PROJECT_REF: ${{ vars.DEMO_SUPABASE_PROJECT_REF }}
+          DEMO_TENANT_SLUG: ${{ vars.DEMO_TENANT_SLUG }}
+          DEMO_SCENARIO: ${{ vars.DEMO_SCENARIO }}
+          DEMO_ACCESS_MODE: ${{ vars.DEMO_ACCESS_MODE }}
+          DEMO_APP_URL: ${{ vars.DEMO_APP_URL }}
+          DEMO_INTERNAL_TOKEN: ${{ secrets.DEMO_INTERNAL_TOKEN }}
+          DEMO_PRESENTER_EMAILS: ${{ vars.DEMO_PRESENTER_EMAILS }}
+          DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '--dry-run' || '' }}
+        run: node scripts/demo/seed-demo.mjs --scenario "$DEMO_SCENARIO" $DRY_RUN

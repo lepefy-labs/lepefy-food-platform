@@ -1,0 +1,72 @@
+name: Demo database (Demo Experience)
+
+# Base Supabase SÉPARÉE de la démo (docs/DEMO_EXPERIENCE.md §2) :
+# - initial : crée tout le schéma sur un projet neuf (refusé si des tables existent) ;
+# - migration : applique UNE migration (même fichier que la production), une fois.
+# Secret DEMO_DATABASE_URL de l'environnement « demo » (chaîne de connexion
+# Postgres du projet démo) ; jamais la base de production.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'initial = schéma complet sur un projet neuf ; migration = un fichier'
+        required: true
+        default: migration
+        type: choice
+        options: [initial, migration]
+      file:
+        description: 'Fichier de supabase/migrations (mode migration), ex. 167_demo_experience.sql'
+        required: false
+        type: string
+      confirm:
+        description: 'Taper DEMO pour confirmer'
+        required: true
+        type: string
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: demo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Guard
+        env:
+          DEMO_DATABASE_URL: ${{ secrets.DEMO_DATABASE_URL }}
+          DEMO_SUPABASE_PROJECT_REF: ${{ vars.DEMO_SUPABASE_PROJECT_REF }}
+        run: |
+          test "${{ github.event.inputs.confirm }}" = "DEMO" || { echo "Confirmation manquante."; exit 1; }
+          test -n "$DEMO_DATABASE_URL" || { echo "DEMO_DATABASE_URL manquant."; exit 1; }
+          echo "$DEMO_SUPABASE_PROJECT_REF" | grep -Eq '^[a-z0-9]{10,40}$' || { echo "DEMO_SUPABASE_PROJECT_REF invalide."; exit 1; }
+          case "$DEMO_DATABASE_URL" in
+            *"$DEMO_SUPABASE_PROJECT_REF"*) ;;
+            *) echo "DEMO_DATABASE_URL ne vise pas le projet démo $DEMO_SUPABASE_PROJECT_REF : refusé."; exit 1 ;;
+          esac
+      - name: Initial schema
+        if: ${{ github.event.inputs.mode == 'initial' }}
+        env:
+          DEMO_DATABASE_URL: ${{ secrets.DEMO_DATABASE_URL }}
+        run: |
+          existing=$(psql "$DEMO_DATABASE_URL" -tA -c "select count(*) from information_schema.tables where table_schema = 'public'")
+          test "$existing" = "0" || { echo "Le schéma public contient déjà $existing table(s) : refusé."; exit 1; }
+          node scripts/demo/build-demo-schema.mjs > demo-schema.sql
+          psql "$DEMO_DATABASE_URL" -v ON_ERROR_STOP=1 -f demo-schema.sql
+          psql "$DEMO_DATABASE_URL" -tA -c "select count(*) || ' migrations appliquées' from public.demo_schema_migrations"
+      - name: One migration
+        if: ${{ github.event.inputs.mode == 'migration' }}
+        env:
+          DEMO_DATABASE_URL: ${{ secrets.DEMO_DATABASE_URL }}
+          FILE: ${{ github.event.inputs.file }}
+        run: |
+          echo "$FILE" | grep -Eq '^[0-9]{3}[a-z]?_[a-z0-9_]+\.sql$' || { echo "Nom de fichier invalide."; exit 1; }
+          test -f "supabase/migrations/$FILE" || { echo "Fichier introuvable."; exit 1; }
+          applied=$(psql "$DEMO_DATABASE_URL" -tA -c "select count(*) from public.demo_schema_migrations where file = '$FILE'")
+          test "$applied" = "0" || { echo "$FILE est déjà appliquée sur la démo."; exit 0; }
+          psql "$DEMO_DATABASE_URL" -v ON_ERROR_STOP=1 -f "supabase/migrations/$FILE"
+          psql "$DEMO_DATABASE_URL" -v ON_ERROR_STOP=1 -c "insert into public.demo_schema_migrations (file) values ('$FILE')"

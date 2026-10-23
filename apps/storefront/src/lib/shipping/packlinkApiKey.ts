@@ -1,3 +1,5 @@
+import { isDemoDeployment } from '@/lib/demo/demoEnvironment';
+
 /**
  * Chiave Packlink da usare per un tenant: la sua chiave propria, altrimenti la
  * chiave di piattaforma PACKLINK_API_KEY. Un tenant di test (tenants.is_test,
@@ -6,6 +8,11 @@
 export function resolvePacklinkApiKey(
   tenant: { packlink_api_key?: string | null; is_test?: boolean | null },
 ): string | null {
+  // Démo (docs/DEMO_EXPERIENCE.md) : jamais Packlink, même avec une clé propre.
+  if (isDemoDeployment()) {
+    console.warn('[demo] skipped: packlink');
+    return null;
+  }
   const own = tenant.packlink_api_key?.trim() ? tenant.packlink_api_key : null;
   if (own) return own;
   if (tenant.is_test) {

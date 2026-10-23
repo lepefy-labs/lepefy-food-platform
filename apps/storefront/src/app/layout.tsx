@@ -3,6 +3,10 @@ import { Inter, Bricolage_Grotesque } from 'next/font/google';
 import { getDisplayTenant } from '@/lib/tenant/getTenant';
 import { toPublicTenant } from '@/lib/tenant/publicTenant';
 import { TenantProvider } from '@/providers/TenantProvider';
+import { demoAccessMode, isDemoActive } from '@/lib/demo/demoEnvironment';
+import { hasDemoAccess } from '@/lib/demo/server/demoContext';
+import DemoRibbon from '@/components/demo/DemoRibbon';
+import PrivateDemoGate from '@/components/demo/PrivateDemoGate';
 import { ProductImageDeliveryProvider } from '@/providers/ProductImageDeliveryProvider';
 import { productImageDeliveryEnabled } from '@/lib/images/productImageRollout';
 import { PWARegister } from '@/components/PWARegister';
@@ -63,6 +67,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // the RSC payload (new tenants columns are private by default).
   const clientTenant = toPublicTenant(tenant);
 
+  // Démo (docs/DEMO_EXPERIENCE.md) : bandeau permanent et, en démo privée, accès
+  // par lien signé. Hors démo rien n'est lu : les pages restent statiques.
+  const demo = isDemoActive(tenant);
+  const demoLocked = demo && demoAccessMode() === 'private' && !hasDemoAccess();
+
   return (
     // The next/font variable classes must sit on <html>: globals.css declares
     // `--font-body: var(--font-inter), …` on :root, and a custom property that
@@ -82,8 +91,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="theme-color" content={tenant.primary_color ?? '#1D9E75'} />
       </head>
       <body>
+        {demo && !demoLocked && <DemoRibbon />}
         <TenantProvider tenant={clientTenant}>
-          <ProductImageDeliveryProvider enabled={productImageDeliveryEnabled(tenant)}>{children}</ProductImageDeliveryProvider>
+          <ProductImageDeliveryProvider enabled={productImageDeliveryEnabled(tenant)}>{demoLocked ? <PrivateDemoGate /> : children}</ProductImageDeliveryProvider>
         </TenantProvider>
         <PWARegister />
       </body>

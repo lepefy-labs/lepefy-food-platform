@@ -27,6 +27,7 @@ import { notifyOrderAttention, notifyOrderCreated, notifyOrderStockConflict } fr
 import { convertCheckoutSessionToOrder } from '@/lib/orders/convertCheckoutSessionToOrder';
 import { recordAssistedOrderEvent } from '@/lib/orders/assisted/assistedOrderEvents';
 import { computePreorderTotals, toCents } from '@/lib/orders/assisted/assistedOrderPolicy';
+import { isDemoDeployment } from '@/lib/demo/demoEnvironment';
 
 // ─── Précommandes assistées (/pay/[token]) ──────────────────────────────────
 
@@ -165,6 +166,12 @@ export async function POST(req: NextRequest) {
   if (!event) {
     console.error('[webhook] Signature verification failed against all configured secrets.');
     return NextResponse.json({ error: 'Invalid signature.' }, { status: 400 });
+  }
+
+  // Démo (docs/DEMO_EXPERIENCE.md) : un évènement live n'est jamais traité ici.
+  if (isDemoDeployment() && event.livemode) {
+    console.error('[webhook] Démo : évènement Stripe live refusé —', event.id);
+    return NextResponse.json({ error: 'Live event refused on the demo.' }, { status: 400 });
   }
 
   // Le compte e2e est un compte Stripe séparé, pas "un module de plus" : les

@@ -209,6 +209,13 @@ The shipping logic is the most complex part of the codebase:
 - Tables `support_*` are RLS-forced with no policy and read-only for the service role: every write goes through a `support_*` RPC (idempotent `client_key`, anti-abuse limits, state machine mirrored in `lib/support/rules.ts`, parity-tested). Shop reads only through the projection RPCs (`support_tenant_thread`, `support_tenant_ticket_page`, …): internal notes, internal files, private events, priority, assignee and GitHub links never reach a shop — never add a direct `support_*` select to shop code.
 - One quick panel for every admin page (`SupportProvider` in the protected layout → `useSupport().open()`); a message relayed from WhatsApp/phone is stored as `relayed_from` by Lepefy, never as written by the shop. Screenshots: private bucket `support-attachments`, type from bytes, read through the authorized route (60 s signed URL). Notifications: type `support_reply` via the dispatcher; Lepefy e-mail only through `SUPPORT_NOTIFY_EMAILS`.
 
+### Demo Experience (prospect demos) — `docs/DEMO_EXPERIENCE.md`
+
+- Same code, separate Supabase project and Vercel project (`lepefy-demo`). Two keys: server env `LEPEFY_DEPLOYMENT_KIND=demo` + private column `tenants.is_demo` (always with `is_test`, migration 167). Blocking a real side effect needs one key (`isDemoDeployment()`); opening demo features (`/demo`, visitor accounts, console) needs both (`isDemoActive()`, `lib/demo/demoEnvironment.ts`). The 167 RPCs raise `demo_disabled` without an active demo tenant: inert in production.
+- On a demo deployment nothing real leaves: `getStripeSecretKey` refuses non-test keys and the webhook refuses `livemode` events; `sendNotification`/`sendViaBrevo` record `demo_simulated_messages` instead of sending; Meta, Green API, WhatsApp n8n dispatch and Packlink (`resolvePacklinkApiKey` → null) are blocked. A new outbound provider must add the same guard.
+- Visitors get an ephemeral `demo_visitor` account (read-only `*.view`, 4 h, `POST /api/demo/visit`); `getAdminAccessContext` refuses an expired visit and `tests/unit/demoExperience.spec.ts` fails if an admin write API becomes reachable with a visitor capability. The root layout renders `DemoRibbon`/`DemoTour` (and the private-demo gate, which reads a cookie) only when the demo is active — never on a production deployment.
+- Data: `scripts/demo/seed-demo.mjs` (scenarios in `scripts/demo/scenarios`, deterministic plan, idempotent, refuses any DB whose URL is not `DEMO_SUPABASE_PROJECT_REF`). Reset = tenant rotation (append-only tables forbid DELETE), refused during a presentation lease. Schema of the demo DB: `scripts/demo/build-demo-schema.mjs` / workflow `demo-database`; apply each new migration there too.
+
 ### Subscription lifecycle and suspension — `docs/SUBSCRIPTION_LIFECYCLE.md`
 
 - One engine: `lib/billing/tenantServiceState.ts` (`getTenantServiceState`, `isModuleAvailable`, `guardModule`). Suspended = manual (`tenant_subscriptions.status = 'suspended'`) or automatic past `paid_until + grace_days`, computed at read time; per-module suspension in `tenant_module_suspensions`. Fail-open without migration 144.
@@ -309,6 +316,12 @@ WHATSAPP_TEST_RECIPIENTS=            # test tenants only: allowed recipients, di
 
 # Scheduled promotions and novelties (migration 156)
 CATALOG_SCHEDULE_SCHEDULER_TOKEN=    # bearer of the n8n tick POST /api/internal/catalog-schedule
+
+# Demo Experience (demo deployment only, docs/DEMO_EXPERIENCE.md §9)
+LEPEFY_DEPLOYMENT_KIND=              # "demo" on the demo Vercel project only; never set in production
+DEMO_ACCESS_MODE=                    # public | private (private = signed access link)
+DEMO_ACCESS_SECRET=                  # HMAC of private access links, ≥ 32 chars
+DEMO_INTERNAL_TOKEN=                 # bearer of POST /api/internal/demo/revalidate (seed after a reset)
 
 # Assistance (migration 163, optional)
 SUPPORT_NOTIFY_EMAILS=               # Lepefy addresses notified of new requests / shop messages, comma-separated
