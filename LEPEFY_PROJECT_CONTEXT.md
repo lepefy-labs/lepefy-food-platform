@@ -8,7 +8,7 @@
 
 ---
 
-## Demo Experience (migration 167 — da applicare; nessun ambiente demo ancora creato) — `docs/DEMO_EXPERIENCE.md`
+## Demo Experience (migration 167 — applicata sul progetto demo `lepefy-demo` il 23/10/2026, non in produzione; seed e Vercel in corso) — `docs/DEMO_EXPERIENCE.md`
 
 - **Isolamento**: progetto Supabase separato (`lepefy-demo`, schema creato da `scripts/demo/build-demo-schema.mjs` = tutte le migration + tenant d'amorçage inattivo eliminato alla fine + due correttivi di deriva su 023/076; workflow `demo-database` modes `initial`/`migration`, guard sul project ref) e progetto Vercel `lepefy-demo`. Nessun dato di produzione letto o copiato.
 - **Due chiavi** (`lib/demo/demoEnvironment.ts`): bloccare un effetto reale basta `LEPEFY_DEPLOYMENT_KIND=demo`; aprire le funzioni demo richiede anche `tenants.is_demo` (privata, sempre con `is_test`, vincolo `tenants_demo_is_test`). Le RPC della 167 rifiutano `demo_disabled` senza tenant demo attivo: in produzione la migration è inerte.

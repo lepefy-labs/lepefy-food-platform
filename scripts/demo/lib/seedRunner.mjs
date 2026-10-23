@@ -37,8 +37,12 @@ async function writeTables(store, tenantId, plan, log) {
     let fresh;
     if (KEYED_TABLES[table]) {
       const key = KEYED_TABLES[table];
-      const existing = new Set(((await store.select(table, key, { tenant_id: tenantId })) ?? []).map((row) => row[key]));
-      fresh = rows.filter((row) => !existing.has(row[key]));
+      const current = new Map(((await store.select(table, `${key},enabled`, { tenant_id: tenantId })) ?? []).map((row) => [row[key], row.enabled]));
+      fresh = rows.filter((row) => !current.has(row[key]));
+      // Lignes créées par défaut (triggers) mais désactivées : la démo les active.
+      for (const row of rows) {
+        if (current.has(row[key]) && current.get(row[key]) !== true) await store.update(table, { tenant_id: tenantId, [key]: row[key] }, { enabled: true });
+      }
     } else if (CHILD_TABLES[table]) {
       // Lignes filles : présentes si leur parent existait déjà avant ce lancement.
       const { parentColumn } = CHILD_TABLES[table];

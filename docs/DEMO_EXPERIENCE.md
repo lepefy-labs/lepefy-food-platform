@@ -22,6 +22,11 @@ production (aucun fork), base Supabase et projet Vercel séparés.
 | Console (propriétaire de la plateforme) | `/admin/platform/demo` (Développement → Démo) |
 | Seed / remise à zéro | `scripts/demo/seed-demo.mjs`, workflows `demo-seed`, `demo-reset` |
 | Schéma de la base démo | `scripts/demo/build-demo-schema.mjs`, workflow `demo-database` |
+| Seed en SQL (premier chargement sans clé) | `scripts/demo/build-seed-sql.mjs` (lots `-- ─── lot` < 120 Ko) |
+
+**État (23/10/2026)** : projet Supabase `lepefy-demo` (`swthkhrjacdfpqksfdmi`, eu-central-1) créé, schéma appliqué
+(174 migrations, 178 tables, aucun tenant), via l'éditeur SQL en 11 lots (l'éditeur refuse une requête de 1,2 Mo).
+Restent : seed, projet Vercel, secrets.
 
 Deux déploiements possibles, sur la même base démo :
 
@@ -117,7 +122,10 @@ générées, jamais de photos du prospect).
   identités fictives).
 - Déterministe : PRNG par scénario et version ; identifiants `stableUuid(tenant, clé)` ;
   dates relatives au jour du seed (la journée « Aujourd'hui » reste crédible).
-- Idempotent : relancer le seed sur le même tenant n'insère rien.
+- Idempotent : relancer le seed sur le même tenant n'insère rien. Les réglages de modules créés par
+  défaut (triggers à l'insertion du tenant) sont activés, pas dupliqués.
+- Variante SQL : `node scripts/demo/build-seed-sql.mjs --scenario <clé> --slug <slug> --app-url <url>`,
+  même plan et mêmes RPC, refusée si le slug existe ; à exécuter lot par lot (éditeur SQL) ou d'un trait (psql).
 - **Remise à zéro par rotation** : `audit_events`, mouvements de stock et finances
   fournisseurs refusent toute suppression. Le reset crée un tenant `…-next-<date>`, le
   remplit, archive l'ancien (`active = false`, slug `…-archive-<date>`), donne le slug

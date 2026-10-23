@@ -242,6 +242,18 @@ test.describe('demo seed', () => {
     expect(JSON.stringify(base)).not.toMatch(/tata pao/i);
   });
 
+  test('the SQL seed refuses an existing tenant, upserts module settings and stays under the editor limit', async () => {
+    const { buildSeedSql, BATCH_SEPARATOR } = await load('build-seed-sql.mjs');
+    const { scenario } = await load('scenarios/traiteur-africain.mjs');
+    const { sql, tenantId } = buildSeedSql(scenario, { slug: 'lepefy-demo', appUrl: 'https://demo.example', anchor: new Date('2026-10-23T08:00:00Z') });
+    const batches: string[] = sql.split(`\n${BATCH_SEPARATOR}\n`);
+    expect(batches[0]).toContain("raise exception 'demo_tenant_exists: %'");
+    expect(batches[0]).toContain(tenantId);
+    expect(sql).toMatch(/insert into public\."tenant_feature_settings"[\s\S]*?on conflict \(tenant_id, feature_key\) do update set enabled = excluded\.enabled/);
+    expect(sql).toContain('p_request_key =>');
+    for (const batch of batches) expect(batch.length).toBeLessThan(120_000);
+  });
+
   test('the seed refuses any database that is not the demo project', async () => {
     const { assertDemoProject } = await load('seed-demo.mjs');
     expect(() => assertDemoProject('https://abcdefghijklmnop.supabase.co', 'abcdefghijklmnop')).not.toThrow();
