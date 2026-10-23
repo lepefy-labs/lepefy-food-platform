@@ -35,9 +35,18 @@ export function tenantClock(date:Date,timezone:string):{localDate:string;hour:nu
   const part=(key:string)=>parts.find(p=>p.type===key)?.value ?? '';
   return {localDate:part('year')+'-'+part('month')+'-'+part('day'),hour:Number(part('hour'))};
 }
+/**
+ * Carriers give a delivery DAY (Packlink: date only, stored as 00:00 UTC): overdue
+ * only from the next local calendar day, never on the day itself (same rule as the admin list).
+ */
+function etaOverdue(eta:string|null,now:Date,timezone:string):boolean{
+  if(!eta||!Number.isFinite(Date.parse(eta)))return false;
+  return tenantClock(new Date(eta),timezone).localDate<tenantClock(now,timezone).localDate;
+}
 /** Never treat a declared payment or an unresolved checkout as a paid order. */
 export function classifyDigest(
   orders:DigestOrder[],preorders:DigestPreorder[],settings:DigestThresholds,now:Date,baseUrl:string,
+  timezone='Europe/Paris',
 ):DigestItem[]{
   const items:DigestItem[]=[];
   for(const order of orders){
@@ -56,8 +65,7 @@ export function classifyDigest(
     }else if(order.payment_status!=='paid'){
       priority='urgent';reason='Statut de paiement incohérent';action='Vérifier le paiement, sans confirmer automatiquement.';
     }else if(order.status==='shipped' && order.fulfillment_type==='delivery' &&
-      order.shipping_provider_reference && order.shipping_estimated_delivery_at &&
-      Date.parse(order.shipping_estimated_delivery_at)<now.getTime() &&
+      order.shipping_provider_reference && etaOverdue(order.shipping_estimated_delivery_at,now,timezone) &&
       ['in_transit','out_for_delivery','ready_for_collection'].includes(order.shipping_normalized_status??'')){
       priority='urgent';reason='Date de livraison estimée dépassée';
       action='Vérifier le suivi transporteur et contacter le client si nécessaire.';

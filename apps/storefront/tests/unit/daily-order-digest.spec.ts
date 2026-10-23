@@ -53,6 +53,22 @@ test('stalled managed shipping needs manual attention without pretending deliver
   expect(actions[0]!.reason).toContain('événement transporteur');
 });
 
+test('estimated delivery is overdue only from the next local day, not in the 08:00 report of the day itself',()=>{
+  const order={
+    id:'66666666-a',full_name:'Marie',email:null,status:'shipped',payment_status:'paid',
+    fulfillment_type:'delivery',created_at:'2026-10-18T12:00:00Z',updated_at:'2026-10-18T12:00:00Z',
+    shipping_normalized_status:'in_transit',shipping_sync_error:null,shipping_provider_reference:'PK1',
+    // Packlink "2026/10/23" is stored as 00:00 UTC.
+    shipping_estimated_delivery_at:'2026-10-23T00:00:00.000Z',shipping_provider_synced_at:'2026-10-23T05:00:00Z',
+    shipping_tracking_events:[{occurredAt:'2026-10-23T04:00:00Z'}],
+  };
+  const at=(iso:string)=>classifyDigest([order],[],settings,new Date(iso),'https://shop.example.com','Europe/Rome');
+  expect(at('2026-10-23T06:00:00Z')).toHaveLength(0); // 08:00 report on the 23rd
+  const next=at('2026-10-24T06:00:00Z');
+  expect(next[0]!.priority).toBe('urgent');
+  expect(next[0]!.reason).toBe('Date de livraison estimée dépassée');
+});
+
 test('urgent cards have a prominent red CTA while other cards keep simple links',()=>{
   const base={reference:'#EXAMPLE',customer:'Marie',reason:'Suivi à vérifier',
     action:'Vérifier la fiche',createdAt:now.toISOString()};

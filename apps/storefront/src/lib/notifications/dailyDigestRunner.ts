@@ -95,7 +95,7 @@ export async function deliverTenantDigest(deps: DigestRunnerDeps, tenant: Digest
     if (prior.error) throw prior.error;
     const storefrontUrl = branding.storefrontUrl.replace(/\/$/, '');
     const adminUrl = storefrontUrl + '/admin';
-    const items = classifyDigest(orders, preorders, toDigestThresholds(tenant.config), now, storefrontUrl);
+    const items = classifyDigest(orders, preorders, toDigestThresholds(tenant.config), now, storefrontUrl, tenant.config.timezone);
     const snapshot = { keys: items.map(i => i.key), counts: {
       urgent: items.filter(i => i.priority === 'urgent').length,
       today: items.filter(i => i.priority === 'today').length,
