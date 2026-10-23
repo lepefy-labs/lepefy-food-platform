@@ -100,6 +100,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
       { label: 'Promotions & Nouveautés', href: '/admin/catalogue/campagnes', keywords: ['campagne', 'promo'] },
       { label: 'Catégories', href: '/admin/catalogue/categories' },
       { label: 'Règles de quantité', href: '/admin/catalogue/quantity-groups', keywords: ['minimum', 'groupe'] },
+      { label: 'Petits plus', href: '/admin/catalogue/petits-plus', keywords: ['impulsion', 'panier', 'chips', 'suggestions'] },
     ] },
   { id: 'shipping', label: 'Livraisons', href: '/admin/livraison', icon: IconTruck, group: 'Essentiel', workspace: 'shop', anyOf: ['shipping.view'], keywords: ['packlink', 'zones', 'tarifs', 'expéditions', 'emballages', 'forfait'],
     children: [

@@ -26,7 +26,7 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
   test(`confirmation layout, focus and consecutive adds at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.route('**/api/products/*/recommendations?*', route => route.fulfill({ json: {
+    await page.route('**/api/cart/suggestions?*', route => route.fulfill({ json: {
       strategy: 'similar', products: [suggestion('one', 1), suggestion('two'), suggestion('three'), suggestion('four')],
     } }));
     await page.goto('/');
@@ -101,7 +101,7 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
     } else {
       expect(Math.abs(bounds!.x + bounds!.width / 2 - width / 2)).toBeLessThanOrEqual(1);
     }
-    await expect(panel.getByRole('heading', { name: 'Vous aimerez peut-être aussi' })).toBeVisible();
+    await expect(panel.getByRole('heading', { name: 'Pour compléter votre panier' })).toBeVisible();
     const firstAdd = panel.getByRole('button', { name: 'Ajouter Suggestion one', exact: true });
     expect((await firstAdd.boundingBox())!.height).toBeGreaterThanOrEqual(48);
     await firstAdd.click();
@@ -133,7 +133,7 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
 
 test('slow, failed, empty and stale suggestions never block confirmation or cart navigation', async ({ page }) => {
   let mode: 'slow' | 'error' | 'empty' = 'slow';
-  await page.route('**/api/products/*/recommendations?*', async route => {
+  await page.route('**/api/cart/suggestions?*', async route => {
     if (mode === 'slow') { await new Promise(resolve => setTimeout(resolve, 10000)); await route.abort().catch(() => {}); }
     else if (mode === 'error') await route.fulfill({ status: 503, json: { products: [] } });
     else await route.fulfill({ json: { products: [] } });
@@ -149,7 +149,7 @@ test('slow, failed, empty and stale suggestions never block confirmation or cart
   mode = 'error';
   await trigger(page).click();
   await expect(dialog(page).getByRole('status')).toHaveCount(0);
-  await expect(dialog(page).getByRole('heading', { name: 'Vous aimerez peut-être aussi' })).toHaveCount(0);
+  await expect(dialog(page).getByRole('heading', { name: 'Pour compléter votre panier' })).toHaveCount(0);
   await page.getByTestId('add-confirmation-overlay').click({ position: { x: 2, y: 2 } });
   await expect(dialog(page)).toHaveCount(0);
   mode = 'empty';
@@ -167,7 +167,7 @@ test('existing cart recommendations are excluded and stock zero suggestions are 
       pendingMutations: [], ownerCustomerId: null,
     } }));
   });
-  await page.route('**/api/products/*/recommendations?*', route => route.fulfill({ json: {
+  await page.route('**/api/cart/suggestions?*', route => route.fulfill({ json: {
     products: [suggestion('existing'), suggestion('sold', 0), suggestion('available')],
   } }));
   await page.goto('/');
@@ -206,7 +206,7 @@ test('public endpoint and product detail reuse real available recommendations; G
 });
 
 test('stepper respects the cart item stock and a product already in the cart', async ({ page }) => {
-  await page.route('**/api/products/*/recommendations?*', route => route.fulfill({ json: { products: [] } }));
+  await page.route('**/api/cart/suggestions?*', route => route.fulfill({ json: { products: [] } }));
   await page.goto('/');
   await trigger(page).click();
   const item = (await readItems(page))[0]!;

@@ -14,6 +14,8 @@ import { CartPromoReminder } from '@/components/cart/CartPromoReminder';
 import { QuantityGroupProgress } from '@/components/cart/QuantityGroupProgress';
 import { CartFulfillmentNotice } from '@/components/cart/CartFulfillmentNotice';
 import { CartCatalogSection, type CartCatalogCategory } from '@/components/cart/CartCatalogSection';
+import { CartShippingEstimateDetail } from '@/components/cart/CartShippingEstimate';
+import { useShippingEstimate } from '@/lib/cart/useShippingEstimate';
 import { cartProductPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { selectCartIsEmpty, selectCartItemCount, selectCartItems, selectCartSubtotal, selectPendingProductIds } from '@/lib/cart/cartSelectors';
 import { formatProductCount } from '@/lib/cart/formatProductCount';
@@ -53,6 +55,8 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
   const {
     groups: quantityGroups, error: groupsError, reloadGroups, blockedMessage, canProceed, checking, fulfillment,
   } = useCartPurchaseGate(items);
+  // Une seule estimation pour la page : barre mobile, récapitulatifs et « Ça rentre dans votre colis ».
+  const { estimate: shippingEstimate, settled: estimateSettled, chooseCountry } = useShippingEstimate();
 
   useEffect(() => () => { if (undo) clearTimeout(undo.timeoutId); }, [undo]);
   useEffect(() => () => clearTimeout(leavingTimer.current), []);
@@ -158,7 +162,7 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
                 </div>
                 <p className="pb-1 text-sm font-medium text-gray-600">{formatProductCount(itemCount)}</p>
               </div>
-              <p className="mt-2 text-sm text-gray-700">Livraison : {SUMMARY_COPY.shippingNextStep}</p>
+              <div className="mt-2"><CartShippingEstimateDetail estimate={shippingEstimate} currency={tenant.currency} onChooseCountry={chooseCountry} /></div>
               <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} aria-hidden="true" /> Paiement sécurisé</p>
             </section>
 
@@ -207,7 +211,7 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
             </div>
 
             {/* Suite d'achat sous le panier ; à côté, le récapitulatif desktop reste collant. */}
-            <CartCatalogSection categories={categories} />
+            <CartCatalogSection categories={categories} headroomG={shippingEstimate?.headroomG ?? null} estimateSettled={estimateSettled} />
           </div>
 
           <aside className="hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)] lg:sticky lg:top-40 lg:block">
@@ -216,11 +220,8 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
                 <dt className="text-gray-700">{productsPriceLabel(itemCount)}</dt>
                 <dd className="text-2xl font-black tracking-tight tabular-nums text-gray-950" aria-live="polite">{formatPrice(subtotal, tenant.currency)}</dd>
               </div>
-              <div className="flex items-baseline justify-between gap-3 py-1">
-                <dt className="text-gray-700">Livraison</dt>
-                <dd className="text-gray-800">{SUMMARY_COPY.shippingNextStep}</dd>
-              </div>
             </dl>
+            <CartShippingEstimateDetail estimate={shippingEstimate} currency={tenant.currency} onChooseCountry={chooseCountry} />
             {staticMessage && <p className="mt-3 text-sm font-semibold text-amber-900" role="status">{staticMessage}</p>}
             <button
               type="button"
@@ -248,6 +249,7 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
           leaving={leaving}
           onCheckout={startCheckout}
           notice={undoToast('mb-2')}
+          shippingEstimate={shippingEstimate}
         />
       )}
     </div>

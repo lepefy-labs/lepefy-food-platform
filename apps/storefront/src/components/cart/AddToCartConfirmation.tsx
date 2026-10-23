@@ -20,6 +20,7 @@ import { CartStepper } from './CartStepper';
 import { PromoBadge } from '@/components/catalog/PromoBadge';
 import { describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { AVAILABILITY_COPY } from '@/lib/storefrontCopy/availability';
+import { recordAddSource } from '@/lib/cart/recordAddSource';
 
 const primary = { backgroundColor: 'var(--color-primary)' };
 const actionFocusClass = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors duration-150 motion-reduce:transition-none';
@@ -126,7 +127,11 @@ function ConfirmationPanel({ product, continueHref, onClose }: {
     }, 8000);
     void (async () => {
       try {
-        const response = await fetch(`/api/products/${encodeURIComponent(product.id)}/recommendations?limit=4`, {
+        // Complémentaires du produit ajouté, puis petits plus, promotions, meilleures ventes ; jamais ce qui est déjà au panier.
+        const params = new URLSearchParams({ anchor: product.id, limit: '4' });
+        const inCart = useCartStore.getState().items.map(item => item.product.id).filter(id => id !== product.id).slice(0, 30);
+        if (inCart.length) params.set('ids', inCart.join(','));
+        const response = await fetch(`/api/cart/suggestions?${params.toString()}`, {
           signal: controller.signal,
         });
         if (!response.ok) return;
@@ -209,7 +214,7 @@ function ConfirmationPanel({ product, continueHref, onClose }: {
         </div>
         {(loading || visible.length > 0) && (
           <section aria-labelledby="add-recommendations-title" aria-busy={loading} className="border-t border-gray-200 px-4 py-4 sm:px-6">
-            <h3 id="add-recommendations-title" className="mb-3 text-base font-semibold text-gray-900">Vous aimerez peut-être aussi</h3>
+            <h3 id="add-recommendations-title" className="mb-3 text-base font-semibold text-gray-900">Pour compléter votre panier</h3>
             {loading ? (
               <div className="flex gap-3 overflow-hidden sm:grid sm:grid-cols-4" role="status" aria-label="Chargement des suggestions">
                 {[0, 1, 2, 3].map(index => <div key={index} className="h-48 w-36 shrink-0 animate-pulse rounded-xl bg-gray-100 motion-reduce:animate-none sm:w-auto" />)}
@@ -217,7 +222,7 @@ function ConfirmationPanel({ product, continueHref, onClose }: {
             ) : (
               <ul className="flex gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-4">
                 {visible.map(p => <RecommendationItem key={p.id} product={p} onClose={onClose}
-                  onAdded={id => setAddedHere(previous => new Set(previous).add(id))} />)}
+                  onAdded={id => { recordAddSource(id, 'add_confirmation'); setAddedHere(previous => new Set(previous).add(id)); }} />)}
               </ul>
             )}
           </section>

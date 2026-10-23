@@ -28,6 +28,12 @@ interface CatalogShelfProps {
   /** Transmis aux cartes (le panier n'ouvre pas la confirmation d'ajout). */
   confirmOnAdd?: boolean;
   className?: string;
+  /** Phrase sous le titre (« Encore 2,8 kg sans frais de livraison en plus »). */
+  subtitle?: string | null;
+  /** Petite ligne sous une carte (« +500 g · livraison inchangée »), null = rien. */
+  note?: (product: ProductCardProduct) => string | null;
+  /** Après un ajout depuis une carte du bloc. */
+  onAdded?: (product: ProductCardProduct) => void;
 }
 
 /**
@@ -35,13 +41,16 @@ interface CatalogShelfProps {
  * avec son bouton « Tout voir » : même forme que les anciens accès de l'en-tête
  * (bord et texte de la couleur du bloc, total dans la pastille). Rien sans produit.
  */
-export function CatalogShelf({ id, title, icon, tone, href, count = 0, allLabel, products, confirmOnAdd, className = 'mt-5' }: CatalogShelfProps) {
+export function CatalogShelf({ id, title, icon, tone, href, count = 0, allLabel, products, confirmOnAdd, className = 'mt-5', subtitle, note, onAdded }: CatalogShelfProps) {
   if (products.length === 0) return null;
   const colors = TONES[tone];
   return (
     <section aria-labelledby={`${id}-title`} className={className}>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 id={`${id}-title`} className="font-display text-xl font-bold text-gray-900"><span aria-hidden="true">{icon} </span>{title}</h2>
+        <div className="min-w-0">
+          <h2 id={`${id}-title`} className="font-display text-xl font-bold text-gray-900"><span aria-hidden="true">{icon} </span>{title}</h2>
+          {subtitle && <p className="mt-0.5 text-sm font-semibold text-emerald-800">{subtitle}</p>}
+        </div>
         {href && <Link
           href={href}
           prefetch={shopLinkPrefetch(href)}
@@ -55,7 +64,8 @@ export function CatalogShelf({ id, title, icon, tone, href, count = 0, allLabel,
       <ul className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 md:gap-4">
         {products.map((product) => (
           <li key={product.id} className="w-[44vw] max-w-[220px] shrink-0 snap-start sm:w-[30vw]">
-            <ProductCard product={product} compactMobile confirmOnAdd={confirmOnAdd} />
+            <ProductCard product={product} compactMobile confirmOnAdd={confirmOnAdd} onAdded={onAdded} />
+            {note?.(product) && <p className="mt-1 px-1 text-xs font-semibold text-emerald-800">{note(product)}</p>}
           </li>
         ))}
       </ul>

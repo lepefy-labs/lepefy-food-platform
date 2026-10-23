@@ -7,7 +7,9 @@ import { useTenant } from '@/providers/TenantProvider';
 import { readableOn } from '@/lib/utils/color';
 import { formatPrice } from '@/lib/utils/format';
 import { formatProductCount } from '@/lib/cart/formatProductCount';
-import { ACTION_COPY, SUMMARY_COPY } from '@/lib/storefrontCopy/copy';
+import { ACTION_COPY } from '@/lib/storefrontCopy/copy';
+import { CartShippingEstimateCompact } from '@/components/cart/CartShippingEstimate';
+import type { CartShippingEstimate } from '@/lib/cart/useShippingEstimate';
 
 interface CartCheckoutBarProps {
   subtotal: number;
@@ -22,6 +24,8 @@ interface CartCheckoutBarProps {
   onCheckout: () => void;
   /** Message temporaire posé au-dessus du total (annulation d'un retrait). */
   notice?: ReactNode;
+  /** Estimation du forfait (null = « calculée à l'étape suivante »). */
+  shippingEstimate?: CartShippingEstimate | null;
 }
 
 const MOBILE_QUERY = '(max-width: 767px)';
@@ -35,7 +39,7 @@ const MOBILE_QUERY = '(max-width: 767px)';
  * le dernier article ; la BottomNav garde sa propre réserve (`ShopMain`).
  * Masquée tant que le clavier de la recherche du panier est ouvert.
  */
-export function CartCheckoutBar({ subtotal, currency, itemCount, blockedMessage, checking, leaving, onCheckout, notice }: CartCheckoutBarProps) {
+export function CartCheckoutBar({ subtotal, currency, itemCount, blockedMessage, checking, leaving, onCheckout, notice, shippingEstimate = null }: CartCheckoutBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   const searching = useCartUiStore((s) => s.cartSearchActive);
   const onPrimary = readableOn(useTenant().primary_color);
@@ -102,7 +106,7 @@ export function CartCheckoutBar({ subtotal, currency, itemCount, blockedMessage,
               : <>{ACTION_COPY.goToShipping} <IconArrowRight size={18} className="shrink-0 max-[359px]:hidden" aria-hidden="true" /></>}
           </button>
         </div>
-        <p id="cart-checkout-shipping" className="mt-1 text-xs leading-snug text-gray-600">Livraison {SUMMARY_COPY.shippingNextStep}</p>
+        <CartShippingEstimateCompact id="cart-checkout-shipping" estimate={shippingEstimate} currency={currency ?? 'EUR'} />
       </div>
     </div>
   );

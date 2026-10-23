@@ -10,6 +10,10 @@ import { MAX_EXCLUDED_IDS } from '@/lib/catalog/catalogLimits';
 import { useCartStore } from '@/stores/cartStore';
 import { useTenant } from '@/providers/TenantProvider';
 import { readableOn } from '@/lib/utils/color';
+import { CART_SUGGESTION_LIMIT, MAX_CART_SUGGESTION_LIMIT } from '@/lib/cart/cartSuggestionRules';
+import { fitsHeadroom, parcelFitLabel, selectParcelFits } from '@/lib/cart/parcelFit';
+import { recordAddSource } from '@/lib/cart/recordAddSource';
+import { formatHeadroom } from '@/lib/shipping/tariff/shippingEstimate';
 
 /** Taille des pages du catalogue intégré (plus petite que le Catalogue : chargement léger). */
 const CART_CATALOG_PAGE_SIZE = 12;
@@ -91,8 +95,17 @@ function keepInPlace(element: Element) {
  * position ne bouge pas. Retour d'une fiche produit : mêmes pages rechargées
  * (prix et stock frais), même position.
  */
-export function CartCatalogSection({ categories, wide = false }: { categories: CartCatalogCategory[]; wide?: boolean }) {
-  const [suggestions, setSuggestions] = useState<ProductCardProduct[] | null>(null);
+export function CartCatalogSection({ categories, wide = false, headroomG = null, estimateSettled = true }: {
+  categories: CartCatalogCategory[];
+  wide?: boolean;
+  /** Marge de tranche estimée (grammes, arrondie) : active « Ça rentre dans votre colis ». */
+  headroomG?: number | null;
+  /** Première estimation reçue : le bloc de suggestions est choisi une seule fois, ensuite. */
+  estimateSettled?: boolean;
+}) {
+  const [fetched, setFetched] = useState<ProductCardProduct[] | null>(null);
+  const [shelf, setShelf] = useState<{ fits: boolean; products: ProductCardProduct[] } | null>(null);
+  const suggestions = shelf?.products ?? null;
   const [category, setCategory] = useState<string | null>(null);
   const [day] = useState(today);
   const restoreRef = useRef<SavedState | null>(null);
@@ -109,12 +122,22 @@ export function CartCatalogSection({ categories, wide = false }: { categories: C
     const ids = useCartStore.getState().items.map((item) => item.product.id).slice(0, 30);
     const params = new URLSearchParams();
     if (ids.length) params.set('ids', ids.join(','));
+    // Plus que le bloc n'en montre : de quoi garder ceux qui rentrent dans le colis.
+    params.set('limit', String(MAX_CART_SUGGESTION_LIMIT));
     fetch(`/api/cart/suggestions?${params.toString()}`, { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : { products: [] }))
-      .then((data: { products?: ProductCardProduct[] }) => setSuggestions(data.products ?? []))
-      .catch(() => { if (!controller.signal.aborted) setSuggestions([]); });
+      .then((data: { products?: ProductCardProduct[] }) => setFetched(data.products ?? []))
+      .catch(() => { if (!controller.signal.aborted) setFetched([]); });
     return () => controller.abort();
   }, []);
+
+  // Choisi une seule fois (suggestions et estimation connues) : le bloc ne change pas sous le doigt après un ajout.
+  // Au moins deux produits qui rentrent dans le colis : « Ça rentre dans votre colis », sinon « Complétez votre panier ».
+  useEffect(() => {
+    if (shelf || fetched === null || !estimateSettled) return;
+    const fits = selectParcelFits(fetched, headroomG, CART_SUGGESTION_LIMIT);
+    setShelf(fits.length >= 2 ? { fits: true, products: fits } : { fits: false, products: fetched.slice(0, CART_SUGGESTION_LIMIT) });
+  }, [shelf, fetched, estimateSettled, headroomG]);
 
   const excludeKey = !category && suggestions ? suggestions.map((product) => product.id).slice(0, MAX_EXCLUDED_IDS).join(',') : '';
   const buildParams = useCallback(() => {
@@ -193,8 +216,12 @@ export function CartCatalogSection({ categories, wide = false }: { categories: C
           </div>
         </section>
       ) : (
-        <CatalogShelf id="cart-suggestions" title="Complétez votre panier" icon="🧺" tone="novelty"
-          products={suggestions} confirmOnAdd={false} className="" />
+        <CatalogShelf id="cart-suggestions" tone="novelty" confirmOnAdd={false} className="" products={suggestions}
+          title={shelf?.fits ? 'Ça rentre dans votre colis' : 'Complétez votre panier'} icon={shelf?.fits ? '📦' : '🧺'}
+          subtitle={shelf?.fits && headroomG ? `Encore ${formatHeadroom(headroomG)} sans frais de livraison en plus` : null}
+          // Étiquette seulement tant que le produit rentre encore (la marge baisse à chaque ajout).
+          note={shelf?.fits ? (product) => (fitsHeadroom(product, headroomG) ? parcelFitLabel(product) : null) : undefined}
+          onAdded={(product) => recordAddSource(product.id, shelf?.fits ? 'cart_fits' : 'cart_suggestions')} />
       )}
 
       <section aria-labelledby="cart-catalog-title">

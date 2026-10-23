@@ -507,7 +507,7 @@ test('« Continuer mes achats » returns to the same catalogue view and position
 test('card: first tap adds the minimum, + adds the step, − at the minimum removes', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.route('**/api/products/*/recommendations?*', route => route.fulfill({ json: { strategy: 'similar', products: [] } }));
+  await page.route('**/api/cart/suggestions?*', route => route.fulfill({ json: { products: [] } }));
   await page.goto('/');
   const add = page.getByRole('button', { name: /^Ajouter( \d+)? au panier$/ }).first();
   // La carte est repérée par son lien : son bouton « Ajouter » va laisser place au +/−.

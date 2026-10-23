@@ -79,6 +79,8 @@ interface ProductCardProps {
    * apparaît déjà dans la liste et le total, le client reste où il est.
    */
   confirmOnAdd?: boolean;
+  /** Après un ajout réussi depuis le bouton de la carte (mesure de l'emplacement d'une suggestion). */
+  onAdded?: (product: ProductCardProduct) => void;
 }
 
 const STORAGE_TAG_LABELS: Record<'dry' | 'fresh' | 'frozen', string> = {
@@ -105,7 +107,7 @@ function getGridStorageLabel(product: ProductCardProduct): 'Frais' | 'Surgelé' 
   return null;
 }
 
-export function ProductCard({ product, variant = 'grid', compactMobile = false, catalogScope = 'shop', confirmOnAdd = true }: ProductCardProps) {
+export function ProductCard({ product, variant = 'grid', compactMobile = false, catalogScope = 'shop', confirmOnAdd = true, onAdded }: ProductCardProps) {
   const { currency } = useTenant();
   const merchandise = catalogScope === 'gadgets';
   const { addToCart, added, outOfStock, atLimit, availability } = useQuickAdd(product, !merchandise);
@@ -192,6 +194,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
       (e.currentTarget as HTMLElement).focus({ preventScroll: true });
       focusStepperAfterAdd.current = !merchandise;
       if (confirmOnAdd) showConfirmation(product);
+      onAdded?.(product);
     }
   }
 

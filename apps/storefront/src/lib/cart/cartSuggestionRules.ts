@@ -9,6 +9,8 @@ export interface SuggestionCandidate {
 
 /** Nombre de suggestions « Complétez votre panier » (défaut et plafond). */
 export const CART_SUGGESTION_LIMIT = 8;
+/** Plafond d'une requête : le panier en demande plus pour garder ceux qui rentrent dans le colis. */
+export const MAX_CART_SUGGESTION_LIMIT = 16;
 export const MAX_CART_SUGGESTION_SOURCES = 30;
 
 /** Achetable maintenant : le stock couvre au moins la quantité minimale (règle du produit). */
@@ -18,7 +20,7 @@ export function isSuggestionPurchasable(product: SuggestionCandidate): boolean {
 
 /**
  * Suggestions du panier, règle pure : les sources sont passées par priorité
- * (complémentaires déclarés par la boutique, promotions actives, meilleures
+ * (complémentaires déclarés par la boutique, petits plus, promotions actives, meilleures
  * ventes, ordre du catalogue) ; on garde l'ordre, sans doublon, sans les
  * produits déjà au panier ni ceux qu'on ne peut pas acheter, jusqu'à `limit`.
  * Aucune association n'est inventée : une source vide est simplement sautée.

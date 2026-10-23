@@ -39,6 +39,8 @@ import { usePaymentRedirectRecovery } from '@/lib/payments/usePaymentRedirectRec
 import { buildNalaCheckoutAttributions } from '@/lib/ai/nalaAttributionClient';
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
+import { useShippingEstimate } from '@/lib/cart/useShippingEstimate';
+import { shippingEstimateParts } from '@/components/cart/CartShippingEstimate';
 import { formatPrice } from '@/lib/utils/format';
 import { useCartStore } from '@/stores/cartStore';
 import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
@@ -304,6 +306,12 @@ export default function CheckoutFlow({
   const subtotal = totalPrice();
   const isPickup = fulfillmentType === 'pickup';
   const effectiveShippingTotal = isPickup ? 0 : shippingTotal;
+  // Après un devis : marge de tranche exacte pour la zone. Affichée seulement si l'estimation donne
+  // le même prix que le devis (jamais deux chiffres différents à l'écran).
+  const { estimate: deliveryEstimate } = useShippingEstimate({ address: quotedFor, enabled: !isPickup && Boolean(quoteToken && quotedFor) });
+  const deliveryNudge = deliveryEstimate && deliveryEstimate.exact && deliveryEstimate.finalCents === Math.round(shippingTotal * 100)
+    ? shippingEstimateParts(deliveryEstimate, tenant.currency)?.nudge ?? null
+    : null;
   const total = subtotal + effectiveShippingTotal - ambassadorDiscount;
   const shippingKnown = isPickup || Boolean(quoteToken);
   const shippingValue = !shippingKnown
@@ -861,6 +869,9 @@ export default function CheckoutFlow({
                       <IconCheck size={18} className="mt-px shrink-0" aria-hidden="true" />
                       <span><span className="font-bold">{hasCompleteAddress ? ADDRESS_COPY.deliveryAvailable : ADDRESS_COPY.deliveryAvailablePostalCode}</span>{' '}{ADDRESS_COPY.deliveryPriceLabel} {shippingTotal === 0 ? SUMMARY_COPY.shippingFree.toLowerCase() : formatPrice(shippingTotal, tenant.currency)}</span>
                     </p>
+                  )}
+                  {!shippingLoading && quoteToken && deliveryNudge && (
+                    <p className="mt-2 text-sm font-semibold text-emerald-800" aria-live="polite">{deliveryNudge}</p>
                   )}
                 </div>
               </div>
