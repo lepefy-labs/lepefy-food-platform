@@ -15,7 +15,7 @@ export interface NalaCartPlanIngredient {
 }
 
 export interface NalaCartPlanExtraction {
-  type: 'recipe';
+  type: 'recipe' | 'shopping_list';
   title: string;
   ingredients: NalaCartPlanIngredient[];
 }
@@ -67,7 +67,7 @@ export interface NalaCartPlan {
   id: string;
   interactionId: string;
   title: string;
-  type: 'recipe';
+  type: 'recipe' | 'shopping_list';
   items: NalaCartPlanItem[];
   currency: string;
   totals: {
@@ -148,7 +148,7 @@ export function normalizeNalaCartPlanExtraction(
   if (!enabled || !value || typeof value !== 'object') return null;
   const candidate = value as Record<string, unknown>;
   const title = cleanText(candidate.title, 80);
-  if (candidate.type !== 'recipe' || !title || !Array.isArray(candidate.ingredients)) return null;
+  if ((candidate.type !== 'recipe' && candidate.type !== 'shopping_list') || !title || !Array.isArray(candidate.ingredients)) return null;
 
   const seen = new Set<string>();
   const ingredients = candidate.ingredients.flatMap((raw) => {
@@ -166,7 +166,7 @@ export function normalizeNalaCartPlanExtraction(
     }];
   }).slice(0, NALA_CART_PLAN_MAX_ITEMS);
 
-  return ingredients.length > 0 ? { type: 'recipe', title, ingredients } : null;
+  return ingredients.length > 0 ? { type: candidate.type, title, ingredients } : null;
 }
 
 export function getNalaCartPlanCopy(locale: unknown): NalaCartPlanLabels {
@@ -342,6 +342,7 @@ export function finalizeNalaCartPlan(params: {
   id: string;
   interactionId: string;
   title: string;
+  type?: 'recipe' | 'shopping_list';
   items: NalaCartPlanItem[];
   currency: string;
   locale: unknown;
@@ -352,7 +353,7 @@ export function finalizeNalaCartPlan(params: {
     id: params.id,
     interactionId: params.interactionId,
     title: params.title,
-    type: 'recipe',
+    type: params.type ?? 'recipe',
     items,
     currency: params.currency.toUpperCase(),
     totals: {

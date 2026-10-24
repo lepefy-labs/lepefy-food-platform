@@ -123,6 +123,7 @@ export async function resolveCartPlanIngredients(params: {
       id: crypto.randomUUID(),
       interactionId: params.interactionId,
       title: params.extraction.title,
+      type: params.extraction.type,
       items,
       currency: params.currency,
       locale: params.locale,

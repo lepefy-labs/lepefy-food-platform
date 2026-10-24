@@ -40,6 +40,7 @@ export type KnowledgeBaseCategory = 'recipe' | 'expression' | 'greeting' | 'cult
 /** Ligne autoritative de tenant_knowledge_base — toujours validée par un humain avant utilisation. */
 export interface KnowledgeBaseEntry {
   id: string;
+  title?: string | null;
   category: KnowledgeBaseCategory;
   content: string;
   source: string | null;
@@ -47,6 +48,31 @@ export interface KnowledgeBaseEntry {
   reviewed_at: string | null;
   active: boolean;
   created_at: string;
+  library_key?: string | null;
+  library_locale?: string | null;
+  library_version?: number | null;
+  revision?: number;
+  updated_at?: string;
+}
+
+export interface KnowledgeLibraryEntry {
+  id: string;
+  stable_key: string;
+  locale: string;
+  version: number;
+  title: string;
+  category: KnowledgeBaseCategory;
+  content: string;
+  scope: 'global' | 'cultural';
+  cultural_area: string | null;
+  provenance: string;
+  verification_status: 'verified';
+  reviewed_at: string | null;
+  review_due_at: string | null;
+  requires_tenant_confirmation: boolean;
+  adopted?: boolean;
+  adoptedVersion?: number | null;
+  updateAvailable?: boolean;
 }
 
 export type KnowledgeSuggestionSignal = 'knowledge_missing' | 'retrieval_weak' | 'retrieval_empty';

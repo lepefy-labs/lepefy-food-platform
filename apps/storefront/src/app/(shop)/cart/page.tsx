@@ -3,6 +3,7 @@ import { toPublicTenant } from '@/lib/tenant/publicTenant';
 import { createClient } from '@/lib/supabase/server';
 import { getShopCategories } from '@/lib/catalog/catalogCache';
 import { getActivePromotions } from '@/lib/catalog/promotions';
+import { getShopShellData } from '@/lib/tenant/getShopShellData';
 import CartPurchaseClient from './CartPurchaseClient';
 
 export const dynamic = 'force-dynamic';
@@ -16,5 +17,6 @@ export default async function CartPage() {
     .catch(() => []);
   // Filtres « Tous les produits » : catégories de la boutique du tenant (nom et slug seulement).
   const catalogCategories = categories.map(({ id, slug, name }) => ({ id, slug, name }));
-  return <CartPurchaseClient tenant={toPublicTenant(tenant)} promoCount={promotions.length} categories={catalogCategories} />;
+  const { nalaEnabled } = await getShopShellData(tenant.id);
+  return <CartPurchaseClient tenant={toPublicTenant(tenant)} promoCount={promotions.length} categories={catalogCategories} nalaEnabled={nalaEnabled} />;
 }

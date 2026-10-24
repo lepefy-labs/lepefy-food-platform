@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { IconSparkles, IconX, IconSend, IconBrandWhatsapp, IconChevronRight } from '@tabler/icons-react';
 import { rememberNalaProductTouch } from '@/lib/ai/nalaAttributionClient';
 import { NalaProductActionCard } from '@/components/chat/NalaProductActionCard';
@@ -19,6 +19,8 @@ interface ChatWidgetProps {
   tenantLocale: string;
   whatsappNumber: string | null;
   raiseForProductPurchaseBar?: boolean;
+  inlineOnly?: boolean;
+  proactiveOffer?: boolean;
 }
 
 interface ChatTurn {
@@ -30,6 +32,7 @@ interface ChatTurn {
 }
 
 const CONVERSATION_STORAGE_KEY = 'lepefy:nala:conversation:v1';
+const SHOPPING_OFFER_STORAGE_KEY = 'lepefy:nala:shopping-offer:v1';
 const MOBILE_COMPACT_SCROLL_Y = 64;
 const MOBILE_ONBOARDING_TIMEOUT_MS = 5000;
 const NALA_PRIMARY = '#6D5AF6';
@@ -62,7 +65,7 @@ function currentDeviceType(): 'mobile' | 'tablet' | 'desktop' {
   return 'desktop';
 }
 
-export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, whatsappNumber, raiseForProductPurchaseBar = false }: ChatWidgetProps) {
+export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, whatsappNumber, raiseForProductPurchaseBar = false, inlineOnly = false, proactiveOffer = false }: ChatWidgetProps) {
   const storeLocale = useLocaleStore((state) => state.locale);
   const storefrontLocale = resolveLocale(storeLocale, tenantLocales) || tenantLocale || 'fr';
   const [open, setOpen] = useState(false);
@@ -73,10 +76,20 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [compactLauncher, setCompactLauncher] = useState(false);
+  const [offerVisible, setOfferVisible] = useState(false);
+  const [guidedStart, setGuidedStart] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const clientSessionIdRef = useRef<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
+  const startShoppingGuide = useCallback(() => {
+    setOfferVisible(false);
+    setCompactLauncher(true);
+    setOpen(true);
+    setGuidedStart(true);
+    setTurns((previous) => previous.length ? previous : [{ role: 'assistant', text: 'Je peux vous aider à composer votre panier. Quel plat souhaitez-vous préparer, ou quels produits avez-vous sur votre liste ?' }]);
+    try { sessionStorage.setItem(SHOPPING_OFFER_STORAGE_KEY, 'accepted'); } catch { /* memory-only */ }
+  }, []);
   const mobileBottomClass = raiseForProductPurchaseBar
     // Au-dessus de la barre d'achat de la fiche (même hauteur, produit au panier ou non).
     ? 'bottom-[calc(9rem+env(safe-area-inset-bottom))]'
@@ -88,6 +101,22 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
   useEffect(() => {
     try { conversationIdRef.current = sessionStorage.getItem(CONVERSATION_STORAGE_KEY); } catch { /* memory-only */ }
   }, []);
+
+  useEffect(() => {
+    if (!enabled || !proactiveOffer || open || turns.length > 0) return;
+    try { if (sessionStorage.getItem(SHOPPING_OFFER_STORAGE_KEY)) return; } catch { /* memory-only */ }
+    const timer = window.setTimeout(() => {
+      setOfferVisible(true);
+      try { sessionStorage.setItem(SHOPPING_OFFER_STORAGE_KEY, 'shown'); } catch { /* memory-only */ }
+    }, 8000);
+    return () => window.clearTimeout(timer);
+  }, [enabled, proactiveOffer, open, turns.length]);
+
+  useEffect(() => {
+    function openShoppingGuide() { startShoppingGuide(); }
+    window.addEventListener('lepefy:nala:compose-cart', openShoppingGuide);
+    return () => window.removeEventListener('lepefy:nala:compose-cart', openShoppingGuide);
+  }, [startShoppingGuide]);
 
   useEffect(() => {
     const messagesContainer = messagesEndRef.current?.parentElement;
@@ -137,6 +166,8 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
 
     clientSessionIdRef.current ??= createClientSessionId();
     setTurns((prev) => [...prev, { role: 'user', text: message }]);
+    const requestMessage = guidedStart ? `Aide-moi à composer mon panier avec : ${message}` : message;
+    setGuidedStart(false);
     setInput('');
     setLoading(true);
     setFailed(false);
@@ -146,7 +177,7 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message,
+          message: requestMessage,
           conversationId: conversationIdRef.current,
           clientSessionId: clientSessionIdRef.current,
           sourcePath: window.location.pathname,
@@ -205,13 +236,19 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
 
   return (
     <>
-      {!open && (
+      {offerVisible && !open && <aside className="fixed bottom-[calc(13rem+env(safe-area-inset-bottom))] right-3 z-[60] max-w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-[#CFC8FF] bg-white p-4 shadow-xl md:bottom-24 md:right-6" aria-label="Aide au panier">
+        <p className="text-sm font-semibold text-gray-900">Besoin d’aide pour composer votre panier ?</p>
+        <p className="mt-1 text-sm text-gray-600">Dites-moi ce que vous aimeriez cuisiner ou acheter.</p>
+        <div className="mt-3 flex gap-2"><button type="button" onClick={startShoppingGuide} className="min-h-11 rounded-xl bg-[#6D5AF6] px-3 text-sm font-semibold text-white">Oui, aidez-moi</button><button type="button" onClick={() => setOfferVisible(false)} className="min-h-11 rounded-xl px-3 text-sm text-gray-600">Plus tard</button></div>
+      </aside>}
+      {!open && !inlineOnly && (
         <button
           ref={launcherRef}
           type="button"
           onClick={() => {
             setCompactLauncher(true);
             setOpen(true);
+            setOfferVisible(false);
           }}
           aria-label="Ouvrir Nala, assistant shopping"
           className={`fixed ${mobileBottomClass} right-3 z-[60] flex h-12 items-center justify-center gap-2 overflow-hidden rounded-full bg-[#6D5AF6] px-4 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(109,90,246,0.35)] transition-[width,padding,background-color] duration-200 hover:bg-[#4B3CC4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D5AF6] focus-visible:ring-offset-2 active:bg-[#4B3CC4] motion-reduce:transition-none md:bottom-6 md:right-6 ${compactLauncher ? 'w-12 px-0' : 'w-[164px]'}`}
@@ -265,6 +302,7 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
 
             {turns.length === 0 && !loading && (
               <div className="mt-2 grid gap-2" aria-label="Suggestions de questions">
+                <button type="button" onClick={startShoppingGuide} className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-[#CFC8FF] bg-white px-3 py-2 text-left text-sm font-medium text-[#5947E8]">Aidez-moi à composer mon panier <IconChevronRight size={18} aria-hidden="true" /></button>
                 {SUGGESTED_PROMPTS.map((prompt) => (
                   <button
                     key={prompt}

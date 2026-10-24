@@ -33,7 +33,7 @@ const UNDO_TIMEOUT_MS = 5000;
 // Si la navigation vers /checkout n'aboutit pas (réseau), le bouton redevient actif.
 const LEAVING_RESET_MS = 8000;
 
-export default function CartPurchaseClient({ tenant, promoCount = 0, categories = [] }: { tenant: PublicTenant; promoCount?: number; categories?: CartCatalogCategory[] }) {
+export default function CartPurchaseClient({ tenant, promoCount = 0, categories = [], nalaEnabled = false }: { tenant: PublicTenant; promoCount?: number; categories?: CartCatalogCategory[]; nalaEnabled?: boolean }) {
   const router = useRouter();
   const items = useCartStore(selectCartItems);
   const itemCount = useCartStore(selectCartItemCount);
@@ -130,6 +130,11 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
           <CartProductSearch currency={tenant.currency} onDecrement={decrement} />
         </div>
       </CartPageHeader>
+
+      {nalaEnabled && <section aria-label="Assistance pour composer le panier" className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3">
+        <div><p className="text-sm font-semibold text-gray-900">Envie d’un coup de main pour compléter votre panier ?</p><p className="text-sm text-gray-700">Nala peut préparer une sélection à partir d’un plat ou de votre liste.</p></div>
+        <button type="button" onClick={() => window.dispatchEvent(new Event('lepefy:nala:compose-cart'))} className="min-h-11 rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700">Composer avec Nala</button>
+      </section>}
 
       {!hydrated ? <CartLoading /> : isEmpty ? (
         <>

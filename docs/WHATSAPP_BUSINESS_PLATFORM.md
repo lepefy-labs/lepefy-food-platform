@@ -146,6 +146,8 @@ Lingua: rilevata dal messaggio (fr/it/en), poi lingua della conversazione, poi `
 
 ## 6. Nala
 
+La Knowledge Library (migration 168) è copiata nella base del tenant solo dopo conferma in `/admin/ai-lab`; il canale WhatsApp riusa `buildSystemPrompt` e `match_knowledge_base`, quindi vede soltanto conoscenze tenant attive e non eliminate. Il prompt tratta i frammenti recuperati come dati non attendibili per le istruzioni e dà priorità a catalogo e dati operativi correnti. La proposta proattiva di composizione carrello è UI del widget storefront, non un messaggio WhatsApp automatico. Il contratto Cart Builder riconosce anche liste di prodotti, ma questo canale non invia card carrello.
+
 WhatsApp è un **canale** di Nala, non un secondo assistente. `runNalaChannelTurn` riusa: `buildSystemPrompt`, contratto di decisione `nalaResponseSchema`, routing AI Core (`consumer = nala`, `capability = structured_chat`), Response Memory, small talk, retrieval `match_products` / `match_knowledge_base`, contesto privato `getNalaExtraContext`, entitlement `canUseNala`, rate limit (`endpoint = nala_whatsapp`). Differenze: storico AI Core separato (`consumer` di conversazione `nala_whatsapp`), istruzioni di formato canale, nessuna card prodotto/carrello.
 
 Contesto prodotti: `buildMatchedProductContexts` (`lib/ai/nalaPromptProducts.ts`, condiviso con `/api/chat`) → righe «3,00 € le sachet de 150 g — disponible — Achetez 2 sachets minimum». Mai `weight_grams` (peso logistico) né lo stock in cifre; il prompt vieta di inventare pesi, volumi o quantità. I gruppi da mescolare sono aggiunti se leggibili (lettura non bloccante).

@@ -1,6 +1,4 @@
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
@@ -13,6 +11,10 @@ import {
   knowledgeSuggestionSource,
 } from '@/lib/admin/knowledgeSuggestions';
 import type { KnowledgeBaseCategory } from '@lepefy/types';
+import { knowledgeFingerprint, knowledgeIssue } from '@/lib/admin/knowledgeSafety';
+import { loadKnowledgeBaseSuggestions } from '@/lib/admin/knowledgeSuggestions';
+import { KNOWLEDGE_ENTRY_SELECT, getKnowledgeAdminEmail } from '@/lib/admin/knowledgeApi';
+import { missingKnowledgeSchema } from '@/lib/admin/knowledgeSchema';
 
 // Route admin — dati mutabili, mai cacheable (bug noto Next.js 14.2.x sulla
 // Data Cache non disattivata da force-dynamic da solo, confermato in
@@ -23,36 +25,9 @@ export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
 const VALID_CATEGORIES: readonly string[] = ['recipe', 'expression', 'greeting', 'cultural_context', 'faq'];
-const MAX_CONTENT_LENGTH = 2000;
 const SUGGESTION_KEY_PATTERN = /^[a-f0-9]{24}$/;
-const ENTRY_SELECT = 'id, category, content, source, reviewed_by, reviewed_at, active, created_at';
 
-/**
- * Récupère l'email de l'admin courant. Requête séparée de `requireAdmin()`
- * (qui ne l'expose pas) — même pattern cookie que `requireAdmin.ts`, juste
- * pour lire `user.email` une fois l'accès déjà validé.
- */
-async function getAdminEmail(): Promise<string | null> {
-  const cookieStore = cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll(); },
-        setAll() {},
-        get(name: string) { return cookieStore.get(name)?.value; },
-        set() {},
-        remove() {},
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
-    },
-  );
-  const { data: { user } } = await supabase.auth.getUser();
-  return user?.email ?? null;
-}
-
-export async function GET() {
+export async function GET(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
@@ -61,17 +36,35 @@ export async function GET() {
 
   const supabase = createServiceClient();
 
-  const { data, error } = await supabase
+  const page = Math.max(1, Math.min(10000, Number(req.nextUrl.searchParams.get('page')) || 1));
+  const pageSize = 20;
+  const search = (req.nextUrl.searchParams.get('q') ?? '').trim().slice(0, 100).replace(/[%_,]/g, ' ');
+  const category = req.nextUrl.searchParams.get('category') ?? '';
+  const status = req.nextUrl.searchParams.get('status') ?? '';
+  let query = supabase
     .from('tenant_knowledge_base')
-    .select(ENTRY_SELECT)
+    .select(KNOWLEDGE_ENTRY_SELECT, { count: 'exact' })
     .eq('tenant_id', tenant.id)
-    .order('created_at', { ascending: false });
+    .is('deleted_at', null).or('source.is.null,source.not.like.nala_dismissed:%');
+  if (search) query = query.or(`content.ilike.%${search}%,title.ilike.%${search}%`);
+  if (VALID_CATEGORIES.includes(category)) query = query.eq('category', category);
+  if (status === 'active' || status === 'paused') query = query.eq('active', status === 'active');
+  const { data, count, error } = await query.order('created_at', { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
 
   if (error) {
+    if (missingKnowledgeSchema(error)) {
+      const { data: legacy, error: legacyError } = await supabase.from('tenant_knowledge_base')
+        .select('id, category, content, source, reviewed_by, reviewed_at, active, created_at')
+        .eq('tenant_id', tenant.id).order('created_at', { ascending: false });
+      if (!legacyError) {
+        const entries = (legacy ?? []).filter((entry) => !entry.source?.startsWith(KNOWLEDGE_DISMISSED_SOURCE_PREFIX));
+        return NextResponse.json({ entries, total: entries.length, page: 1, pageSize: entries.length });
+      }
+    }
     return NextResponse.json({ error: 'Chargement impossible.' }, { status: 500 });
   }
 
-  return NextResponse.json({ entries: data ?? [] });
+  return NextResponse.json({ entries: data ?? [], total: count ?? 0, page, pageSize });
 }
 
 export async function POST(req: NextRequest) {
@@ -93,7 +86,7 @@ export async function POST(req: NextRequest) {
     if (!existing) {
       const { error } = await db.from('tenant_knowledge_base').insert({
         tenant_id: tenant.id, category: 'faq', content: 'Suggestion ignorée', embedding: null, source,
-        active: false, reviewed_by: await getAdminEmail(), reviewed_at: new Date().toISOString(),
+        active: false, reviewed_by: await getKnowledgeAdminEmail(), reviewed_at: new Date().toISOString(),
       });
       if (error) return NextResponse.json({ error: 'Impossible d’ignorer cette suggestion.' }, { status: 500 });
     }
@@ -102,14 +95,15 @@ export async function POST(req: NextRequest) {
 
   const category = typeof body?.category === 'string' ? body.category : '';
   const content = typeof body?.content === 'string' ? body.content.trim() : '';
+  const title = typeof body?.title === 'string' ? body.title.trim() : '';
   const rawSuggestionKey = typeof body?.suggestionKey === 'string' ? body.suggestionKey.trim() : '';
 
   if (!VALID_CATEGORIES.includes(category)) {
     return NextResponse.json({ error: 'Catégorie invalide.' }, { status: 400 });
   }
-  if (!content || content.length > MAX_CONTENT_LENGTH) {
-    return NextResponse.json({ error: `Le contenu est obligatoire (${MAX_CONTENT_LENGTH} caractères au plus).` }, { status: 400 });
-  }
+  const issue = knowledgeIssue(content);
+  if (issue) return NextResponse.json({ error: issue }, { status: 400 });
+  if (title.length > 160) return NextResponse.json({ error: 'Titre trop long.' }, { status: 400 });
   if (rawSuggestionKey && !SUGGESTION_KEY_PATTERN.test(rawSuggestionKey)) {
     return NextResponse.json({ error: 'Suggestion inconnue.' }, { status: 400 });
   }
@@ -119,16 +113,33 @@ export async function POST(req: NextRequest) {
     : 'manual';
   const source = rawSuggestionKey
     ? knowledgeSuggestionSource(rawSuggestionKey)
-    : manualSource.startsWith(KNOWLEDGE_SUGGESTION_SOURCE_PREFIX) || manualSource.startsWith(KNOWLEDGE_DISMISSED_SOURCE_PREFIX) ? 'manual' : manualSource.slice(0, 120);
+    : manualSource.startsWith(KNOWLEDGE_SUGGESTION_SOURCE_PREFIX) || manualSource.startsWith(KNOWLEDGE_DISMISSED_SOURCE_PREFIX) || manualSource.startsWith('library:') ? 'manual' : manualSource.slice(0, 120);
 
-  const adminEmail = await getAdminEmail();
+  const adminEmail = await getKnowledgeAdminEmail();
   const supabase = createServiceClient();
+  const { error: schemaError } = await supabase.from('knowledge_library').select('id', { head: true }).limit(1);
+  if (schemaError && !missingKnowledgeSchema(schemaError)) return NextResponse.json({ error: 'Base de connaissance indisponible.' }, { status: 503 });
+  const legacySchema = Boolean(schemaError);
 
   try {
     if (rawSuggestionKey) {
+      const { data: sources } = await supabase.from('tenant_knowledge_base').select('source').eq('tenant_id', tenant.id);
+      const candidates = await loadKnowledgeBaseSuggestions({ supabase, tenantId: tenant.id, existingSources: (sources ?? []).map((row) => row.source) });
+      if (!candidates.some((item) => item.key === rawSuggestionKey)) {
+        return NextResponse.json({ error: 'Cette suggestion n’est plus disponible.' }, { status: 409 });
+      }
+    }
+    let existingQuery = supabase.from('tenant_knowledge_base').select('content').eq('tenant_id', tenant.id);
+    if (!legacySchema) existingQuery = existingQuery.is('deleted_at', null);
+    const { data: currentTexts, error: textsError } = await existingQuery;
+    if (textsError) throw new Error(textsError.message);
+    if ((currentTexts ?? []).some((row) => knowledgeFingerprint(row.content) === knowledgeFingerprint(content))) {
+      return NextResponse.json({ error: 'Cette connaissance existe déjà.' }, { status: 409 });
+    }
+    if (rawSuggestionKey) {
       const { data: existing, error: existingError } = await supabase
         .from('tenant_knowledge_base')
-        .select(ENTRY_SELECT)
+        .select(legacySchema ? 'id, category, content, source, reviewed_by, reviewed_at, active, created_at' : KNOWLEDGE_ENTRY_SELECT)
         .eq('tenant_id', tenant.id)
         .eq('source', source)
         .maybeSingle();
@@ -145,6 +156,7 @@ export async function POST(req: NextRequest) {
       .from('tenant_knowledge_base')
       .insert({
         tenant_id: tenant.id,
+        ...(!legacySchema ? { title: title || null, modified_by: adminEmail } : {}),
         category: category as KnowledgeBaseCategory,
         content,
         embedding: vector,
@@ -152,7 +164,7 @@ export async function POST(req: NextRequest) {
         reviewed_by: adminEmail,
         reviewed_at: new Date().toISOString(),
       })
-      .select(ENTRY_SELECT)
+      .select(legacySchema ? 'id, category, content, source, reviewed_by, reviewed_at, active, created_at' : KNOWLEDGE_ENTRY_SELECT)
       .single();
 
     if (error) throw new Error(error.message);
