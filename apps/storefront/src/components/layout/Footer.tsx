@@ -12,6 +12,7 @@ import {
 import { useTenant } from '@/providers/TenantProvider';
 import { SOCIAL_PLATFORM_REGISTRY, type TenantSocialLink } from '@lepefy/types';
 import { TenantLogo } from '@/components/branding/TenantLogo';
+import { isCheckoutPath } from '@/lib/storefront/shopChrome';
 
 const SOCIAL_ICONS = {
   IconBrandInstagram,
@@ -31,6 +32,10 @@ export function Footer({ socialLinks = [], storyEnabled = false }: FooterProps) 
   const tenant = useTenant();
   const pathname = usePathname();
   const isHome = pathname === '/';
+
+  // Tunnel de paiement : aucun lien de sortie. CGV et confidentialité sont
+  // déjà liées dans la mention au-dessus du bouton de paiement.
+  if (isCheckoutPath(pathname)) return null;
 
   if (pathname === '/avis/donner') {
     return (

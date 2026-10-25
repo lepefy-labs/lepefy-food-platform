@@ -49,10 +49,20 @@ export const ERROR_COPY = {
   sessionNotFound: "Ce paiement n'est plus disponible. Retournez au panier pour recommencer.",
   sessionForbidden: "Ce lien de paiement ne correspond pas à votre compte. Connectez-vous avec le bon e-mail.",
   invalidPaymentMethod: "Ce moyen de paiement n'est plus proposé. Choisissez-en un autre.",
-  termsRequired: 'Cochez la case pour accepter les Conditions générales de vente.',
+  termsRequired: 'Rechargez la page, puis validez de nouveau votre commande pour accepter les Conditions générales de vente.',
   quantityRulesUnavailable: "Nous n'arrivons pas à vérifier votre panier. Vérifiez votre connexion, puis touchez « Réessayer ».",
   shippingQuoteFailed: "Nous n'arrivons pas à calculer la livraison. Vérifiez votre connexion, puis réessayez.",
   shippingUnavailableNow: "La livraison n'est pas disponible pour le moment. Réessayez plus tard.",
+} as const;
+
+/** Mention au-dessus du bouton de paiement : le clic vaut acceptation des CGV
+ *  (pas de case à cocher). La politique de confidentialité s'informe, elle ne
+ *  s'accepte pas (RGPD art. 13). */
+export const TERMS_NOTICE_COPY = {
+  beforeTerms: 'En validant votre commande, vous acceptez nos ',
+  terms: 'Conditions Générales de Vente',
+  beforePrivacy: '. Vos données sont traitées selon notre ',
+  privacy: 'Politique de confidentialité',
 } as const;
 
 export const FORM_COPY = {

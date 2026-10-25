@@ -46,7 +46,7 @@ import { formatPrice } from '@/lib/utils/format';
 import { useCartStore } from '@/stores/cartStore';
 import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
 import type { PublicTenant, TenantPaymentMethod } from '@lepefy/types';
-import { ACTION_COPY, ERROR_COPY, FORM_COPY, SUMMARY_COPY, productsPriceLabel, totalWithPendingShipping } from '@/lib/storefrontCopy/copy';
+import { ACTION_COPY, ERROR_COPY, FORM_COPY, SUMMARY_COPY, TERMS_NOTICE_COPY, productsPriceLabel, totalWithPendingShipping } from '@/lib/storefrontCopy/copy';
 import { ADDRESS_COPY } from '@/lib/storefrontCopy/addressCopy';
 import {
   ADDRESS_FIELD_LABELS,
@@ -202,7 +202,6 @@ export default function CheckoutFlow({
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('stripe');
   const [selectedExternalMethodId, setSelectedExternalMethodId] = useState<string | null>(null);
-  const [termsAccepted, setTermsAccepted] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -559,7 +558,10 @@ export default function CheckoutFlow({
       fullName: `${data.firstName} ${data.lastName}`,
       shippingDetails: isPickup ? null : shippingDetails,
       quoteToken: isPickup ? null : quoteToken,
-      termsAccepted: consentState.showTermsCheckbox ? termsAccepted : undefined,
+      // Pas de case CGV : la mention est affichée au-dessus du bouton de
+      // paiement, le clic sur ce bouton vaut acceptation (version enregistrée
+      // côté serveur avec la commande).
+      termsAccepted: consentState.showTermsCheckbox ? true : undefined,
       marketingOptIn: consentState.showMarketingCheckbox ? marketingOptIn : undefined,
     };
   }
@@ -614,10 +616,6 @@ export default function CheckoutFlow({
   async function confirmPaymentChoice() {
     if (!purchaseGate.canProceed) {
       showCartIssues();
-      return;
-    }
-    if (consentState.showTermsCheckbox && !termsAccepted) {
-      setSubmitError(ERROR_COPY.termsRequired);
       return;
     }
     setIsSubmitting(true);
@@ -913,7 +911,7 @@ export default function CheckoutFlow({
         <aside className="mt-5 space-y-4 lg:sticky lg:top-24 lg:mt-0">
           {fullSummary}
 
-          <button type="button" data-checkout-sticky="cta" onClick={handleSubmit(continueFromInformation, focusFirstContactError)} disabled={shippingLoading || !purchaseGate.canProceed} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--color-primary)' }}>
+          <button type="button" data-checkout-sticky="cta" onClick={handleSubmit(continueFromInformation, focusFirstContactError)} disabled={shippingLoading || !purchaseGate.canProceed} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white" style={{ backgroundColor: shippingLoading || !purchaseGate.canProceed ? mutedCtaColor('var(--color-primary)') : 'var(--color-primary)' }}>
             {shippingLoading ? 'Calcul du prix de livraison…' : ACTION_COPY.choosePayment}
           </button>
         </aside>
@@ -943,17 +941,18 @@ export default function CheckoutFlow({
             </div>
           </section>
 
-          {(consentState.showTermsCheckbox || consentState.showMarketingCheckbox) && (
+          {consentState.showMarketingCheckbox && (
             <section className="space-y-3 border-t border-gray-100 pt-4">
-              {consentState.showTermsCheckbox && <label className="flex min-h-11 items-start gap-3 text-sm text-gray-800"><input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} className="sf-checkbox mt-0.5" /><span>J’accepte les <Link href="/conditions-generales-vente" target="_blank" className="underline">Conditions Générales de Vente</Link> et la <Link href="/politique-confidentialite" target="_blank" className="underline">Politique de confidentialité</Link>.</span></label>}
-              {consentState.showMarketingCheckbox && <label className="flex min-h-11 items-start gap-3 text-sm text-gray-800"><input type="checkbox" checked={marketingOptIn} onChange={(event) => setMarketingOptIn(event.target.checked)} className="sf-checkbox mt-0.5" /><span>{marketingConsentLabel(tenant.name)}</span></label>}
+              
+              <label className="flex min-h-11 items-start gap-3 text-sm text-gray-800"><input type="checkbox" checked={marketingOptIn} onChange={(event) => setMarketingOptIn(event.target.checked)} className="sf-checkbox mt-0.5" /><span>{marketingConsentLabel(tenant.name)}</span></label>
             </section>
           )}
 
           {fullSummary}
 
           {submitError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" role="alert">{submitError}</p>}
-          <button type="button" data-checkout-sticky="cta" onClick={confirmPaymentChoice} disabled={isSubmitting || !purchaseGate.canProceed || (consentState.showTermsCheckbox && !termsAccepted)} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: paymentCtaColor }}>
+          <p id="checkout-terms-notice" className="text-xs leading-relaxed text-gray-600">{TERMS_NOTICE_COPY.beforeTerms}<Link href="/conditions-generales-vente" target="_blank" className="underline">{TERMS_NOTICE_COPY.terms}</Link>{TERMS_NOTICE_COPY.beforePrivacy}<Link href="/politique-confidentialite" target="_blank" className="underline">{TERMS_NOTICE_COPY.privacy}</Link>.</p>
+          <button type="button" data-checkout-sticky="cta" onClick={confirmPaymentChoice} disabled={isSubmitting || !purchaseGate.canProceed} aria-describedby="checkout-terms-notice" className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white" style={{ backgroundColor: isSubmitting || !purchaseGate.canProceed ? mutedCtaColor(paymentCtaColor) : paymentCtaColor }}>
             {isSubmitting ? ACTION_COPY.processing : `${paymentCtaLabel} · ${formatPrice(total, tenant.currency)}`}
           </button>
         </div>
@@ -987,4 +986,10 @@ export default function CheckoutFlow({
       )}
     </div>
   );
+}
+
+/** CTA inactif en couleur pleine : jamais d'opacité, sinon le contenu de la
+ *  page se lit à travers la barre fixe mobile. */
+function mutedCtaColor(color: string): string {
+  return `color-mix(in srgb, ${color} 45%, white)`;
 }
