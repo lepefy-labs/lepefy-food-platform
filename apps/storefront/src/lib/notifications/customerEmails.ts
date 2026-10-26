@@ -926,3 +926,32 @@ ${cta(input.consoleUrl, 'Ouvrir Plateforme → Abonnements')}`,
     }),
   };
 }
+
+/** Lepefy-only alert: a Stripe SaaS payment event that renewed nothing. */
+export function subscriptionStripeIssueEmail(input: {
+  tenantSlug: string;
+  reason: string;
+  eventType: string;
+  sessionId: string;
+  amount: string;
+  livemode: boolean;
+  consoleUrl: string | null;
+}): RenderedEmail {
+  return {
+    subject: `[Abonnement] Paiement Stripe à vérifier · ${input.tenantSlug || 'tenant inconnu'}`,
+    html: page(PLATFORM_EMAIL_CONTEXT, {
+      title: 'Paiement Stripe d’abonnement non pris en compte',
+      footerLink: { url: null, label: '' },
+      body: `<p>${esc(input.reason)}</p>
+${infoBox([
+    ['Tenant', input.tenantSlug || '—'],
+    ['Évènement', input.eventType],
+    ['Session Checkout', input.sessionId, { mono: true }],
+    ['Montant', input.amount],
+    ['Mode', input.livemode ? 'live' : 'test'],
+  ])}
+<p>Vérifiez le paiement dans Stripe. S’il est bien reçu, enregistrez-le depuis la console : l’échéance n’a pas été modifiée.</p>
+${cta(input.consoleUrl, 'Ouvrir Plateforme → Abonnements')}`,
+    }),
+  };
+}

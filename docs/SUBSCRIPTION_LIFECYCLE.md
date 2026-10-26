@@ -47,7 +47,8 @@ Un modulo sospeso singolarmente applica le stesse regole solo alle sue superfici
 
 ## 4. Pagamenti
 
-- **Carta**: Stripe Payment Link del tenant con metadata `type = saas_subscription`, `tenant_slug`. Il webhook `checkout.session.completed` chiama `recordSaasSubscriptionPayment` → RPC (idempotente sulla sessione: un retry non prolunga due volte). Senza 144 o senza riga `tenant_subscriptions`: comportamento precedente (+30 giorni sulle colonne legacy).
+- **Carta**: Stripe Payment Link del tenant con metadata `type = saas_subscription`, `tenant_slug`. Eventi `checkout.session.completed`, `checkout.session.async_payment_succeeded` e `checkout.session.async_payment_failed`; regole pure in `lib/billing/saasStripeEvent.ts` (`precheckSaasEvent`, `checkSaasPayment`). Rinnova solo se: `payment_status = paid` (un `completed` ancora `unpaid` di un metodo asincrono attende `async_payment_succeeded`); evento live (test mode solo per un tenant `is_test`, mai dal conto Stripe e2e); il tenant ha una riga `tenant_subscriptions`; valuta = valuta del piano e `amount_total ≥` prezzo mensile del piano. Altrimenti nessun rinnovo, risposta 200 (Stripe non ritenta) e avviso a Lepefy (`SUPPORT_NOTIFY_EMAILS`, «Paiement Stripe à vérifier»): il pagamento, se reale, si registra a mano. `paid_at` = istante dell'evento (conferma del pagamento). Poi `recordSaasSubscriptionPayment` → RPC, idempotente sulla sessione: `completed` + `async_payment_succeeded` o un retry non prolungano due volte.
+- **Configurazione Stripe richiesta**: l'endpoint `/api/webhooks/stripe` del conto che incassa il Payment Link deve ricevere i tre eventi `checkout.session.*` qui sopra; Payment Link senza codici promozionali.
 - **Bonifico**: registrato dalla piattaforma (Platform → Abonnements → «Enregistrer un virement»), stessa regola. Riferimento chiesto al tenant: `LEPEFY <SLUG> <AAAA-MM>` (mese coperto).
 
 ## 5. Console piattaforma

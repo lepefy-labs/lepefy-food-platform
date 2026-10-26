@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { revalidateProductAvailability, revalidateTenantCache } from '@/lib/cache/storefrontCache';
-import { recordSaasSubscriptionPayment } from '@/lib/billing/recordSubscriptionPayment';
+import { loadSaasTenant, recordSaasSubscriptionPayment } from '@/lib/billing/recordSubscriptionPayment';
+import { checkSaasPayment, isSaasCheckoutEventType, precheckSaasEvent, SAAS_REJECT_MESSAGES, type SaasRejectReason, type SaasSessionFacts } from '@/lib/billing/saasStripeEvent';
+import { notifyPlatformOfSaasPaymentIssue } from '@/lib/billing/subscriptionNotifications';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
@@ -184,28 +186,62 @@ export async function POST(req: NextRequest) {
   console.info('[webhook] Received event:', event.type, '— id:', event.id, '— verified against module:', verifiedModule);
 
   // ─── ABBONAMENTO SAAS ──────────────────────────────────────────────────────
-  if (event.type === 'checkout.session.completed') {
+  // Checkout Sessions servono solo al canone SaaS (Payment Link): gli ordini
+  // passano da payment_intent.*. Regole pure in lib/billing/saasStripeEvent.ts.
+  if (isSaasCheckoutEventType(event.type)) {
     const session = event.data.object as Stripe.Checkout.Session;
+    const facts: SaasSessionFacts = {
+      eventType: event.type,
+      livemode: event.livemode,
+      fromE2EAccount: isE2EEvent,
+      metadataType: session.metadata?.type,
+      tenantSlug: session.metadata?.tenant_slug,
+      paymentStatus: session.payment_status,
+      amountTotal: session.amount_total,
+      currency: session.currency,
+    };
+    const alertPlatform = (reason: SaasRejectReason) => notifyPlatformOfSaasPaymentIssue({
+      tenantSlug: facts.tenantSlug ?? '', reason: SAAS_REJECT_MESSAGES[reason], eventType: event!.type, sessionId: session.id,
+      amountCents: session.amount_total ?? null, currency: session.currency ?? null, livemode: event!.livemode,
+    });
 
-    // Gestisce solo i pagamenti SaaS (non confondere con gli ordini storefront)
-    if (session.metadata?.type !== 'saas_subscription') {
+    const precheck = precheckSaasEvent(facts);
+    if (precheck.action === 'ignore') return NextResponse.json({ received: true });
+    if (precheck.action === 'wait') {
+      console.info('[webhook/billing] pagamento SaaS in attesa (metodo asincrono) — sessione:', session.id);
+      return NextResponse.json({ received: true });
+    }
+    if (precheck.action === 'reject') {
+      console.warn('[webhook/billing] pagamento SaaS non registrato:', precheck.reason, '— sessione:', session.id);
+      if (precheck.alert) await alertPlatform(precheck.reason);
       return NextResponse.json({ received: true });
     }
 
-    const tenantSlug = session.metadata?.tenant_slug;
-    if (!tenantSlug) {
-      console.error('[webhook/billing] checkout.session.completed — tenant_slug mancante nei metadata');
+    const db = createServiceClient();
+    const tenant = await loadSaasTenant(db, precheck.tenantSlug);
+    if (tenant === 'db_error') return NextResponse.json({ error: 'DB read failed' }, { status: 500 });
+    if (tenant === 'not_found') {
+      console.error('[webhook/billing] tenant sconosciuto:', precheck.tenantSlug, '— sessione:', session.id);
+      await alertPlatform('unknown_tenant');
+      return NextResponse.json({ received: true });
+    }
+    const verdict = checkSaasPayment(facts, tenant);
+    if (!verdict.ok) {
+      console.warn('[webhook/billing] pagamento SaaS non registrato:', verdict.reason, '— tenant:', precheck.tenantSlug, '— sessione:', session.id);
+      await alertPlatform(verdict.reason);
       return NextResponse.json({ received: true });
     }
 
-    // Rinnovo: regola della migration 144 (ledger idempotente sulla sessione),
-    // altrimenti comportamento precedente (+30 giorni sulle colonne legacy).
-    const outcome = await recordSaasSubscriptionPayment(createServiceClient(), {
+    // Rinnovo: regola della migration 144 (ledger idempotente sulla sessione:
+    // completed + async_payment_succeeded o un retry non prolungano due volte).
+    const tenantSlug = precheck.tenantSlug;
+    const outcome = await recordSaasSubscriptionPayment(db, {
       tenantSlug,
       stripeSessionId: session.id,
       amountCents: session.amount_total ?? 0,
       currency: session.currency ?? 'eur',
-      paidAt: new Date(session.created * 1000),
+      // Istante in cui Stripe conferma il pagamento, non la creazione della sessione.
+      paidAt: new Date(event.created * 1000),
     });
 
     if (!outcome.ok) {

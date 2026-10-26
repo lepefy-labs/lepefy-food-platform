@@ -10,6 +10,7 @@ import {
   PLATFORM_EMAIL_CONTEXT,
   subscriptionPaymentReceivedEmail,
   subscriptionPlatformAlertEmail,
+  subscriptionStripeIssueEmail,
 } from '@/lib/notifications/customerEmails';
 import { describeDue, type ReminderDecision } from './subscriptionReminders';
 import { formatBillingDate, type SubscriptionRow } from './subscriptionRules';
@@ -97,6 +98,43 @@ export async function notifySubscriptionPayment(payment: RecordedSubscriptionPay
 function platformRecipients(): string[] {
   return (process.env.SUPPORT_NOTIFY_EMAILS ?? '').split(',').map((value) => value.trim().toLowerCase())
     .filter((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)).slice(0, 10);
+}
+
+/**
+ * Lepefy is told when a Stripe SaaS payment event renewed nothing (unpaid,
+ * failed, wrong amount or currency, test mode, no subscription). Stripe does
+ * not redeliver an event answered with 2xx, so this is sent once. Never throws.
+ */
+export async function notifyPlatformOfSaasPaymentIssue(input: {
+  tenantSlug: string; reason: string; eventType: string; sessionId: string;
+  amountCents: number | null; currency: string | null; livemode: boolean;
+}): Promise<void> {
+  const recipients = platformRecipients();
+  if (recipients.length === 0) {
+    console.warn('[billing] SaaS payment issue (no SUPPORT_NOTIFY_EMAILS):', input.tenantSlug, input.sessionId);
+    return;
+  }
+  try {
+    const base = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '');
+    const rendered = subscriptionStripeIssueEmail({
+      tenantSlug: input.tenantSlug,
+      reason: input.reason,
+      eventType: input.eventType,
+      sessionId: input.sessionId,
+      amount: input.amountCents === null ? '—' : formatAmount(input.amountCents, (input.currency || 'EUR').toUpperCase()),
+      livemode: input.livemode,
+      consoleUrl: base ? `${base}/admin/platform/abonnements` : null,
+    });
+    const [path, payload] = emailRequest({ ...PLATFORM_EMAIL_CONTEXT, tenantId: '' }, {
+      ...rendered,
+      notificationType: 'subscription_platform',
+      idempotencyKey: `platform-saas-stripe:${input.sessionId}:${input.eventType}`.slice(0, 200),
+      recipients,
+    });
+    await notifyN8n(path, payload);
+  } catch (error) {
+    console.error('[billing] platform Stripe alert failed:', error instanceof Error ? error.message.slice(0, 120) : 'unknown');
+  }
 }
 
 /**

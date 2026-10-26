@@ -25,8 +25,36 @@ interface PaymentRpcRow {
   out_was_suspended: boolean;
 }
 
+export interface SaasTenantLookup {
+  tenantId: string;
+  isTest: boolean;
+  plan: { monthlyPriceCents: number; currency: string } | null;
+}
+
 /**
- * SaaS card payment (Stripe Payment Link, metadata.type = saas_subscription).
+ * Tenant of a SaaS payment (by the Payment Link's tenant_slug), its test flag
+ * and the plan of its subscription (null without a tenant_subscriptions row),
+ * for the checks of lib/billing/saasStripeEvent.ts.
+ */
+export async function loadSaasTenant(db: ServiceClient, tenantSlug: string): Promise<SaasTenantLookup | 'not_found' | 'db_error'> {
+  const { data: tenant, error } = await db.from('tenants').select('id, is_test').eq('slug', tenantSlug).maybeSingle();
+  if (error) return 'db_error';
+  if (!tenant) return 'not_found';
+  const row = tenant as { id: string; is_test: boolean | null };
+  const { data: sub, error: subError } = await db.from('tenant_subscriptions')
+    .select('platform_plans(monthly_price_cents, currency)').eq('tenant_id', row.id).maybeSingle();
+  if (subError) return 'db_error';
+  const plan = (sub as { platform_plans: { monthly_price_cents: number; currency: string } | null } | null)?.platform_plans ?? null;
+  return {
+    tenantId: row.id,
+    isTest: Boolean(row.is_test),
+    plan: plan ? { monthlyPriceCents: Number(plan.monthly_price_cents), currency: plan.currency || 'EUR' } : null,
+  };
+}
+
+/**
+ * SaaS card payment (Stripe Payment Link, metadata.type = saas_subscription),
+ * once the webhook has checked it (lib/billing/saasStripeEvent.ts).
  *
  * With migration 144: record_tenant_subscription_payment applies the renewal
  * rule (end of the month after the paid month, or end of the payment month
