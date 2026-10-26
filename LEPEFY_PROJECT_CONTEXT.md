@@ -288,13 +288,13 @@ Pagina fuori dal gruppo `(protected)` (accessibile a `tenant_cashier`), protetta
 - **Zone** raggruppate per paese, ricerca « paese + CAP → zona » con la stessa regola del calcolo (prefisso più lungo); prefissi identici tra zone attive dello stesso paese segnalati e rifiutati (`409 PREFIX_OVERLAP`). Il testo dice ora che in modalità grille tarifaire la zona determina il prezzo.
 - Senza `shipping.manage`: « Lecture seule ». Dettagli: `docs/SHIPPING_INTELLIGENCE.md` §3.
 
-### Abbonamento e sospensione (migration 144 — da applicare)
+### Abbonamento e sospensione (migration 144 — applicata in produzione)
 
 - **Rinnovo**: un pagamento (carta via webhook `saas_subscription`, o bonifico registrato dalla piattaforma) prolunga fino alla fine del mese successivo al mese pagato; dopo una sospensione con arretrati copre il mese del pagamento (mesi senza servizio non addebitati). Registro `tenant_subscription_payments` idempotente sulla sessione Stripe; senza 144 il webhook mantiene il +30 giorni legacy.
 - **Sospensione reale**: manuale o automatica dopo N giorni (`suspension_mode`, default **manuale** per tutti), più la sospensione di un singolo modulo. Motore unico `lib/billing/tenantServiceState.ts` (cache 60 s, fail-open): siti pubblici «Service temporairement indisponible», API di checkout/pagamento/prenotazione 503, Nala e avis spenti, admin del tenant limitato ad Abonnement e ordini in lettura (API 423). Webhook mai bloccati; `platform_owner` mai limitato.
 - **Platform → Abonnements** (`/admin/platform/abonnements`): virement, sospensione/riattivazione, politica automatica, correzione scadenza, link Stripe, moduli, storico e journal (audit con motivo obbligatorio).
 - **`/admin/billing`**: stato veritiero (sospeso, in ritardo, da rinnovare, attivo), mese coperto, riferimento bonifico `LEPEFY <SLUG> <AAAA-MM>` copiabile, ultimi pagamenti. Runbook: `docs/SUBSCRIPTION_LIFECYCLE.md`.
-- **Avvisi**: e-mail a 7 giorni, 1 giorno e alla sospensione (tipo notifica `subscription_billing`, idempotenti nel ledger) da `POST /api/internal/subscription-reminders` (secret `SUBSCRIPTION_REMINDERS_CRON_SECRET`, template n8n `ops/n8n/subscription-reminders.json`, da attivare dopo la 144).
+- **Avvisi** (tipo notifica `subscription_billing`, e-mail + WhatsApp staff, idempotenti nel ledger): promemoria di scadenza D-7, D-3, D0 e D+3 in **ogni** modalità (chiave legata a `paid_until`: un pagamento li ferma), avvisi prima della sospensione automatica (7 giorni, 1 giorno) e alla sospensione; avviso a Lepefy (`SUPPORT_NOTIFY_EMAILS`) a D0 e D+3; conferma «Paiement reçu» al tenant per ogni pagamento registrato (Stripe o bonifico). Job `POST /api/internal/subscription-reminders` (secret `SUBSCRIPTION_REMINDERS_CRON_SECRET`, template n8n orario `ops/n8n/subscription-reminders.json`). Dettagli: `docs/SUBSCRIPTION_LIFECYCLE.md` §7.
 
 ### Configurazione parrainage (migration 132)
 

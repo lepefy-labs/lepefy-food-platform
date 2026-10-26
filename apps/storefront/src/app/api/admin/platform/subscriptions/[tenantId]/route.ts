@@ -7,6 +7,7 @@ import { endOfDayUtc, platformSubscriptionActionSchema, transferPaidAt } from '@
 import { subscriptionErrorMessage } from '@/lib/billing/subscriptionRules';
 import { revalidateServiceState } from '@/lib/billing/tenantServiceState';
 import { revalidateTenantCache } from '@/lib/cache/storefrontCache';
+import { notifySubscriptionPayment } from '@/lib/billing/subscriptionNotifications';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -80,5 +81,12 @@ export async function POST(req: NextRequest, { params }: { params: { tenantId: s
   revalidateServiceState(params.tenantId);
   revalidateTenantCache();
   const row = Array.isArray(data) ? data[0] : null;
+  // Confirmation to the tenant, once per recorded transfer.
+  if (input.action === 'record_transfer' && row?.out_created && row.out_payment_id) {
+    await notifySubscriptionPayment({
+      tenantId: params.tenantId, paymentId: row.out_payment_id, source: 'bank_transfer', amountCents: Math.round(input.amountEur * 100),
+      currency: 'EUR', paidAt: transferPaidAt(input.paidOn), paidUntil: row.out_paid_until,
+    });
+  }
   return NextResponse.json({ ok: true, paidUntil: row?.out_paid_until ?? null });
 }

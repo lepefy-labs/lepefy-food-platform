@@ -1,12 +1,19 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import { deliverEmail } from '@/lib/notifications/sendEmail';
 import { PLATFORM_EMAIL_CONTEXT, subscriptionReminderEmail } from '@/lib/notifications/customerEmails';
-import { reminderDates, runSubscriptionReminders, type ReminderTenant } from '@/lib/billing/subscriptionReminders';
-import { isMissingLifecycleSchema, type SubscriptionRow } from '@/lib/billing/subscriptionRules';
+import {
+  describeDue,
+  PLATFORM_ALERT_KINDS,
+  reminderDates,
+  runSubscriptionReminders,
+  type ReminderDecision,
+  type ReminderTenant,
+} from '@/lib/billing/subscriptionReminders';
+import { coveredMonth, formatBillingMonth, isMissingLifecycleSchema, type SubscriptionRow } from '@/lib/billing/subscriptionRules';
+import { billingUrlFor, notifyPlatformOfDueReminder, subscriptionRecipients } from '@/lib/billing/subscriptionNotifications';
 import { revalidateServiceState } from '@/lib/billing/tenantServiceState';
 import { dispatchTenantNotification } from '@/lib/notifications/staff/dispatcher';
 import { subscriptionBillingAlert } from '@/lib/notifications/staff/staffMessages';
@@ -15,12 +22,29 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
+function whatsappAlert(decision: ReminderDecision, dates: { suspendOn: string; paidUntil: string }) {
+  if (decision.kind === 'suspended') {
+    return subscriptionBillingAlert({ title: 'Abonnement Lepefy suspendu', text: 'La boutique est hors ligne : régler l’abonnement pour rétablir le service.', urgent: true });
+  }
+  if (decision.kind === 'd7' || decision.kind === 'd1') {
+    const when = decision.daysLeft <= 0 ? 'aujourd’hui' : decision.daysLeft === 1 ? 'demain' : `dans ${decision.daysLeft} jours`;
+    return subscriptionBillingAlert({ title: `Abonnement Lepefy : suspension ${when} (${dates.suspendOn})`, text: 'Régler l’abonnement pour éviter la suspension de la boutique.', urgent: decision.daysLeft <= 1 });
+  }
+  const overdue = decision.daysToDue < 0;
+  return subscriptionBillingAlert({
+    title: overdue ? `Abonnement Lepefy : paiement en retard (échéance du ${dates.paidUntil})` : `Abonnement Lepefy : échéance ${describeDue(decision.daysToDue)} (${dates.paidUntil})`,
+    text: 'Régler l’abonnement depuis la page Abonnement (carte ou virement).',
+    urgent: overdue,
+  });
+}
+
 /**
  * Hourly scheduler entry point (n8n, ops/n8n/subscription-reminders.json):
- * warnings before an automatic suspension and suspension notices
- * (lib/billing/subscriptionReminders.ts). Idempotent through the delivery
- * ledger, so running it every hour sends nothing twice. Also drops the
- * storefront cache of a tenant whose automatic suspension just started.
+ * due-date reminders (every mode), warnings before an automatic suspension
+ * and suspension notices (lib/billing/subscriptionReminders.ts). Idempotent
+ * through the delivery ledger, so running it every hour sends nothing twice.
+ * Also drops the storefront cache of a tenant whose automatic suspension just
+ * started.
  */
 export async function POST(request: NextRequest) {
   const secret = process.env.SUBSCRIPTION_REMINDERS_CRON_SECRET ?? '';
@@ -43,45 +67,52 @@ export async function POST(request: NextRequest) {
     return (data ?? []).map((row: SubscriptionRow & { tenant_id: string }) => ({ tenantId: row.tenant_id, row }));
   };
 
-  const recipients = async (tenantId: string): Promise<string[]> => {
-    const subscribed = await getNotificationRecipients(db, tenantId, 'subscription_billing');
-    if (subscribed.length > 0) return subscribed;
-    // Nobody opted in yet (type added after the recipients were configured):
-    // the tenant's active administrators still have to know.
-    const { data } = await db.from('admin_users').select('email').eq('tenant_id', tenantId).eq('role', 'tenant_admin').eq('active', true);
-    return [...new Set(((data ?? []) as Array<{ email: string | null }>).map((admin) => admin.email).filter((email): email is string => Boolean(email)))];
+  /** Status of an already recorded delivery, or null on the first attempt for this key. */
+  const recordedStatus = async (tenantId: string, key: string): Promise<string | null> => {
+    const { data } = await db.from('notification_deliveries').select('status').eq('tenant_id', tenantId).eq('idempotency_key', key).maybeSingle();
+    return (data as { status: string } | null)?.status ?? null;
   };
 
   const send: Parameters<typeof runSubscriptionReminders>[0]['send'] = async (tenantId, decision, to, row) => {
+    // Already handled by an earlier run (accepted, or retried by the ledger's
+    // own schedule): nothing more to send, Lepefy already knows.
+    const existing = await recordedStatus(tenantId, decision.idempotencyKey);
+    if (existing) return existing === 'accepted' || existing === 'delivered';
+
     const tenant = await getTenantNotificationContext(tenantId);
     const dates = reminderDates(decision, row);
-    const billingUrl = tenant?.storefrontUrl ? `${tenant.storefrontUrl.replace(/\/$/, '')}/admin/billing` : null;
     // WhatsApp de l'équipe (opt-in, numéro confirmé) : même clé que l'email, donc une seule fois.
-    const when = decision.daysLeft <= 0 ? 'aujourd’hui' : decision.daysLeft === 1 ? 'demain' : `dans ${decision.daysLeft} jours`;
     await dispatchTenantNotification({
       tenantId, eventType: 'subscription_billing', entityType: 'tenant_subscription', entityId: tenantId,
       occurrenceId: decision.idempotencyKey.slice(0, 120), channels: ['whatsapp'],
-      alert: subscriptionBillingAlert(decision.kind === 'suspended'
-        ? { title: 'Abonnement Lepefy suspendu', text: 'La boutique est hors ligne : régler l’abonnement pour rétablir le service.', urgent: true }
-        : { title: `Abonnement Lepefy : suspension ${when} (${dates.suspendOn})`, text: 'Régler l’abonnement pour éviter la suspension de la boutique.', urgent: decision.daysLeft <= 1 }),
+      alert: whatsappAlert(decision, dates),
     });
-    return deliverEmail({ ...PLATFORM_EMAIL_CONTEXT, tenantId }, {
+    const accepted = await deliverEmail({ ...PLATFORM_EMAIL_CONTEXT, tenantId }, {
       ...subscriptionReminderEmail({
         tenantName: tenant?.tenantName ?? 'votre établissement',
         kind: decision.kind,
         daysLeft: decision.daysLeft,
-        suspendOn: dates.suspendOn,
+        suspendOn: decision.suspendOn ? dates.suspendOn : '',
         paidUntil: dates.paidUntil,
-        billingUrl,
+        billingUrl: billingUrlFor(tenant?.storefrontUrl),
+        dueWhen: describeDue(decision.daysToDue),
+        coveredMonth: formatBillingMonth(coveredMonth(row)),
       }),
       notificationType: 'subscription_billing',
       idempotencyKey: decision.idempotencyKey,
       recipients: to,
     });
+    if (PLATFORM_ALERT_KINDS.includes(decision.kind)) await notifyPlatformOfDueReminder(tenantId, decision, row);
+    return accepted;
   };
 
   try {
-    const outcomes = await runSubscriptionReminders({ listTenants, recipients, send, invalidate: revalidateServiceState });
+    const outcomes = await runSubscriptionReminders({
+      listTenants,
+      recipients: (tenantId) => subscriptionRecipients(db, tenantId),
+      send,
+      invalidate: revalidateServiceState,
+    });
     return NextResponse.json({ outcomes }, { status: outcomes.failed > 0 ? 503 : 200 });
   } catch (error) {
     const missing = isMissingLifecycleSchema(error as { code?: string; message?: string });

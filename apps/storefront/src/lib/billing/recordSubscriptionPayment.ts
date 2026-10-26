@@ -1,6 +1,7 @@
 import type { createServiceClient } from '@/lib/supabase/server';
 import { isMissingLifecycleSchema } from './subscriptionRules';
 import { revalidateServiceState } from './tenantServiceState';
+import { notifySubscriptionPayment } from './subscriptionNotifications';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -53,6 +54,13 @@ export async function recordSaasSubscriptionPayment(db: ServiceClient, input: Sa
   if (!error && Array.isArray(data) && data[0]) {
     const row = data[0] as PaymentRpcRow;
     revalidateServiceState(tenant.id);
+    // Confirmation to the tenant, once per payment (never on a webhook retry).
+    if (row.out_created) {
+      await notifySubscriptionPayment({
+        tenantId: tenant.id, paymentId: row.out_payment_id, source: 'stripe', amountCents: Math.max(0, Math.round(input.amountCents)),
+        currency: input.currency.toUpperCase(), paidAt: input.paidAt.toISOString(), paidUntil: row.out_paid_until,
+      });
+    }
     return { ok: true, mode: 'ledger', tenantId: tenant.id, paidUntil: row.out_paid_until, created: row.out_created };
   }
 

@@ -2,7 +2,7 @@ import type { TenantNotificationContext } from '@/lib/notifications/getTenantNot
 import {
   adminInvitedEmail, cardQuickPaymentCustomerEmail, cardQuickPaymentEmail, eventBookingClosedReportsEmail, eventExternalPaymentAwaitingVerificationEmail,
   eventReservationConfirmedEmail, externalPaymentAwaitingVerificationEmail, orderCancelledEmail, orderCompletedEmail,
-  orderConfirmedEmail, orderReadyForPickupEmail, orderShippedEmail, paymentReminderEmail, cartComebackEmail, reviewInviteEmail, subscriptionReminderEmail,
+  orderConfirmedEmail, orderReadyForPickupEmail, orderShippedEmail, paymentReminderEmail, cartComebackEmail, reviewInviteEmail, subscriptionReminderEmail, subscriptionPaymentReceivedEmail,
 } from '@/lib/notifications/customerEmails';
 import {
   eventCapacityConflictEmail, marketingCampaignEmail, rentalDeliveryQuotePendingEmail, rentalReservationAdminEmail,
@@ -155,8 +155,14 @@ export function buildTemplatePreviews(context: TenantNotificationContext, now = 
   }));
 
   const subscription = { tenantName: context.tenantName, daysLeft: 7, suspendOn: '15 octobre 2026', paidUntil: '30 septembre 2026', billingUrl: `${base}/admin/billing` };
+  const due = { ...subscription, suspendOn: '', paidUntil: '31 octobre 2026', coveredMonth: 'novembre 2026' };
+  add('subscription-due', 'Avis & invitations', 'Abonnement : rappel d’échéance', 'Plateforme', subscriptionReminderEmail({ ...due, kind: 'due_d3', dueWhen: 'dans 3 jours' }));
+  add('subscription-overdue', 'Avis & invitations', 'Abonnement : paiement en retard', 'Plateforme', subscriptionReminderEmail({ ...due, kind: 'overdue_d3', dueWhen: 'dépassée depuis 3 jours' }));
   add('subscription-reminder', 'Avis & invitations', 'Abonnement : rappel avant suspension', 'Plateforme', subscriptionReminderEmail({ ...subscription, kind: 'd7' }));
   add('subscription-suspended', 'Avis & invitations', 'Abonnement : suspension', 'Plateforme', subscriptionReminderEmail({ ...subscription, kind: 'suspended' }));
+  add('subscription-payment', 'Avis & invitations', 'Abonnement : paiement reçu', 'Plateforme', subscriptionPaymentReceivedEmail({
+    tenantName: context.tenantName, amount: '89,00 €', method: 'Virement', paidOn: '28 octobre 2026', paidUntil: '30 novembre 2026', billingUrl: `${base}/admin/billing`,
+  }));
 
   // Opérations & marketing
   add('daily-digest', 'Opérations & marketing', 'Rapport quotidien (08h)', 'Équipe du tenant', {

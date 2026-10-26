@@ -62,18 +62,21 @@ Un modulo sospeso singolarmente applica le stesse regole solo alle sue superfici
 4. Attivare la sospensione automatica tenant per tenant solo dopo aver verificato la scadenza: con una scadenza già superata oltre la tolleranza la sospensione è **immediata** (l'anteprima lo indica).
 5. Rollback funzionale: `set_suspension_policy` → manuale e `reactivate`; il codice resta fail-open se le tabelle mancano.
 
-Test: `supabase/tests/144_*.sql` (CI), `tests/unit/subscriptionLifecycle.spec.ts`.
+Test: `supabase/tests/144_*.sql` (CI), `tests/unit/subscriptionLifecycle.spec.ts`, `tests/unit/subscriptionReminders.spec.ts`.
 
 ## 7. Avvisi e-mail (tipo `subscription_billing`)
 
-- **Quando**: `lib/billing/subscriptionReminders.ts` (`dueSubscriptionReminder`): in modalità automatica, `d7` quando la sospensione cade entro 7 giorni, `d1` l'ultimo giorno; `suspended` all'inizio di una sospensione (manuale o automatica, solo se recente: ≤ 7 giorni). In modalità manuale senza sospensione non parte nulla.
-- **Idempotenza**: chiavi `subscription-reminder:<tenant>:<data sospensione>:<d7|d1>` e `subscription-suspended:<tenant>:<inizio>` nel ledger `notification_deliveries`: lo scheduler può girare più volte senza doppioni.
+- **Scadenza (ogni modalità, manuale compresa)**: `lib/billing/subscriptionReminders.ts` (`dueSubscriptionReminder`, `DUE_REMINDER_STEPS`), giorni di calendario UTC rispetto a `paid_until` (la data mostrata): `due_d7` da D-7 a D-4, `due_d3` da D-3 a D-1, `due_d0` da D0 a D+2, `overdue_d3` da D+3 a D+10; mai prima delle 07:00 UTC, mai se sospeso o senza `paid_until`. Una tappa resta dovuta per tutta la sua finestra: uno scheduler fermo invia solo l'ultima tappa ancora valida; oltre D+10 nessun sollecito automatico per il periodo. Il testo indica il mese coperto dal prossimo pagamento e, solo in modalità automatica, la data di sospensione.
+- **Sospensione (solo automatica)**: `d7` quando la sospensione cade entro 7 giorni, `d1` l'ultimo giorno; `suspended` all'inizio di una sospensione (manuale o automatica, solo se recente: ≤ 7 giorni). Un solo invio per tenant e per giro: le tappe di sospensione prevalgono su quelle di scadenza (con 15 giorni di tolleranza da D+8).
+- **Idempotenza**: chiavi `subscription-due:<tenant>:<paid_until>:<tappa>`, `subscription-reminder:<tenant>:<data sospensione>:<d7|d1>` e `subscription-suspended:<tenant>:<inizio>` nel ledger `notification_deliveries`: lo scheduler può girare più volte senza doppioni. La chiave di scadenza contiene `paid_until`: un pagamento (che sposta la scadenza) ferma da solo i solleciti del periodo e quelli del periodo successivo ripartono a D-7.
+- **Lepefy**: a `due_d0` e `overdue_d3` un avviso a `SUPPORT_NOTIFY_EMAILS` (fuori dal ledger del tenant), inviato solo dal giro che registra per primo il promemoria del tenant (`notifyPlatformOfDueReminder`), con link alla console.
+- **Conferma di pagamento**: `notifySubscriptionPayment` (`lib/billing/subscriptionNotifications.ts`) quando la RPC restituisce `out_created = true` (webhook Stripe e bonifico registrato dalla console): e-mail «Paiement reçu» + WhatsApp staff, chiave `subscription-payment:<payment_id>`, mai bloccante (il pagamento è già registrato).
 - **Destinatari**: abbonati al tipo `subscription_billing` (gruppo «Compte», attivo di default per i nuovi destinatari, preset Gérant e Comptabilité); se nessuno è abbonato, gli `admin_users` `tenant_admin` attivi del tenant. E-mail con mittente Lepefy (`PLATFORM_EMAIL_CONTEXT`), CTA verso `/admin/billing`; anteprime in Plateforme → Notifications → Modèles.
 - **Cache**: una sospensione automatica scatta col solo passare del tempo, senza scritture che invalidino la cache. Lo stesso job, quando vede una sospensione iniziata da meno di 3 ore (`suspensionJustStarted`), chiama `revalidateServiceState` (tag `service-state:<tenant>` + layout): le pagine ISR (120–300 s) passano subito a «Service temporairement indisponible». Sospensione manuale, riattivazione e pagamenti invalidano già nella propria richiesta; checkout e pagamenti sono bloccati entro 60 s in ogni caso.
-- **Scheduler**: `POST /api/internal/subscription-reminders` (Bearer `SUBSCRIPTION_REMINDERS_CRON_SECRET`, confronto timing-safe; `503` se un invio fallisce o se 144 manca). Template n8n `ops/n8n/subscription-reminders.json` (ogni ora, credential Header Auth `Authorization: Bearer <secret>`), importato **inattivo**.
+- **Scheduler**: `POST /api/internal/subscription-reminders` (Bearer `SUBSCRIPTION_REMINDERS_CRON_SECRET`, confronto timing-safe; `503` se un invio fallisce o se 144 manca). Template n8n `ops/n8n/subscription-reminders.json` (ogni ora, credential Header Auth `Authorization: Bearer <secret>`), importato **inattivo**. Senza scheduler attivo nessun promemoria parte (stato al 26/10/2026: nessun invio `subscription_billing` nel ledger).
 
 ### Attivazione
 
-1. Applicare la migration 144 (§6).
-2. Vercel (progetti `chloefood` e `lepefy-food-test`): variabile `SUBSCRIPTION_REMINDERS_CRON_SECRET` (valore casuale lungo), redeploy.
+1. Migration 144: applicata in produzione (verificato il 26/10/2026).
+2. Vercel (progetti `chloefood` e `lepefy-food-test`): variabile `SUBSCRIPTION_REMINDERS_CRON_SECRET` (valore casuale lungo), redeploy. Facoltativo: `SUPPORT_NOTIFY_EMAILS` per gli avvisi a Lepefy.
 3. n8n: importare il template, creare la credential Header Auth con lo stesso secret, «Manual test» → `outcomes` senza `failed`, poi attivare il workflow.

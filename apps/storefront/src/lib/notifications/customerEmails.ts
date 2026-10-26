@@ -796,19 +796,26 @@ ${infoBox([
 }
 
 /**
- * Platform email to a tenant's staff about its Lepefy subscription: warning
- * before the automatic suspension (kind d7 / d1) or suspension notice.
+ * Platform email to a tenant's staff about its Lepefy subscription:
+ * due-date reminders (due_d7 / due_d3 / due_d0 / overdue_d3, every mode),
+ * warning before the automatic suspension (d7 / d1) or suspension notice.
  */
 export function subscriptionReminderEmail(input: {
   tenantName: string;
-  kind: 'd7' | 'd1' | 'suspended';
+  kind: 'due_d7' | 'due_d3' | 'due_d0' | 'overdue_d3' | 'd7' | 'd1' | 'suspended';
   daysLeft: number;
+  /** Formatted automatic suspension date; empty in manual mode. */
   suspendOn: string;
   paidUntil: string;
   billingUrl: string | null;
+  /** Due-date reminders: « dans 3 jours », « aujourd’hui », « dépassée depuis 3 jours ». */
+  dueWhen?: string;
+  /** Due-date reminders: month the next payment covers, e.g. « novembre 2026 ». */
+  coveredMonth?: string;
 }): RenderedEmail {
   const tenant = esc(input.tenantName);
   const offline = 'boutique, événementiel, carte digitale et paiements en ligne';
+  const alreadyPaid = '<p class="note">Paiement déjà effectué par virement ? Il sera pris en compte dès sa réception par Lepefy et ces rappels s’arrêteront.</p>';
   if (input.kind === 'suspended') {
     return {
       subject: `Abonnement Lepefy suspendu — ${input.tenantName}`,
@@ -822,17 +829,100 @@ ${cta(input.billingUrl, 'Régler l’abonnement')}`,
       }),
     };
   }
-  const when = input.daysLeft <= 0 ? 'aujourd’hui' : input.daysLeft === 1 ? 'demain' : `dans ${input.daysLeft} jours`;
-  return {
-    subject: `Abonnement Lepefy : suspension ${when} (${input.suspendOn}) — ${input.tenantName}`,
-    html: page(PLATFORM_EMAIL_CONTEXT, {
-      title: 'Votre abonnement arrive à suspension',
-      footerLink: { url: null, label: '' },
-      body: `<p>Bonjour,</p>
+  if (input.kind === 'd7' || input.kind === 'd1') {
+    const when = input.daysLeft <= 0 ? 'aujourd’hui' : input.daysLeft === 1 ? 'demain' : `dans ${input.daysLeft} jours`;
+    return {
+      subject: `Abonnement Lepefy : suspension ${when} (${input.suspendOn}) — ${input.tenantName}`,
+      html: page(PLATFORM_EMAIL_CONTEXT, {
+        title: 'Votre abonnement arrive à suspension',
+        footerLink: { url: null, label: '' },
+        body: `<p>Bonjour,</p>
 <p>L’abonnement Lepefy de <strong>${tenant}</strong> était payé jusqu’au <strong>${esc(input.paidUntil)}</strong>.</p>
 <p>Sans paiement, le service sera suspendu <strong>${esc(when)}, le ${esc(input.suspendOn)}</strong> : ${offline} seront hors ligne.</p>
 ${cta(input.billingUrl, 'Régler l’abonnement')}
-<p class="note">Paiement déjà effectué par virement ? Il sera pris en compte dès sa réception, aucune action supplémentaire n’est nécessaire.</p>`,
+${alreadyPaid}`,
+      }),
+    };
+  }
+  const overdue = input.kind === 'overdue_d3' || (input.dueWhen ?? '').startsWith('dépassée');
+  const when = input.dueWhen ?? '';
+  const month = input.coveredMonth ? ` de <strong>${esc(input.coveredMonth)}</strong>` : '';
+  const consequence = input.suspendOn
+    ? `<p>Sans paiement, le service sera suspendu le <strong>${esc(input.suspendOn)}</strong>.</p>`
+    : overdue ? '<p>Votre service reste actif pour l’instant : merci de régler l’abonnement dès que possible.</p>' : '';
+  return {
+    subject: overdue
+      ? `Abonnement Lepefy : paiement en retard (échéance du ${input.paidUntil}) — ${input.tenantName}`
+      : `Abonnement Lepefy : échéance ${when} (${input.paidUntil}) — ${input.tenantName}`,
+    html: page(PLATFORM_EMAIL_CONTEXT, {
+      title: overdue ? 'Paiement de l’abonnement en retard' : 'Échéance de votre abonnement',
+      footerLink: { url: null, label: '' },
+      body: overdue
+        ? `<p>Bonjour,</p>
+<p>L’abonnement Lepefy de <strong>${tenant}</strong> était payé jusqu’au <strong>${esc(input.paidUntil)}</strong> : l’échéance est ${esc(when)} et nous n’avons pas encore reçu le paiement${month}.</p>
+${consequence}
+${cta(input.billingUrl, 'Régler l’abonnement')}
+${alreadyPaid}`
+        : `<p>Bonjour,</p>
+<p>L’abonnement Lepefy de <strong>${tenant}</strong> est payé jusqu’au <strong>${esc(input.paidUntil)}</strong> : l’échéance est <strong>${esc(when)}</strong>.</p>
+<p>Le prochain paiement couvre le mois${month}. Vous pouvez régler par carte ou par virement depuis la page Abonnement.</p>
+${consequence}
+${cta(input.billingUrl, 'Régler l’abonnement')}
+${alreadyPaid}`,
+    }),
+  };
+}
+
+/** Platform email to a tenant's staff once a subscription payment is recorded. */
+export function subscriptionPaymentReceivedEmail(input: {
+  tenantName: string;
+  amount: string;
+  method: string;
+  paidOn: string;
+  paidUntil: string;
+  billingUrl: string | null;
+}): RenderedEmail {
+  return {
+    subject: `Paiement reçu — abonnement Lepefy prolongé jusqu’au ${input.paidUntil} — ${input.tenantName}`,
+    html: page(PLATFORM_EMAIL_CONTEXT, {
+      title: 'Paiement reçu, merci',
+      footerLink: { url: null, label: '' },
+      body: `<p>Bonjour,</p>
+<p>Nous avons bien reçu le paiement de l’abonnement Lepefy de <strong>${esc(input.tenantName)}</strong>.</p>
+${infoBox([
+    ['Montant', input.amount],
+    ['Moyen', input.method],
+    ['Date', input.paidOn],
+    ['Abonnement payé jusqu’au', input.paidUntil],
+  ])}
+${cta(input.billingUrl, 'Voir l’abonnement')}
+<p class="note">Aucune action n’est nécessaire. Les rappels d’échéance reprendront avant la prochaine échéance.</p>`,
+    }),
+  };
+}
+
+/** Lepefy-only alert: a tenant's payment is due today or still missing. */
+export function subscriptionPlatformAlertEmail(input: {
+  tenantName: string;
+  tenantSlug: string;
+  paidUntil: string;
+  dueWhen: string;
+  overdue: boolean;
+  mode: string;
+  consoleUrl: string | null;
+}): RenderedEmail {
+  return {
+    subject: `[Abonnement] ${input.tenantName} · ${input.overdue ? 'paiement en retard' : `échéance ${input.dueWhen}`} (${input.paidUntil})`,
+    html: page(PLATFORM_EMAIL_CONTEXT, {
+      title: input.overdue ? 'Paiement d’abonnement en retard' : 'Échéance d’abonnement aujourd’hui',
+      footerLink: { url: null, label: '' },
+      body: `<p>Le tenant <strong>${esc(input.tenantName)}</strong> (${esc(input.tenantSlug)}) a reçu un rappel automatique : échéance ${esc(input.dueWhen)}.</p>
+${infoBox([
+    ['Payé jusqu’au', input.paidUntil],
+    ['Suspension', input.mode],
+  ])}
+<p>Un paiement reçu hors Stripe s’enregistre depuis la console : le rappel s’arrête dès l’enregistrement.</p>
+${cta(input.consoleUrl, 'Ouvrir Plateforme → Abonnements')}`,
     }),
   };
 }

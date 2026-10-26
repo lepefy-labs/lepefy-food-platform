@@ -70,7 +70,7 @@ export const NOTIFICATION_TYPES = [
   { key: 'rental_reservations', group: 'events', label: 'Réservations matériel', short: 'Location', description: 'Réservation de matériel confirmée ou devis de livraison à établir.', defaultOn: false, module: 'events', channels: ['email', 'whatsapp'] },
   { key: 'daily_digest', group: 'reports', label: 'Rapport quotidien (08h)', short: 'Digest', description: 'Résumé quotidien des commandes à traiter.', defaultOn: false, channels: ['email'] },
   { key: 'support_reply', group: 'account', label: 'Réponse de l’assistance Lepefy', short: 'Assistance', description: 'L’équipe Lepefy a répondu à une demande d’assistance, attend une précision ou l’a terminée.', defaultOn: true, module: 'support', channels: ['email', 'whatsapp'] },
-  { key: 'subscription_billing', group: 'account', label: 'Abonnement Lepefy', short: 'Abonnement', description: 'Rappels avant la suspension automatique et avis de suspension de l’abonnement.', defaultOn: true, channels: ['email', 'whatsapp'] },
+  { key: 'subscription_billing', group: 'account', label: 'Abonnement Lepefy', short: 'Abonnement', description: 'Rappels d’échéance, paiement reçu, rappels avant la suspension automatique et avis de suspension de l’abonnement.', defaultOn: true, channels: ['email', 'whatsapp'] },
 ] as const satisfies ReadonlyArray<NotificationTypeDefinition>;
 
 export type NotificationTypeKey = typeof NOTIFICATION_TYPES[number]['key'];
