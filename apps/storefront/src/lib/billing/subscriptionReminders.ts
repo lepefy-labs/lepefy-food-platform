@@ -1,10 +1,12 @@
+import { SHOP_TIME_ZONE } from '../time/shopTime';
 import { autoSuspendAt, formatBillingDate, isSuspendedAt, plural, SUSPENSION_WARNING_DAYS, type SubscriptionRow } from './subscriptionRules';
 
 /**
  * Subscription emails to a tenant's staff (type subscription_billing), run
  * hourly by the scheduler:
  *   due_d7 / due_d3 / due_d0 / overdue_d3
- *             around the due date (paid_until), in manual AND automatic mode
+ *             around the due date (paid_until), in manual AND automatic mode,
+ *             between 08:00 and 20:00 Paris time
  *   d7 / d1   automatic suspension within 7 days / tomorrow or today
  *   suspended the suspension started (manual or automatic), sent once
  * At most one email per run and tenant; the suspension ones win over the due
@@ -33,8 +35,15 @@ export interface ReminderDecision {
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** A suspension older than this is not announced (first run after deploy, long-standing suspensions). */
 const SUSPENDED_NOTICE_WINDOW_DAYS = 7;
-/** Due-date reminders are not sent before this hour (UTC): never in the middle of the night. */
-export const DUE_REMINDER_FIRST_HOUR_UTC = 7;
+/** Due-date reminders go out during the shops' working hours only (Paris time, 08:00–19:59). */
+export const DUE_REMINDER_HOURS = { from: 8, to: 20 } as const;
+
+const PARIS_HOUR = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: SHOP_TIME_ZONE });
+
+export function isDueReminderHour(now: Date): boolean {
+  const hour = Number(PARIS_HOUR.format(now));
+  return hour >= DUE_REMINDER_HOURS.from && hour < DUE_REMINDER_HOURS.to;
+}
 
 /**
  * Due-date steps, in calendar days before (positive) or after (negative) the
@@ -70,7 +79,7 @@ export function describeDue(daysToDue: number): string {
 }
 
 function dueDateReminder(tenantId: string, row: SubscriptionRow, now: Date): ReminderDecision | null {
-  if (!row.paid_until || now.getUTCHours() < DUE_REMINDER_FIRST_HOUR_UTC) return null;
+  if (!row.paid_until || !isDueReminderHour(now)) return null;
   const dueOn = new Date(row.paid_until);
   const daysToDue = calendarDaysUntil(dueOn, now);
   const step = DUE_REMINDER_STEPS.find((candidate) => daysToDue <= candidate.from && daysToDue >= candidate.to);

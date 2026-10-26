@@ -120,8 +120,14 @@ test.describe('due-date reminders (D-7, D-3, D0, D+3)', () => {
   });
 
   test('never at night, never when suspended or without a due date', () => {
-    expect(dueSubscriptionReminder(T, manual(), d('2026-10-28T06:59:00Z'))).toBeNull();
-    expect(dueSubscriptionReminder(T, manual(), d('2026-10-28T07:00:00Z'))?.kind).toBe('due_d3');
+    // Paris time (CET, UTC+1 on 28 October 2026): 08:00–19:59 only.
+    expect(dueSubscriptionReminder(T, manual(), d('2026-10-28T06:59:00Z'))).toBeNull(); // 07:59 Paris
+    expect(dueSubscriptionReminder(T, manual(), d('2026-10-28T07:00:00Z'))?.kind).toBe('due_d3'); // 08:00 Paris
+    expect(dueSubscriptionReminder(T, manual(), d('2026-10-28T18:59:00Z'))?.kind).toBe('due_d3'); // 19:59 Paris
+    expect(dueSubscriptionReminder(T, manual(), d('2026-10-28T19:00:00Z'))).toBeNull(); // 20:00 Paris
+    expect(dueSubscriptionReminder(T, manual(), d('2026-10-26T22:23:00Z'))).toBeNull(); // 23:23 Paris
+    // Summer time (CEST, UTC+2): 08:00 Paris is 06:00 UTC.
+    expect(dueSubscriptionReminder(T, manual({ paid_until: '2026-06-30T23:59:59Z' }), d('2026-06-27T06:00:00Z'))?.kind).toBe('due_d3');
     expect(dueSubscriptionReminder(T, manual({ paid_until: null }), d('2026-10-28T09:00:00Z'))).toBeNull();
     const suspendedLongAgo = manual({ status: 'suspended', suspended_at: '2026-09-01T10:00:00Z' });
     expect(dueSubscriptionReminder(T, suspendedLongAgo, d('2026-10-28T09:00:00Z'))).toBeNull();
@@ -129,7 +135,7 @@ test.describe('due-date reminders (D-7, D-3, D0, D+3)', () => {
 
   test('same key all window long; a scheduler that was down sends only the latest step', () => {
     const a = dueSubscriptionReminder(T, manual(), d('2026-10-24T09:00:00Z'));
-    const b = dueSubscriptionReminder(T, manual(), d('2026-10-26T20:00:00Z'));
+    const b = dueSubscriptionReminder(T, manual(), d('2026-10-26T17:00:00Z'));
     expect(a?.idempotencyKey).toBe(b?.idempotencyKey);
     // Down from D-7 to D0: D0 is sent, the missed D-3 is not.
     expect(dueSubscriptionReminder(T, manual(), d('2026-10-31T09:00:00Z'))?.kind).toBe('due_d0');
