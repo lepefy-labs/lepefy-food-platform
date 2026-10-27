@@ -27,8 +27,8 @@ const METHODS: Array<{ value: Method; label: string; icon: typeof IconBuildingBa
   { value: 'paypal', label: 'PayPal', icon: IconBrandPaypal },
 ];
 
-/** A payment of the same tenant within this many days of the new one is flagged as a possible duplicate. */
-const DUPLICATE_WINDOW_DAYS = 25;
+/** A payment of the same tenant received within this many days is flagged as a possible double entry (a monthly payment is ~30 days apart). */
+const DUPLICATE_WINDOW_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const euro = (cents: number, currency = 'EUR') =>
