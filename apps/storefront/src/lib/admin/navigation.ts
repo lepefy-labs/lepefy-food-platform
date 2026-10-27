@@ -136,7 +136,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { id: 'inventory', label: 'Stocks', href: '/admin/gestion/stocks', icon: IconPackages, group: 'Gestion', workspace: 'shop', anyOf: ['inventory.view'], flag: 'gestion', keywords: ['inventaire', 'mouvements'] },
   { id: 'treasury', label: 'Trésorerie', href: '/admin/gestion/tresorerie', icon: IconCash, group: 'Gestion', workspace: 'shop', anyOf: ['treasury.view'], flag: 'gestion', keywords: ['paiements fournisseurs', 'échéances'] },
   // Événementiel
-  { id: 'events-overview', label: 'Vue d’ensemble', href: '/admin', icon: IconCalendarEvent, group: 'Événementiel', workspace: 'events', anyOf: ['events.view'], match: 'exact', alsoActive: [{ href: '/admin/evenementiel', match: 'exact' }], mobile: 1 },
+  { id: 'events-overview', label: 'Vue d’ensemble', href: '/admin/evenementiel', icon: IconCalendarEvent, group: 'Événementiel', workspace: 'events', anyOf: ['events.view'], match: 'exact', alsoActive: [{ href: '/admin', match: 'exact' }], mobile: 1 },
   { id: 'events', label: 'Événements', href: '/admin/evenementiel/evenements', icon: IconCalendarEvent, group: 'Événementiel', workspace: 'events', anyOf: ['events.view'] },
   // The list route accepts event_reservations.view only (adminRoutePermissions).
   { id: 'event-reservations', label: 'Réservations / Paiements', href: '/admin/evenementiel/reservations', icon: IconFileInvoice, group: 'Événementiel', workspace: 'events', anyOf: ['event_reservations.view'], alsoActive: [{ href: '/admin/evenementiel/paiements-en-attente' }], badge: { key: 'pendingEventRequests', tone: 'warning', label: 'demandes en attente' }, mobile: 2 },
@@ -144,7 +144,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { id: 'rentals', label: 'Locations', href: '/admin/evenementiel/reservations-materiel', icon: IconToolsKitchen2, group: 'Événementiel', workspace: 'events', anyOf: ['event_reservations.view'], badge: { key: 'pendingRentalRequests', tone: 'warning', label: 'demandes en attente' }, keywords: ['matériel'] },
   { id: 'event-content', label: 'Galerie / Contenu', href: '/admin/evenementiel/contenu', icon: IconPhoto, group: 'Événementiel', workspace: 'events', anyOf: ['event_content.manage'], alsoActive: [{ href: '/admin/evenementiel/services' }, { href: '/admin/evenementiel/galerie' }] },
   { id: 'rental-delivery', label: 'Livraison matériel', href: '/admin/evenementiel/livraison-materiel', icon: IconTruckDelivery, group: 'Événementiel', workspace: 'events', anyOf: ['event_content.manage'] },
-  { id: 'event-scan', label: 'Service repas / Scan', href: '/scan', icon: IconScan, group: 'Service sur place', workspace: 'events', anyOf: ['scan.access'], match: 'exact', mobile: 3, keywords: ['billets', 'repas'] },
+  { id: 'event-scan', label: 'Service repas / Scan', href: '/admin/evenementiel/scan', icon: IconScan, group: 'Service sur place', workspace: 'events', anyOf: ['scan.access'], match: 'exact', mobile: 3, keywords: ['billets', 'repas'] },
   // Contenu & outils
   { id: 'home-slides', label: 'Slides d’accueil', href: '/admin/accueil-slides', icon: IconPhoto, group: 'Contenu & outils', workspace: 'shop', anyOf: ['catalog.manage'], match: 'exact', keywords: ['bannière', 'hero'] },
   { id: 'public-content', label: 'Contenu public', href: '/admin/contenu', icon: IconFileText, group: 'Contenu & outils', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['notre origine', 'histoire'] },

@@ -86,7 +86,7 @@ export default async function AdminEvenementielOverviewPage() {
                 <Link href={`/admin/evenementiel/evenements/${nextEvent.id}`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-a-border bg-a-surface px-4 text-sm font-semibold text-a-text-2 shadow-sm hover:bg-a-surface-2">
                   Gérer l’événement
                 </Link>
-                <Link href={`/scan?event_id=${nextEvent.id}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-a-brand px-4 text-sm font-semibold text-a-on-brand shadow-sm hover:opacity-95">
+                <Link href={`/admin/evenementiel/scan?event_id=${nextEvent.id}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-a-brand px-4 text-sm font-semibold text-a-on-brand shadow-sm hover:opacity-95">
                   <IconScan size={18} />
                   Ouvrir le service repas
                 </Link>

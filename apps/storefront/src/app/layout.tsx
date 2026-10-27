@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, Bricolage_Grotesque } from 'next/font/google';
 import { getDisplayTenant } from '@/lib/tenant/getTenant';
 import { toPublicTenant } from '@/lib/tenant/publicTenant';
@@ -32,6 +32,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title:           { default: tenant.name, template: `%s | ${tenant.name}` },
     description:     tenant.tagline ?? undefined,
     manifest:        '/manifest.webmanifest',
+    // Declared as metadata (not hand-written <head> tags) so /admin can override it with the Lepefy Admin icon.
+    icons:           { apple: [{ url: buildPwaIconPath(180, undefined, getAppIconRevision(tenant.app_icon_url)), sizes: '180x180' }] },
     appleWebApp: {
       capable:         true,
       statusBarStyle:  'default',
@@ -57,10 +59,14 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+export async function generateViewport(): Promise<Viewport> {
+  const tenant = await getDisplayTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+  return { themeColor: tenant.primary_color ?? '#1D9E75' };
+}
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getDisplayTenant(slug);
-  const appIconRevision = getAppIconRevision(tenant.app_icon_url);
 
   // Client Components receive only the explicit public projection: provider
   // credentials, assistant context, billing and internal settings never reach
@@ -87,8 +93,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             --color-secondary: ${tenant.secondary_color};
           }
         `}</style>
-        <link rel="apple-touch-icon" href={buildPwaIconPath(180, undefined, appIconRevision)} />
-        <meta name="theme-color" content={tenant.primary_color ?? '#1D9E75'} />
       </head>
       <body>
         {demo && !demoLocked && <DemoRibbon />}

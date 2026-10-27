@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   ADMIN_NAV, ADMIN_QUICK_ACTIONS, activeNavChild, visibleNavChildren, isNavItemActive, mobileNavItems, navItemsById, resolveAdminNavigation, type AdminNavContext, ADMIN_NAV_PRIMARY_GROUPS, ADMIN_NAV_GROUPS, isPrimaryNavGroup } from '../../src/lib/admin/navigation';
+import { resolveAdminWorkspace } from '../../src/lib/admin/workspace';
 import { defaultAdminDestination, permissionsForAdminPath } from '../../src/lib/auth/adminRoutePermissions';
 
 const NO_FLAGS = { gestion: false, whatsapp: false, activity: false, support: false };
@@ -49,15 +50,16 @@ test('the default destination always opens for the same permissions (no redirect
     for (const permission of SINGLE_PERMISSIONS) {
       const destination = defaultAdminDestination([permission], workspace);
       if (!destination || !destination.startsWith('/admin')) continue;
-      const required = permissionsForAdminPath(destination, workspace);
+      // The destination's workspace follows its path (the layout resolves it the same way).
+      const required = permissionsForAdminPath(destination, resolveAdminWorkspace(null, destination));
       expect(required?.includes(permission), `${workspace} ${permission} -> ${destination} requires ${required}`).toBe(true);
     }
   }
   // Payments-only role: no page opens with event_payments.view alone, so no admin landing page.
   expect(defaultAdminDestination(['event_payments.view'], 'events')).toBeNull();
-  expect(defaultAdminDestination(['event_payments.view', 'scan.access'], 'events')).toBe('/scan');
+  expect(defaultAdminDestination(['event_payments.view', 'scan.access'], 'events')).toBe('/admin/evenementiel/scan');
   expect(defaultAdminDestination(['event_reservations.view'], 'events')).toBe('/admin/evenementiel/reservations');
-  expect(defaultAdminDestination(['events.view'], 'events')).toBe('/admin');
+  expect(defaultAdminDestination(['events.view'], 'events')).toBe('/admin/evenementiel');
   expect(defaultAdminDestination(['catalog.view'], 'shop')).toBe('/admin/catalogue');
   expect(defaultAdminDestination(['*'], 'shop')).toBe('/admin');
   expect(defaultAdminDestination(['platform.access'], 'shop')).toBe('/admin/platform');

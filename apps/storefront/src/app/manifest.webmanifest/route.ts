@@ -1,4 +1,5 @@
-import { MetadataRoute } from 'next';
+import { NextResponse } from 'next/server';
+import type { MetadataRoute } from 'next';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { buildPwaIconPath, getAppIconRevision } from '@/lib/tenant/appIcon';
 
@@ -20,7 +21,7 @@ function buildShortcuts(revision?: string | null): MetadataRoute.Manifest['short
   ];
 }
 
-export default async function manifest(): Promise<MetadataRoute.Manifest> {
+async function buildManifest(): Promise<MetadataRoute.Manifest> {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   try {
     const tenant = await getTenant(slug);
@@ -42,4 +43,13 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
       categories: ['food', 'shopping'], icons: buildIcons(), shortcuts: buildShortcuts(),
     };
   }
+}
+
+// A route handler (not the app/manifest.ts file convention): the file
+// convention wins over the `manifest` metadata field, which would stop
+// /admin from declaring its own Lepefy Admin manifest. Same URL, same content.
+export async function GET() {
+  return new NextResponse(JSON.stringify(await buildManifest()), {
+    headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=0, must-revalidate' },
+  });
 }

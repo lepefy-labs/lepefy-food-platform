@@ -17,6 +17,8 @@ import { platformAwaitingCount } from '@/lib/support/server/platformService';
 import SupportProvider from '../_components/support/SupportProvider';
 import AdminHeader from '../_components/AdminHeader';
 import AdminShell from '../_components/shell/AdminShell';
+import AdminInstallPrompt from '../_components/AdminInstallPrompt';
+import AdminWorkspaceMemory from '../_components/AdminWorkspaceMemory';
 import type { AdminSearchScope, AdminShellNav } from '../_components/shell/shellState';
 import { canSee, navItemsById, resolveAdminNavigation } from '@/lib/admin/navigation';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
@@ -30,8 +32,9 @@ import { SUSPENDED_ADMIN_PERMISSIONS, isAdminPathAllowedWhenSuspended } from '@/
 export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = cookies();
   const requestHeaders = headers();
-  const workspace = resolveAdminWorkspace(requestHeaders.get('host'));
   const requestedPath = requestHeaders.get('x-admin-path') ?? '/admin';
+  const workspace = resolveAdminWorkspace(requestHeaders.get('host'), requestedPath);
+  const onLegacyEventsHost = resolveAdminWorkspace(requestHeaders.get('host'), '/admin') === 'events';
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -60,7 +63,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   const requiredPermissions = permissionsForAdminPath(requestedPath, workspace);
   const requiredPermission = requiredPermissions?.[0] ?? null;
   if (!personalPath && requiredPermissions && !requiredPermissions.some((permission) => canAdmin(access, permission))) {
-    const destination = defaultAdminDestination(access.permissions, workspace);
+    const destination = defaultAdminDestination(access.permissions, workspace, { onLegacyEventsHost });
     if (!destination) redirect('/admin/login?error=unauthorized');
     redirect(destination);
   }
@@ -68,7 +71,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   // during progressive migration, while custom roles fail closed. Personal
   // account/security pages are always available to an authenticated admin.
   if (!personalPath && !requiredPermission && !access.isPlatformOwner && access.roleCode !== 'tenant_admin') {
-    const destination = defaultAdminDestination(access.permissions, workspace);
+    const destination = defaultAdminDestination(access.permissions, workspace, { onLegacyEventsHost });
     if (!destination) redirect('/admin/login?error=unauthorized');
     redirect(destination);
   }
@@ -149,6 +152,8 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           tenantName={tenant.name}
           header={<AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} canShop={canShop} canEvents={canEvents} adminEmail={user.email ?? ''} adminDisplayName={displayName} support={supportEnabled} />}
         >
+          <AdminWorkspaceMemory workspace={workspace} />
+          <AdminInstallPrompt />
           <SubscriptionBanner serviceState={serviceState} canViewBilling={canAdmin(access, 'billing.view')} />
           {access.roleCode === DEMO_VISITOR_ROLE && <DemoVisitorBanner userId={access.userId} />}
           {children}

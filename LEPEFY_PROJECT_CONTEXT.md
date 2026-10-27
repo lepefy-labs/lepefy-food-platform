@@ -342,11 +342,12 @@ Il tenant applicativo è ancora risolto principalmente da `NEXT_PUBLIC_TENANT_SL
 Admin Core unico, due workspace UX:
 
 ```text
-shop host   -> workspace shop
-events host -> workspace events
+/admin/evenementiel/**          -> workspace events (qualsiasi host)
+altro /admin/**                 -> workspace shop
+host eventi legacy (NEXT_PUBLIC_EVENTS_SUBDOMAIN) -> workspace events per tutto l'admin
 ```
 
-Resolver canonico: `src/lib/admin/workspace.ts`.
+Resolver canonico: `src/lib/admin/workspace.ts` (`resolveAdminWorkspace(host, pathname)`). **Lepefy Admin (PWA)** — `docs/ADMIN_PWA.md`: un'unica app installabile per tenant, manifest `/admin/manifest.webmanifest` (`id`/`scope` `/admin`, icone `public/brand/admin-*.png`, override dei metadata di `app/admin/layout.tsx`; il manifest storefront è la route `app/manifest.webmanifest/route.ts`, non più `app/manifest.ts`, perché il file-convention batterebbe l'override). Host admin canonico opzionale `ADMIN_HOST` (+ `ADMIN_FALLBACK_HOST` con redirect 307 temporaneo, `ADMIN_LEGACY_REDIRECT=1` per ritirare `/admin` sul dominio storefront): tutto spento senza variabili. Il selettore workspace usa link relativi sull'origine admin; il cookie `lepefy_admin_ws` è solo UX (riapertura da `?source=pwa`, mai un'autorizzazione). Lo scanner pasti è `/admin/evenementiel/scan` (`/scan` è un alias redirect). Nessuna modifica a DB, cookie Supabase (host-only) o RBAC.
 
 La navigazione admin e la ricerca globale sono permission-aware. Lo switch workspace è mostrato solo se l'utente possiede almeno una capability della surface destinazione.
 

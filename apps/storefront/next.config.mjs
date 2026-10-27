@@ -1,3 +1,5 @@
+import { adminHostRedirects } from './adminHostRedirects.mjs';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@lepefy/types'],
@@ -17,6 +19,8 @@ const nextConfig = {
         destination: '/',
         permanent: true,
       },
+      // Unified Lepefy Admin origin: empty until ADMIN_HOST is configured.
+      ...adminHostRedirects(process.env),
     ];
   },
   async rewrites() {

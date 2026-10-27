@@ -30,7 +30,7 @@ export default function AdminHeader({ platformName, platformLogoUrl, tenantName,
         Aller au contenu
       </a>
       <NavMenuButton />
-      <Link href="/admin" className="hidden w-[13.5rem] shrink-0 items-center gap-2 md:flex" aria-label={`${platformName} — accueil de l’administration`}>
+      <Link href={workspace === 'events' ? '/admin/evenementiel' : '/admin'} className="hidden w-[13.5rem] shrink-0 items-center gap-2 md:flex" aria-label={`${platformName} — accueil de l’administration`}>
         {platformLogoUrl
           ? <Image src={platformLogoUrl} alt="" width={112} height={30} className="h-7 w-auto object-contain" priority />
           : <><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-a-brand text-sm font-bold text-a-on-brand">L</span><span className="text-base font-semibold text-a-text">{platformName}</span></>}

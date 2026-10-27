@@ -1,4 +1,5 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import { ADMIN_MANIFEST_PATH, ADMIN_PWA_NAME, ADMIN_PWA_THEME_COLOR } from '@/lib/admin/adminManifest';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getPlatformBranding } from '@/lib/admin/platformBranding';
 import { adminTokensCss } from '@/lib/admin/tokens';
@@ -7,7 +8,18 @@ import { SHELL_CSS } from './_components/shell/shellState';
 export const metadata: Metadata = {
   title: 'Administration',
   robots: { index: false, follow: false },
+  // Lepefy Admin is its own installable app: these override the tenant's
+  // storefront manifest and icons set by the root layout.
+  manifest: ADMIN_MANIFEST_PATH,
+  applicationName: ADMIN_PWA_NAME,
+  icons: {
+    icon: [{ url: '/brand/admin-192.png', sizes: '192x192', type: 'image/png' }],
+    apple: [{ url: '/brand/admin-apple-180.png', sizes: '180x180', type: 'image/png' }],
+  },
+  appleWebApp: { capable: true, title: ADMIN_PWA_NAME, statusBarStyle: 'default' },
 };
+
+export const viewport: Viewport = { themeColor: ADMIN_PWA_THEME_COLOR };
 
 export const dynamic = 'force-dynamic';
 

@@ -263,6 +263,11 @@ Two separate clients exist — use the right one:
 - `src/lib/supabase/client.ts` — browser client (for client components)
 - `src/lib/supabase/server.ts` — server client using cookies (for Server Components and API routes)
 
+### Lepefy Admin PWA (installable admin) — `docs/ADMIN_PWA.md`
+
+- Manifest `/admin/manifest.webmanifest` (id/scope `/admin`), metadata override in `app/admin/layout.tsx`; the storefront manifest is the route `app/manifest.webmanifest/route.ts` (a `manifest.ts` file convention would beat the admin override). `public/sw.js` stays network-only.
+- Workspace = path (`/admin/evenementiel/**` events), legacy events host still maps to events; optional canonical host `ADMIN_HOST` (+ `ADMIN_FALLBACK_HOST` 307, `ADMIN_LEGACY_REDIRECT=1`), all inert when unset. Cookie `lepefy_admin_ws` is UX only. Meal scanner: `/admin/evenementiel/scan` (`/scan` redirects).
+
 ### Admin
 
 `/admin` routes are protected via **Supabase Auth** (email/password) implemented at the Server Component layout level (Edge middleware is not used due to Vercel monorepo limitations).

@@ -20,6 +20,8 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/gestion/stocks', permission: 'inventory.view' },
   { prefix: '/admin/gestion', permission: 'suppliers.view', anyOf: ['purchases.view', 'treasury.view', 'inventory.view'] },
   { prefix: '/admin/team', permission: 'platform.users.manage' },
+  // Meal-service scanner (own page outside the shell, checks scan.access itself).
+  { prefix: '/admin/evenementiel/scan', permission: 'scan.access' },
   { prefix: '/admin/evenementiel/paiements-en-attente', permission: 'event_payments.view' },
   { prefix: '/admin/evenementiel/reservations', permission: 'event_reservations.view' },
   // Locations: rental reservations and requests (customer data), same capability as the
@@ -93,17 +95,23 @@ export function permissionsForAdminPath(pathname: string, workspace: AdminWorksp
 // permissions really open it (same rules as the layout guard), so the layout
 // redirect can never point to a page that redirects again.
 const LANDING_PAGES: Record<AdminWorkspace, string[]> = {
-  events: ['/admin', '/admin/evenementiel/reservations', '/admin/evenementiel/contenu'],
+  events: ['/admin/evenementiel', '/admin/evenementiel/reservations', '/admin/evenementiel/contenu'],
   shop: ['/admin', '/admin/catalogue', '/admin/clients', '/admin/avis', '/admin/loyalty/scan', '/admin/livraison', '/admin/billing', '/admin/ai-usage'],
 };
 
-export function defaultAdminDestination(permissions: string[], workspace: AdminWorkspace): string | null {
+export const EVENTS_SCAN_PATH = '/admin/evenementiel/scan';
+
+export function defaultAdminDestination(permissions: string[], workspace: AdminWorkspace, options: { onLegacyEventsHost?: boolean } = {}): string | null {
   const has = (permission: string) => permissions.includes('*') || permissions.includes(permission);
   const opens = (path: string, pathWorkspace: AdminWorkspace) => (permissionsForAdminPath(path, pathWorkspace) ?? []).some(has);
   const page = LANDING_PAGES[workspace].find((path) => opens(path, workspace));
   if (page) return page;
-  if (workspace === 'events' && has('scan.access')) return '/scan';
+  // The other workspace (single-workspace collaborators open the one they have).
+  // `/admin` itself is Événementiel on the legacy events host, so there it is never a cross-workspace target.
+  const other: AdminWorkspace = workspace === 'events' ? 'shop' : 'events';
+  const otherPage = LANDING_PAGES[other].find((path) => !(options.onLegacyEventsHost && path === '/admin') && opens(path, other));
+  if (otherPage) return otherPage;
   if (opens('/admin/platform', workspace)) return '/admin/platform';
-  if (has('scan.access')) return '/scan';
+  if (has('scan.access')) return EVENTS_SCAN_PATH;
   return null;
 }

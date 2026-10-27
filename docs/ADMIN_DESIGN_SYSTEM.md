@@ -134,3 +134,5 @@ I moduli esistenti passano ai token con un codemod a regole fisse (una unità pe
 | U12 | Rete di sicurezza dark (`adminDarkTheme.ts`), rimappatura `--color-*` e alias token legacy rimossi; guard senza eccezioni | ✅ |
 | U13 | Campi visibili: token `--admin-field-border` / `border-a-field` (≥ 3:1), kit `Form` aggiornato, codemod su tutti gli `input`/`select`/`textarea` admin (78 file, risoluzione delle costanti via compilatore TypeScript), etichette locali su `labelClasses`, editor prodotto su `controlClasses`; regola del guard | ✅ 13/10/2026 |
 | — | Journal d'activité (`/admin/activite`, `AuditChanges`, `ResourceActivity`, `JournalLink`), nato sul kit | ✅ |
+
+Nota PWA: `AdminInstallPrompt` e `AdminWorkspaceMemory` (`app/admin/_components/`) seguono queste regole (kit `InlineAlert`/`Button`, token a-*); l'app installabile è descritta in `docs/ADMIN_PWA.md`.
