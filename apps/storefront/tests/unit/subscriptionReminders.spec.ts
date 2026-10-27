@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { calendarDaysUntil, describeDue, dueSubscriptionReminder, PLATFORM_ALERT_KINDS, runSubscriptionReminders, suspensionJustStarted } from '../../src/lib/billing/subscriptionReminders';
+import { calendarDaysUntil, describeDue, dueSubscriptionReminder, nextDueReminder, PLATFORM_ALERT_KINDS, reminderKindFromKey, REMINDER_KIND_LABELS, runSubscriptionReminders, suspensionJustStarted } from '../../src/lib/billing/subscriptionReminders';
 import type { SubscriptionRow } from '../../src/lib/billing/subscriptionRules';
 import { subscriptionPaymentReceivedEmail, subscriptionReminderEmail } from '../../src/lib/notifications/customerEmails';
 
@@ -194,4 +194,23 @@ test('due-date, overdue and payment emails', () => {
   const receipt = subscriptionPaymentReceivedEmail({ tenantName: 'Chloe', amount: '89,00 €', method: 'Virement', paidOn: '28 octobre 2026', paidUntil: '30 novembre 2026', billingUrl: null });
   expect(receipt.subject).toContain('30 novembre 2026');
   expect(receipt.html).toContain('89,00 €');
+});
+
+test.describe('platform console: reminders column', () => {
+  test('kind from the delivery key; payment confirmations are not reminders', () => {
+    expect(reminderKindFromKey(`subscription-due:${T}:2026-10-31T23:59:59.000Z:due_d7`)).toBe('due_d7');
+    expect(reminderKindFromKey(`subscription-reminder:${T}:2026-11-15T23:59:59.000Z:d1`)).toBe('d1');
+    expect(reminderKindFromKey(`subscription-suspended:${T}:2026-11-15T23:59:59.000Z`)).toBe('suspended');
+    expect(reminderKindFromKey('subscription-payment:abc')).toBeNull();
+    expect(REMINDER_KIND_LABELS.due_d0).toBe('Jour J');
+  });
+
+  test('next step to come for the period', () => {
+    expect(nextDueReminder(manual(), d('2026-10-20T09:00:00Z'))).toEqual({ kind: 'due_d7', on: new Date('2026-10-24T12:00:00Z') });
+    expect(nextDueReminder(manual(), d('2026-10-27T09:00:00Z'))).toEqual({ kind: 'due_d3', on: new Date('2026-10-28T12:00:00Z') });
+    expect(nextDueReminder(manual(), d('2026-10-31T09:00:00Z'))).toEqual({ kind: 'overdue_d3', on: new Date('2026-11-03T12:00:00Z') });
+    expect(nextDueReminder(manual(), d('2026-11-05T09:00:00Z'))).toBeNull();
+    expect(nextDueReminder(manual({ paid_until: null }), d('2026-10-20T09:00:00Z'))).toBeNull();
+    expect(nextDueReminder(manual({ status: 'suspended', suspended_at: '2026-10-01T00:00:00Z' }), d('2026-10-20T09:00:00Z'))).toBeNull();
+  });
 });

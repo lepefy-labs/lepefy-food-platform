@@ -2,21 +2,25 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
+import { IconBrandPaypal, IconChevronDown, IconChevronRight, IconReceipt } from '@tabler/icons-react';
 import type { PlatformSubscriptionRow, SubscriptionHistory } from '@/lib/billing/platformSubscriptions';
 import {
   MODULE_KEYS,
   MODULE_LABELS,
   autoSuspendAt,
   formatBillingDate,
-  isSuspendedAt,
-  nextPaidUntil,
   paymentSourceLabel,
   plural,
   subscriptionState,
   type SubscriptionRow,
-  type SubscriptionStateKind,
 } from '@/lib/billing/subscriptionRules';
+import { nextDueReminder, REMINDER_KIND_LABELS } from '@/lib/billing/subscriptionReminders';
+import { SUBSCRIPTION_REMINDER_STATUS_META, SUBSCRIPTION_STATE_META } from '@/lib/admin/statusRegistry';
+import Badge from '@/app/admin/_components/ui/Badge';
+import Button from '@/app/admin/_components/ui/Button';
+import { FormField, Input } from '@/app/admin/_components/ui/Form';
+import { useAdminMutation } from '@/app/admin/_components/ui/useAdminMutation';
+import RecordPaymentDialog from './RecordPaymentDialog';
 import { labelClasses } from '@/app/admin/_components/ui/Form';
 
 const INPUT = 'w-full rounded-lg border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus';
@@ -25,14 +29,6 @@ const BUTTON = 'inline-flex min-h-10 items-center justify-center rounded-lg px-3
 const PRIMARY = `${BUTTON} bg-a-brand text-a-on-brand hover:opacity-90`;
 const SECONDARY = `${BUTTON} border border-a-border text-a-text-2 hover:bg-a-surface-2`;
 const DANGER = `${BUTTON} border border-tone-danger-border text-tone-danger-fg hover:bg-tone-danger-bg`;
-
-const STATE_BADGE: Record<SubscriptionStateKind, { label: string; cls: string }> = {
-  suspended: { label: 'Suspendu', cls: 'bg-tone-danger-bg text-tone-danger-fg' },
-  overdue: { label: 'En retard', cls: 'bg-tone-warning-bg text-tone-warning-fg' },
-  due_soon: { label: 'À renouveler', cls: 'bg-tone-warning-bg text-tone-warning-fg' },
-  active: { label: 'Actif', cls: 'bg-tone-success-bg text-tone-success-fg' },
-  undefined: { label: 'Échéance non définie', cls: 'bg-a-hover text-a-text-2' },
-};
 
 const AUDIT_LABEL: Record<string, string> = {
   payment_recorded: 'Paiement enregistré',
@@ -77,9 +73,7 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
 
-  const [amount, setAmount] = useState(row.monthlyPriceCents !== null ? (row.monthlyPriceCents / 100).toFixed(2) : '');
-  const [paidOn, setPaidOn] = useState(todayIso());
-  const [note, setNote] = useState('');
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [statusReason, setStatusReason] = useState('');
   const [newPaidUntil, setNewPaidUntil] = useState(row.paidUntil ? row.paidUntil.slice(0, 10) : todayIso());
   const [paidUntilReason, setPaidUntilReason] = useState('');
@@ -129,10 +123,6 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
   }
 
   const subscription = toRow(row);
-  const transferDate = new Date(`${paidOn}T12:00:00Z`);
-  const transferPreview = row.hasSubscription && !Number.isNaN(transferDate.getTime())
-    ? nextPaidUntil(row.paidUntil ? new Date(row.paidUntil) : null, transferDate, isSuspendedAt(subscription, transferDate).suspended)
-    : null;
   const policyPreview = mode === 'automatic' && row.paidUntil
     ? autoSuspendAt({ suspension_mode: 'automatic', paid_until: row.paidUntil, grace_days: Number(graceDays) || 0 })
     : null;
@@ -153,35 +143,22 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
       {row.hasSubscription && (
         <div className="grid gap-4 lg:grid-cols-2">
           <section className="rounded-xl border border-a-border p-4">
-            <h3 className="mb-3 text-sm font-semibold">Enregistrer un virement</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor={`amount-${row.tenantId}`} className={LABEL}>Montant (€)</label>
-                <input id={`amount-${row.tenantId}`} type="number" step="0.01" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className={INPUT} />
-              </div>
-              <div>
-                <label htmlFor={`paid-on-${row.tenantId}`} className={LABEL}>Date du virement</label>
-                <input id={`paid-on-${row.tenantId}`} type="date" max={todayIso()} value={paidOn} onChange={(e) => setPaidOn(e.target.value)} className={INPUT} />
-              </div>
-            </div>
-            <div className="mt-3">
-              <label htmlFor={`note-${row.tenantId}`} className={LABEL}>Note (référence bancaire…)</label>
-              <input id={`note-${row.tenantId}`} type="text" value={note} onChange={(e) => setNote(e.target.value)} className={INPUT} />
-            </div>
-            {transferPreview && (
-              <p className="mt-2 text-xs text-a-text-2">
-                → Nouvelle échéance : <strong>{formatBillingDate(transferPreview)}</strong>
-                {isSuspendedAt(subscription, transferDate).suspended && row.paidUntil && new Date(row.paidUntil) < transferDate && ' (tenant suspendu : les mois sans service ne sont pas facturés)'}
-              </p>
-            )}
-            <button
-              type="button"
-              disabled={busy !== null || !(Number(amount) >= 0) || amount.trim() === ''}
-              onClick={() => void run('transfer', { action: 'record_transfer', amountEur: Number(amount), paidOn, note: note || undefined }, 'Virement enregistré.', () => setNote(''))}
-              className={`${PRIMARY} mt-3`}
-            >
-              {busy === 'transfer' ? 'Enregistrement…' : 'Enregistrer le virement'}
-            </button>
+            <h3 className="mb-1 text-sm font-semibold">Paiements reçus hors Stripe</h3>
+            <p className="mb-3 text-xs text-a-text-3">
+              Virement ou PayPal, à enregistrer une fois l&apos;argent reçu sur le compte Lepefy : l&apos;échéance est prolongée
+              automatiquement et le tenant reçoit une confirmation. Les paiements par carte (Stripe) s&apos;enregistrent seuls.
+            </p>
+            <Button onClick={() => setPaymentOpen(true)}>
+              <IconReceipt size={16} stroke={1.8} aria-hidden="true" />Enregistrer un paiement
+            </Button>
+            <RecordPaymentDialog
+              open={paymentOpen}
+              onClose={() => setPaymentOpen(false)}
+              row={row}
+              subscription={subscription}
+              payments={history?.payments ?? []}
+              onRecorded={() => void loadHistory()}
+            />
           </section>
 
           <section className="rounded-xl border border-a-border p-4">
@@ -334,7 +311,54 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
   );
 }
 
-export default function AbonnementsClient({ initialRows, schemaReady }: { initialRows: PlatformSubscriptionRow[]; schemaReady: boolean }) {
+/** Lepefy's PayPal link, shown to every tenant on its Abonnement page (amount prefilled for a PayPal.me link). */
+function PaypalSettings({ paypalUrl }: { paypalUrl: string | null }) {
+  const mutation = useAdminMutation();
+  const [value, setValue] = useState(paypalUrl ?? '');
+  const dirty = value.trim() !== (paypalUrl ?? '');
+  return (
+    <section className="rounded-2xl border border-a-border bg-a-surface p-4">
+      <h2 className="mb-1 flex items-center gap-2 text-base font-semibold text-a-text">
+        <IconBrandPaypal size={18} stroke={1.8} aria-hidden="true" />Lien PayPal Lepefy
+      </h2>
+      <p className="mb-3 text-xs text-a-text-3">
+        Affiché à tous les tenants sur leur page Abonnement, à côté de la carte et du virement. Avec un lien PayPal.me, le montant du plan est prérempli.
+        Vide = pas de PayPal proposé.
+      </p>
+      <form
+        className="flex flex-col gap-3 sm:flex-row sm:items-end"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void mutation.run('/api/admin/platform/subscriptions/settings', {
+            body: { paypalUrl: value.trim() || null },
+            successMessage: value.trim() ? 'Lien PayPal enregistré.' : 'Lien PayPal retiré.',
+          });
+        }}
+      >
+        <FormField label="Lien PayPal" optional error={mutation.error ?? undefined} className="flex-1">
+          <Input type="url" value={value} onChange={(event) => setValue(event.target.value)} placeholder="https://paypal.me/lepefy" />
+        </FormField>
+        <Button type="submit" variant="secondary" loading={mutation.pending} disabled={!dirty}>Enregistrer le lien</Button>
+      </form>
+    </section>
+  );
+}
+
+function ReminderCell({ row, subscription }: { row: PlatformSubscriptionRow; subscription: SubscriptionRow }) {
+  const next = row.hasSubscription ? nextDueReminder(subscription) : null;
+  const last = row.lastReminder;
+  const status = last ? SUBSCRIPTION_REMINDER_STATUS_META[last.status] : null;
+  return (
+    <span className="text-xs text-a-text-3">
+      {last && status
+        ? <span className="flex flex-wrap items-center gap-1.5"><Badge tone={status.tone}>{REMINDER_KIND_LABELS[last.kind]} · {status.label}</Badge>{formatBillingDate(last.at)}</span>
+        : <span className="block">Aucun rappel envoyé</span>}
+      {next && <span className="block">Prochain : {REMINDER_KIND_LABELS[next.kind]} le {formatBillingDate(next.on)}</span>}
+    </span>
+  );
+}
+
+export default function AbonnementsClient({ initialRows, schemaReady, paypalUrl }: { initialRows: PlatformSubscriptionRow[]; schemaReady: boolean; paypalUrl: string | null }) {
   const [openId, setOpenId] = useState<string | null>(null);
 
   return (
@@ -344,9 +368,13 @@ export default function AbonnementsClient({ initialRows, schemaReady }: { initia
           Migration 144 non appliquée : suspension, paiements et journal sont indisponibles. Les tenants sont considérés actifs.
         </p>
       )}
+      {initialRows.length === 0 && (
+        <p className="rounded-2xl border border-a-border bg-a-surface px-4 py-6 text-center text-sm text-a-text-3">Aucun tenant dans cette vue.</p>
+      )}
       {initialRows.map((row) => {
-        const state = subscriptionState(row.hasSubscription ? toRow(row) : null);
-        const badge = STATE_BADGE[state.kind];
+        const subscription = toRow(row);
+        const state = subscriptionState(row.hasSubscription ? subscription : null);
+        const badge = SUBSCRIPTION_STATE_META[state.kind];
         const open = openId === row.tenantId;
         return (
           <div key={row.tenantId} className="rounded-2xl border border-a-border bg-a-surface">
@@ -354,7 +382,7 @@ export default function AbonnementsClient({ initialRows, schemaReady }: { initia
               type="button"
               aria-expanded={open}
               onClick={() => setOpenId(open ? null : row.tenantId)}
-              className="grid w-full grid-cols-1 gap-2 px-4 py-3 text-left sm:grid-cols-[1.4fr_1fr_1fr_1.2fr_auto] sm:items-center"
+              className="grid w-full grid-cols-1 gap-2 px-4 py-3 text-left sm:grid-cols-[1.4fr_1fr_1fr_1.4fr_1.1fr] sm:items-center"
             >
               <span className="flex min-w-0 items-center gap-2">
                 {open ? <IconChevronDown size={16} aria-hidden="true" /> : <IconChevronRight size={16} aria-hidden="true" />}
@@ -363,18 +391,19 @@ export default function AbonnementsClient({ initialRows, schemaReady }: { initia
                   <span className="block truncate text-xs text-a-text-3">{row.slug}{row.planName ? ` · ${row.planName}` : ''}{row.monthlyPriceCents !== null ? ` · ${euro(row.monthlyPriceCents, row.currency)}/mois` : ''}</span>
                 </span>
               </span>
-              <span><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${badge.cls}`}>{badge.label}{state.kind === 'suspended' && state.suspendedBy === 'automatic' ? ' (auto)' : ''}</span></span>
+              <span><Badge tone={badge.tone} dot>{badge.label}{state.kind === 'suspended' && state.suspendedBy === 'automatic' ? ' (auto)' : ''}</Badge></span>
               <span className="text-sm text-a-text-2">
                 {formatBillingDate(row.paidUntil)}
                 {state.kind === 'overdue' && <span className="block text-xs text-tone-warning-fg">retard {plural(state.daysOverdue, 'jour')}</span>}
+                {state.kind === 'due_soon' && state.daysLeft !== null && <span className="block text-xs text-tone-warning-fg">{state.daysLeft === 0 ? 'aujourd’hui' : `dans ${plural(state.daysLeft, 'jour')}`}</span>}
+                <span className="block text-xs text-a-text-3">
+                  {row.suspensionMode === 'automatic' ? `Suspension auto ${plural(row.graceDays, 'jour')} après` : 'Suspension manuelle'}
+                  {row.suspendedModules.length > 0 && <span className="block text-tone-danger-fg">{plural(row.suspendedModules.length, 'module suspendu', 'modules suspendus')}</span>}
+                </span>
               </span>
+              <ReminderCell row={row} subscription={subscription} />
               <span className="text-xs text-a-text-3">
-                {row.suspensionMode === 'automatic' ? `Auto, ${plural(row.graceDays, 'jour')} après l’échéance` : 'Suspension manuelle'}
-                {state.autoSuspendAt && state.kind !== 'suspended' && <span className="block">prévue le {formatBillingDate(state.autoSuspendAt)}</span>}
-                {row.suspendedModules.length > 0 && <span className="block text-tone-danger-fg">{plural(row.suspendedModules.length, 'module suspendu', 'modules suspendus')}</span>}
-              </span>
-              <span className="text-xs text-a-text-3">
-                {row.lastPayment ? `Dernier paiement ${formatBillingDate(row.lastPayment.paidAt)}` : 'Aucun paiement'}
+                {row.lastPayment ? `${paymentSourceLabel(row.lastPayment.source)} ${euro(row.lastPayment.amountCents)} le ${formatBillingDate(row.lastPayment.paidAt)}` : 'Aucun paiement'}
               </span>
             </button>
             {open && (
@@ -385,6 +414,7 @@ export default function AbonnementsClient({ initialRows, schemaReady }: { initia
           </div>
         );
       })}
+      <PaypalSettings paypalUrl={paypalUrl} />
     </div>
   );
 }

@@ -1,5 +1,14 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { isMissingLifecycleSchema, isModuleKey, type ModuleKey, type SuspensionMode } from './subscriptionRules';
+import { reminderKindFromKey, type ReminderKind } from './subscriptionReminders';
+
+export type ReminderDeliveryStatus = 'sent' | 'pending' | 'failed';
+
+function reminderStatus(status: string): ReminderDeliveryStatus {
+  if (status === 'accepted' || status === 'delivered') return 'sent';
+  if (status === 'failed' || status === 'dead') return 'failed';
+  return 'pending';
+}
 
 /**
  * Platform console data (platform_owner only, service role): every tenant
@@ -23,11 +32,15 @@ export interface PlatformSubscriptionRow {
   stripePaymentLink: string | null;
   suspendedModules: Array<{ module: ModuleKey; reason: string; since: string }>;
   lastPayment: { paidAt: string; amountCents: number; source: string } | null;
+  /** Last subscription reminder recorded in the delivery ledger (email). */
+  lastReminder: { kind: ReminderKind; status: ReminderDeliveryStatus; at: string } | null;
 }
 
 export interface PlatformSubscriptionsData {
   schemaReady: boolean;
   rows: PlatformSubscriptionRow[];
+  /** Lepefy's PayPal link shown to tenants (platform_billing_settings.paypal_url, migration 169). */
+  paypalUrl: string | null;
 }
 
 // Not in the generated DB types yet (migration 144).
@@ -36,11 +49,14 @@ type LooseClient = any;
 
 export async function loadPlatformSubscriptions(): Promise<PlatformSubscriptionsData> {
   const db = createServiceClient() as LooseClient;
-  const [tenants, plans, lifecycle] = await Promise.all([
+  const [tenants, plans, lifecycle, deliveries, settings] = await Promise.all([
     db.from('tenants').select('id, slug, name').order('name', { ascending: true }),
     db.from('platform_plans').select('id, name, monthly_price_cents, currency'),
     db.from('tenant_subscriptions')
       .select('tenant_id, plan_id, status, paid_until, stripe_payment_link, suspension_mode, grace_days, suspended_at, suspension_reason'),
+    db.from('notification_deliveries').select('tenant_id, idempotency_key, status, created_at')
+      .eq('notification_type', 'subscription_billing').order('created_at', { ascending: false }).limit(500),
+    db.from('platform_billing_settings').select('paypal_url').eq('id', 'default').maybeSingle(),
   ]);
   if (tenants.error) throw new Error(tenants.error.message);
 
@@ -64,6 +80,11 @@ export async function loadPlatformSubscriptions(): Promise<PlatformSubscriptions
     payments = paymentRes.data ?? [];
   }
 
+  // Reminders only (payment confirmations share the type): newest first.
+  const reminders = ((deliveries.data ?? []) as Array<{ tenant_id: string; idempotency_key: string; status: string; created_at: string }>)
+    .map((delivery) => ({ ...delivery, kind: reminderKindFromKey(delivery.idempotency_key) }))
+    .filter((delivery): delivery is typeof delivery & { kind: ReminderKind } => delivery.kind !== null);
+
   const planById = new Map<string, { name: string; monthly_price_cents: number; currency: string }>(
     (plans.data ?? []).map((plan: { id: string; name: string; monthly_price_cents: number; currency: string }) => [plan.id, plan]),
   );
@@ -73,6 +94,7 @@ export async function loadPlatformSubscriptions(): Promise<PlatformSubscriptions
     const sub = subByTenant.get(tenant.id);
     const plan = sub ? planById.get(sub.plan_id as string) : undefined;
     const last = payments.find((payment) => payment.tenant_id === tenant.id);
+    const reminder = reminders.find((delivery) => delivery.tenant_id === tenant.id);
     return {
       tenantId: tenant.id,
       slug: tenant.slug,
@@ -92,9 +114,10 @@ export async function loadPlatformSubscriptions(): Promise<PlatformSubscriptions
         .filter((m) => m.tenant_id === tenant.id && isModuleKey(m.module_key))
         .map((m) => ({ module: m.module_key as ModuleKey, reason: m.reason, since: m.created_at })),
       lastPayment: last ? { paidAt: last.paid_at, amountCents: last.amount_cents, source: last.source } : null,
+      lastReminder: reminder ? { kind: reminder.kind, status: reminderStatus(reminder.status), at: reminder.created_at } : null,
     };
   });
-  return { schemaReady, rows };
+  return { schemaReady, rows, paypalUrl: (settings.data as { paypal_url?: string | null } | null)?.paypal_url ?? null };
 }
 
 export interface SubscriptionHistory {

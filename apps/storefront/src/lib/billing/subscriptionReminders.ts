@@ -114,6 +114,40 @@ export function dueSubscriptionReminder(tenantId: string, row: SubscriptionRow, 
   return dueDateReminder(tenantId, row, now);
 }
 
+/** Platform console wording of each reminder. */
+export const REMINDER_KIND_LABELS: Record<ReminderKind, string> = {
+  due_d7: 'J-7',
+  due_d3: 'J-3',
+  due_d0: 'Jour J',
+  overdue_d3: 'J+3',
+  d7: 'Suspension J-7',
+  d1: 'Suspension J-1',
+  suspended: 'Suspension',
+};
+
+/** Reminder kind of a subscription_billing delivery key (null for other keys, e.g. payment confirmations). */
+export function reminderKindFromKey(key: string): ReminderKind | null {
+  if (key.startsWith('subscription-suspended:')) return 'suspended';
+  if (!key.startsWith('subscription-due:') && !key.startsWith('subscription-reminder:')) return null;
+  const kind = key.slice(key.lastIndexOf(':') + 1);
+  return kind in REMINDER_KIND_LABELS ? (kind as ReminderKind) : null;
+}
+
+/**
+ * Next due-date step still to come for the current period (null when
+ * suspended, without a due date or past the last step). `on` is the UTC
+ * calendar day the step starts (sent from 08:00 Paris that day).
+ */
+export function nextDueReminder(row: SubscriptionRow, now: Date = new Date()): { kind: DueReminderKind; on: Date } | null {
+  if (!row.paid_until || isSuspendedAt(row, now).suspended) return null;
+  const due = new Date(row.paid_until);
+  const daysToDue = calendarDaysUntil(due, now);
+  const step = DUE_REMINDER_STEPS.find((candidate) => candidate.from < daysToDue);
+  if (!step) return null;
+  const on = new Date(Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate() - step.from, 12));
+  return { kind: step.kind, on };
+}
+
 /** Window in which a suspension counts as just started (scheduler runs hourly). */
 export const CACHE_INVALIDATION_WINDOW_MS = 3 * 60 * 60 * 1000;
 

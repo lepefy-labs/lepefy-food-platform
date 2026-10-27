@@ -18,6 +18,8 @@ export interface TenantBillingSnapshot {
   bankIban: string | null;
   bankBeneficiary: string | null;
   bankBic: string | null;
+  /** Lepefy PayPal link (platform_billing_settings.paypal_url, migration 169); null when not configured. */
+  paypalUrl: string | null;
   supportEmail: string;
   source: 'platform_billing' | 'legacy_tenant';
 }
@@ -51,10 +53,12 @@ export async function getTenantBillingSnapshot(tenant: LegacyTenantBilling): Pro
     .maybeSingle();
 
   if (!subscriptionError && subscription) {
-    const [{ data: plan }, { data: features }, { data: platformSettings }] = await Promise.all([
+    const [{ data: plan }, { data: features }, { data: platformSettings }, { data: paypalSettings }] = await Promise.all([
       service.from('platform_plans').select('code, name, monthly_price_cents, currency').eq('id', subscription.plan_id).single(),
       service.from('platform_plan_features').select('feature_key, label, position').eq('plan_id', subscription.plan_id).order('position', { ascending: true }),
       service.from('platform_billing_settings').select('bank_iban, bank_beneficiary, bank_bic, support_email').eq('id', 'default').maybeSingle(),
+      // Separate read: a database without 169 (demo) keeps its bank details.
+      service.from('platform_billing_settings').select('paypal_url').eq('id', 'default').maybeSingle(),
     ]);
 
     if (plan) {
@@ -75,6 +79,7 @@ export async function getTenantBillingSnapshot(tenant: LegacyTenantBilling): Pro
         bankIban: platformSettings?.bank_iban ?? null,
         bankBeneficiary: platformSettings?.bank_beneficiary ?? null,
         bankBic: platformSettings?.bank_bic ?? null,
+        paypalUrl: (paypalSettings as { paypal_url?: string | null } | null)?.paypal_url ?? null,
         supportEmail: platformSettings?.support_email ?? 'support@lepefy.com',
         source: 'platform_billing',
       };
@@ -94,6 +99,7 @@ export async function getTenantBillingSnapshot(tenant: LegacyTenantBilling): Pro
     bankIban: tenant.bank_iban,
     bankBeneficiary: tenant.bank_beneficiary,
     bankBic: tenant.bank_bic,
+    paypalUrl: null,
     supportEmail: 'support@lepefy.com',
     source: 'legacy_tenant',
   };

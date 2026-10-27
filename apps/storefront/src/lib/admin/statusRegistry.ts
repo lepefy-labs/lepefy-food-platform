@@ -152,3 +152,19 @@ export const SUPPORT_PRIORITY_META: Record<string, AdminStatusMeta> = {
   high: { label: 'Haute', tone: 'urgent' },
   critical: { label: 'Critique', tone: 'danger' },
 };
+
+/** Lepefy subscription of a tenant (lib/billing/subscriptionRules.ts → subscriptionState). */
+export const SUBSCRIPTION_STATE_META = {
+  suspended: { label: 'Suspendu', tone: 'danger' },
+  overdue: { label: 'En retard', tone: 'warning' },
+  due_soon: { label: 'Échéance proche', tone: 'warning' },
+  active: { label: 'À jour', tone: 'success' },
+  undefined: { label: 'Échéance non définie', tone: 'neutral' },
+} as const satisfies Record<string, AdminStatusMeta>;
+
+/** Subscription reminder delivery (notification_deliveries status, grouped). */
+export const SUBSCRIPTION_REMINDER_STATUS_META = {
+  sent: { label: 'Envoyé', tone: 'success' },
+  pending: { label: 'En cours', tone: 'info' },
+  failed: { label: 'Échec', tone: 'danger' },
+} as const satisfies Record<string, AdminStatusMeta>;

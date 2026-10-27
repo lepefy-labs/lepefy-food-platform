@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { IconBuildingBank, IconCreditCard, IconPlayerPause, IconAlertTriangle } from '@tabler/icons-react';
+import { IconBrandPaypal, IconBuildingBank, IconCreditCard, IconPlayerPause, IconAlertTriangle } from '@tabler/icons-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { aggregateTenantAiUsage, type AiRawUsageRow } from '@/lib/ai/productUsage';
 import { formatPlanPrice, getTenantBillingSnapshot } from '@/lib/admin/platformBilling';
@@ -19,17 +19,27 @@ import {
 } from '@/lib/billing/subscriptionRules';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import CopyableValue from '../../_components/ui/CopyableValue';
+import Badge from '../../_components/ui/Badge';
+import { SUBSCRIPTION_STATE_META } from '@/lib/admin/statusRegistry';
+import { applyLinkAmount } from '@/lib/payments/externalPaymentLink';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-const BADGE = {
-  suspended: { label: 'Suspendu', cls: 'bg-tone-danger-bg text-tone-danger-fg' },
-  overdue: { label: 'Paiement en retard', cls: 'bg-tone-warning-bg text-tone-warning-fg' },
-  due_soon: { label: 'À renouveler', cls: 'bg-tone-warning-bg text-tone-warning-fg' },
-  active: { label: 'Actif', cls: 'bg-tone-success-bg text-tone-success-fg' },
-  undefined: { label: 'Échéance non définie', cls: 'bg-a-hover text-a-text-2' },
+/** Tenant-facing wording; the tone comes from the registry. */
+const STATE_LABEL = {
+  suspended: 'Suspendu',
+  overdue: 'Paiement en retard',
+  due_soon: 'À renouveler',
+  active: 'À jour',
+  undefined: 'Échéance non définie',
 } as const;
+
+/** First day of the month a payment paid up to (the month it covers). */
+function coveredBy(paidUntilAfter: string): Date {
+  const end = new Date(paidUntilAfter);
+  return new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+}
 
 export default async function BillingPage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -46,7 +56,7 @@ export default async function BillingPage() {
   const [billing, serviceState, payments, aiUsageResult] = await Promise.all([
     getTenantBillingSnapshot(tenant),
     getTenantServiceState(tenant.id),
-    loadTenantPayments(tenant.id),
+    loadTenantPayments(tenant.id, 12),
     supabase
       .from('ai_usage_monthly_by_tenant')
       .select('endpoint, total_calls')
@@ -64,7 +74,7 @@ export default async function BillingPage() {
     grace_days: 15,
   };
   const state = subscriptionState(subscription);
-  const badge = BADGE[state.kind];
+  const badgeTone = SUBSCRIPTION_STATE_META[state.kind].tone;
   const aiUsage = aggregateTenantAiUsage((aiUsageResult.data ?? []) as AiRawUsageRow[]);
   const aiUsageTotal = aiUsage.reduce((sum, row) => sum + row.usageCount, 0);
   const price = formatPlanPrice(billing.monthlyPriceCents, billing.currency);
@@ -72,6 +82,8 @@ export default async function BillingPage() {
   const month = coveredMonth(subscription);
   const reference = transferReference(slug, month);
   const coveredLabel = formatBillingMonth(month);
+  // PayPal.me: the plan amount is prefilled; any other PayPal link is used as is.
+  const paypalLink = billing.paypalUrl ? applyLinkAmount('paypal', billing.paypalUrl, billing.monthlyPriceCents / 100, billing.currency) : null;
 
   return (
     <div className="max-w-3xl">
@@ -114,7 +126,7 @@ export default async function BillingPage() {
       <div className="mb-5 rounded-2xl border border-a-border bg-a-surface p-5">
         <div className="mb-4 flex items-start justify-between gap-4">
           <p className="text-sm font-semibold text-a-text">{tenant.name}</p>
-          <span className={`inline-flex shrink-0 rounded-full px-3 py-1 text-xs font-medium ${badge.cls}`}>{badge.label}</span>
+          <Badge tone={badgeTone} dot className="shrink-0">{STATE_LABEL[state.kind]}</Badge>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl bg-a-surface-2 p-3">
@@ -146,7 +158,7 @@ export default async function BillingPage() {
       <p className="mb-3 text-xs text-a-text-3">
         Un paiement couvre le mois de <strong className="font-medium text-a-text-2">{coveredLabel}</strong> : il prolonge l&apos;abonnement jusqu&apos;à la fin de ce mois.
       </p>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className={`grid gap-3 ${paypalLink ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
         <div className="rounded-2xl border border-a-border bg-a-surface p-5">
           <p className="flex items-center gap-2 text-sm font-semibold text-a-text"><IconCreditCard size={18} stroke={1.8} aria-hidden="true" />Carte bancaire</p>
           <p className="mb-4 mt-1 text-xs text-a-text-3">Paiement Stripe sécurisé. L&apos;échéance est prolongée automatiquement dès le paiement.</p>
@@ -175,16 +187,37 @@ export default async function BillingPage() {
             <p className="text-xs italic text-a-text-3">Coordonnées bancaires non encore configurées. <a href={`mailto:${billing.supportEmail}`} className="underline">Contactez Lepefy</a>.</p>
           )}
         </div>
+
+        {paypalLink && (
+          <div className="rounded-2xl border border-a-border bg-a-surface p-5">
+            <p className="flex items-center gap-2 text-sm font-semibold text-a-text"><IconBrandPaypal size={18} stroke={1.8} aria-hidden="true" />PayPal</p>
+            <p className="mb-3 mt-1 text-xs text-a-text-3">L&apos;échéance est prolongée par Lepefy à réception du paiement.</p>
+            <a href={paypalLink} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center rounded-xl border border-a-border px-4 py-2.5 text-sm font-semibold text-a-text hover:bg-a-hover">
+              Payer avec PayPal — {price}
+            </a>
+            <div className="mt-3 rounded-xl bg-a-surface-2 p-3 text-xs">
+              <CopyableValue label="Note à indiquer" value={reference} />
+            </div>
+          </div>
+        )}
       </div>
 
       {payments.length > 0 && (
         <section className="mt-6 rounded-2xl border border-a-border bg-a-surface p-5">
-          <h2 className="mb-3 text-sm font-semibold text-a-text-2">Derniers paiements</h2>
+          <h2 className="mb-3 text-sm font-semibold text-a-text-2">Historique des paiements</h2>
           <ul className="divide-y divide-a-border text-sm">
             {payments.map((payment) => (
               <li key={payment.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <span className="text-a-text-2">{formatBillingDate(payment.paidAt)} · {paymentSourceLabel(payment.source)}</span>
-                <span className="text-a-text-3">{formatPlanPrice(payment.amountCents, payment.currency)} · jusqu&apos;au {formatBillingDate(payment.paidUntilAfter)}</span>
+                <span className="min-w-0">
+                  <span className="block font-medium capitalize text-a-text">{formatBillingMonth(coveredBy(payment.paidUntilAfter))}</span>
+                  <span className="block text-xs text-a-text-3">
+                    {paymentSourceLabel(payment.source)} · reçu le {formatBillingDate(payment.paidAt)} · payé jusqu&apos;au {formatBillingDate(payment.paidUntilAfter)}
+                  </span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="text-sm font-semibold tabular-nums text-a-text">{formatPlanPrice(payment.amountCents, payment.currency)}</span>
+                  <Badge tone="success">Reçu</Badge>
+                </span>
               </li>
             ))}
           </ul>
