@@ -1,4 +1,4 @@
-# Ciclo di vita dell'abbonamento tenant (migration 144)
+# Ciclo di vita dell'abbonamento tenant (migration 144, pagamenti v2: 169)
 
 Documento operativo: rinnovo, sospensione reale (globale o per modulo), gestione manuale dalla console piattaforma, pagina Abonnement del tenant.
 
@@ -12,10 +12,10 @@ Documento operativo: rinnovo, sospensione reale (globale o per modulo), gestione
 | `tenant_subscriptions.grace_days` | sospensione automatica N giorni dopo `paid_until` (default 15) |
 | `tenant_subscriptions.suspended_at`, `suspension_reason` | sospensione manuale in vigore |
 | `tenant_module_suspensions` | un modulo (`shop`, `events`, `digital_card`, `ai`, `reviews`) sospeso dalla piattaforma, con motivo |
-| `tenant_subscription_payments` | registro append-only dei pagamenti (`stripe` \| `bank_transfer`); `stripe_checkout_session_id` unico |
+| `tenant_subscription_payments` | registro append-only dei pagamenti (`stripe` \| `bank_transfer` \| `paypal`); `stripe_checkout_session_id` unico; 169: `external_reference` (n° PayPal obbligatorio, riferimento bancario facoltativo; unico per tenant + fonte, senza maiuscole/spazi), `request_key` (unico per tenant: un doppio invio restituisce lo stesso pagamento), `stripe_event_id` (traccia) |
 | `tenant_subscription_audit` | ogni azione della piattaforma, valore prima/dopo, motivo obbligatorio, autore |
 
-Le tabelle 144 sono service role only, RLS senza policy, nessun INSERT/UPDATE/DELETE diretto: si scrive solo tramite le RPC `record_tenant_subscription_payment` e `admin_update_tenant_subscription` (security definer, riga bloccata, audit nella stessa transazione). Le colonne legacy `tenants.subscription_status/subscription_paid_until` restano allineate.
+Le tabelle 144 sono service role only, RLS senza policy, nessun INSERT/UPDATE/DELETE diretto: si scrive solo tramite le RPC `record_tenant_subscription_payment` e `admin_update_tenant_subscription` (security definer, riga bloccata, audit nella stessa transazione). Le colonne legacy `tenants.subscription_status/subscription_paid_until` restano allineate (dalla 169 anche su `suspend` → `expired` e `reactivate` → `active`). Dalla 169 ogni tenant ha la sua riga: trigger `tenants_ensure_subscription` (AFTER INSERT) + backfill, piano attivo predefinito (`default_platform_plan_id()`: `food-platform` se attivo), `paid_until` vuoto, modalità manuale — nessuna sospensione possibile finché la piattaforma non imposta la scadenza.
 
 ## 2. Regola di rinnovo
 
@@ -49,7 +49,7 @@ Un modulo sospeso singolarmente applica le stesse regole solo alle sue superfici
 
 - **Carta**: Stripe Payment Link del tenant con metadata `type = saas_subscription`, `tenant_slug`. Eventi `checkout.session.completed`, `checkout.session.async_payment_succeeded` e `checkout.session.async_payment_failed`; regole pure in `lib/billing/saasStripeEvent.ts` (`precheckSaasEvent`, `checkSaasPayment`). Rinnova solo se: `payment_status = paid` (un `completed` ancora `unpaid` di un metodo asincrono attende `async_payment_succeeded`); evento live (test mode solo per un tenant `is_test`, mai dal conto Stripe e2e); il tenant ha una riga `tenant_subscriptions`; valuta = valuta del piano e `amount_total ≥` prezzo mensile del piano. Altrimenti nessun rinnovo, risposta 200 (Stripe non ritenta) e avviso a Lepefy (`SUPPORT_NOTIFY_EMAILS`, «Paiement Stripe à vérifier»): il pagamento, se reale, si registra a mano. `paid_at` = istante dell'evento (conferma del pagamento). Poi `recordSaasSubscriptionPayment` → RPC, idempotente sulla sessione: `completed` + `async_payment_succeeded` o un retry non prolungano due volte.
 - **Configurazione Stripe richiesta**: l'endpoint `/api/webhooks/stripe` del conto che incassa il Payment Link deve ricevere i tre eventi `checkout.session.*` qui sopra; Payment Link senza codici promozionali.
-- **Bonifico**: registrato dalla piattaforma (Platform → Abonnements → «Enregistrer un virement»), stessa regola. Riferimento chiesto al tenant: `LEPEFY <SLUG> <AAAA-MM>` (mese coperto).
+- **Bonifico e PayPal esterno**: confermati dalla piattaforma solo a pagamento ricevuto (mai su dichiarazione del tenant), stessa regola. API `POST /api/admin/platform/subscriptions/[tenantId]` azione `record_payment` (`method: bank_transfer | paypal`, importo, data, `reference` — obbligatoria per PayPal —, nota, `requestKey` UUID generato all'apertura del modulo); l'azione `record_transfer` del modulo 144 resta come alias (bonifico senza riferimento né chiave). Riferimento duplicato → 409 «Ce paiement est déjà enregistré». Conferma «Paiement reçu» al tenant solo se `out_created`. Riferimento chiesto al tenant: `LEPEFY <SLUG> <AAAA-MM>` (mese coperto). Link PayPal di Lepefy: `platform_billing_settings.paypal_url` (https).
 
 ## 5. Console piattaforma
 
@@ -62,8 +62,9 @@ Un modulo sospeso singolarmente applica le stesse regole solo alle sue superfici
 3. Verificare Platform → Abonnements (nessun avviso «migration 144 non appliquée»).
 4. Attivare la sospensione automatica tenant per tenant solo dopo aver verificato la scadenza: con una scadenza già superata oltre la tolleranza la sospensione è **immediata** (l'anteprima lo indica).
 5. Rollback funzionale: `set_suspension_policy` → manuale e `reactivate`; il codice resta fail-open se le tabelle mancano.
+6. Migration 169 (additiva, rieseguibile): applicarla **prima** del deploy del codice che passa `p_external_reference` / `p_request_key` / `p_stripe_event_id` (la firma a 8 argomenti è sostituita da una a 11 con default: il codice 144 continua a funzionare). Rollback: ridistribuire il codice precedente; colonne, indici e trigger possono restare (`drop trigger tenants_ensure_subscription on public.tenants` se serve). Applicarla anche al DB demo (workflow `demo-database`, file `169_subscription_payments_v2.sql`).
 
-Test: `supabase/tests/144_*.sql` (CI), `tests/unit/subscriptionLifecycle.spec.ts`, `tests/unit/subscriptionReminders.spec.ts`.
+Test: `supabase/tests/144_*.sql` e `169_*.sql` (CI), `tests/unit/subscriptionLifecycle.spec.ts`, `tests/unit/subscriptionReminders.spec.ts`, `tests/unit/saasStripeEvent.spec.ts`.
 
 ## 7. Avvisi e-mail (tipo `subscription_billing`)
 

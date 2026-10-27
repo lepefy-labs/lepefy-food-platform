@@ -8,6 +8,8 @@ type ServiceClient = ReturnType<typeof createServiceClient>;
 export interface SaasPaymentInput {
   tenantSlug: string;
   stripeSessionId: string;
+  /** Stripe event that confirmed the payment (kept for tracing, migration 169). */
+  stripeEventId?: string;
   amountCents: number;
   currency: string;
   paidAt: Date;
@@ -77,6 +79,7 @@ export async function recordSaasSubscriptionPayment(db: ServiceClient, input: Sa
     p_stripe_session_id: input.stripeSessionId,
     p_note: null,
     p_actor: null,
+    p_stripe_event_id: input.stripeEventId ?? null,
   });
 
   if (!error && Array.isArray(data) && data[0]) {

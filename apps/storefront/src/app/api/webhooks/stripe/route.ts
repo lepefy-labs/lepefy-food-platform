@@ -238,6 +238,7 @@ export async function POST(req: NextRequest) {
     const outcome = await recordSaasSubscriptionPayment(db, {
       tenantSlug,
       stripeSessionId: session.id,
+      stripeEventId: event.id,
       amountCents: session.amount_total ?? 0,
       currency: session.currency ?? 'eur',
       // Istante in cui Stripe conferma il pagamento, non la creazione della sessione.

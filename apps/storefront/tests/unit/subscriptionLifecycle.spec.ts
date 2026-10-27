@@ -14,7 +14,8 @@ import {
   transferReference,
   type SubscriptionRow,
 } from '../../src/lib/billing/subscriptionRules';
-import { endOfDayUtc, platformSubscriptionActionSchema, transferPaidAt } from '../../src/lib/billing/platformSubscriptionActions';
+import { endOfDayUtc, platformSubscriptionActionSchema, recordPaymentIssue, transferPaidAt } from '../../src/lib/billing/platformSubscriptionActions';
+import { paymentSourceLabel } from '../../src/lib/billing/subscriptionRules';
 
 const d = (iso: string) => new Date(iso);
 const row = (patch: Partial<SubscriptionRow> = {}): SubscriptionRow => ({
@@ -131,6 +132,25 @@ test('platform action schema', () => {
   const now = d('2026-10-04T08:00:00Z');
   expect(transferPaidAt('2026-10-02', now)).toBe('2026-10-02T12:00:00.000Z');
   expect(transferPaidAt('2026-10-04', now)).toBe(now.toISOString());
+});
+
+test('record_payment: bank transfer or PayPal, one request key per form, PayPal needs its reference', () => {
+  const key = '0f8e6c2a-4b1d-4c3e-9a7b-2d5f6e8a9b10';
+  const base = { action: 'record_payment', amountEur: 89, paidOn: '2026-10-28', requestKey: key };
+  expect(platformSubscriptionActionSchema.safeParse({ ...base, method: 'paypal', reference: '7XK21ABC' }).success).toBe(true);
+  expect(platformSubscriptionActionSchema.safeParse({ ...base, method: 'bank_transfer' }).success).toBe(true);
+  expect(platformSubscriptionActionSchema.safeParse({ ...base, method: 'cash' }).success).toBe(false);
+  expect(platformSubscriptionActionSchema.safeParse({ ...base, method: 'paypal', requestKey: 'not-a-uuid' }).success).toBe(false);
+  expect(platformSubscriptionActionSchema.safeParse({ ...base, method: 'paypal', reference: 'x'.repeat(121) }).success).toBe(false);
+  expect(recordPaymentIssue({ method: 'paypal' })).toBe('Indiquez le n° de transaction PayPal.');
+  expect(recordPaymentIssue({ method: 'paypal', reference: '  ' })).toBe('Indiquez le n° de transaction PayPal.');
+  expect(recordPaymentIssue({ method: 'bank_transfer', reference: 'ab' })).toContain('entre 3 et 120');
+  expect(recordPaymentIssue({ method: 'bank_transfer' })).toBeNull();
+  expect(recordPaymentIssue({ method: 'paypal', reference: '7XK21ABC' })).toBeNull();
+  expect(subscriptionErrorMessage({ message: 'duplicate_external_reference' })).toContain('déjà enregistré');
+  expect(paymentSourceLabel('paypal')).toBe('PayPal');
+  expect(paymentSourceLabel('bank_transfer')).toBe('Virement');
+  expect(paymentSourceLabel('stripe')).toBe('Carte');
 });
 
 test.describe('service state engine', () => {

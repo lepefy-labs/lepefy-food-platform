@@ -21,6 +21,17 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
 
 export type SuspensionMode = 'manual' | 'automatic';
 
+/** Payment sources of tenant_subscription_payments (169). */
+export const PAYMENT_SOURCE_LABELS: Record<string, string> = {
+  stripe: 'Carte',
+  bank_transfer: 'Virement',
+  paypal: 'PayPal',
+};
+
+export function paymentSourceLabel(source: string): string {
+  return PAYMENT_SOURCE_LABELS[source] ?? source;
+}
+
 /** Days before an automatic suspension when warnings start. */
 export const SUSPENSION_WARNING_DAYS = 7;
 
@@ -163,6 +174,11 @@ export const SUBSCRIPTION_ERROR_MESSAGES: Record<string, string> = {
   invalid_amount: 'Montant invalide.',
   invalid_paid_at: 'Date de paiement invalide (pas dans le futur).',
   invalid_source: 'Source de paiement invalide.',
+  reference_required: 'Indiquez le n° de transaction PayPal.',
+  invalid_reference: 'La référence doit faire entre 3 et 120 caractères.',
+  duplicate_external_reference: 'Ce paiement est déjà enregistré pour ce tenant (même référence).',
+  invalid_request_key: 'Requête invalide : rechargez la page.',
+  stripe_session_required: 'Session Stripe manquante.',
 };
 
 /** Maps a Postgres/PostgREST error to a French message (unknown → generic). */

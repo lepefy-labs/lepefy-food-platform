@@ -11,6 +11,7 @@ import {
   coveredMonth,
   formatBillingDate,
   formatBillingMonth,
+  paymentSourceLabel,
   plural,
   subscriptionState,
   transferReference,
@@ -182,7 +183,7 @@ export default async function BillingPage() {
           <ul className="divide-y divide-a-border text-sm">
             {payments.map((payment) => (
               <li key={payment.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <span className="text-a-text-2">{formatBillingDate(payment.paidAt)} · {payment.source === 'stripe' ? 'Carte' : 'Virement'}</span>
+                <span className="text-a-text-2">{formatBillingDate(payment.paidAt)} · {paymentSourceLabel(payment.source)}</span>
                 <span className="text-a-text-3">{formatPlanPrice(payment.amountCents, payment.currency)} · jusqu&apos;au {formatBillingDate(payment.paidUntilAfter)}</span>
               </li>
             ))}

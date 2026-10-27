@@ -331,6 +331,18 @@ jobs:
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/144_tenant_subscription_lifecycle.sql
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/144_tenant_subscription_lifecycle.test.sql
 
+      - name: Subscription payments v2 (PayPal, references, idempotent records)
+        if: ${{ !cancelled() }}
+        env:
+          PGPASSWORD: test
+        run: |
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/144_tenant_subscription_lifecycle.fixture.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/144_tenant_subscription_lifecycle.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/169_subscription_payments_v2.fixture.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/169_subscription_payments_v2.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/169_subscription_payments_v2.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/169_subscription_payments_v2.test.sql
+
       - name: Order documents settings, public order tokens and review token purpose
         if: ${{ !cancelled() }}
         env:

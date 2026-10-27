@@ -13,7 +13,7 @@ import {
   subscriptionStripeIssueEmail,
 } from '@/lib/notifications/customerEmails';
 import { describeDue, type ReminderDecision } from './subscriptionReminders';
-import { formatBillingDate, type SubscriptionRow } from './subscriptionRules';
+import { formatBillingDate, paymentSourceLabel, type SubscriptionRow } from './subscriptionRules';
 
 /**
  * Subscription notifications on the existing infrastructure (type
@@ -37,10 +37,6 @@ export function billingUrlFor(storefrontUrl: string | null | undefined): string 
   return storefrontUrl ? `${storefrontUrl.replace(/\/$/, '')}/admin/billing` : null;
 }
 
-export const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  stripe: 'Carte bancaire',
-  bank_transfer: 'Virement',
-};
 
 function formatAmount(amountCents: number, currency: string): string {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currency || 'EUR' }).format(amountCents / 100);
@@ -80,7 +76,7 @@ export async function notifySubscriptionPayment(payment: RecordedSubscriptionPay
       ...subscriptionPaymentReceivedEmail({
         tenantName: tenant?.tenantName ?? 'votre établissement',
         amount: formatAmount(payment.amountCents, payment.currency),
-        method: PAYMENT_METHOD_LABELS[payment.source] ?? payment.source,
+        method: paymentSourceLabel(payment.source),
         paidOn: formatBillingDate(payment.paidAt),
         paidUntil,
         billingUrl: billingUrlFor(tenant?.storefrontUrl),

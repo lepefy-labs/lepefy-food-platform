@@ -98,7 +98,7 @@ export async function loadPlatformSubscriptions(): Promise<PlatformSubscriptions
 }
 
 export interface SubscriptionHistory {
-  payments: Array<{ id: string; source: string; amountCents: number; currency: string; paidAt: string; paidUntilBefore: string | null; paidUntilAfter: string; wasSuspended: boolean; note: string | null }>;
+  payments: Array<{ id: string; source: string; amountCents: number; currency: string; paidAt: string; paidUntilBefore: string | null; paidUntilAfter: string; wasSuspended: boolean; note: string | null; externalReference: string | null }>;
   audit: Array<{ id: string; action: string; moduleKey: string | null; reason: string | null; createdAt: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null }>;
 }
 
@@ -106,7 +106,7 @@ export async function loadSubscriptionHistory(tenantId: string, limit = 50): Pro
   const db = createServiceClient() as LooseClient;
   const [payments, audit] = await Promise.all([
     db.from('tenant_subscription_payments')
-      .select('id, source, amount_cents, currency, paid_at, paid_until_before, paid_until_after, was_suspended, note')
+      .select('id, source, amount_cents, currency, paid_at, paid_until_before, paid_until_after, was_suspended, note, external_reference')
       .eq('tenant_id', tenantId).order('paid_at', { ascending: false }).limit(limit),
     db.from('tenant_subscription_audit')
       .select('id, action, module_key, reason, created_at, before_state, after_state')
@@ -119,6 +119,7 @@ export async function loadSubscriptionHistory(tenantId: string, limit = 50): Pro
       id: p.id as string, source: p.source as string, amountCents: Number(p.amount_cents), currency: (p.currency as string) ?? 'EUR',
       paidAt: p.paid_at as string, paidUntilBefore: (p.paid_until_before as string | null) ?? null,
       paidUntilAfter: p.paid_until_after as string, wasSuspended: Boolean(p.was_suspended), note: (p.note as string | null) ?? null,
+      externalReference: (p.external_reference as string | null) ?? null,
     })),
     audit: (audit.data ?? []).map((a: Record<string, unknown>) => ({
       id: a.id as string, action: a.action as string, moduleKey: (a.module_key as string | null) ?? null, reason: (a.reason as string | null) ?? null,

@@ -11,6 +11,7 @@ import {
   formatBillingDate,
   isSuspendedAt,
   nextPaidUntil,
+  paymentSourceLabel,
   plural,
   subscriptionState,
   type SubscriptionRow,
@@ -305,7 +306,7 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
               <ul className="space-y-1.5 text-xs">
                 {history.payments.map((payment) => (
                   <li key={payment.id} className="flex flex-wrap justify-between gap-2">
-                    <span>{formatBillingDate(payment.paidAt)} · {payment.source === 'stripe' ? 'Carte' : 'Virement'} · {euro(payment.amountCents, payment.currency)}</span>
+                    <span>{formatBillingDate(payment.paidAt)} · {paymentSourceLabel(payment.source)} · {euro(payment.amountCents, payment.currency)}{payment.externalReference ? ` · réf. ${payment.externalReference}` : ''}</span>
                     <span className="text-a-text-3">→ {formatBillingDate(payment.paidUntilAfter)}{payment.wasSuspended ? ' (après suspension)' : ''}</span>
                   </li>
                 ))}
