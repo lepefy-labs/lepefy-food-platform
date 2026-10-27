@@ -18,7 +18,7 @@ import { notifyCardQuickPaymentPaid } from '@/lib/notifications/notifyCardQuickP
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
 import { createRentalReservationFromRequest } from '@/lib/rental/createRentalReservationFromRequest';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
-import { getConfiguredWebhookSecrets, getStripeClient, type PaymentModule } from '@/lib/payments/stripeServerConfig';
+import { getConfiguredWebhookSecrets, getPlatformWebhookSecrets, getStripeClient, type PaymentModule } from '@/lib/payments/stripeServerConfig';
 import { recordCardPaymentFailure } from '@/lib/payments/recordCardPaymentFailure';
 import { verifyE2EStripeWebhookSignature } from '@/lib/e2e/verifyStripeWebhookSignature';
 import type { EventCheckoutItemInput, RentalCheckoutItemInput } from '@lepefy/types';
@@ -142,7 +142,20 @@ export async function POST(req: NextRequest) {
   let event: Stripe.Event | null = null;
   let verifiedModule: PaymentModule | null = null;
 
-  for (const { module, secret } of getConfiguredWebhookSecrets()) {
+  // Compte Stripe de Lepefy (canone SaaS) : un secret distinct de ceux des
+  // tenants. Seul un évènement vérifié ici peut prolonger un abonnement.
+  let isPlatformEvent = false;
+  for (const secret of getPlatformWebhookSecrets()) {
+    try {
+      event = getStripeClient('shop').webhooks.constructEvent(body, sig, secret);
+      isPlatformEvent = true;
+      break;
+    } catch {
+      continue;
+    }
+  }
+
+  for (const { module, secret } of event ? [] : getConfiguredWebhookSecrets()) {
     try {
       event = getStripeClient('shop').webhooks.constructEvent(body, sig, secret);
       verifiedModule = module;
@@ -183,7 +196,13 @@ export async function POST(req: NextRequest) {
     ? new Stripe(process.env.STRIPE_SECRET_KEY_TEST ?? '')
     : getStripeClient(verifiedModule ?? 'shop');
 
-  console.info('[webhook] Received event:', event.type, '— id:', event.id, '— verified against module:', verifiedModule);
+  console.info('[webhook] Received event:', event.type, '— id:', event.id, '— verified against:', isPlatformEvent ? 'platform' : verifiedModule);
+
+  // Le compte Lepefy ne sert qu'au canone : ses autres évènements ne touchent
+  // jamais aux commandes, réservations ou paiements des tenants.
+  if (isPlatformEvent && !isSaasCheckoutEventType(event.type)) {
+    return NextResponse.json({ received: true });
+  }
 
   // ─── ABBONAMENTO SAAS ──────────────────────────────────────────────────────
   // Checkout Sessions servono solo al canone SaaS (Payment Link): gli ordini
@@ -194,6 +213,7 @@ export async function POST(req: NextRequest) {
       eventType: event.type,
       livemode: event.livemode,
       fromE2EAccount: isE2EEvent,
+      fromPlatformAccount: isPlatformEvent,
       metadataType: session.metadata?.type,
       tenantSlug: session.metadata?.tenant_slug,
       paymentStatus: session.payment_status,

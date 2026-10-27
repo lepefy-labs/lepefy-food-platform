@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import type { PaymentModule } from '@lepefy/types';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import { isDemoDeployment, isStripeTestKey } from '@/lib/demo/demoEnvironment';
+import { parsePlatformWebhookSecrets } from '@/lib/billing/saasStripeEvent';
 
 // Fichier server-only (secret key + webhook secret) — jamais importé par un
 // composant client. Séparé volontairement de stripeClientConfig.ts (qui ne
@@ -78,4 +79,13 @@ export function getConfiguredWebhookSecrets(): { module: PaymentModule; secret: 
     deduped.push({ module, secret });
   }
   return deduped;
+}
+
+// Secrets du compte Stripe de Lepefy (canone SaaS), jamais ceux d'un tenant :
+// seuls les évènements vérifiés ici peuvent prolonger un abonnement.
+export function getPlatformWebhookSecrets(): string[] {
+  return parsePlatformWebhookSecrets(
+    process.env.STRIPE_WEBHOOK_SECRET_PLATFORM,
+    getConfiguredWebhookSecrets().map(({ secret }) => secret),
+  );
 }

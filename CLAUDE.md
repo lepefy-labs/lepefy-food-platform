@@ -307,6 +307,7 @@ NEXT_PUBLIC_APP_URL=
 # Server-only (never expose to client)
 SUPABASE_SERVICE_ROLE_KEY=
 STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET_PLATFORM=      # signing secret(s) of Lepefy's own Stripe account (SaaS Payment Link); only these renew a subscription, never a tenant's secret
 PACKLINK_API_KEY=
 ADMIN_EMAILS=email1@example.com,email2@example.com  # comma-separated, no spaces
 

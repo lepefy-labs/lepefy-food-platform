@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   checkSaasPayment,
   isSaasCheckoutEventType,
+  parsePlatformWebhookSecrets,
   precheckSaasEvent,
   SAAS_REJECT_MESSAGES,
   type SaasSessionFacts,
@@ -13,6 +14,7 @@ const paid = (patch: Partial<SaasSessionFacts> = {}): SaasSessionFacts => ({
   eventType: 'checkout.session.completed',
   livemode: true,
   fromE2EAccount: false,
+  fromPlatformAccount: true,
   metadataType: 'saas_subscription',
   tenantSlug: 'chloefood',
   paymentStatus: 'paid',
@@ -57,7 +59,14 @@ test.describe('SaaS Stripe events: which ones can renew', () => {
 
   test('missing tenant slug and e2e account', () => {
     expect(precheckSaasEvent(paid({ tenantSlug: '  ' }))).toEqual({ action: 'reject', reason: 'missing_tenant_slug', alert: true });
-    expect(precheckSaasEvent(paid({ fromE2EAccount: true }))).toEqual({ action: 'reject', reason: 'e2e_account', alert: false });
+    expect(precheckSaasEvent(paid({ fromE2EAccount: true, fromPlatformAccount: false }))).toEqual({ action: 'reject', reason: 'e2e_account', alert: false });
+  });
+
+  test('an event signed by a tenant account never renews, even paid at the plan price', () => {
+    expect(precheckSaasEvent(paid({ fromPlatformAccount: false })))
+      .toEqual({ action: 'reject', reason: 'not_platform_account', alert: true });
+    // Non-SaaS sessions of the tenant account stay ignored, without alert.
+    expect(precheckSaasEvent(paid({ fromPlatformAccount: false, metadataType: undefined }))).toEqual({ action: 'ignore' });
   });
 });
 
@@ -91,5 +100,17 @@ test.describe('SaaS Stripe events: tenant checks', () => {
     expect(email.subject).toContain('Paiement Stripe à vérifier');
     expect(email.html).toContain('chloe&lt;food&gt;');
     expect(email.html).toContain('cs_live_123');
+  });
+});
+
+test.describe('Platform webhook secrets', () => {
+  test('comma-separated, trimmed, deduplicated; empty when unset', () => {
+    expect(parsePlatformWebhookSecrets(' whsec_live , whsec_test,whsec_live,', [])).toEqual(['whsec_live', 'whsec_test']);
+    expect(parsePlatformWebhookSecrets(undefined, ['whsec_shop'])).toEqual([]);
+    expect(parsePlatformWebhookSecrets('', [])).toEqual([]);
+  });
+
+  test('a value shared with a tenant/module secret is never treated as the Lepefy one', () => {
+    expect(parsePlatformWebhookSecrets('whsec_shop,whsec_lepefy', ['whsec_shop', 'whsec_event'])).toEqual(['whsec_lepefy']);
   });
 });
