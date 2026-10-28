@@ -59,7 +59,7 @@ export default async function PlatformEmailAnalyticsPage({ searchParams = {} }: 
   let failed = false;
   const tenants = await listPlatformTenants().catch(() => []);
   try { data = await loadAnalytics(createServiceClient(), values); } catch (error) {
-    console.error('[platform/email-analytics] load failed', error instanceof Error ? error.message : 'unknown');
+    console.error('[platform/email-analytics] load failed', (error as { message?: string } | null)?.message ?? 'unknown');
     failed = true;
   }
 
