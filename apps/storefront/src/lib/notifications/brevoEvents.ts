@@ -224,10 +224,20 @@ export const FOOD_NOTIFICATION_TYPES: readonly string[] = [
 
 export interface ClassifyInput { notificationType: string | null; tags: readonly string[] | null; hasLedgerMatch: boolean }
 
-/** Resolves the notification type: ledger first, then a known Food tag. */
+/** The console test sender (Notifications → Tests) tags `console_test_<type>`. */
+export const TEST_TAG_PREFIX = 'console_test_';
+
+/** Every tag that marks one of our emails (server-side scope filter). */
+export const FOOD_EMAIL_TAGS: readonly string[] = FOOD_NOTIFICATION_TYPES.flatMap((type) => [type, `${TEST_TAG_PREFIX}${type}`]);
+
+/** Resolves the notification type: ledger first, then a known Food tag (test prefix removed). */
 export function resolveNotificationType({ notificationType, tags }: Pick<ClassifyInput, 'notificationType' | 'tags'>): string | null {
   if (notificationType) return notificationType;
-  return (tags ?? []).find((tag) => FOOD_NOTIFICATION_TYPES.includes(tag)) ?? null;
+  for (const tag of tags ?? []) {
+    const type = tag.startsWith(TEST_TAG_PREFIX) ? tag.slice(TEST_TAG_PREFIX.length) : tag;
+    if (FOOD_NOTIFICATION_TYPES.includes(type)) return type;
+  }
+  return null;
 }
 
 /**

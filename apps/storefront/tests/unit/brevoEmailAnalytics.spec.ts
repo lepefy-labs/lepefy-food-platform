@@ -158,6 +158,7 @@ test.describe('categories and scope', () => {
     expect(classifyEmail({ notificationType: 'card_quick_payment_customer', tags: [], hasLedgerMatch: true })).toBe('payment_confirmation');
     expect(classifyEmail({ notificationType: 'order_completed', tags: [], hasLedgerMatch: true })).toBe('order_completed');
     expect(classifyEmail({ notificationType: 'daily_order_digest', tags: [], hasLedgerMatch: true })).toBe('other_food');
+    expect(classifyEmail({ notificationType: null, tags: ['console_test_order_confirmed'], hasLedgerMatch: false })).toBe('order_confirmation');
     // Ledger-linked but unknown type: still ours.
     expect(classifyEmail({ notificationType: null, tags: [], hasLedgerMatch: true })).toBe('other_food');
     // Another Lepefy project on the same Brevo account.

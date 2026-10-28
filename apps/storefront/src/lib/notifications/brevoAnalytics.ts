@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { defineListParams, pageWindow, type ListParamValues, type PageWindow } from '@/lib/admin/listParams';
 import {
-  classifyEmail, EMAIL_CATEGORIES, FOOD_NOTIFICATION_TYPES, typesForCategory,
+  classifyEmail, EMAIL_CATEGORIES, FOOD_EMAIL_TAGS, typesForCategory,
   type EmailCategory,
 } from '@/lib/notifications/brevoEvents';
 
@@ -260,7 +260,7 @@ const VIEW = 'brevo_email_message_summary';
 function applyScope<Q extends { gte: any; lt: any; eq: any; or: any }>(query: Q, period: Period, values: Pick<AnalyticsValues, 'tenant' | 'category'>): Q {
   let q = query.gte('first_event_at', period.fromIso).lt('first_event_at', period.toIso);
   // Food scope: ledger-linked or tagged with one of our notification types (the Brevo account is shared).
-  q = q.or(`delivery_id.not.is.null,tags.ov.{${FOOD_NOTIFICATION_TYPES.join(',')}}`);
+  q = q.or(`delivery_id.not.is.null,tags.ov.{${FOOD_EMAIL_TAGS.join(',')}}`);
   if (values.tenant) q = q.eq('tenant_id', values.tenant);
   return q;
 }
