@@ -6,6 +6,7 @@ import type { StripeExpressCheckoutElementConfirmEvent } from '@stripe/stripe-js
 import { IconBrandApple, IconCreditCard } from '@tabler/icons-react';
 import { getStripeForModule, type PaymentModule } from '@/lib/payments/stripeClientConfig';
 import { logFunnelEvent, registerAbandonmentListener } from '@/lib/funnelLog';
+import { useBusyLock } from '@/lib/pwa/useBusyLock';
 
 // Flux « un seul bouton » Apple Pay (Express Checkout Element), utilisé
 // aujourd'hui uniquement par /card (CardQuickPay mode="apple_pay"). Même
@@ -56,6 +57,8 @@ function InnerExpressWalletStep({
   const elements = useElements();
   const [availability, setAvailability] = useState<Availability>('loading');
   const [isConfirming, setIsConfirming] = useState(false);
+  // The payment form is open: no automatic reload while it exists (lib/pwa).
+  useBusyLock(true, 'payment-form');
   const referenceIdRef  = useRef<string | null>(null);
   const hasSucceededRef = useRef(false);
 

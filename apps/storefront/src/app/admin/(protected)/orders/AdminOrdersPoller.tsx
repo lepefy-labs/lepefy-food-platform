@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { isBusy, subscribeBusyRelease } from '@/lib/pwa/busyRegistry';
 
 const POLL_INTERVAL_MS = 18_000; // 18s — impercettibile per <10 ordini/giorno, leggero sul DB
 
@@ -41,7 +42,7 @@ export default function AdminOrdersPoller({
           // Guardia anti-interruzione: se l'operatore sta compilando qualcosa
           // (es. il pannello tracking della Fase 3), non forzare un refresh
           // adesso — segna solo che c'è un aggiornamento in sospeso.
-          if (isEditingRef.current) {
+          if (isEditingRef.current || isBusy()) {
             pendingRef.current = true;
           } else {
             router.refresh();
@@ -62,6 +63,15 @@ export default function AdminOrdersPoller({
       document.removeEventListener('visibilitychange', poll);
     };
   }, [router, onNewOrders]);
+
+  // Un blocco del registro PWA (scrittura in corso, form non salvato) rimanda
+  // il refresh allo stesso modo; viene applicato appena il blocco cade.
+  useEffect(() => subscribeBusyRelease(() => {
+    if (pendingRef.current && !isEditingRef.current && !isBusy()) {
+      pendingRef.current = false;
+      router.refresh();
+    }
+  }), [router]);
 
   // Appena l'edizione finisce, applica subito l'eventuale refresh rimasto in sospeso
   useEffect(() => {

@@ -10,6 +10,7 @@ Una sola app installabile per tenant, **Lepefy Admin** (identità Lepefy, non de
 - Icone: `public/brand/admin-192.png`, `admin-512.png`, `admin-maskable-512.png`, `admin-apple-180.png` (sorgente `lepefy-admin-icon.svg`, rigenerabili con sharp).
 - `app/admin/layout.tsx` sovrascrive `manifest`, `icons`, `appleWebApp`, `viewport.themeColor` del root layout. Il root layout dichiara apple-touch-icon e theme-color come metadata (non più `<head>` a mano) proprio per consentire l'override. Il manifest storefront è una route handler: il file `app/manifest.ts` avrebbe la precedenza sul campo `manifest`.
 - Service worker: resta `public/sw.js` network-only senza handler `fetch`; nessuna cache di HTML o dati autenticati.
+- Aggiornamento: il root layout monta `PwaLifecycle` (versione, dati, banner, protezione dei form non salvati) — vedi `docs/PWA_LIFECYCLE.md`; per l'admin nessun reload automatico con un form modificabile montato.
 - Installazione: `AdminInstallPrompt` (prompt nativo Android/desktop, istruzioni Safari su iPhone/iPad, nascosto se già installata, rimando 30 giorni).
 
 ## Workspace

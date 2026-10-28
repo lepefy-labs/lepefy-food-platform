@@ -9,7 +9,7 @@ import DemoRibbon from '@/components/demo/DemoRibbon';
 import PrivateDemoGate from '@/components/demo/PrivateDemoGate';
 import { ProductImageDeliveryProvider } from '@/providers/ProductImageDeliveryProvider';
 import { productImageDeliveryEnabled } from '@/lib/images/productImageRollout';
-import { PWARegister } from '@/components/PWARegister';
+import { PwaLifecycle } from '@/components/pwa/PwaLifecycle';
 import { buildPwaIconPath, getAppIconRevision } from '@/lib/tenant/appIcon';
 import './globals.css';
 
@@ -99,7 +99,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <TenantProvider tenant={clientTenant}>
           <ProductImageDeliveryProvider enabled={productImageDeliveryEnabled(tenant)}>{demoLocked ? <PrivateDemoGate /> : children}</ProductImageDeliveryProvider>
         </TenantProvider>
-        <PWARegister />
+        <PwaLifecycle />
       </body>
     </html>
   );

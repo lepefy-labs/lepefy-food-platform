@@ -535,7 +535,7 @@ La route pubblica tenant-aware `/supprimer-compte` è disponibile anche senza se
 
 Sul dominio Events la navigazione pubblica usa URL pulite (`/`, `/evenements/[slug]`, `/services/[slug]`) mentre le route interne `/evenementiel/**` restano l'implementazione App Router raggiunta tramite rewrite host-based. I link verso Traiteur/Location/Galerie sono esposti solo se esistono contenuti pubblici attivi.
 
-La PWA usa `start_url: '/'` e lo shortcut prodotti punta a `/`; il service worker pre-cachea la root canonica.
+La PWA usa `start_url: '/'` e lo shortcut prodotti punta a `/`; il service worker (`public/sw.js`) è network-only, senza cache né handler `fetch`. Il ciclo di vita (controllo versione `GET /api/app-version` contro `NEXT_PUBLIC_APP_VERSION` = `VERCEL_GIT_COMMIT_SHA`, refresh dati dopo assenza, reload solo se sicuro tramite registro `lib/pwa/busyRegistry.ts`, guardia anti-loop) è in `components/pwa/PwaLifecycle.tsx` + `lib/pwa/lifecycle.ts`; dettagli in `docs/PWA_LIFECYCLE.md`.
 
 ---
 

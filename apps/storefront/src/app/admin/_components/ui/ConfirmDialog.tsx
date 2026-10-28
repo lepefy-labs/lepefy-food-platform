@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import Button from './Button';
 import Dialog from './Dialog';
 import { ErrorText } from './InlineAlert';
+import { useBusyLock } from '@/lib/pwa/useBusyLock';
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -137,6 +138,7 @@ export function useConfirm(): [(request: ConfirmRequest) => Promise<boolean>, Re
 export function useUnsavedChangesGuard(dirty: boolean, description = 'Vos modifications seront perdues.'): ReactNode {
   const router = useRouter();
   const [ask, dialog] = useConfirm();
+  useBusyLock(dirty, 'unsaved-changes');
   useEffect(() => {
     if (!dirty) return;
     const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };

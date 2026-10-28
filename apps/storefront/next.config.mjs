@@ -3,6 +3,9 @@ import { adminHostRedirects } from './adminHostRedirects.mjs';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@lepefy/types'],
+  // Build identity for the PWA update check (docs/PWA_LIFECYCLE.md); empty
+  // outside Vercel, which keeps the check inert in local development.
+  env: { NEXT_PUBLIC_APP_VERSION: process.env.VERCEL_GIT_COMMIT_SHA ?? '' },
   images: {
     remotePatterns: [{ protocol: 'https', hostname: '*.supabase.co', pathname: '/storage/v1/object/public/**' }],
     formats: ['image/avif', 'image/webp'],

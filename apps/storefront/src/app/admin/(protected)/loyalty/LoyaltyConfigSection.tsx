@@ -16,6 +16,7 @@ import {
   type LoyaltyForm,
 } from '@/lib/loyalty/loyaltyAdmin';
 import { labelClasses } from '@/app/admin/_components/ui/Form';
+import { useBusyLock } from '@/lib/pwa/useBusyLock';
 
 const INPUT_CLS =
   'w-full border border-a-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text disabled:bg-a-surface-2 disabled:text-a-text-3';
@@ -68,6 +69,7 @@ export function LoyaltyConfigSection(props: LoyaltyConfigSectionProps) {
   const formIssues = loyaltyFormIssues(form);
   const tierIssues = referralTierIssues(form.referral_max_depth, tiers);
 
+  useBusyLock(dirty, 'admin-form');
   // Leaving with unsaved changes asks first.
   useEffect(() => {
     if (!dirty) return;

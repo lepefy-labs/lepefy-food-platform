@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { getStripeForModule, type PaymentModule } from '@/lib/payments/stripeClientConfig';
 import { logFunnelEvent, registerAbandonmentListener } from '@/lib/funnelLog';
+import { useBusyLock } from '@/lib/pwa/useBusyLock';
 
 interface CreateIntentResult {
   clientSecret?: string;
@@ -59,6 +60,8 @@ function InnerPaymentStep({
   const stripe   = useStripe();
   const elements = useElements();
   const [isConfirming, setIsConfirming] = useState(false);
+  // The payment form is open: no automatic reload while it exists (lib/pwa).
+  useBusyLock(true, 'payment-form');
   const hasSucceededRef = useRef(false);
   const paymentSectionRef = useRef<HTMLDivElement>(null);
 

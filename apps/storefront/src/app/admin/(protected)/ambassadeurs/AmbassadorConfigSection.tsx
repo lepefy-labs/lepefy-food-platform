@@ -17,6 +17,7 @@ import Button from '../../_components/ui/Button';
 import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import type { AmbassadorCommissionMode, AmbassadorDiscountType } from '@lepefy/types';
 import { labelClasses } from '@/app/admin/_components/ui/Form';
+import { useBusyLock } from '@/lib/pwa/useBusyLock';
 
 const INPUT_CLS =
   'w-full border border-a-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text disabled:bg-a-surface-2 disabled:text-a-text-3';
@@ -70,6 +71,7 @@ export function AmbassadorConfigSection({ initialSettings, currency, canEdit }: 
   const isSplitPool = form.ambassador_commission_mode === 'SPLIT_POOL';
   const modeChanged = form.ambassador_commission_mode !== baseline.ambassador_commission_mode;
 
+  useBusyLock(dirty, 'admin-form');
   useEffect(() => {
     if (!dirty) return;
     const onBeforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };

@@ -23,6 +23,7 @@ import { CustomerAddressForm, addressFieldId } from '@/components/address/Custom
 import { NEW_ADDRESS, SavedAddressPicker, type SavedAddress } from '@/components/address/SavedAddressPicker';
 import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
 import { ErrorSummary, TextField } from '@/components/ui/form';
+import { useBusyLock } from '@/lib/pwa/useBusyLock';
 import {
   PaymentOptionList,
   buildExternalPaymentOptions,
@@ -154,6 +155,8 @@ export default function CheckoutFlow({
   isE2ETest?: boolean;
 }) {
   const router = useRouter();
+  // The whole checkout holds a lock: no automatic reload while it is mounted (lib/pwa).
+  useBusyLock(true, 'checkout');
   const { items, totalPrice, shippingPayload } = useCartStore();
   const hydrated = useHasMounted();
   // Pré-contrôle des minimums et du stock (même moteur que /cart et le

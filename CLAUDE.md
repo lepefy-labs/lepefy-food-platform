@@ -268,6 +268,11 @@ Two separate clients exist — use the right one:
 - `src/lib/supabase/client.ts` — browser client (for client components)
 - `src/lib/supabase/server.ts` — server client using cookies (for Server Components and API routes)
 
+### PWA smart refresh — `docs/PWA_LIFECYCLE.md`
+
+- One controller (`lib/pwa/lifecycle.ts`, pure, injected deps) mounted by `components/pwa/PwaLifecycle.tsx` in the root layout (replaces `PWARegister`): on return to foreground it updates the service worker, compares `NEXT_PUBLIC_APP_VERSION` (build SHA) with `GET /api/app-version` (no DB, throttled 5 min, failures silent), refreshes server data with `router.refresh()` after ≥ 30 min away and revalidates the customer session after ≥ 6 h. No polling.
+- A full reload happens only when safe: work that a reload would destroy holds a lock (`useBusyLock(active, reason)` / `acquireBusy` in `lib/pwa/busyRegistry.ts`; `useUnsavedChangesGuard`, `CheckoutFlow` and the Stripe steps already do), `activityTracker` covers touched form fields and in-flight writes, critical routes and unsynced cart mutations also block, and `sessionStorage` `lepefy:pwa-reload` allows one automatic reload per target per 30 min. Otherwise a banner offers the update. New payment/editing UI must take a lock; never reload from elsewhere.
+
 ### Lepefy Admin PWA (installable admin) — `docs/ADMIN_PWA.md`
 
 - Manifest `/admin/manifest.webmanifest` (id/scope `/admin`), metadata override in `app/admin/layout.tsx`; the storefront manifest is the route `app/manifest.webmanifest/route.ts` (a `manifest.ts` file convention would beat the admin override). `public/sw.js` stays network-only.
