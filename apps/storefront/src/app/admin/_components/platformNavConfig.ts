@@ -47,6 +47,7 @@ export const PLATFORM_NAV: PlatformNavGroup[] = [
       { label: 'Tests', href: '/admin/platform/notifications/tests' },
       { label: 'Rattrapage', href: '/admin/platform/notifications/rattrapage' },
       { label: 'Transport & santé', href: '/admin/platform/notifications/sante' },
+      { label: 'Email Analytics', href: '/admin/platform/notifications/email-analytics' },
     ],
   },
   { id: 'external-catalogs', label: 'Catalogues WhatsApp', icon: IconBrandWhatsapp, href: '/admin/platform/catalogues-whatsapp' },
