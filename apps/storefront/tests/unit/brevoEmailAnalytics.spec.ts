@@ -104,7 +104,8 @@ test.describe('webhook security', () => {
     expect(isAuthorizedBrevoWebhook(`Bearer ${TOKEN}`, TOKEN)).toBe(true);
     expect(isAuthorizedBrevoWebhook(`bearer ${TOKEN}`, TOKEN)).toBe(true);
     expect(isAuthorizedBrevoWebhook(`Bearer ${TOKEN}y`, TOKEN)).toBe(false);
-    expect(isAuthorizedBrevoWebhook(TOKEN, TOKEN)).toBe(false);
+    expect(isAuthorizedBrevoWebhook(TOKEN, TOKEN)).toBe(true);
+    expect(isAuthorizedBrevoWebhook(`Basic ${TOKEN}`, TOKEN)).toBe(false);
     expect(isAuthorizedBrevoWebhook(null, TOKEN)).toBe(false);
     expect(isAuthorizedBrevoWebhook(`Bearer ${TOKEN}`, undefined)).toBe(false);
     expect(isAuthorizedBrevoWebhook('Bearer short', 'short')).toBe(false);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { eventKey, isAuthorizedBrevoWebhook, maskEmail, parseBrevoEvent, recipientHash } from '@/lib/notifications/brevoEvents';
+import { describeAuthorization, eventKey, isAuthorizedBrevoWebhook, maskEmail, parseBrevoEvent, recipientHash } from '@/lib/notifications/brevoEvents';
 
 /**
  * Brevo transactional webhook (docs/BREVO_EMAIL_ANALYTICS.md). Append-only
@@ -19,6 +19,8 @@ const PURGE_PROBABILITY = 0.005;
 
 export async function POST(request: NextRequest) {
   if (!isAuthorizedBrevoWebhook(request.headers.get('authorization'), process.env.BREVO_WEBHOOK_TOKEN)) {
+    // Shape only (header present, scheme, length, token configured): never a value.
+    console.warn('[brevo-webhook] unauthorized', { ...describeAuthorization(request.headers.get('authorization')), tokenConfigured: Boolean(process.env.BREVO_WEBHOOK_TOKEN), expectedLength: process.env.BREVO_WEBHOOK_TOKEN?.length ?? 0 });
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 

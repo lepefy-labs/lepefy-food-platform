@@ -152,16 +152,25 @@ export function eventKey(messageId: string, hash: string, event: BrevoEventName,
 }
 
 /**
- * `Authorization: Bearer <BREVO_WEBHOOK_TOKEN>`, constant time. Fails closed
- * when the token is not configured or is too short to be a real secret.
+ * `Authorization: Bearer <BREVO_WEBHOOK_TOKEN>` (or the bare token: Brevo's
+ * "Token" authentication does not document the exact header form), constant
+ * time. Fails closed when the token is not configured or is too short to be a
+ * real secret.
  */
 export function isAuthorizedBrevoWebhook(authorization: string | null, expected: string | undefined): boolean {
   if (!expected || expected.length < 24 || !authorization) return false;
-  const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
-  if (!match) return false;
-  const a = createHash('sha256').update(match[1]!.trim()).digest();
+  const received = authorization.trim().replace(/^Bearer\s+/i, '').trim();
+  if (!received) return false;
+  const a = createHash('sha256').update(received).digest();
   const b = createHash('sha256').update(expected).digest();
   return timingSafeEqual(a, b);
+}
+
+/** Shape of a rejected Authorization header for the logs: never the value. */
+export function describeAuthorization(authorization: string | null): { present: boolean; scheme: string | null; length: number } {
+  if (!authorization) return { present: false, scheme: null, length: 0 };
+  const scheme = /^([A-Za-z]+)\s+\S/.exec(authorization.trim())?.[1] ?? null;
+  return { present: true, scheme, length: authorization.trim().length };
 }
 
 // ─── Categories ─────────────────────────────────────────────────────────────
