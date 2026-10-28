@@ -114,8 +114,16 @@ test.describe('webhook security', () => {
   test('route refuses a missing/invalid token before touching the database, and rejects GET', async () => {
     const previous = process.env.BREVO_WEBHOOK_TOKEN;
     process.env.BREVO_WEBHOOK_TOKEN = TOKEN;
+    // `require` (not `import()`): on Node 20 a dynamic import bypasses Playwright's
+    // TypeScript transform ("Cannot use import statement outside a module").
+    // The database client is stubbed so a refused request that touched it fails loudly.
+    const serverModule = require.resolve('../../src/lib/supabase/server');
+    require.cache[serverModule] = {
+      id: serverModule, filename: serverModule, loaded: true, children: [], paths: [], path: '', parent: null,
+      exports: { createServiceClient: () => { throw new Error('database touched before authorization'); } },
+    } as unknown as NodeJS.Module;
     try {
-      const { POST, GET } = await import('../../src/app/api/webhooks/brevo/route');
+      const { POST, GET } = require('../../src/app/api/webhooks/brevo/route') as typeof import('../../src/app/api/webhooks/brevo/route');
       const noAuth = await POST(new NextRequest('http://localhost/api/webhooks/brevo', { method: 'POST', body: JSON.stringify(payload()) }));
       expect(noAuth.status).toBe(401);
       const wrong = await POST(new NextRequest('http://localhost/api/webhooks/brevo', { method: 'POST', headers: { authorization: 'Bearer nope' }, body: '{}' }));
@@ -127,6 +135,7 @@ test.describe('webhook security', () => {
       const unconfigured = await POST(new NextRequest('http://localhost/api/webhooks/brevo', { method: 'POST', headers: { authorization: `Bearer ${TOKEN}` }, body: '{}' }));
       expect(unconfigured.status).toBe(401);
     } finally {
+      delete require.cache[serverModule];
       if (previous === undefined) delete process.env.BREVO_WEBHOOK_TOKEN; else process.env.BREVO_WEBHOOK_TOKEN = previous;
     }
   });
