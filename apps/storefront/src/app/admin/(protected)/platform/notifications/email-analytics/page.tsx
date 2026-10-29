@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { IconExternalLink } from '@tabler/icons-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { formatDate } from '@/lib/admin/format';
@@ -6,6 +7,7 @@ import {
   messageStatus, paginate, FAILURE_LABELS, type EnrichedMessage, type MessageStatus, type Rate,
 } from '@/lib/notifications/brevoAnalytics';
 import { EMAIL_CATEGORIES, EMAIL_CATEGORY_LABELS } from '@/lib/notifications/brevoEvents';
+import { deliveryResourceHref } from '@/lib/notifications/deliveryHistory';
 import { listPlatformTenants } from '@/lib/notifications/platformTenant';
 import AdminStatCard from '../../../../_components/ui/AdminStatCard';
 import Badge from '../../../../_components/ui/Badge';
@@ -91,13 +93,26 @@ export default async function PlatformEmailAnalyticsPage({ searchParams = {} }: 
     { key: 'open', header: 'Première ouverture', hideBelow: 'sm', cell: (row) => (
       <span className="text-a-text-2">{OPEN_LABEL[row.openKind]}{row.first_open_at && <span className="block text-xs text-a-text-3">{formatDate(row.first_open_at, 'datetime')}</span>}</span>
     ) },
-    { key: 'click', header: 'Clic', align: 'center', hideBelow: 'sm', cell: (row) => <span className="tabular-nums text-a-text-2">{row.clicked ? `Oui · ${row.click_events}` : '—'}</span> },
+    { key: 'click', header: 'Clic', hideBelow: 'sm', className: 'max-w-[260px]', cell: (row) => (
+      row.clicked ? (
+        <span className="text-a-text-2">
+          Oui · {row.click_events}
+          {(row.links ?? []).map((link) => <span key={link} className="block break-all text-xs text-a-text-3" title={link}>{link.replace(/^https?:\/\//, '')}</span>)}
+          {(row.links ?? []).length === 0 && <span className="block text-xs text-a-text-3">lien non enregistré</span>}
+        </span>
+      ) : <span className="text-a-text-3">—</span>
+    ) },
+    { key: 'order', header: 'Commande', hideBelow: 'md', cell: (row) => {
+      const resource = row.entity_type && row.entity_id ? deliveryResourceHref({ entity_type: row.entity_type, entity_id: row.entity_id, source: 'live' }) : null;
+      if (!resource) return <span className="text-a-text-3">—</span>;
+      return <Link href={resource} className="font-medium text-a-brand-fg hover:underline">{row.entity_type === 'order' ? 'Voir la commande' : 'Ouvrir'}</Link>;
+    } },
     { key: 'error', header: 'Erreur', hideBelow: 'lg', className: 'max-w-[220px]', cell: (row) => (
       row.failure_event || row.has_error
         ? <span className="text-xs text-tone-danger-fg">{FAILURE_LABELS[row.failure_event ?? 'error']}{row.reason && <span className="block break-words text-a-text-3">{row.reason}</span>}</span>
         : <span className="text-a-text-3">—</span>
     ) },
-    { key: 'recipient', header: 'Destinataire', hideBelow: 'xl', cell: (row) => <span className="font-mono text-xs text-a-text-3">{row.recipient_masked ?? '—'}</span> },
+    { key: 'recipient', header: 'Destinataire', hideBelow: 'sm', className: 'max-w-[220px]', cell: (row) => <span className="break-all text-xs text-a-text">{row.recipient_email ?? row.recipient_masked ?? '—'}</span> },
   ];
 
   return (
@@ -179,7 +194,7 @@ export default async function PlatformEmailAnalyticsPage({ searchParams = {} }: 
           <Card>
             <div className="border-b border-a-border p-4">
               <h2 className="text-base font-semibold text-a-text">Messages</h2>
-              <p className="mt-1 text-sm text-a-text-3">Un message par destinataire. Adresses masquées ; objet issu de l’historique des envois.
+              <p className="mt-1 text-sm text-a-text-3">Un message par destinataire. Les adresses et liens cliqués ne sont enregistrés qu’à partir de la migration 172 (avant : adresse masquée, aucun lien) ; objet et commande viennent de l’historique des envois.
                 <a href="https://app.brevo.com/transactional/email/logs" target="_blank" rel="noreferrer" className="ml-2 inline-flex items-center gap-1 font-medium text-a-brand-fg hover:underline">Logs Brevo <IconExternalLink size={13} aria-hidden="true" /></a>
               </p>
             </div>

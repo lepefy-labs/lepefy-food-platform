@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
       message_id: event.messageId,
       recipient_hash: hash,
       recipient_masked: maskEmail(event.email),
+      recipient_email: event.email.slice(0, 254),
       event: event.event,
       raw_event: event.rawEvent,
       occurred_at: event.occurredAt.toISOString(),
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
       template_id: event.templateId,
       reason: event.reason,
       link_host: event.linkHost,
+      link_url: event.linkUrl,
     });
   }
 

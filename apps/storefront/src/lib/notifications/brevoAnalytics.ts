@@ -44,6 +44,9 @@ export interface MessageRow {
   has_error: boolean;
   has_deferred: boolean;
   recipient_masked: string | null;
+  /** Readable address (rows received after migration 172); older rows only have the masked form. */
+  recipient_email: string | null;
+  links: string[] | null;
   tags: string[] | null;
   template_id: number | null;
   reason: string | null;
@@ -253,7 +256,7 @@ export function shopDayStart(day: string): string {
 
 // ─── Loader ─────────────────────────────────────────────────────────────────
 
-const COLUMNS = 'message_id, recipient_hash, first_event_at, sent_at, delivered_at, first_open_at, proxy_open_at, click_at, click_events, open_events, failed_at, failure_event, has_error, has_deferred, recipient_masked, tags, template_id, reason, delivery_id, tenant_id, notification_type, subject, entity_type, entity_id';
+const COLUMNS = 'message_id, recipient_hash, first_event_at, sent_at, delivered_at, first_open_at, proxy_open_at, click_at, click_events, open_events, failed_at, failure_event, has_error, has_deferred, recipient_masked, recipient_email, links, tags, template_id, reason, delivery_id, tenant_id, notification_type, subject, entity_type, entity_id';
 const VIEW = 'brevo_email_message_summary';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

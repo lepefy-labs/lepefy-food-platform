@@ -25,12 +25,15 @@ notification_deliveries.provider_message_id ◄── join in view ─┘  brevo
   (join su `provider_message_id` = `message-id` Brevo). Così un evento arrivato prima che il ledger sia scritto,
   o fuori ordine, viene comunque attribuito.
 - **Messaggio = (message-id, destinatario).** Brevo usa lo stesso `message-id` per tutti i destinatari di un invio:
-  il destinatario è un HMAC (`TRACKING_SECRET`, fallback `BREVO_WEBHOOK_TOKEN`); l'indirizzo non è mai salvato,
-  solo una forma mascherata `m***@dominio`.
+  la chiave è un HMAC del destinatario (`TRACKING_SECRET`, fallback `BREVO_WEBHOOK_TOKEN`). Dalla migrazione 172
+  (decisione di prodotto) si salva anche l'indirizzo leggibile (`recipient_email`, solo service role, stessa retention);
+  le righe precedenti hanno solo la forma mascherata `m***@dominio`.
 - **Dedupe.** `event_key = sha256(message-id, recipient_hash, evento, timestamp Brevo)` con indice unico:
   un retry di Brevo è un no-op, una seconda apertura reale (altro timestamp) è una nuova riga.
 - **Fuori ordine.** La view aggrega con `min/bool_or` per messaggio, non con una macchina a stati: l'ordine di arrivo non conta.
-- **Non salvati:** oggetto (viene dal ledger), URL completi dei click (solo host), indirizzi nei motivi di bounce (mascherati), IP.
+- **Link cliccato:** si salva `link_url` = origine + percorso, **mai** query né fragment, con i segmenti che sembrano token (base64url misto maiuscole/minuscole/cifre ≥ 20 caratteri, esadecimali lunghi) sostituiti da `…` (es. `/o/<token>` → `/o/…`). Si mostrano tutti i link distinti cliccati da un messaggio.
+- **Ordine collegato:** `tenant_notification_events.entity_*` del ledger (link «Voir la commande»); assente per i messaggi senza evento di dominio (es. test dalla console).
+- **Non salvati:** oggetto (viene dal ledger), query dei link, indirizzi nei motivi di bounce (mascherati), IP.
 - **Retention:** 180 giorni, `purge_brevo_email_events()` chiamata in modo opportunistico (~1 richiesta su 200) dal webhook.
 
 ## Eventi gestiti (payload Brevo → interno)

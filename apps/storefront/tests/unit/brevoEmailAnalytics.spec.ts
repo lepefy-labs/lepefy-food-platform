@@ -4,7 +4,7 @@ import path from 'node:path';
 import { NextRequest } from 'next/server';
 import {
   classifyEmail, eventKey, isAuthorizedBrevoWebhook, isFoodEmail, maskEmail, normalizeBrevoEvent, parseBrevoEvent,
-  recipientHash, sanitizeReason, typesForCategory, NOTIFICATION_TYPE_CATEGORY,
+  recipientHash, sanitizeLink, sanitizeReason, typesForCategory, NOTIFICATION_TYPE_CATEGORY,
 } from '../../src/lib/notifications/brevoEvents';
 import {
   computeKpis, dailySeries, enrich, failureDistribution, matchesEventFilter, median, messageStatus, openKindOf,
@@ -22,7 +22,7 @@ function row(extra: Partial<MessageRow> = {}): MessageRow {
   return {
     message_id: '<m1>', recipient_hash: 'h1', first_event_at: '2026-10-27T09:00:00Z', sent_at: '2026-10-27T09:00:00Z', delivered_at: '2026-10-27T09:00:05Z',
     first_open_at: null, proxy_open_at: null, click_at: null, click_events: 0, open_events: 0, failed_at: null, failure_event: null,
-    has_error: false, has_deferred: false, recipient_masked: 'm***@example.com', tags: ['order_confirmed'], template_id: null, reason: null,
+    has_error: false, has_deferred: false, recipient_masked: 'm***@example.com', recipient_email: 'marie@example.com', links: null, tags: ['order_confirmed'], template_id: null, reason: null,
     delivery_id: 'd1', tenant_id: 't1', notification_type: 'order_confirmed', subject: 'Commande', entity_type: 'order', entity_id: 'o1', ...extra,
   };
 }
@@ -62,10 +62,22 @@ test.describe('webhook payload', () => {
     expect(parseBrevoEvent(payload({ ts_event: Math.floor(NOW.getTime() / 1000) + 10 * 86_400 }), NOW)).toMatchObject({ ok: false, reason: 'invalid_date' });
   });
 
-  test('click keeps only the host of the link, never path or query', () => {
-    const result = parseBrevoEvent(payload({ event: 'click', link: 'https://shop.chloefood.com/o/SECRET-TOKEN?sig=abc#x' }), NOW);
+  test('click host is kept; the stored link never contains the token or the query', () => {
+    const result = parseBrevoEvent(payload({ event: 'click', link: 'https://shop.chloefood.com/o/SeCrEt0TokenSeCrEt0TokenXY?sig=abc#x' }), NOW);
     expect(result.ok && result.value.linkHost).toBe('shop.chloefood.com');
-    expect(JSON.stringify(result)).not.toContain('SECRET-TOKEN');
+    expect(JSON.stringify(result)).not.toContain('SeCrEt0Token');
+  });
+
+  test('clicked link keeps origin and path, redacts token segments, drops query and fragment', () => {
+    expect(sanitizeLink('https://shop.chloefood.com/o/AbC123xyzAbC123xyzAbC12?sig=1#x')).toBe('https://shop.chloefood.com/o/…');
+    expect(sanitizeLink('https://shop.chloefood.com/products/riz-parfume-5kg-qualite-superieure')).toBe('https://shop.chloefood.com/products/riz-parfume-5kg-qualite-superieure');
+    expect(sanitizeLink('https://shop.chloefood.com/avis/donner/0123456789abcdef0123456789abcdef')).toBe('https://shop.chloefood.com/avis/donner/…');
+    expect(sanitizeLink('https://shop.chloefood.com/orders/123e4567-e89b-12d3-a456-426614174000')).toBe('https://shop.chloefood.com/orders/123e4567-e89b-12d3-a456-426614174000');
+    expect(sanitizeLink('https://shop.chloefood.com/')).toBe('https://shop.chloefood.com');
+    expect(sanitizeLink('https://user:pw@shop.chloefood.com/a')).toBe('https://shop.chloefood.com/a');
+    expect(sanitizeLink('javascript:alert(1)')).toBeNull();
+    const click = parseBrevoEvent(payload({ event: 'click', link: 'https://shop.chloefood.com/o/AbC123xyzAbC123xyzAbC12?x=1' }), NOW);
+    expect(click.ok && click.value.linkUrl).toBe('https://shop.chloefood.com/o/…');
   });
 
   test('reasons are truncated and e-mail addresses masked; tags accept string or array', () => {
@@ -148,7 +160,7 @@ test.describe('webhook security', () => {
     expect(layout).toContain("redirect('/admin')");
   });
 
-  test('migration keeps the table service-role only and never stores an address column', () => {
+  test('migration keeps the table service-role only (170 stores no address; 172 adds the readable one on purpose)', () => {
     const sql = readFileSync(path.resolve(__dirname, '../../../../supabase/migrations/170_brevo_email_events.sql'), 'utf8');
     expect(sql).toContain('enable row level security');
     expect(sql).toContain('revoke all on table public.brevo_email_events from public, anon, authenticated');

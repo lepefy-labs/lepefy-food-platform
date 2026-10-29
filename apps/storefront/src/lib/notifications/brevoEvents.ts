@@ -45,6 +45,8 @@ export interface ParsedBrevoEvent {
   templateId: number | null;
   reason: string | null;
   linkHost: string | null;
+  /** origin + path of a clicked link, opaque segments redacted; never query or fragment. */
+  linkUrl: string | null;
 }
 
 export type ParseResult =
@@ -99,6 +101,31 @@ export function linkHost(value: unknown): string | null {
   try { return new URL(text).hostname.slice(0, 120) || null; } catch { return null; }
 }
 
+const UUID_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A path segment that looks like an access token (mixed-case/digits base64url, or long hex), not a slug or an id. */
+function isOpaqueSegment(segment: string): boolean {
+  if (UUID_SEGMENT.test(segment) || segment.length < 20 || !/^[A-Za-z0-9_-]+$/.test(segment)) return false;
+  if (/^[0-9a-f]{32,}$/i.test(segment)) return true;
+  return /[A-Z]/.test(segment) && /[a-z]/.test(segment) && /\d/.test(segment);
+}
+
+/**
+ * The link the recipient clicked, safe to show the platform owner: origin and
+ * path only (no query, no fragment, no credentials), with token-looking path
+ * segments replaced by "…" (e.g. `/o/<token>` → `/o/…`).
+ */
+export function sanitizeLink(value: unknown): string | null {
+  const text = str(value);
+  if (!text) return null;
+  try {
+    const url = new URL(text);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    const path = url.pathname.split('/').map((segment) => (isOpaqueSegment(segment) ? '…' : segment)).join('/');
+    return `${url.origin}${path === '/' ? '' : path}`.slice(0, 300);
+  } catch { return null; }
+}
+
 function parseTags(payload: Record<string, unknown>): string[] {
   const raw = Array.isArray(payload.tags) ? payload.tags : payload.tag !== undefined ? [payload.tag] : [];
   const flat = raw.flatMap((item) => (typeof item === 'string' ? item.split(',') : []));
@@ -130,6 +157,7 @@ export function parseBrevoEvent(payload: unknown, now: Date = new Date()): Parse
       templateId: Number.isInteger(template) && template > 0 ? template : null,
       reason: sanitizeReason(body.reason),
       linkHost: event === 'click' ? linkHost(body.link) : null,
+      linkUrl: event === 'click' ? sanitizeLink(body.link) : null,
     },
   };
 }
