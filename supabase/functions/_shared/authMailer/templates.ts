@@ -6,7 +6,7 @@ export const MAIL_LANGUAGES = ['fr', 'it', 'en'] as const;
 export type MailLanguage = (typeof MAIL_LANGUAGES)[number];
 export const DEFAULT_MAIL_LANGUAGE: MailLanguage = 'fr';
 
-export type MailPurpose = 'login' | 'delete_account' | 'reauthentication' | 'email_change' | 'invite' | 'recovery';
+export type MailPurpose = 'login' | 'admin_login' | 'delete_account' | 'reauthentication' | 'email_change' | 'invite' | 'recovery';
 
 export interface MailBrand {
   /** Official tenant name, or "Lepefy" for platform sign-in. */
@@ -44,7 +44,8 @@ export function purposeFor(action: AuthEmailAction, kind: string): MailPurpose {
   if (action === 'email_change') return 'email_change';
   if (action === 'invite') return 'invite';
   if (action === 'recovery') return 'recovery';
-  return kind === 'deletion' ? 'delete_account' : 'login';
+  if (kind === 'deletion') return 'delete_account';
+  return kind === 'admin' || kind === 'platform' ? 'admin_login' : 'login';
 }
 
 interface Copy {
@@ -59,6 +60,7 @@ interface Copy {
 
 const COPY: Record<MailLanguage, Record<MailPurpose, Copy>> = {
   fr: {
+    admin_login: { subject: () => 'Ton code de connexion admin', title: 'Connexion à l’administration', intro: (b) => `Voici ton code pour accéder à l’espace d’administration de ${b}.`, ignore: "Si tu n'as pas demandé ce code, tu peux ignorer cet e-mail.", expiry: (m) => `Ce code expire dans ${m} minutes.`, footer: 'Connexion sécurisée par Lepefy' },
     login: { subject: () => 'Ton code de connexion', title: 'Ton code de connexion', intro: (b) => `Voici ton code pour te connecter à ${b}.`, ignore: "Si tu n'as pas demandé ce code, tu peux ignorer cet e-mail.", expiry: (m) => `Ce code expire dans ${m} minutes.`, footer: 'Connexion sécurisée par Lepefy' },
     delete_account: { subject: () => 'Ton code pour supprimer ton compte', title: 'Suppression de ton compte', intro: (b) => `Voici ton code pour confirmer la suppression de ton compte ${b}.`, ignore: "Si tu n'as pas demandé la suppression de ton compte, ignore cet e-mail : rien ne sera supprimé.", expiry: (m) => `Ce code expire dans ${m} minutes.`, footer: 'Connexion sécurisée par Lepefy' },
     reauthentication: { subject: () => 'Ton code de confirmation', title: 'Ton code de confirmation', intro: (b) => `Voici ton code pour confirmer ton action sur ${b}.`, ignore: "Si tu n'as pas demandé ce code, tu peux ignorer cet e-mail.", expiry: (m) => `Ce code expire dans ${m} minutes.`, footer: 'Connexion sécurisée par Lepefy' },
@@ -67,6 +69,7 @@ const COPY: Record<MailLanguage, Record<MailPurpose, Copy>> = {
     recovery: { subject: () => 'Réinitialise ton mot de passe', title: 'Réinitialisation du mot de passe', intro: (b) => `Utilise le bouton ci-dessous pour choisir un nouveau mot de passe pour ${b}.`, cta: 'Choisir un mot de passe', ignore: "Si tu n'as pas fait cette demande, ignore cet e-mail.", expiry: (m) => `Ce lien expire dans ${m} minutes.`, footer: 'Connexion sécurisée par Lepefy' },
   },
   it: {
+    admin_login: { subject: () => 'Il tuo codice di accesso amministratore', title: 'Accesso all’amministrazione', intro: (b) => `Ecco il tuo codice per accedere all’area di amministrazione di ${b}.`, ignore: 'Se non hai richiesto questo codice, puoi ignorare questa e-mail.', expiry: (m) => `Il codice scade tra ${m} minuti.`, footer: 'Accesso protetto da Lepefy' },
     login: { subject: () => 'Il tuo codice di accesso', title: 'Il tuo codice di accesso', intro: (b) => `Ecco il tuo codice per accedere a ${b}.`, ignore: 'Se non hai richiesto questo codice, puoi ignorare questa e-mail.', expiry: (m) => `Il codice scade tra ${m} minuti.`, footer: 'Accesso protetto da Lepefy' },
     delete_account: { subject: () => 'Il tuo codice per eliminare l’account', title: 'Eliminazione del tuo account', intro: (b) => `Ecco il tuo codice per confermare l’eliminazione dell’account ${b}.`, ignore: 'Se non hai richiesto l’eliminazione, ignora questa e-mail: non verrà eliminato nulla.', expiry: (m) => `Il codice scade tra ${m} minuti.`, footer: 'Accesso protetto da Lepefy' },
     reauthentication: { subject: () => 'Il tuo codice di conferma', title: 'Il tuo codice di conferma', intro: (b) => `Ecco il tuo codice per confermare l’operazione su ${b}.`, ignore: 'Se non hai richiesto questo codice, puoi ignorare questa e-mail.', expiry: (m) => `Il codice scade tra ${m} minuti.`, footer: 'Accesso protetto da Lepefy' },
@@ -75,6 +78,7 @@ const COPY: Record<MailLanguage, Record<MailPurpose, Copy>> = {
     recovery: { subject: () => 'Reimposta la tua password', title: 'Reimpostazione della password', intro: (b) => `Usa il pulsante qui sotto per scegliere una nuova password per ${b}.`, cta: 'Scegli una password', ignore: 'Se non hai fatto tu questa richiesta, ignora questa e-mail.', expiry: (m) => `Il link scade tra ${m} minuti.`, footer: 'Accesso protetto da Lepefy' },
   },
   en: {
+    admin_login: { subject: () => 'Your admin sign-in code', title: 'Admin sign-in', intro: (b) => `Here is your code to access the ${b} admin area.`, ignore: "If you didn't request this code, you can ignore this email.", expiry: (m) => `This code expires in ${m} minutes.`, footer: 'Secure sign-in by Lepefy' },
     login: { subject: () => 'Your sign-in code', title: 'Your sign-in code', intro: (b) => `Here is your code to sign in to ${b}.`, ignore: "If you didn't request this code, you can ignore this email.", expiry: (m) => `This code expires in ${m} minutes.`, footer: 'Secure sign-in by Lepefy' },
     delete_account: { subject: () => 'Your code to delete your account', title: 'Deleting your account', intro: (b) => `Here is your code to confirm the deletion of your ${b} account.`, ignore: "If you didn't ask to delete your account, ignore this email: nothing will be deleted.", expiry: (m) => `This code expires in ${m} minutes.`, footer: 'Secure sign-in by Lepefy' },
     reauthentication: { subject: () => 'Your confirmation code', title: 'Your confirmation code', intro: (b) => `Here is your code to confirm your action on ${b}.`, ignore: "If you didn't request this code, you can ignore this email.", expiry: (m) => `This code expires in ${m} minutes.`, footer: 'Secure sign-in by Lepefy' },

@@ -118,6 +118,8 @@ test.describe('Auth Mailer — OTP and branding', () => {
     await handleAuthMailHook(await hookRequest(await otpPayload({ kind: 'admin', tid: OTHER, email: 'a@x.com' })), deps);
     await handleAuthMailHook(await hookRequest(await otpPayload({ kind: 'platform', tid: null, email: 'p@x.com' }), { id: 'h_p' }), deps);
     expect(sent[0]!.from).toContain('Mama Spice');
+    expect(sent[0]!.subject).toBe('Il tuo codice di accesso amministratore');
+    expect(sent[1]!.subject).toBe('Ton code de connexion admin');
     expect(sent[1]!.from).toBe('"Lepefy" <no-reply@auth.lepefy.com>');
     expect(sent[1]!.html).toContain('Connexion sécurisée par Lepefy');
   });
