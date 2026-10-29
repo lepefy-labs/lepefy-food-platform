@@ -1,4 +1,5 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { authMailRedirectOptions } from '@/lib/authMailer/otpContext';
 import { normalizeCustomerEmail } from '@/lib/customers/normalizeCustomerIdentity';
 
 export async function requestOtp(
@@ -11,7 +12,10 @@ export async function requestOtp(
 
   const { error } = await supabase.auth.signInWithOtp({
     email: normalizedEmail,
-    options: { shouldCreateUser: true },
+    options: {
+      shouldCreateUser: true,
+      ...(await authMailRedirectOptions({ tenantId, kind: 'customer', email: normalizedEmail })),
+    },
   });
 
   if (error) {

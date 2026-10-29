@@ -221,6 +221,10 @@ The shipping logic is the most complex part of the codebase:
 - Visitors get an ephemeral `demo_visitor` account (read-only `*.view`, 4 h, `POST /api/demo/visit`); `getAdminAccessContext` refuses an expired visit and `tests/unit/demoExperience.spec.ts` fails if an admin write API becomes reachable with a visitor capability. The root layout renders `DemoRibbon`/`DemoTour` (and the private-demo gate, which reads a cookie) only when the demo is active — never on a production deployment.
 - Data: `scripts/demo/seed-demo.mjs` (scenarios in `scripts/demo/scenarios`, deterministic plan, idempotent, refuses any DB whose URL is not `DEMO_SUPABASE_PROJECT_REF`). Reset = tenant rotation (append-only tables forbid DELETE), refused during a presentation lease. Schema of the demo DB: `scripts/demo/build-demo-schema.mjs` / workflow `demo-database`; apply each new migration there too.
 
+### Auth Mailer (Auth emails per tenant) — `docs/AUTH_MAILER_MULTITENANT.md`
+
+- Supabase Send Email Hook → Edge Function `auth-mailer` → Resend; Supabase keeps OTP/sessions. Tenant ONLY from the signed `lctx` context in `redirect_to` (`lib/authMailer/core/contextToken.ts`), never from the email/user_metadata; invalid context = fail closed. Edit the core in `src/lib/authMailer/core`, then run `node apps/storefront/scripts/syncAuthMailer.mjs` (a unit test fails when `supabase/functions/_shared/authMailer` is stale). Sender address is fixed to `@auth.lepefy.com`. The hook is activated manually in Supabase (cutover needs explicit approval); `AUTH_MAILER_CONTEXT_ENABLED` keeps the storefront inert until then. Never log codes, tokens or links.
+
 ### Subscription lifecycle and suspension — `docs/SUBSCRIPTION_LIFECYCLE.md`
 
 - One engine: `lib/billing/tenantServiceState.ts` (`getTenantServiceState`, `isModuleAvailable`, `guardModule`). Suspended = manual (`tenant_subscriptions.status = 'suspended'`) or automatic past `paid_until + grace_days`, computed at read time; per-module suspension in `tenant_module_suspensions`. Fail-open without migration 144.

@@ -1,0 +1,121 @@
+/**
+ * Supabase Send Email Hook payload: validation and "who gets which email".
+ * https://supabase.com/docs/guides/auth/auth-hooks/send-email-hook
+ */
+export const CODE_ACTIONS = ['magiclink', 'email', 'signup', 'reauthentication'] as const;
+export const LINK_ACTIONS = ['invite', 'recovery'] as const;
+export const NOTIFICATION_ACTIONS = [
+  'password_changed_notification', 'email_changed_notification', 'phone_changed_notification',
+  'identity_linked_notification', 'identity_unlinked_notification',
+  'mfa_factor_enrolled_notification', 'mfa_factor_unenrolled_notification',
+] as const;
+
+export type AuthEmailAction =
+  | (typeof CODE_ACTIONS)[number] | (typeof LINK_ACTIONS)[number] | 'email_change'
+  | (typeof NOTIFICATION_ACTIONS)[number];
+
+const ALL_ACTIONS: readonly string[] = [...CODE_ACTIONS, ...LINK_ACTIONS, 'email_change', ...NOTIFICATION_ACTIONS];
+
+export interface SendEmailHookPayload {
+  user: { id: string; email: string; new_email?: string };
+  email_data: {
+    token: string;
+    token_hash: string;
+    token_new?: string;
+    token_hash_new?: string;
+    redirect_to: string;
+    site_url?: string;
+    email_action_type: AuthEmailAction;
+  };
+}
+
+export type PayloadResult = { ok: true; payload: SendEmailHookPayload } | { ok: false; reason: string };
+
+const EMAIL_RE = /^[^\s@<>",;:\\]+@[^\s@<>",;:\\]+\.[^\s@<>",;:\\]+$/;
+const str = (v: unknown): v is string => typeof v === 'string';
+
+export function parseHookPayload(raw: unknown): PayloadResult {
+  if (typeof raw !== 'object' || raw === null) return { ok: false, reason: 'payload_not_object' };
+  const { user, email_data: data } = raw as Record<string, unknown>;
+  if (typeof user !== 'object' || user === null) return { ok: false, reason: 'missing_user' };
+  if (typeof data !== 'object' || data === null) return { ok: false, reason: 'missing_email_data' };
+  const u = user as Record<string, unknown>;
+  const d = data as Record<string, unknown>;
+
+  if (!str(u.id) || !str(u.email) || !EMAIL_RE.test(u.email) || u.email.length > 254) return { ok: false, reason: 'invalid_user' };
+  if (u.new_email !== undefined && u.new_email !== '' && (!str(u.new_email) || !EMAIL_RE.test(u.new_email))) {
+    return { ok: false, reason: 'invalid_new_email' };
+  }
+  if (!str(d.email_action_type) || !ALL_ACTIONS.includes(d.email_action_type)) return { ok: false, reason: 'unknown_action' };
+  if (!str(d.redirect_to) && d.redirect_to !== undefined) return { ok: false, reason: 'invalid_redirect' };
+  for (const k of ['token', 'token_hash', 'token_new', 'token_hash_new', 'site_url'] as const) {
+    if (d[k] !== undefined && !str(d[k])) return { ok: false, reason: `invalid_${k}` };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      user: { id: u.id, email: u.email, ...(str(u.new_email) && u.new_email ? { new_email: u.new_email } : {}) },
+      email_data: {
+        token: (d.token as string | undefined) ?? '',
+        token_hash: (d.token_hash as string | undefined) ?? '',
+        token_new: (d.token_new as string | undefined) || undefined,
+        token_hash_new: (d.token_hash_new as string | undefined) || undefined,
+        redirect_to: (d.redirect_to as string | undefined) ?? '',
+        site_url: d.site_url as string | undefined,
+        email_action_type: d.email_action_type as AuthEmailAction,
+      },
+    },
+  };
+}
+
+export interface PlannedEmail {
+  to: string;
+  /** Distinguishes the two emails of a secure email change (idempotency key part). */
+  role: 'primary' | 'current_address' | 'new_address';
+  action: AuthEmailAction;
+  code?: string;
+  tokenHash?: string;
+}
+
+const CODE_RE = /^\d{6,10}$/;
+const HASH_RE = /^[\w-]{10,64}$/;
+
+/**
+ * Secure email change sends TWO hook emails' worth of data in one call:
+ * the current address gets `token`, the new address gets `token_new`
+ * (the hash field names are crossed for backward compatibility, but we only
+ * ever show the code, so that does not matter here). With secure change off
+ * there is one email to the new address, with whichever code is present.
+ */
+export function planEmails(p: SendEmailHookPayload): { ok: true; emails: PlannedEmail[] } | { ok: false; reason: string } {
+  const { user, email_data: d } = p;
+  const action = d.email_action_type;
+
+  if ((NOTIFICATION_ACTIONS as readonly string[]).includes(action)) return { ok: true, emails: [] };
+
+  if (action === 'email_change') {
+    const newAddress = user.new_email;
+    if (!newAddress) return { ok: false, reason: 'email_change_without_new_email' };
+    if (d.token_new && d.token && CODE_RE.test(d.token) && CODE_RE.test(d.token_new)) {
+      return {
+        ok: true,
+        emails: [
+          { to: user.email, role: 'current_address', action, code: d.token },
+          { to: newAddress, role: 'new_address', action, code: d.token_new },
+        ],
+      };
+    }
+    const code = d.token_new && CODE_RE.test(d.token_new) ? d.token_new : d.token;
+    if (!CODE_RE.test(code)) return { ok: false, reason: 'missing_code' };
+    return { ok: true, emails: [{ to: newAddress, role: 'new_address', action, code }] };
+  }
+
+  if ((LINK_ACTIONS as readonly string[]).includes(action)) {
+    if (!HASH_RE.test(d.token_hash)) return { ok: false, reason: 'missing_token_hash' };
+    return { ok: true, emails: [{ to: user.email, role: 'primary', action, tokenHash: d.token_hash }] };
+  }
+
+  if (!CODE_RE.test(d.token)) return { ok: false, reason: 'missing_code' };
+  return { ok: true, emails: [{ to: user.email, role: 'primary', action, code: d.token }] };
+}

@@ -1,4 +1,5 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
+import { authMailRedirectOptions } from '@/lib/authMailer/otpContext';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import {
   buildAccountDeletionOtpRequest,
@@ -23,7 +24,11 @@ export async function requestAccountDeletionOtp(
   if (customerError) throw customerError;
   if (!customer?.auth_user_id) return { sent: true };
 
-  const { error } = await createClient().auth.signInWithOtp(buildAccountDeletionOtpRequest(email));
+  const request = buildAccountDeletionOtpRequest(email);
+  const { error } = await createClient().auth.signInWithOtp({
+    ...request,
+    options: { ...request.options, ...(await authMailRedirectOptions({ tenantId, kind: 'deletion', email })) },
+  });
   if (error) throw error;
   return { sent: true };
 }

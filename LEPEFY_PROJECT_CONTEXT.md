@@ -9,6 +9,10 @@
 
 ---
 
+## Lepefy Auth Mailer (migration 173 — non applicata in produzione; hook Supabase NON attivato) — `docs/AUTH_MAILER_MULTITENANT.md`
+
+Email Auth (OTP cliente/admin/platform, cancellazione account, email change) via Supabase Send Email Hook → Edge Function `supabase/functions/auth-mailer` → Resend, mittente `"<nome tenant>" <no-reply@auth.lepefy.com>`. Supabase resta proprietario di OTP, scadenze e sessioni. Il tenant arriva solo da un contesto firmato HMAC (`lctx`, 10 min, legato al destinatario) nel `redirect_to` di `signInWithOtp` (`lib/authMailer/otpContext.ts`, attivo solo con `AUTH_MAILER_CONTEXT_ENABLED=1`); senza contesto valido l'hook fallisce chiuso. Codice unico in `src/lib/authMailer/core` (Web Crypto), copia generata per Deno in `supabase/functions/_shared/authMailer` (`scripts/syncAuthMailer.mjs`, test di sincronia). Tabelle `tenant_auth_mail_settings` e `auth_mail_log` (service role). Pagina platform `/admin/platform/notifications/auth-mail`. Il team invite usa `createUser` (nessuna email Auth). Cutover e rollback: vedi documento.
+
 ## Nala Knowledge Library e assistenza all'acquisto (24 ottobre 2026)
 
 La migration 168, **da applicare prima di rendere operativa la nuova AI Lab**, aggiunge `knowledge_library` (versioni editoriali verificate, scope globale o culturale e provenienza), campi di origine/revisione su `tenant_knowledge_base`, `tenant_knowledge_revisions` append-only e un filtro `deleted_at` nel retrieval. Sette testi francesi iniziali descrivono soltanto processi stabili e contesto camerunese; nessuna conoscenza viene attivata automaticamente per un tenant. Le tre voci su francese informale, ambiguità e saluti restano istruzioni comportamentali del prompt, evitando duplicati documentali. Le ricette future richiedono verifica editoriale prima della pubblicazione.

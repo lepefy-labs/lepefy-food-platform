@@ -1,0 +1,31 @@
+export const DEFAULT_SENDER_NAME = 'Lepefy';
+export const DEFAULT_FROM_ADDRESS = 'no-reply@auth.lepefy.com';
+const MAX_NAME_LENGTH = 60;
+
+/**
+ * Display name of the sender. Server-side only, from the tenant's official name
+ * (or a platform-owner override). The address is NEVER tenant-controlled.
+ * Removes header-injection characters and anything that makes the name look
+ * like an address or a URL (spoofing), then caps the length.
+ */
+export function sanitizeSenderName(raw: string | null | undefined): string {
+  if (!raw) return DEFAULT_SENDER_NAME;
+  const cleaned = raw
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/g, ' ')
+    .replace(/[<>"\\@;:,]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned || /https?|www\.|\.[a-z]{2,}\b/i.test(cleaned) || cleaned.length < 2) return DEFAULT_SENDER_NAME;
+  return cleaned.slice(0, MAX_NAME_LENGTH).trim();
+}
+
+/** Only an address on the verified technical domain is accepted, whatever the config says. */
+export function resolveFromAddress(envValue: string | undefined): string {
+  const value = (envValue ?? '').trim().toLowerCase();
+  return /^[a-z0-9._-]+@auth\.lepefy\.com$/.test(value) ? value : DEFAULT_FROM_ADDRESS;
+}
+
+export function formatFrom(name: string, address: string): string {
+  return `"${sanitizeSenderName(name)}" <${address}>`;
+}

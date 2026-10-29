@@ -1,0 +1,140 @@
+import { base64UrlToBytes, bytesToBase64Url, bytesToHex, constantTimeEqual, hmacSha256, utf8 } from './encoding';
+
+/**
+ * Signed, expiring tenant context carried from the storefront to the Auth
+ * Mailer inside the `redirect_to` URL of the Supabase OTP request
+ * (`email_data.redirect_to` in the Send Email Hook payload).
+ *
+ * It is the ONLY source of the tenant for an Auth email: never the recipient
+ * address, user_metadata or the last tenant used. Altering it needs the shared
+ * secret; the binding to the recipient address stops reusing a captured token
+ * for another address.
+ */
+export const CONTEXT_PARAM = 'lctx';
+export const CONTEXT_TTL_SECONDS = 600;
+const CLOCK_SKEW_SECONDS = 60;
+
+export const CONTEXT_KINDS = ['customer', 'admin', 'platform', 'deletion'] as const;
+export type ContextKind = (typeof CONTEXT_KINDS)[number];
+
+export interface AuthMailContext {
+  v: 1;
+  /** Canonical tenant id; null only for platform-owner sign-in. */
+  tid: string | null;
+  kind: ContextKind;
+  /** Correlation id, unique per request. */
+  cid: string;
+  iat: number;
+  exp: number;
+  /** Keyed hash of the normalised recipient address. */
+  eh: string;
+  /** Admin workspace (optional, informational). */
+  ws?: string;
+}
+
+export type ContextFailure =
+  | 'missing' | 'malformed' | 'bad_signature' | 'expired' | 'not_yet_valid' | 'email_mismatch' | 'invalid_claims';
+
+export function normalizeRecipient(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+export async function emailBinding(secret: string, email: string): Promise<string> {
+  const mac = await hmacSha256(utf8(secret), utf8(`email:${normalizeRecipient(email)}`));
+  return bytesToHex(mac).slice(0, 32);
+}
+
+async function mac(secret: string, payloadB64: string): Promise<Uint8Array> {
+  return hmacSha256(utf8(secret), utf8(`lepefy-auth-mail.v1.${payloadB64}`));
+}
+
+export async function issueContext(
+  secret: string,
+  input: {
+    tid: string | null;
+    kind: ContextKind;
+    email: string;
+    cid?: string;
+    ws?: string;
+    nowSeconds?: number;
+    ttlSeconds?: number;
+  },
+): Promise<string> {
+  const iat = input.nowSeconds ?? Math.floor(Date.now() / 1000);
+  const claims: AuthMailContext = {
+    v: 1,
+    tid: input.tid,
+    kind: input.kind,
+    cid: input.cid ?? crypto.randomUUID(),
+    iat,
+    exp: iat + (input.ttlSeconds ?? CONTEXT_TTL_SECONDS),
+    eh: await emailBinding(secret, input.email),
+    ...(input.ws ? { ws: input.ws } : {}),
+  };
+  const payload = bytesToBase64Url(utf8(JSON.stringify(claims)));
+  return `${payload}.${bytesToBase64Url(await mac(secret, payload))}`;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function verifyContext(
+  secret: string,
+  token: string | null | undefined,
+  recipients: string[],
+  nowSeconds: number,
+): Promise<{ ok: true; context: AuthMailContext } | { ok: false; reason: ContextFailure }> {
+  if (!token) return { ok: false, reason: 'missing' };
+  const parts = token.split('.');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return { ok: false, reason: 'malformed' };
+  const [payload, sig] = parts as [string, string];
+
+  let sigBytes: Uint8Array;
+  try {
+    sigBytes = base64UrlToBytes(sig);
+  } catch {
+    return { ok: false, reason: 'malformed' };
+  }
+  if (!constantTimeEqual(sigBytes, await mac(secret, payload))) return { ok: false, reason: 'bad_signature' };
+
+  let claims: AuthMailContext;
+  try {
+    claims = JSON.parse(new TextDecoder().decode(base64UrlToBytes(payload))) as AuthMailContext;
+  } catch {
+    return { ok: false, reason: 'malformed' };
+  }
+
+  const kindOk = (CONTEXT_KINDS as readonly string[]).includes(claims.kind);
+  const tidOk = claims.kind === 'platform'
+    ? claims.tid === null
+    : typeof claims.tid === 'string' && UUID_RE.test(claims.tid);
+  if (claims.v !== 1 || !kindOk || !tidOk || typeof claims.cid !== 'string' || typeof claims.eh !== 'string'
+    || !Number.isInteger(claims.iat) || !Number.isInteger(claims.exp)) {
+    return { ok: false, reason: 'invalid_claims' };
+  }
+  if (claims.iat > nowSeconds + CLOCK_SKEW_SECONDS) return { ok: false, reason: 'not_yet_valid' };
+  if (claims.exp < nowSeconds) return { ok: false, reason: 'expired' };
+
+  const ehBytes = utf8(claims.eh);
+  let bound = false;
+  for (const r of recipients) {
+    if (constantTimeEqual(ehBytes, utf8(await emailBinding(secret, r)))) bound = true;
+  }
+  if (!bound) return { ok: false, reason: 'email_mismatch' };
+  return { ok: true, context: claims };
+}
+
+/** Appends the context to a base URL as the `lctx` query parameter. */
+export function withContext(baseUrl: string, token: string): string {
+  const url = new URL(baseUrl);
+  url.searchParams.set(CONTEXT_PARAM, token);
+  return url.toString();
+}
+
+export function contextFromRedirect(redirectTo: string | null | undefined): string | null {
+  if (!redirectTo) return null;
+  try {
+    return new URL(redirectTo).searchParams.get(CONTEXT_PARAM);
+  } catch {
+    return null;
+  }
+}

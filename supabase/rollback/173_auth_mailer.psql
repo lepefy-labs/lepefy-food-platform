@@ -1,0 +1,10 @@
+-- psql-only rollback for migration 173 (Lepefy Auth Mailer).
+-- Run: psql -v ON_ERROR_STOP=1 -f supabase/rollback/173_auth_mailer.psql
+-- Disable the Send Email Hook in Supabase (Auth > Hooks) BEFORE dropping, otherwise
+-- the function loses its settings/log tables (the function tolerates missing
+-- settings but would fail closed on nothing else). The audit log is lost.
+\set ON_ERROR_STOP on
+begin;
+drop table if exists public.auth_mail_log;
+drop table if exists public.tenant_auth_mail_settings;
+commit;

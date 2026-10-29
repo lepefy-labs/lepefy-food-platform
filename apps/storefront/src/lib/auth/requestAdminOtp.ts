@@ -1,3 +1,4 @@
+import { authMailRedirectOptions } from '@/lib/authMailer/otpContext';
 import { createServiceClient } from '@/lib/supabase/server';
 
 // Échappe % et _ (wildcards ILIKE) avant un filtre .ilike() sans intention de
@@ -18,7 +19,7 @@ export async function requestAdminOtp(email: string): Promise<{ sent: boolean; e
   // insensible à la casse.
   const { data: admin } = await adminClient
     .from('admin_users')
-    .select('id')
+    .select('id, role, tenant_id')
     .ilike('email', escapeIlike(trimmedEmail))
     .eq('active', true)
     .maybeSingle();
@@ -37,7 +38,16 @@ export async function requestAdminOtp(email: string): Promise<{ sent: boolean; e
   // compte fantôme.
   const { error } = await adminClient.auth.signInWithOtp({
     email: trimmedEmail,
-    options: { shouldCreateUser: false },
+    options: {
+      shouldCreateUser: false,
+      // Tenant of the admin row (platform_owner has none → "Lepefy" identity).
+      ...(await authMailRedirectOptions({
+        tenantId: admin.role === 'platform_owner' ? null : (admin.tenant_id as string | null),
+        kind: admin.role === 'platform_owner' || !admin.tenant_id ? 'platform' : 'admin',
+        email: trimmedEmail,
+        redirectPath: '/admin',
+      })),
+    },
   });
 
   if (error) {

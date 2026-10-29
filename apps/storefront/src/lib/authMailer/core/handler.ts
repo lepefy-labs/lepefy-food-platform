@@ -1,0 +1,148 @@
+import { contextFromRedirect, verifyContext, type AuthMailContext } from './contextToken';
+import { parseHookPayload, planEmails, type PlannedEmail } from './payload';
+import type { MailTransport } from './resend';
+import { DEFAULT_SENDER_NAME, formatFrom, sanitizeSenderName } from './sender';
+import { MAIL_LANGUAGES, purposeFor, renderAuthEmail, resolveLanguage, type MailBrand, type MailLanguage } from './templates';
+import { verifyWebhook } from './webhook';
+
+export interface TenantMailConfig {
+  id: string;
+  name: string;
+  active: boolean;
+  logoUrl: string | null;
+  color: string | null;
+  /** tenants.locale (e.g. "fr-FR") and tenants.locales (e.g. ["fr","it"]). */
+  locale: string | null;
+  locales: string[];
+  /** tenant_auth_mail_settings (platform owner only). Absent row = defaults. */
+  enabled: boolean;
+  senderNameOverride: string | null;
+  languageOverride: string | null;
+}
+
+export interface AuditEntry {
+  tenantId: string | null;
+  kind: string | null;
+  emailActionType: string | null;
+  outcome: 'accepted' | 'failed' | 'rejected' | 'skipped';
+  errorCode: string | null;
+  durationMs: number;
+  providerMessageId: string | null;
+  correlationId: string | null;
+}
+
+export interface HandlerDeps {
+  webhookSecret: string;
+  contextSecret: string;
+  fromAddress: string;
+  /** Real Auth OTP expiry in minutes; null = unknown, so nothing is promised in the email. */
+  otpExpiryMinutes: number | null;
+  /** https://<project>.supabase.co, to build verify links for invite/recovery. */
+  supabaseUrl: string;
+  nowMs: () => number;
+  loadTenant: (id: string) => Promise<TenantMailConfig | null>;
+  transport: MailTransport;
+  audit: (entry: AuditEntry) => Promise<void>;
+}
+
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+// Supabase surfaces `error.message` to its caller; keep it generic, codes carry the detail.
+const fail = (status: number, code: string) => json(status, { error: { http_code: status, message: code } });
+
+export function brandFor(tenant: TenantMailConfig | null): MailBrand {
+  if (!tenant) return { name: DEFAULT_SENDER_NAME, logoUrl: null, color: null };
+  return { name: sanitizeSenderName(tenant.senderNameOverride ?? tenant.name), logoUrl: tenant.logoUrl, color: tenant.color };
+}
+
+export function languageFor(tenant: TenantMailConfig | null): MailLanguage {
+  if (!tenant) return 'fr';
+  const override = (MAIL_LANGUAGES as readonly string[]).includes(tenant.languageOverride ?? '') ? tenant.languageOverride : null;
+  return resolveLanguage([override, tenant.locales[0], tenant.locale]);
+}
+
+export async function handleAuthMailHook(req: Request, deps: HandlerDeps): Promise<Response> {
+  const started = deps.nowMs();
+  const done = (entry: Omit<AuditEntry, 'durationMs'>) =>
+    deps.audit({ ...entry, durationMs: Math.max(0, deps.nowMs() - started) }).catch(() => undefined);
+  const reject = async (status: number, code: string, ctx?: Partial<AuditEntry>) => {
+    await done({
+      tenantId: ctx?.tenantId ?? null, kind: ctx?.kind ?? null, emailActionType: ctx?.emailActionType ?? null,
+      outcome: 'rejected', errorCode: code, providerMessageId: null, correlationId: ctx?.correlationId ?? null,
+    });
+    return fail(status, code);
+  };
+
+  if (req.method !== 'POST') return fail(405, 'method_not_allowed');
+
+  const body = await req.text();
+  const verdict = await verifyWebhook(deps.webhookSecret, req.headers, body, Math.floor(deps.nowMs() / 1000));
+  // No audit row before the signature is proven: unauthenticated callers must not write to our log.
+  if (!verdict.ok) return fail(401, `signature_${verdict.reason}`);
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(body);
+  } catch {
+    return reject(400, 'payload_not_json');
+  }
+  const parsed = parseHookPayload(raw);
+  if (!parsed.ok) return reject(400, `payload_${parsed.reason}`);
+  const { payload } = parsed;
+  const action = payload.email_data.email_action_type;
+
+  const plan = planEmails(payload);
+  if (!plan.ok) return reject(400, `payload_${plan.reason}`, { emailActionType: action });
+  if (plan.emails.length === 0) {
+    // Security notifications are not part of this mailer: acknowledge without sending.
+    await done({ tenantId: null, kind: null, emailActionType: action, outcome: 'skipped', errorCode: null, providerMessageId: null, correlationId: null });
+    return json(200, {});
+  }
+
+  // Tenant context: signed token from redirect_to, never the recipient or user_metadata.
+  const recipients = [payload.user.email, ...(payload.user.new_email ? [payload.user.new_email] : [])];
+  const ctx = await verifyContext(
+    deps.contextSecret, contextFromRedirect(payload.email_data.redirect_to), recipients, Math.floor(deps.nowMs() / 1000),
+  );
+  if (!ctx.ok) return reject(403, `context_${ctx.reason}`, { emailActionType: action });
+  const context: AuthMailContext = ctx.context;
+  const audit = { tenantId: context.tid, kind: context.kind, emailActionType: action, correlationId: context.cid };
+
+  let tenant: TenantMailConfig | null = null;
+  if (context.kind !== 'platform') {
+    tenant = context.tid ? await deps.loadTenant(context.tid) : null;
+    if (!tenant) return reject(403, 'tenant_not_found', audit);
+    if (!tenant.active) return reject(403, 'tenant_inactive', audit);
+    if (!tenant.enabled) return reject(403, 'tenant_mail_disabled', audit);
+  }
+
+  const brand = brandFor(tenant);
+  const language = languageFor(tenant);
+  const from = formatFrom(brand.name, deps.fromAddress);
+  const isLink = action === 'invite' || action === 'recovery';
+
+  let firstFailure: string | null = null;
+  let lastId: string | null = null;
+  for (const email of plan.emails as PlannedEmail[]) {
+    const link = isLink && email.tokenHash
+      ? `${deps.supabaseUrl}/auth/v1/verify?token=${encodeURIComponent(email.tokenHash)}&type=${action}&redirect_to=${encodeURIComponent(payload.email_data.redirect_to)}`
+      : undefined;
+    const rendered = renderAuthEmail({
+      purpose: purposeFor(action, context.kind), language, brand, code: email.code, link, expiryMinutes: deps.otpExpiryMinutes,
+    });
+    const res = await deps.transport({
+      from, to: email.to, subject: rendered.subject, html: rendered.html, text: rendered.text,
+      idempotencyKey: `auth-mail/${verdict.webhookId}/${email.role}`,
+    });
+    if (res.ok) lastId = res.providerMessageId;
+    else firstFailure ??= res.code;
+  }
+
+  if (firstFailure) {
+    await done({ ...audit, outcome: 'failed', errorCode: firstFailure, providerMessageId: lastId });
+    return fail(502, 'email_provider_failed');
+  }
+  await done({ ...audit, outcome: 'accepted', errorCode: null, providerMessageId: lastId });
+  return json(200, {});
+}
