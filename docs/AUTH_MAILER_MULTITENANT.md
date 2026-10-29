@@ -1,6 +1,6 @@
 # Lepefy Auth Mailer (multi-tenant Auth emails)
 
-Reviewed base: `cf107483` (2026-10-29). Status: **code ready, hook NOT activated** (see §9).
+Reviewed base: `cf107483` (2026-10-29). Status: **live in production since 2026-10-29** (migration 173, function `auth-mailer`, Send Email hook enabled; customer and admin OTP verified with real emails; platform-owner and account-deletion emails not yet exercised).
 
 ## 1. Architecture
 
@@ -22,7 +22,7 @@ Code layout (single source of truth, tested in the storefront):
 
 ## 2. Tenant context (the critical part)
 
-The tenant is **never** inferred from the recipient, `user_metadata` or a last-tenant lookup. The server that calls `signInWithOtp` knows the tenant (customer: the deployment's tenant; admin: the `admin_users` row; platform owner: none) and signs a context into the `redirect_to` URL, which Supabase returns unchanged as `email_data.redirect_to`:
+The tenant is **never** inferred from the recipient, `user_metadata` or a last-tenant lookup. The server that calls `signInWithOtp` knows the tenant (customer: the deployment's tenant; admin: the deployment tenant when the user has access to it via `getAdminAccessContext`, else the legacy `admin_users.tenant_id`; platform owner: none) and signs a context into the `redirect_to` URL, which Supabase returns unchanged as `email_data.redirect_to`:
 
 `lctx = base64url(claims) . base64url(HMAC-SHA256(secret, "lepefy-auth-mail.v1." + claims))`
 

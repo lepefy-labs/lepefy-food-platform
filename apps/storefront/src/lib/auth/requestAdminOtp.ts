@@ -1,4 +1,7 @@
-import { authMailRedirectOptions } from '@/lib/authMailer/otpContext';
+import { resolveAdminMailIdentity } from '@/lib/authMailer/adminMailTenant';
+import { authMailRedirectOptions, authMailerEnabled } from '@/lib/authMailer/otpContext';
+import { getAdminAccessContext } from '@/lib/auth/adminRbac';
+import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 
 // Échappe % et _ (wildcards ILIKE) avant un filtre .ilike() sans intention de
@@ -40,13 +43,20 @@ export async function requestAdminOtp(email: string): Promise<{ sent: boolean; e
     email: trimmedEmail,
     options: {
       shouldCreateUser: false,
-      // Tenant of the admin row (platform_owner has none → "Lepefy" identity).
-      ...(await authMailRedirectOptions({
-        tenantId: admin.role === 'platform_owner' ? null : (admin.tenant_id as string | null),
-        kind: admin.role === 'platform_owner' || !admin.tenant_id ? 'platform' : 'admin',
-        email: trimmedEmail,
-        redirectPath: '/admin',
-      })),
+      // Tenant the admin logs in on (membership checked); platform_owner → "Lepefy" identity.
+      ...(authMailerEnabled()
+        ? await authMailRedirectOptions({
+            ...(await resolveAdminMailIdentity(
+              { id: admin.id as string, role: admin.role as string, tenant_id: (admin.tenant_id as string | null) ?? null },
+              {
+                deploymentTenantId: async () => (await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood')).id,
+                hasTenantAccess: async (userId, tenantId) => (await getAdminAccessContext(userId, tenantId)) !== null,
+              },
+            )),
+            email: trimmedEmail,
+            redirectPath: '/admin',
+          })
+        : {}),
     },
   });
 

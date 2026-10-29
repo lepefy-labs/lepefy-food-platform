@@ -9,6 +9,7 @@ import { createResendTransport, type MailTransport, type OutgoingMail } from '..
 import { sanitizeSenderName, resolveFromAddress, formatFrom } from '../../src/lib/authMailer/core/sender';
 import { renderAuthEmail } from '../../src/lib/authMailer/core/templates';
 import { authMailRedirectOptions } from '../../src/lib/authMailer/otpContext';
+import { resolveAdminMailIdentity } from '../../src/lib/authMailer/adminMailTenant';
 
 const WH_SECRET = `v1,whsec_${bytesToBase64(new Uint8Array(32).fill(7))}`;
 const CTX_SECRET = 'ctx-secret-for-tests-0123456789abcdef';
@@ -266,6 +267,23 @@ test.describe('Auth Mailer — fail closed', () => {
     expect(dump).not.toContain(CODE);
     expect(dump).not.toContain('client@example.com');
     expect(dump).not.toContain('hash_hash');
+  });
+});
+
+test.describe('Auth Mailer — admin identity', () => {
+  const deps = (deployment: string | null, access: boolean) => ({
+    deploymentTenantId: async () => deployment,
+    hasTenantAccess: async () => access,
+  });
+  test('admin logging in on a tenant deployment gets that tenant when a membership exists', async () => {
+    // legacy row says Lepefy Test, membership grants Chloe Food (the PlatformTest case)
+    const r = await resolveAdminMailIdentity({ id: 'u', role: 'tenant_admin', tenant_id: OTHER }, deps(CHLOE, true));
+    expect(r).toEqual({ tenantId: CHLOE, kind: 'admin' });
+  });
+  test('no access to the deployment tenant falls back to the legacy row; platform owner stays Lepefy', async () => {
+    expect(await resolveAdminMailIdentity({ id: 'u', role: 'tenant_admin', tenant_id: OTHER }, deps(CHLOE, false))).toEqual({ tenantId: OTHER, kind: 'admin' });
+    expect(await resolveAdminMailIdentity({ id: 'u', role: 'platform_owner', tenant_id: null }, deps(CHLOE, true))).toEqual({ tenantId: null, kind: 'platform' });
+    expect(await resolveAdminMailIdentity({ id: 'u', role: 'tenant_admin', tenant_id: null }, { deploymentTenantId: async () => { throw new Error('x'); }, hasTenantAccess: async () => true })).toEqual({ tenantId: null, kind: 'platform' });
   });
 });
 
