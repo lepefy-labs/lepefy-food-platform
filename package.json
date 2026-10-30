@@ -11,6 +11,7 @@
     "lint": "pnpm --filter @lepefy/storefront lint",
     "typecheck": "pnpm --filter @lepefy/storefront typecheck",
     "catalog:whatsapp:test": "pnpm --filter @lepefy/storefront catalog:whatsapp:test",
+    "engineering:index": "pnpm --filter @lepefy/storefront engineering:index",
     "catalog:whatsapp:review": "pnpm --filter @lepefy/storefront catalog:whatsapp:review"
   }
 }

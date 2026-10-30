@@ -100,6 +100,22 @@ Non-negotiable invariants:
 3. report in the final response which guides changed and which published guides must be republished, or flag them "to review" when the change is uncertain;
 4. never republish a guide: publication/republication is an explicit editorial action of the requester (console or SQL they run). The database copy is the source served to tenants; the repository library is only the seed.
 
+### Engineering Hub documentation contract
+
+For **any task that touches the Engineering Hub** (`apps/storefront/src/lib/engineering/**`, `apps/storefront/scripts/engineering-*`, `app/admin/(protected)/platform/engineering/**`, `app/api/admin/platform/engineering/**`, `app/api/engineering/**`, `app/api/internal/engineering/**`, `docs/engineering/**`, migration `175_engineering_hub.sql` or later Engineering migrations, `tests/unit/engineeringHub*.spec.ts`), read and follow:
+
+```text
+docs/engineering/README.md
+```
+
+Non-negotiable invariants:
+
+1. the Hub is internal: Platform Owner only until a separately approved change opens it to IT members; never evaluate `engineering.*` with `canAdmin()` (a `tenant_admin` would pass), never map engineering routes in `adminApiPermissions.ts` / `adminRoutePermissions.ts`, never import from or into the Help Center or Assistance;
+2. the index never contains secrets, personal data, binaries, dumps or environment files: a file that trips an exclusion rule is excluded whole and only `path + rule id` is kept; never log or store the matched value;
+3. relations are stored only when demonstrated by a file and a line; excerpts and citations come from the database, never from generated text; a run that is not `active` is never shown as the current index;
+4. never apply a migration, enable an AI route, issue an integration token or spend on embeddings/AI without the requester's explicit approval; the indexer parses in GitHub Actions, never inside a Vercel request;
+5. the technical documents in `docs/engineering/` are a mandatory co-change: when a change touches a file listed in a document's `file_monitorati`, update the document or flag it "Da revisionare"; never mark a document "Verificata" without a human review at a recorded SHA.
+
 ### Admin Design System V2 contract
 
 For **any task that touches admin UI** (`apps/storefront/src/app/admin/**`), read and follow:
