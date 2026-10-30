@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { IconChevronDown, IconFlask, IconLock, IconPencil } from '@tabler/icons-react';
 import type { ShippingPricingMode, ShippingTariffFallback, ShippingTariffVersionRow } from '@lepefy/types';
 import Badge from '@/app/admin/_components/ui/Badge';
+import HelpHint from '@/app/admin/_components/help/HelpHint';
 import Button, { ButtonLink } from '@/app/admin/_components/ui/Button';
 import InlineAlert from '@/app/admin/_components/ui/InlineAlert';
 import { Panel } from '@/app/admin/_components/ui/Panel';
@@ -137,7 +138,7 @@ export function ForfaitClient(props: ForfaitClientProps) {
       <section aria-labelledby="forfait-current-title" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
-            <h2 id="forfait-current-title" className="text-base font-semibold text-a-text">Tarifs de livraison actuels</h2>
+            <div className="flex items-center gap-1.5"><h2 id="forfait-current-title" className="text-base font-semibold text-a-text">Tarifs de livraison actuels</h2><HelpHint slug="forfait-livraison" label="Forfait de livraison" /></div>
             <p className="text-sm text-a-text-2">Prix payés par le client pour une livraison à domicile, selon le poids de la commande.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { IconBook2, IconSearch } from '@tabler/icons-react';
 import { helpModuleLabel } from '@/lib/helpCenter/domain';
 import { cleanSearchQuery } from '@/lib/helpCenter/rules';
-import { requireHelpTenantPage } from '@/lib/helpCenter/server/access';
+import { normalizeHelpLocale, requireHelpTenantPage } from '@/lib/helpCenter/server/access';
 import { helpCatalog, helpSearch } from '@/lib/helpCenter/server/service';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { Card } from '../../_components/ui/Panel';
@@ -16,7 +16,7 @@ export const fetchCache = 'force-no-store';
 /** All guides this admin may read, grouped by module; plain GET search (works without JavaScript). */
 export default async function HelpCenterPage({ searchParams = {} }: { searchParams?: Record<string, string | string[] | undefined> }) {
   const { tenant, access, level } = await requireHelpTenantPage();
-  const scope = { tenantId: tenant.id, access, level, locale: 'fr' as const };
+  const scope = { tenantId: tenant.id, access, level, locale: normalizeHelpLocale(Array.isArray(searchParams.lang) ? searchParams.lang[0] : searchParams.lang) };
   const raw = Array.isArray(searchParams.q) ? searchParams.q[0] : searchParams.q;
   const query = cleanSearchQuery(raw);
   const [catalog, found] = await Promise.all([helpCatalog(scope), query ? helpSearch(scope, query) : Promise.resolve(null)]);
@@ -49,7 +49,7 @@ export default async function HelpCenterPage({ searchParams = {} }: { searchPara
             <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {items.filter((item) => item.module === module).map((item) => (
                 <li key={item.slug}>
-                  <Link href={`/admin/aide/${item.slug}`} className="block h-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus">
+                  <Link href={`/admin/aide/${item.slug}${scope.locale !== 'fr' ? `?lang=${scope.locale}` : ''}`} className="block h-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus">
                     <Card className="h-full p-3 hover:bg-a-hover">
                       <p className="text-sm font-semibold text-a-text">{item.title}</p>
                       {item.summary && <p className="mt-1 text-sm leading-5 text-a-text-2">{item.summary}</p>}

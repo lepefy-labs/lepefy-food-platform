@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { helpModuleLabel } from '@/lib/helpCenter/domain';
 import { isValidSlug } from '@/lib/helpCenter/rules';
-import { requireHelpTenantPage } from '@/lib/helpCenter/server/access';
+import { normalizeHelpLocale, requireHelpTenantPage } from '@/lib/helpCenter/server/access';
 import { helpArticle } from '@/lib/helpCenter/server/service';
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
 import Badge from '../../../_components/ui/Badge';
@@ -12,10 +12,10 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 /** Shareable page of one guide. Unknown, unpublished and not-authorised guides are the same 404. */
-export default async function HelpArticlePage({ params }: { params: { slug: string } }) {
+export default async function HelpArticlePage({ params, searchParams = {} }: { params: { slug: string }; searchParams?: Record<string, string | string[] | undefined> }) {
   const { tenant, access, level } = await requireHelpTenantPage();
   if (!isValidSlug(params.slug)) notFound();
-  const found = await helpArticle({ tenantId: tenant.id, access, level, locale: 'fr' }, params.slug);
+  const found = await helpArticle({ tenantId: tenant.id, access, level, locale: normalizeHelpLocale(Array.isArray(searchParams.lang) ? searchParams.lang[0] : searchParams.lang) }, params.slug);
   if (!found) notFound();
   const { article, related, localeFallback } = found;
   return (
@@ -27,7 +27,7 @@ export default async function HelpArticlePage({ params }: { params: { slug: stri
         meta={localeFallback ? <Badge tone="neutral">Affiché en français : pas encore traduit</Badge> : undefined}
       />
       <HelpArticleBody blocks={article.blocks} />
-      <RelatedLinks href={(slug) => `/admin/aide/${slug}`} items={related.map((item) => ({ slug: item.slug, title: item.title }))} />
+      <RelatedLinks href={(slug) => `/admin/aide/${slug}${localeFallback || article.localeUsed === 'fr' ? '' : `?lang=${article.localeUsed}`}`} items={related.map((item) => ({ slug: item.slug, title: item.title }))} />
       <HelpArticleFeedback slug={article.slug} />
     </div>
   );

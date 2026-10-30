@@ -78,6 +78,28 @@ Non-negotiable invariants:
 4. inference, source data and confirmed decisions stay separate; the WhatsApp price is the total for the minimum quantity: the unit price is computed only by `computeUnitPrice` (lot ÷ minimum × (1 − discount), shown rounding gap), never applied without explicit confirmation;
 5. CLI outputs stay under `artifacts/whatsapp-catalog/` (git-ignored); never enable the flag on a real tenant (e.g. Chloe Food) without explicit approval; the document is a mandatory co-change.
 
+### Help Center documentation contract
+
+For **any task that touches the Help Center** (`apps/storefront/src/lib/helpCenter/**`, `app/admin/_components/help/**`, `app/admin/(protected)/aide/**`, `platform/knowledge/**`, `app/api/admin/help/**`, `app/api/admin/platform/knowledge/**`, migration `174_help_center.sql` or later Help Center migrations), read and follow:
+
+```text
+docs/HELP_CENTER.md
+```
+
+Non-negotiable invariants:
+
+1. the module never depends on Assistance (no import from `lib/support`, no read of its flag); the commercial level is resolved only by `resolveHelpLevel`, and a flag or capability never raises it;
+2. tenants read only published revisions through the `help_tenant_*` projection RPCs; content is structured blocks, never HTML; the console and its APIs are platform-owner only;
+3. never add `help_center` / `help_center_advanced` to `platform_plan_features` or `tenant_feature_overrides`, nor publish an article, without the requester's explicit approval; never publish AI-written text without editorial review;
+4. metrics stay aggregate and minimised (no order, customer, payment or personal data); the document is a mandatory co-change.
+
+**Guide maintenance contract.** When a task changes a user-facing admin workflow (screen, button label, rule, permission, flow), before the final commit the agent must:
+
+1. find the potentially stale guides: match the touched source paths against each guide's `watch` list in `lib/helpCenter/library/initialLibrary.ts`, and grep the changed button/field labels in the guides' text (including the IT/EN translations in `library/translations.ts`);
+2. update the guide text in the library source (French first, then the translations, keeping the **bold** UI labels identical to the real French interface), citing only labels that exist in the code;
+3. report in the final response which guides changed and which published guides must be republished, or flag them "to review" when the change is uncertain;
+4. never republish a guide: publication/republication is an explicit editorial action of the requester (console or SQL they run). The database copy is the source served to tenants; the repository library is only the seed.
+
 ### Admin Design System V2 contract
 
 For **any task that touches admin UI** (`apps/storefront/src/app/admin/**`), read and follow:

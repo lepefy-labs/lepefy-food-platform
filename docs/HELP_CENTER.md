@@ -1,6 +1,6 @@
 # Lepefy Help Center (Centre d'aide contestuale multi-tenant)
 
-> Stato: codice implementato su `main` (base `2a688bce`, 30/10/2026). Migration `174_help_center.sql` **scritta e validata in locale (PGlite, due applicazioni + test), NON applicata in produzione**. Nessuna riga di piano concessa: il modulo è inerte ovunque finché §10.3 non viene eseguito con l'approvazione esplicita del richiedente.
+> Stato: codice su `main` (base `2a688bce`, 30/10/2026; micro-aiuto, traduzioni IT/EN e contratto AGENTS aggiunti dopo). Migration `174_help_center.sql` **applicata in produzione e verificata il 30/10/2026**; riga di piano `help_center` concessa al piano `food-platform` (Chloe Food e Lepefy Test) su approvazione esplicita; le 17 guide francesi sono pubblicate (v1). Traduzioni IT/EN: copie di lavoro da importare e ripubblicare.
 > Proposta approvata: artifact «Lepefy Help Center — Mockup PRE/POST» (drawer desktop/mobile, console Platform Owner, editor).
 
 Obiettivo: aiuto pertinente **nella pagina in cui l'admin lavora**, senza lasciarla: guide brevi, ricerca, link condivisibili. Modulo autonomo (`helpCenter`), incluso oggi nel piano Base, vendibile in futuro come livello separato senza riscrivere architettura, permessi, navigazione o contenuti. Funziona senza IA e senza Assistance.
@@ -30,6 +30,7 @@ Moduli (`apps/storefront/src/lib/helpCenter/`):
 | `server/service.ts` | letture tenant (contesto, catalogo, articolo, ricerca) e metriche |
 | `server/platformService.ts` | CRUD, workflow, revisioni, metriche per la console |
 | `library/initialLibrary.ts` | 17 guide iniziali in francese (importate come **bozze**) |
+| `library/translations.ts` | versioni IT/EN delle stesse guide (copie di lavoro) |
 
 UI: `app/admin/_components/help/` (`HelpProvider`, `HelpDrawer`, `HelpHeaderButton`, `HelpArticleBody`, `HelpArticleFeedback`, `helpClient`), pagine `app/admin/(protected)/aide/**` e `platform/knowledge/**`.
 
@@ -95,7 +96,11 @@ Il drawer mostra il percorso «Contacter Lepefy» solo se `SupportProvider` dice
 
 Pulsante «Aide» nella barra admin (accanto ad «Assistance»), voce «Centre d'aide» nel gruppo Administration (flag di navigazione `help`), palette comandi. **Mai** aperto automaticamente. `HelpDrawer` usa il `Drawer` del kit (dialog nativo, schermo intero su telefono): contenuto caricato solo all'apertura, ricerca con debounce e annullamento, guide per la pagina, correlate, articolo con «Copier le lien», «Utile / Pas utile», lingua di ripiego dichiarata. Pagina condivisibile `/admin/aide/[slug]` (404 identico per ignota/bozza/altro tenant/non autorizzata) e indice `/admin/aide` con ricerca GET (funziona senza JavaScript). Design System V2: solo token `a-*`, kit condiviso, nessuna eccezione al guard.
 
-Nota: il drawer è modale (come tutti i `Drawer` del kit): lo sfondo è inerte mentre è aperto. Micro-aiuto sui singoli campi **non** implementato (non giustificato in questa fase).
+Nota: il drawer è modale (come tutti i `Drawer` del kit): lo sfondo è inerte mentre è aperto.
+
+**Micro-aiuto** (`HelpHint`, un «?» discreto che apre il drawer direttamente sulla guida, mai un popup): collocato solo dove la configurazione è complessa — «Règles de vente» e sezioni «Promotion» / «Nouveauté» dell'editor prodotto, «Checklist de préparation» delle impostazioni di preparazione, «Tarifs de livraison actuels» del forfait. Non rende nulla se il modulo non è disponibile all'admin; l'autorizzazione resta sul server (guida non pubblicata/non permessa = messaggio «Guide indisponible»). Aggiungerne uno = un `<HelpHint slug="…" label="…" />` con lo slug di una guida esistente (test: lo slug deve esistere nella libreria).
+
+**Lingue**: il drawer ha un selettore FR · IT · EN (scelta ricordata sul dispositivo, `lepefy-help-lang`; le pagine `/admin/aide` accettano `?lang=it|en`). L'interfaccia admin resta in francese: le traduzioni (`library/translations.ts`) mantengono **identiche** le etichette in grassetto (test) e ricadono sul francese, con avviso, se una lingua manca. La ricerca usa la configurazione testuale francese su tutte le lingue (meno precisa per IT/EN: i termini di interfaccia in francese funzionano meglio).
 
 ## 9. Sicurezza
 
@@ -142,7 +147,7 @@ Quando un task cambia in modo significativo un workflow amministrativo (schermat
 3. non ripubblicare mai una guida senza controllo editoriale: la pubblicazione resta un'azione del platform owner (`Publier` / `Republier`);
 4. non inventare funzionalità, pulsanti o comportamenti: ogni etichetta citata deve esistere nel codice.
 
-Le guide nel database sono la fonte servita; la libreria nel repository è solo il seme (l'import non sovrascrive mai un articolo esistente).
+Il contratto è ora in `AGENTS.md` («Help Center documentation contract»). Le guide nel database sono la fonte servita; la libreria nel repository (`initialLibrary.ts` + `translations.ts`) è solo il seme: l'import non sovrascrive mai un articolo né una traduzione esistenti. Le traduzioni IT/EN arrivano ai tenant solo dopo una **ripubblicazione** (nuova versione) dell'articolo.
 
 ## 13. Roadmap IA (non implementata)
 

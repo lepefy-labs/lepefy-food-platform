@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import HelpHint from '../../_components/help/HelpHint';
 import { IconClipboardCheck, IconSnowflake } from '@tabler/icons-react';
 import Button from '../../_components/ui/Button';
 import InlineAlert from '../../_components/ui/InlineAlert';
@@ -83,7 +84,7 @@ export function OrderPreparationSettingsSection({ initial, available, invalid, c
         <header className="flex items-start gap-4 border-b border-a-border px-4 py-4 sm:px-6">
           <SettingsIconTile icon={IconClipboardCheck} accent="teal" />
           <div className="min-w-0">
-            <h2 id="checklist-title" className="text-base font-semibold text-a-text">Checklist de préparation</h2>
+            <div className="flex items-center gap-1.5"><h2 id="checklist-title" className="text-base font-semibold text-a-text">Checklist de préparation</h2><HelpHint slug="mode-de-preparation-papier" label="Mode de préparation" /></div>
             <p className="mt-1 text-sm text-a-text-3">Comment votre équipe confirme que les articles ont été préparés.</p>
           </div>
         </header>

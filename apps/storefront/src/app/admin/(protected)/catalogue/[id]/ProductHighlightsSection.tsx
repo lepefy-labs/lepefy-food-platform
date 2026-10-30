@@ -2,6 +2,7 @@
 
 import { IconAlertTriangle, IconFlame, IconSparkles } from '@tabler/icons-react';
 import Badge from '../../../_components/ui/Badge';
+import HelpHint from '../../../_components/help/HelpHint';
 import { controlClasses, labelClasses } from '@/app/admin/_components/ui/Form';
 import { formatPrice } from '@/lib/utils/format';
 import { PRODUCT_NOVELTY_META, PRODUCT_PROMOTION_META, statusMeta } from '@/lib/admin/statusRegistry';
@@ -82,6 +83,7 @@ export default function ProductHighlightsSection({
         <h2 id="product-promotion-title" className={TITLE_CLS}>
           <IconFlame size={16} aria-hidden="true" /> Promotion
           <Badge tone={promotionMeta.tone} dot>{promotionMeta.label}</Badge>
+          <HelpHint slug="creer-une-promotion-planifiee" label="Promotion" />
         </h2>
         <label className={CHECK_ROW}>
           <input
@@ -167,6 +169,7 @@ export default function ProductHighlightsSection({
           <Badge tone={noveltyMeta.tone} dot>
             {savedNewUntil ? `Jusqu’au ${formatShopDate(savedNewUntil)}` : noveltyMeta.label}
           </Badge>
+          <HelpHint slug="mettre-en-nouveaute" label="Nouveauté" />
         </h2>
         <label className={CHECK_ROW}>
           <input

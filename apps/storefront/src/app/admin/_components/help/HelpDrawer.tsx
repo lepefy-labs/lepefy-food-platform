@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { IconArrowLeft, IconBook2, IconLifebuoy, IconLink, IconSearch, IconThumbDown, IconThumbUp } from '@tabler/icons-react';
-import type { HelpArticleSummary } from '@/lib/helpCenter/domain';
+import type { HelpArticleSummary, HelpLocale } from '@/lib/helpCenter/domain';
 import { helpModuleLabel } from '@/lib/helpCenter/domain';
 import { cleanSearchQuery, isSearchable } from '@/lib/helpCenter/rules';
 import { cn } from '@/lib/utils/cn';
@@ -16,7 +16,7 @@ import { Input } from '../ui/Form';
 import { useAdminToast } from '../ui/Toaster';
 import HelpArticleBody, { RelatedLinks } from './HelpArticleBody';
 import {
-  fetchHelpArticle, fetchHelpContext, fetchHelpSearch, helpArticleHref, sendHelpEvent,
+  fetchHelpArticle, fetchHelpContext, fetchHelpSearch, helpArticleHref, readHelpLang, saveHelpLang, sendHelpEvent,
   type HelpArticlePayload, type HelpContextPayload,
 } from './helpClient';
 
@@ -39,6 +39,9 @@ export default function HelpDrawer({ open, onClose, pathname, initialSlug, suppo
   const toast = useAdminToast();
   const searchId = useId();
   const [tab, setTab] = useState<Tab>('learn');
+  const [lang, setLang] = useState<HelpLocale>('fr');
+  useEffect(() => { setLang(readHelpLang()); }, []);
+  const changeLang = (next: HelpLocale) => { setLang(next); saveHelpLang(next); };
   const [context, setContext] = useState<HelpContextPayload | null>(null);
   const [contextError, setContextError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -55,11 +58,11 @@ export default function HelpDrawer({ open, onClose, pathname, initialSlug, suppo
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
-    fetchHelpContext(pathname, controller.signal)
+    fetchHelpContext(pathname, lang, controller.signal)
       .then((payload) => { setContext(payload); setContextError(null); })
       .catch((error: Error) => { if (error.name !== 'AbortError') setContextError(error.message); });
     return () => controller.abort();
-  }, [open, pathname]);
+  }, [open, pathname, lang]);
 
   // Search (debounced, abortable).
   useEffect(() => {
@@ -68,13 +71,13 @@ export default function HelpDrawer({ open, onClose, pathname, initialSlug, suppo
     setSearching(true);
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      fetchHelpSearch(clean, controller.signal)
+      fetchHelpSearch(clean, lang, controller.signal)
         .then((payload) => { setResults(payload.results); setSearchError(null); })
         .catch((error: Error) => { if (error.name !== 'AbortError') setSearchError(error.message); })
         .finally(() => setSearching(false));
     }, 350);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [query]);
+  }, [query, lang]);
 
   // A guide.
   useEffect(() => {
@@ -83,14 +86,14 @@ export default function HelpDrawer({ open, onClose, pathname, initialSlug, suppo
     setArticle(null);
     setArticleError(null);
     setVoted(null);
-    fetchHelpArticle(slug, controller.signal)
+    fetchHelpArticle(slug, lang, controller.signal)
       .then((payload) => {
         setArticle(payload);
         if (!viewed.current.has(slug)) { viewed.current.add(slug); sendHelpEvent(slug, 'view'); }
       })
       .catch((error: Error) => { if (error.name !== 'AbortError') setArticleError(error.message); });
     return () => controller.abort();
-  }, [slug]);
+  }, [slug, lang]);
 
   const vote = useCallback((event: 'helpful' | 'not_helpful') => {
     if (!slug || voted) return;
@@ -101,12 +104,12 @@ export default function HelpDrawer({ open, onClose, pathname, initialSlug, suppo
   const copyLink = useCallback(async () => {
     if (!slug) return;
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}${helpArticleHref(slug)}`);
+      await navigator.clipboard.writeText(`${window.location.origin}${helpArticleHref(slug, lang)}`);
       toast.success('Lien copié.');
     } catch {
       toast.error('Impossible de copier le lien.');
     }
-  }, [slug, toast]);
+  }, [slug, lang, toast]);
 
   const contact = useCallback(() => {
     if (slug) sendHelpEvent(slug, 'support_opened');
@@ -124,6 +127,12 @@ export default function HelpDrawer({ open, onClose, pathname, initialSlug, suppo
       footer={slug ? undefined : <Link href="/admin/aide" onClick={onClose} className="text-sm font-semibold text-a-brand-fg underline-offset-2 hover:underline">Voir toutes les guides</Link>}
     >
       <div className="space-y-4">
+        <div role="group" aria-label="Langue des guides" className="flex items-center justify-end gap-1">
+          {(['fr', 'it', 'en'] as const).map((code) => (
+            <button key={code} type="button" onClick={() => changeLang(code)} aria-pressed={lang === code}
+              className={cn('min-h-9 min-w-9 rounded-lg px-2 text-xs font-semibold uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus', lang === code ? 'bg-a-brand-soft text-a-brand-fg' : 'text-a-text-2 hover:bg-a-hover')}>{code}</button>
+          ))}
+        </div>
         {slug ? (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -144,7 +153,7 @@ export default function HelpDrawer({ open, onClose, pathname, initialSlug, suppo
                   {article.localeFallback && <Badge tone="neutral">Affiché en français : pas encore traduit</Badge>}
                 </header>
                 <HelpArticleBody blocks={article.article.blocks} />
-                <RelatedLinks href={helpArticleHref} items={article.related.map((item) => ({ slug: item.slug, title: item.title }))} />
+                <RelatedLinks href={(related) => helpArticleHref(related, lang)} items={article.related.map((item) => ({ slug: item.slug, title: item.title }))} />
                 <footer className="space-y-3 border-t border-a-border pt-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm text-a-text-2">Cette guide vous a aidé ?</span>

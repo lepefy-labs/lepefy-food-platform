@@ -10,6 +10,7 @@ import { isAllowedImageSrc, isAllowedVideoUrl, parseBlocks } from '../../src/lib
 import {
   isArticleVisible, isLocaleFallback, matchRoutePattern, normalizeHelpRoute, resolveHelpContext, type HelpViewer,
 } from '../../src/lib/helpCenter/contextResolver';
+import { LIBRARY_TRANSLATIONS } from '../../src/lib/helpCenter/library/translations';
 import { INITIAL_LIBRARY } from '../../src/lib/helpCenter/library/initialLibrary';
 import { ADMIN_NAV, resolveAdminNavigation } from '../../src/lib/admin/navigation';
 import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
@@ -327,4 +328,48 @@ test('navigation: the Centre d’aide entry needs the entitlement flag and help.
   expect(resolveAdminNavigation(ctx(['orders.view'], true)).items).not.toContain('help');
   expect(resolveAdminNavigation(ctx(['help.view'], true, false)).items).toContain('help');
   expect(resolveAdminNavigation(ctx(['help.view'], true, false)).items).not.toContain('assistance');
+});
+
+const boldLabels = (blocks: Array<{ type: string; text?: string; items?: string[] }>) =>
+  blocks.flatMap((block) => [block.text, ...(block.items ?? [])]).filter((value): value is string => Boolean(value))
+    .flatMap((text) => parseInline(text).filter((segment) => segment.bold).map((segment) => segment.text));
+
+test('translations: every guide has valid IT and EN versions with the same structure and the same French UI labels', () => {
+  expect(Object.keys(LIBRARY_TRANSLATIONS).sort()).toEqual(INITIAL_LIBRARY.map((guide) => guide.slug).sort());
+  for (const guide of INITIAL_LIBRARY) {
+    for (const locale of ['it', 'en'] as const) {
+      const t = LIBRARY_TRANSLATIONS[guide.slug]![locale];
+      const where = `${guide.slug}/${locale}`;
+      expect(parseBlocks(t.blocks).ok, where).toBe(true);
+      expect(t.title.length, where).toBeGreaterThan(0);
+      expect(t.title.length, where).toBeLessThanOrEqual(160);
+      expect(t.summary.length, where).toBeLessThanOrEqual(400);
+      expect(t.blocks.map((block) => block.type), where).toEqual(guide.blocks.map((block) => block.type));
+      // The admin interface is in French: the bold labels must match the French source exactly.
+      expect(boldLabels(t.blocks as never), where).toEqual(boldLabels(guide.blocks as never));
+      // Steps keep their count; related links keep their targets.
+      expect(t.blocks.map((block) => (block.type === 'steps' ? block.items.length : block.type === 'related' ? block.slug : 0)), where)
+        .toEqual(guide.blocks.map((block) => (block.type === 'steps' ? block.items.length : block.type === 'related' ? block.slug : 0)));
+      expect(JSON.stringify(t), where).not.toMatch(/TODO|lorem|XXX/i);
+    }
+  }
+});
+
+test('micro-help: a hint renders nothing without the module and points to published library slugs', () => {
+  const slugs = INITIAL_LIBRARY.map((guide) => guide.slug);
+  const files = [
+    'src/app/admin/(protected)/catalogue/[id]/ProductEditClient.tsx',
+    'src/app/admin/(protected)/catalogue/[id]/ProductHighlightsSection.tsx',
+    'src/app/admin/(protected)/parametres/OrderPreparationSettingsSection.tsx',
+    'src/app/admin/(protected)/livraison/forfait/ForfaitClient.tsx',
+  ];
+  let hints = 0;
+  for (const file of files) {
+    for (const match of readFileSync(join(ROOT, file), 'utf8').matchAll(/<HelpHint slug="([a-z0-9-]+)"/g)) {
+      hints += 1;
+      expect(slugs, `${file} → ${match[1]}`).toContain(match[1]);
+    }
+  }
+  expect(hints).toBeGreaterThanOrEqual(5);
+  expect(readFileSync(join(ROOT, 'src/app/admin/_components/help/HelpHint.tsx'), 'utf8')).toContain('if (!enabled) return null');
 });

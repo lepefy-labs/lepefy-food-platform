@@ -228,7 +228,7 @@ The shipping logic is the most complex part of the codebase:
 ### Help Center (contextual admin guides) — `docs/HELP_CENTER.md`
 
 - Autonomous module `lib/helpCenter/`: entitlements `help_center` (standard, included in Base once the plan row is granted) / `help_center_advanced` (reserved, inactive), resolved only by `rules.resolveHelpLevel` (suspension > flag `help_center_disabled` > advanced > standard); capability `help.view`; never Assistance-dependent (no import from `lib/support`). Tenant reads go through the `help_tenant_*` projection RPCs (published revisions only); console and its APIs are platform-owner only (`helpPlatformApi`). Content is structured blocks (`blocks.ts`), never HTML.
-- Migration 174 grants nothing: adding the `help_center` row to `platform_plan_features` (activation for a tenant/plan) needs the requester's explicit approval. When an admin workflow changes, check the guides' `watch` paths in `library/initialLibrary.ts` and flag or update them; never republish without editorial control.
+- Migration 174 grants nothing: adding the `help_center` row to `platform_plan_features` (activation for a tenant/plan) needs the requester's explicit approval. `HelpHint` (micro-help « ? ») opens a guide from a complex field; translations live in `library/translations.ts` with the French UI labels kept identical. When an admin workflow changes, check the guides' `watch` paths in `library/initialLibrary.ts` and flag or update them; never republish without editorial control.
 
 ### Subscription lifecycle and suspension — `docs/SUBSCRIPTION_LIFECYCLE.md`
 

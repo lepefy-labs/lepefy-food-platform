@@ -13,10 +13,10 @@ export default function ImportLibraryButton() {
   const { run, pending, error } = useAdminMutation();
   const toast = useAdminToast();
   async function confirm() {
-    const result = await run<{ created: number; skipped: string[] }>('/api/admin/platform/knowledge/import-library', { successMessage: undefined });
+    const result = await run<{ created: number; skipped: string[]; translationsAdded: number }>('/api/admin/platform/knowledge/import-library', { successMessage: undefined });
     if (result) {
       setOpen(false);
-      toast.success(`${result.created} brouillon${result.created > 1 ? 's' : ''} créé${result.created > 1 ? 's' : ''}${result.skipped.length ? ` · ${result.skipped.length} déjà présent${result.skipped.length > 1 ? 's' : ''}` : ''}.`);
+      toast.success(`${result.created} brouillon${result.created > 1 ? 's' : ''} créé${result.created > 1 ? 's' : ''} · ${result.translationsAdded} traduction${result.translationsAdded > 1 ? 's' : ''} IT/EN ajoutée${result.translationsAdded > 1 ? 's' : ''}${result.skipped.length ? ` · ${result.skipped.length} guide${result.skipped.length > 1 ? 's' : ''} déjà présente${result.skipped.length > 1 ? 's' : ''}` : ''}.`);
     }
   }
   return (
@@ -25,7 +25,7 @@ export default function ImportLibraryButton() {
       <ConfirmDialog
         open={open}
         title="Importer la bibliothèque initiale ?"
-        description="Les guides en français sont créés comme brouillons. Aucun n’est publié et ceux qui existent déjà ne sont pas modifiés. Relisez-les avant de publier."
+        description="Les guides en français sont créés comme brouillons et les traductions italiennes et anglaises manquantes sont ajoutées à la copie de travail. Rien n’est publié et rien d’existant n’est modifié. Relisez avant de publier ou de republier."
         confirmLabel="Importer"
         loading={pending}
         error={error}

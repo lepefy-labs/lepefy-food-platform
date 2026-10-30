@@ -33,6 +33,7 @@ import { controlClasses, labelClasses } from '@/app/admin/_components/ui/Form';
 import ProductHighlightsSection, { type HighlightsValue } from './ProductHighlightsSection';
 import { pricingInputFromRow, promotionState } from '@/lib/catalog/promotionSchedule';
 import { isoToShopLocal, shopLocalToIso } from '@/lib/time/shopTime';
+import HelpHint from '@/app/admin/_components/help/HelpHint';
 
 /** Une ligne d'aide sous le choix : ce que vivra le client. */
 const FULFILLMENT_POLICY_HELP: Record<ProductFulfillmentPolicy, string> = {
@@ -943,7 +944,7 @@ export default function ProductEditClient({
             </section>
 
             <section className="bg-a-surface rounded-xl border border-a-border p-5">
-              <h2 className={SECTION_TITLE_CLS}>Règles de vente</h2>
+              <div className="mb-4 flex items-center gap-1.5"><h2 className="text-sm font-semibold text-a-text-2">Règles de vente</h2><HelpHint slug="regles-de-vente-quantite-minimale" label="Règles de vente" /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="product-min-qty" className={LABEL_CLS}>Quantité minimale{reviewHint}</label>
