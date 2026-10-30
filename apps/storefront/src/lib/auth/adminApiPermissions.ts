@@ -16,7 +16,7 @@ export type AdminApiPermission =
   | 'inventory.view' | 'inventory.manage' | 'treasury.view' | 'treasury.manage' | 'supplier_payments.verify'
   | 'whatsapp.view' | 'whatsapp.reply' | 'whatsapp.manage'
   | 'audit.view' | 'audit.export'
-  | 'support.use';
+  | 'support.use' | 'help.view';
 
 function isRead(method: string): boolean {
   const normalized = method.toUpperCase();
@@ -95,6 +95,8 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path === '/api/admin/activite' || /^\/api\/admin\/activite\/[^/]+$/.test(path)) return read ? 'audit.view' : null;
   // Assistance (migration 163) : le flag support_assistance est vérifié par supportTenantApi.
   if (path === '/api/admin/assistance' || path.startsWith('/api/admin/assistance/')) return 'support.use';
+  // Centre d'aide (migration 174) : l'accès commercial est vérifié par helpTenantApi.
+  if (path === '/api/admin/help' || path.startsWith('/api/admin/help/')) return 'help.view';
   // Gestion du commerce: mappa dedicata, fail-closed (null = nessuna capability).
   if (path.startsWith('/api/admin/gestion/')) return gestionApiPermission(path, method) as AdminApiPermission | null;
   // Canal WhatsApp (migration 147). Identité du numéro et envoi de test : platform owner en plus (requireWhatsAppApi).

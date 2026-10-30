@@ -39,6 +39,7 @@ export async function POST(request: Request) {
     userAgent: headers().get('user-agent'),
     appVersion: appVersion(),
     viewport: body.viewport,
+    helpArticle: body.helpArticle,
   });
   if (!pathname && chosenLabel) context.page_label = chosenLabel;
   const resource = pathname

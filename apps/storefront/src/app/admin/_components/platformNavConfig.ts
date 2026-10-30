@@ -1,5 +1,5 @@
 import { isHrefActive, type AdminNavBadgeKey } from '@/lib/admin/navigation';
-import { IconBell, IconBrandWhatsapp, IconBriefcase, IconReceipt, IconDeviceMobile, IconLifebuoy, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
+import { IconBell, IconBook2, IconBrandWhatsapp, IconBriefcase, IconReceipt, IconDeviceMobile, IconLifebuoy, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
 
 /**
  * Platform-owner navigation, single source of truth for the sidebar groups and
@@ -27,6 +27,7 @@ export interface PlatformNavGroup {
 export const PLATFORM_NAV: PlatformNavGroup[] = [
   { id: 'console', label: 'Console Lepefy', icon: IconSettings, href: '/admin/platform', match: 'exact' },
   { id: 'support', label: 'Assistance tenants', icon: IconLifebuoy, href: '/admin/platform/assistance', badge: { key: 'platformSupportAwaiting', label: 'demandes à répondre' } },
+  { id: 'knowledge', label: 'Base de connaissances', icon: IconBook2, href: '/admin/platform/knowledge' },
   { id: 'subscriptions', label: 'Abonnements', icon: IconReceipt, href: '/admin/platform/abonnements' },
   {
     id: 'access', label: 'Accès', icon: IconShieldLock, children: [

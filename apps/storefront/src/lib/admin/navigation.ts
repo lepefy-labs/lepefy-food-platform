@@ -1,6 +1,6 @@
 import {
   IconBrandWhatsapp, IconBriefcase, IconClipboardList, IconHome, IconBuildingWarehouse, IconCalendarEvent, IconCash, IconChartBar, IconCreditCard,
-  IconFileInvoice, IconFileText, IconGift, IconHistory, IconLayoutDashboard, IconLifebuoy, IconMessageCircle, IconPackage, IconPackages, IconPhoto,
+  IconFileInvoice, IconFileText, IconGift, IconHistory, IconBook2, IconLayoutDashboard, IconLifebuoy, IconMessageCircle, IconPackage, IconPackages, IconPhoto,
   IconPlus, IconQrcode, IconScan, IconSettings, IconShoppingBag, IconSparkles, IconStar, IconToolsKitchen2, IconTruck,
   IconTruckDelivery, IconTruckLoading, IconUserPlus, IconUsers, type Icon,
 } from '@tabler/icons-react';
@@ -21,7 +21,7 @@ import type { AdminTone } from './tokens';
 export type AdminNavGroup =
   | 'Essentiel' | 'Ventes' | 'Croissance' | 'Canaux' | 'Gestion' | 'Contenu & outils' | 'Administration'
   | 'Événementiel' | 'Service sur place';
-export type AdminNavFlag = 'gestion' | 'whatsapp' | 'activity' | 'support';
+export type AdminNavFlag = 'gestion' | 'whatsapp' | 'activity' | 'support' | 'help';
 export type AdminNavBadgeKey = 'pendingPayments' | 'pendingEventRequests' | 'newInquiries' | 'pendingRentalRequests' | 'preordersToVerify' | 'supportUnread' | 'platformSupportAwaiting';
 
 export interface AdminNavItem {
@@ -152,6 +152,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   // Administration
   { id: 'settings', label: 'Paramètres', href: '/admin/parametres', icon: IconSettings, group: 'Administration', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['réglages', 'configuration', 'notifications', 'préparation papier'] },
   { id: 'activity', label: 'Journal d’activité', href: '/admin/activite', icon: IconHistory, group: 'Administration', workspace: 'all', anyOf: ['audit.view'], flag: 'activity', keywords: ['audit', 'historique', 'traçabilité', 'qui a modifié'] },
+  { id: 'help', label: 'Centre d’aide', href: '/admin/aide', icon: IconBook2, group: 'Administration', workspace: 'all', anyOf: ['help.view'], flag: 'help', keywords: ['aide', 'guide', 'documentation', 'tutoriel', 'comment faire', 'mode d’emploi'] },
   { id: 'assistance', label: 'Assistance', href: '/admin/assistance', icon: IconLifebuoy, group: 'Administration', workspace: 'all', anyOf: ['support.use'], flag: 'support', badge: { key: 'supportUnread', tone: 'info', label: 'réponses non lues' }, keywords: ['aide', 'support', 'problème', 'bug', 'suggestion', 'question', 'lepefy', 'contact'] },
   { id: 'billing', label: 'Abonnement', href: '/admin/billing', icon: IconCreditCard, group: 'Administration', workspace: 'all', anyOf: ['billing.view'], match: 'exact', keywords: ['facture'] },
   { id: 'ai-usage', label: 'Utilisation IA', href: '/admin/ai-usage', icon: IconChartBar, group: 'Administration', workspace: 'all', anyOf: ['ai_usage.view'], match: 'exact' },

@@ -168,3 +168,11 @@ export const SUBSCRIPTION_REMINDER_STATUS_META = {
   pending: { label: 'En cours', tone: 'info' },
   failed: { label: 'Échec', tone: 'danger' },
 } as const satisfies Record<string, AdminStatusMeta>;
+
+/** Help Center article workflow (migration 174, docs/HELP_CENTER.md). */
+export const HELP_STATUS_META: Record<string, AdminStatusMeta> = {
+  draft: { label: 'Brouillon', tone: 'neutral' },
+  review: { label: 'En relecture', tone: 'warning' },
+  published: { label: 'Publié', tone: 'success' },
+  archived: { label: 'Archivé', tone: 'neutral' },
+};

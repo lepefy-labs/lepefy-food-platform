@@ -15,6 +15,8 @@ import { isSupportEnabled } from '@/lib/support/server/access';
 import { tenantUnreadCount } from '@/lib/support/server/tenantService';
 import { platformAwaitingCount } from '@/lib/support/server/platformService';
 import SupportProvider from '../_components/support/SupportProvider';
+import HelpProvider from '../_components/help/HelpProvider';
+import { getHelpLevel } from '@/lib/helpCenter/server/access';
 import AdminHeader from '../_components/AdminHeader';
 import AdminShell from '../_components/shell/AdminShell';
 import AdminInstallPrompt from '../_components/AdminInstallPrompt';
@@ -112,7 +114,9 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   const supportUnread = supportEnabled && !access.isPlatformOwner ? await tenantUnreadCount(tenant.id, access.userId) : 0;
   // Platform console: requests of every shop waiting for Lepefy (0 before migration 163).
   const platformSupportAwaiting = access.isPlatformOwner ? await platformAwaitingCount() : 0;
-  const navContext = { workspace, permissions: navPermissions, isPlatformOwner: access.isPlatformOwner, flags: { gestion: gestionEnabled, whatsapp: whatsappEnabled, activity: activityEnabled, support: supportEnabled } };
+  // Centre d'aide: commercial level (entitlement, suspension, kill-switch) + help.view. Independent from Assistance.
+  const helpEnabled = canAdmin(access, 'help.view') && !limitedBySuspension ? (await getHelpLevel(tenant.id)) !== 'disabled' : false;
+  const navContext = { workspace, permissions: navPermissions, isPlatformOwner: access.isPlatformOwner, flags: { gestion: gestionEnabled, whatsapp: whatsappEnabled, activity: activityEnabled, support: supportEnabled, help: helpEnabled } };
   const resolvedNav = resolveAdminNavigation(navContext);
   const searchScopes: AdminSearchScope[] = workspace === 'events'
     ? (canSee(navContext, ['events.view']) ? ['events'] : [])
@@ -146,11 +150,12 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     <AdminThemeProvider>
       <AdminToaster>
         <SupportProvider enabled={supportEnabled} readOnly={access.isPlatformOwner} unread={supportUnread} pageLabels={supportPageLabels}>
+        <HelpProvider enabled={helpEnabled}>
         <AdminShell
           nav={shellNav}
           workspaceLabel={workspace === 'events' ? 'Événementiel' : 'Boutique'}
           tenantName={tenant.name}
-          header={<AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} canShop={canShop} canEvents={canEvents} adminEmail={user.email ?? ''} adminDisplayName={displayName} support={supportEnabled} />}
+          header={<AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} canShop={canShop} canEvents={canEvents} adminEmail={user.email ?? ''} adminDisplayName={displayName} support={supportEnabled} help={helpEnabled} />}
         >
           <AdminWorkspaceMemory workspace={workspace} />
           <AdminInstallPrompt />
@@ -158,6 +163,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           {access.roleCode === DEMO_VISITOR_ROLE && <DemoVisitorBanner userId={access.userId} />}
           {children}
         </AdminShell>
+        </HelpProvider>
         </SupportProvider>
       </AdminToaster>
     </AdminThemeProvider>

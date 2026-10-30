@@ -174,6 +174,8 @@ export interface SupportContext {
   browser?: string;
   app_version?: string;
   viewport?: string;
+  /** Slug of the Help Center guide read just before (opaque reference; the modules stay independent). */
+  help_article?: string;
 }
 
 /**
@@ -187,6 +189,7 @@ export function buildSupportContext(input: {
   userAgent?: string | null;
   appVersion?: string | null;
   viewport?: unknown;
+  helpArticle?: unknown;
 }): SupportContext {
   const context: SupportContext = {};
   if (input.pathname) {
@@ -201,6 +204,7 @@ export function buildSupportContext(input: {
   context.browser = device.browser;
   if (input.appVersion && /^[0-9a-f]{7,40}$/i.test(input.appVersion)) context.app_version = input.appVersion.slice(0, 7);
   if (typeof input.viewport === 'string' && /^\d{2,5}x\d{2,5}$/.test(input.viewport)) context.viewport = input.viewport;
+  if (typeof input.helpArticle === 'string' && input.helpArticle.length <= 80 && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(input.helpArticle)) context.help_article = input.helpArticle;
   return context;
 }
 

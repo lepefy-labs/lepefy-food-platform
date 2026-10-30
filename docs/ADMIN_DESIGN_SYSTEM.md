@@ -91,6 +91,9 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 - `SupportProvider` (montato nel layout protetto quando il flag `support_assistance` e `support.use` lo permettono) espone `useSupport().open()`: un solo pannello `SupportComposer` (Drawer) per tutte le pagine. `SupportHeaderButton` nella barra admin, `SupportHint` (link discreto, mai popup), `SupportOpenButton`.
 - Conversazioni: `ThreadComposer` (testo conservato fino al salvataggio, « Réessayer » con la stessa chiave), `AttachmentStrip` + `useSupportUploads` (anteprima, avanzamento, rimozione, incolla/trascina), `SupportImage` (dimensioni riservate). Stati da `SUPPORT_TENANT_STATUS_META`, `SUPPORT_STATUS_META`, `SUPPORT_PRIORITY_META` del registry.
 
+### Centre d'aide (`_components/help/`, `docs/HELP_CENTER.md`)
+- `HelpProvider` (nel layout protetto, dentro `SupportProvider`) espone `useHelp().open()`: un solo `HelpDrawer` (Drawer del kit) per tutte le pagine, mai aperto in automatico; `HelpHeaderButton` («Aide») nella barra, voce `help` del registry. `HelpArticleBody` rende i blocchi strutturati (nessun HTML grezzo). Stato guida `HELP_STATUS_META`.
+
 ### Aujourd'hui e Commandes
 - `/admin` è la dashboard « Aujourd'hui » (Panel « À régler en priorité » con banda di tono, « Dernières mises à jour », azioni rapide come card-link, lista « Commandes à préparer » con selezione); il cockpit Commandes è su `/admin/orders`. `PreparationStepBadge` (tono da `PREPARATION_STEP_META` del registry) mostra l'étape di preparazione su lista, dashboard e dettaglio. Vedi `docs/ORDER_PREPARATION.md`.
 - Clôture: `OrderClosureDialog` (dialog in due passaggi, azione distruttiva solo al passo finale, mai CTA primaria nel dettaglio); `StatusBadge closureType` mostra « Traitée hors plateforme » (info). Vedi `docs/ORDER_CLOSURE.md`.

@@ -4,6 +4,7 @@ import type { AdminWorkspace } from '@/lib/admin/workspace';
 import ThemeToggleButton from './ThemeToggleButton';
 import NotificationBell from './ui/NotificationBell';
 import SupportHeaderButton from './support/SupportHeaderButton';
+import HelpHeaderButton from './help/HelpHeaderButton';
 import { NavMenuButton, PaletteTrigger, UserMenu, WorkspaceMenu } from './shell/HeaderControls';
 
 interface AdminHeaderProps {
@@ -20,10 +21,12 @@ interface AdminHeaderProps {
   adminDisplayName?: string;
   /** Assistance enabled for this admin (flag support_assistance + support.use). */
   support?: boolean;
+  /** Help Center available to this admin (entitlement + help.view). */
+  help?: boolean;
 }
 
 /** Admin top bar: menu (mobile), platform logo, workspace, command palette, assistance, notifications, theme, account. */
-export default function AdminHeader({ platformName, platformLogoUrl, tenantName, tenantLogoUrl, workspace, shopAdminUrl, eventsAdminUrl, canShop, canEvents, adminEmail, adminDisplayName, support = false }: AdminHeaderProps) {
+export default function AdminHeader({ platformName, platformLogoUrl, tenantName, tenantLogoUrl, workspace, shopAdminUrl, eventsAdminUrl, canShop, canEvents, adminEmail, adminDisplayName, support = false, help = false }: AdminHeaderProps) {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-a-border bg-a-surface px-3 md:gap-3 md:px-4">
       <a href="#admin-main" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-a-surface focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-a-text focus:shadow">
@@ -40,6 +43,7 @@ export default function AdminHeader({ platformName, platformLogoUrl, tenantName,
         <PaletteTrigger />
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
+        {help && <span className="mr-1"><HelpHeaderButton /></span>}
         {support && <span className="mr-1"><SupportHeaderButton /></span>}
         <NotificationBell />
         <ThemeToggleButton />

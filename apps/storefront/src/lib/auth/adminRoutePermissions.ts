@@ -61,6 +61,8 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/outils', permission: 'tenant_settings.view' },
   // Assistance (flag support_assistance, contrôlé par les pages).
   { prefix: '/admin/assistance', permission: 'support.use' },
+  // Centre d'aide (entitlement help_center, contrôlé par les pages et l'API).
+  { prefix: '/admin/aide', permission: 'help.view' },
   { prefix: '/admin/billing', permission: 'billing.view' },
   { prefix: '/admin/ai-usage', permission: 'ai_usage.view' },
 ];

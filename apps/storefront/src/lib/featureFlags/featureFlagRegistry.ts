@@ -68,6 +68,12 @@ export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
   },
   {
     // Assistance & suggestions (migration 163, docs/SMART_ASSISTANCE.md).
+    key: 'help_center_disabled',
+    label: 'Centre d’aide désactivé',
+    description: 'Désactive le Centre d’aide pour cette boutique (interrupteur administratif ; sans ligne, le Centre d’aide suit l’abonnement). Activation réservée à Lepefy.',
+    platformOnly: true,
+  },
+  {
     key: 'support_assistance',
     label: 'Assistance Lepefy',
     description: 'Donne à l’équipe de la boutique le bouton « Assistance » : demandes avec captures et page concernée, conversation avec Lepefy, suivi des réponses. Activation réservée à Lepefy.',

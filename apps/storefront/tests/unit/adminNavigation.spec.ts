@@ -4,7 +4,7 @@ import {
 import { resolveAdminWorkspace } from '../../src/lib/admin/workspace';
 import { defaultAdminDestination, permissionsForAdminPath } from '../../src/lib/auth/adminRoutePermissions';
 
-const NO_FLAGS = { gestion: false, whatsapp: false, activity: false, support: false };
+const NO_FLAGS = { gestion: false, whatsapp: false, activity: false, support: false, help: false };
 const ctx = (patch: Partial<AdminNavContext>): AdminNavContext => ({ workspace: 'shop', permissions: [], isPlatformOwner: false, flags: NO_FLAGS, ...patch });
 
 test('entry ids are unique', () => {
@@ -76,13 +76,13 @@ test('full shop admin sees the shop and common entries, flagged modules only wit
   expect(full.actions).toEqual(['new-order', 'prepare-orders', 'new-product', 'new-catalog-campaign', 'new-customer']);
   expect(full.platform).toBe(false);
 
-  const withFlags = resolveAdminNavigation(ctx({ permissions: ['*'], flags: { gestion: true, whatsapp: true, activity: true, support: true } }));
+  const withFlags = resolveAdminNavigation(ctx({ permissions: ['*'], flags: { gestion: true, whatsapp: true, activity: true, support: true, help: false } }));
   expect(withFlags.items).toEqual(expect.arrayContaining(['whatsapp', 'gestion', 'suppliers', 'purchases', 'inventory', 'treasury', 'activity', 'assistance']));
   expect(withFlags.actions).toContain('support-request');
 });
 
 test('assistance: hidden until the platform enables it, and only with support.use', () => {
-  const on = { gestion: false, whatsapp: false, activity: false, support: true };
+  const on = { gestion: false, whatsapp: false, activity: false, support: true, help: false };
   expect(resolveAdminNavigation(ctx({ permissions: ['support.use'] })).items).not.toContain('assistance');
   expect(resolveAdminNavigation(ctx({ permissions: ['support.use'] })).actions).not.toContain('support-request');
   expect(resolveAdminNavigation(ctx({ permissions: ['orders.view'], flags: on })).items).not.toContain('assistance');
@@ -97,13 +97,13 @@ test('assistance: hidden until the platform enables it, and only with support.us
 
 test('activity journal: hidden until the platform enables it, and only with audit.view', () => {
   expect(resolveAdminNavigation(ctx({ permissions: ['audit.view'] })).items).not.toContain('activity');
-  expect(resolveAdminNavigation(ctx({ permissions: ['orders.view'], flags: { gestion: false, whatsapp: false, activity: true, support: false } })).items).not.toContain('activity');
-  expect(resolveAdminNavigation(ctx({ permissions: ['audit.view'], flags: { gestion: false, whatsapp: false, activity: true, support: false } })).items).toContain('activity');
+  expect(resolveAdminNavigation(ctx({ permissions: ['orders.view'], flags: { gestion: false, whatsapp: false, activity: true, support: false, help: false } })).items).not.toContain('activity');
+  expect(resolveAdminNavigation(ctx({ permissions: ['audit.view'], flags: { gestion: false, whatsapp: false, activity: true, support: false, help: false } })).items).toContain('activity');
 });
 
 test('a cashier only sees the loyalty scanner; a stock clerk only sees Stocks', () => {
   expect(resolveAdminNavigation(ctx({ permissions: ['loyalty.scan'] })).items).toEqual(['loyalty-scan']);
-  const clerk = resolveAdminNavigation(ctx({ permissions: ['inventory.view'], flags: { gestion: true, whatsapp: false, activity: false, support: false } }));
+  const clerk = resolveAdminNavigation(ctx({ permissions: ['inventory.view'], flags: { gestion: true, whatsapp: false, activity: false, support: false, help: false } }));
   expect(clerk.items).toEqual(['gestion', 'inventory']);
 });
 
@@ -117,7 +117,7 @@ test('events workspace shows events entries, never shop ones', () => {
 });
 
 test('platform owner sees everything of the workspace plus the platform block', () => {
-  const owner = resolveAdminNavigation(ctx({ isPlatformOwner: true, flags: { gestion: true, whatsapp: true, activity: true, support: true } }));
+  const owner = resolveAdminNavigation(ctx({ isPlatformOwner: true, flags: { gestion: true, whatsapp: true, activity: true, support: true, help: false } }));
   expect(owner.platform).toBe(true);
   expect(owner.items).toContain('treasury');
 });

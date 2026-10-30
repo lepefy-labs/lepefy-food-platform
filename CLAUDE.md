@@ -225,6 +225,11 @@ The shipping logic is the most complex part of the codebase:
 
 - Supabase Send Email Hook → Edge Function `auth-mailer` → Resend; Supabase keeps OTP/sessions. Tenant ONLY from the signed `lctx` context in `redirect_to` (`lib/authMailer/core/contextToken.ts`), never from the email/user_metadata; invalid context = fail closed. Edit the core in `src/lib/authMailer/core`, then run `node apps/storefront/scripts/syncAuthMailer.mjs` (a unit test fails when `supabase/functions/_shared/authMailer` is stale). Sender address is fixed to `@auth.lepefy.com`. The hook is activated manually in Supabase (cutover needs explicit approval); `AUTH_MAILER_CONTEXT_ENABLED` keeps the storefront inert until then. Never log codes, tokens or links.
 
+### Help Center (contextual admin guides) — `docs/HELP_CENTER.md`
+
+- Autonomous module `lib/helpCenter/`: entitlements `help_center` (standard, included in Base once the plan row is granted) / `help_center_advanced` (reserved, inactive), resolved only by `rules.resolveHelpLevel` (suspension > flag `help_center_disabled` > advanced > standard); capability `help.view`; never Assistance-dependent (no import from `lib/support`). Tenant reads go through the `help_tenant_*` projection RPCs (published revisions only); console and its APIs are platform-owner only (`helpPlatformApi`). Content is structured blocks (`blocks.ts`), never HTML.
+- Migration 174 grants nothing: adding the `help_center` row to `platform_plan_features` (activation for a tenant/plan) needs the requester's explicit approval. When an admin workflow changes, check the guides' `watch` paths in `library/initialLibrary.ts` and flag or update them; never republish without editorial control.
+
 ### Subscription lifecycle and suspension — `docs/SUBSCRIPTION_LIFECYCLE.md`
 
 - One engine: `lib/billing/tenantServiceState.ts` (`getTenantServiceState`, `isModuleAvailable`, `guardModule`). Suspended = manual (`tenant_subscriptions.status = 'suspended'`) or automatic past `paid_until + grace_days`, computed at read time; per-module suspension in `tenant_module_suspensions`. Fail-open without migration 144.

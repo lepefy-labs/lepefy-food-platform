@@ -15,7 +15,7 @@ interface SupportApi {
   /** Lepefy account previewing the shop: reading only. */
   readOnly: boolean;
   unread: number;
-  open: (options?: { category?: Exclude<SupportCategory, 'unspecified'>; text?: string }) => void;
+  open: (options?: { category?: Exclude<SupportCategory, 'unspecified'>; text?: string; helpArticle?: string }) => void;
 }
 
 const SupportContext = createContext<SupportApi>({ enabled: false, readOnly: true, unread: 0, open: () => {} });
@@ -30,11 +30,11 @@ export default function SupportProvider({ enabled, readOnly, unread, pageLabels,
   children: ReactNode;
 }) {
   const pathname = usePathname() ?? '/admin';
-  const [state, setState] = useState<{ open: boolean; pathname: string; category: SupportCategory | null; text: string | null; session: number }>(
-    { open: false, pathname: '/admin', category: null, text: null, session: 0 },
+  const [state, setState] = useState<{ open: boolean; pathname: string; category: SupportCategory | null; text: string | null; helpArticle: string | null; session: number }>(
+    { open: false, pathname: '/admin', category: null, text: null, helpArticle: null, session: 0 },
   );
   const open = useCallback<SupportApi['open']>((options) => {
-    setState((current) => ({ open: true, pathname, category: options?.category ?? null, text: options?.text ?? null, session: current.session + 1 }));
+    setState((current) => ({ open: true, pathname, category: options?.category ?? null, text: options?.text ?? null, helpArticle: options?.helpArticle ?? null, session: current.session + 1 }));
   }, [pathname]);
   const api = useMemo(() => ({ enabled, readOnly, unread, open }), [enabled, readOnly, unread, open]);
 
@@ -51,6 +51,7 @@ export default function SupportProvider({ enabled, readOnly, unread, pageLabels,
           initialText={state.text}
           pageLabels={pageLabels}
           readOnly={readOnly}
+          helpArticle={state.helpArticle}
         />
       )}
     </SupportContext.Provider>

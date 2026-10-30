@@ -32,7 +32,7 @@ interface Similar { id: string; number: number; title: string; tenant_status: st
  * category, the urgency, the screenshots and the page are optional; the page
  * is added automatically and can be changed or removed.
  */
-export default function SupportComposer({ open, onClose, pathname, initialCategory, initialText, pageLabels, readOnly }: {
+export default function SupportComposer({ open, onClose, pathname, initialCategory, initialText, pageLabels, readOnly, helpArticle = null }: {
   open: boolean;
   onClose: () => void;
   pathname: string;
@@ -40,6 +40,8 @@ export default function SupportComposer({ open, onClose, pathname, initialCatego
   initialText: string | null;
   pageLabels: string[];
   readOnly: boolean;
+  /** Help Center guide read just before (reference sent with the request). */
+  helpArticle?: string | null;
 }) {
   const formId = useId();
   const textId = useId();
@@ -103,6 +105,7 @@ export default function SupportComposer({ open, onClose, pathname, initialCatego
           viewport: typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : null,
           attachmentIds: uploads.readyIds,
           clientKey: clientKey.current,
+          helpArticle,
         },
       });
       clearDraft();
