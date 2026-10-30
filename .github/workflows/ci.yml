@@ -608,7 +608,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout (full history: a verified card is compared with its sha)
+      - name: Checkout with full history (a verified card is compared with its sha)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0

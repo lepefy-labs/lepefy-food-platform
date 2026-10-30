@@ -137,6 +137,17 @@ test.describe('ingest surface', () => {
     expect(workflow).toContain('--branch main');
   });
 
+  test('step names are valid plain YAML scalars (a ": " inside breaks the whole workflow)', () => {
+    for (const file of ['.github/workflows/ci.yml', '.github/workflows/engineering-sync.yml']) {
+      for (const line of read(file).split(/\r?\n/)) {
+        const match = /^\s*-?\s*name:\s*(.+)$/.exec(line);
+        const value = match?.[1]?.trim() ?? '';
+        if (!match || /^["']/.test(value)) continue;
+        expect(value, `${file}: ${line.trim()}`).not.toMatch(/: |\s#/);
+      }
+    }
+  });
+
   test('CI has the docs-check job on a Node that runs the scripts, with full history', () => {
     const ci = read('.github/workflows/ci.yml');
     const job = ci.slice(ci.indexOf('engineering-docs:'));
