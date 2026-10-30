@@ -73,12 +73,35 @@ export function queryTokens(query: string): string[] {
  * to_tsquery text for the 'simple' configuration: every token must appear, each as a prefix.
  * Only [a-z0-9_] characters survive, so the string cannot carry tsquery operators.
  */
-export function buildTsQuery(query: string): string | null {
+export function buildTsQuery(query: string, mode: 'and' | 'or' = 'and'): string | null {
   const tokens = queryTokens(query)
     .map((token) => token.normalize('NFD').replace(/[^a-z0-9_]/g, ''))
     .filter((token) => token.length >= 2);
   if (tokens.length === 0) return null;
-  return tokens.map((token) => `${token}:*`).join(' & ');
+  return tokens.map((token) => `${token}:*`).join(mode === 'and' ? ' & ' : ' | ');
+}
+
+/** Lower-cased words of a multi-word query (identifiers such as purchaseQuantityRules contain several of them). */
+export function wordTokens(query: string): string[] {
+  const tokens = queryTokens(query).map((token) => token.normalize('NFD').replace(/[^a-z0-9_]/g, '')).filter((token) => token.length >= 3);
+  return /\s/.test(query.trim()) ? [...new Set(tokens)].slice(0, 4) : [];
+}
+
+export function containsAllTokens(text: string, tokens: string[]): boolean {
+  const lower = text.toLowerCase();
+  return tokens.length > 0 && tokens.every((token) => lower.includes(token));
+}
+
+/**
+ * Hits an AI tool turns into evidence: code and migrations first, documents only after, so a
+ * prose page that mentions the topic never crowds out the file that implements it.
+ */
+export function pickToolHits(hits: SearchHit[], max: number, minCode: number = 4): SearchHit[] {
+  const isProse = (hit: SearchHit) => hit.kind === 'document' || hit.detail === 'doc' || hit.path.endsWith('.md');
+  const code = hits.filter((hit) => !isProse(hit));
+  const prose = hits.filter(isProse);
+  const picked = [...code.slice(0, Math.max(minCode, max - prose.length)), ...prose].slice(0, max);
+  return hits.filter((hit) => picked.includes(hit));
 }
 
 export function makeSnippet(body: string, query: string, maxLength = 220): string {

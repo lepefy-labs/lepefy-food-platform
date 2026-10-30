@@ -6,6 +6,7 @@
  * dropped, and an answer left without any valid citation is not shown as an answer.
  */
 import type { StructuredSchema } from '../../ai/core/types';
+import { ENGINEERING_MODULES } from '../moduleRegistry';
 
 export const AI_TOOLS = ['search', 'read_file', 'list_module', 'find_references'] as const;
 export type AiTool = (typeof AI_TOOLS)[number];
@@ -140,6 +141,10 @@ export const SYSTEM_PROMPT = [
   '- "find_references" (name): file che usano una tabella, una RPC o una rotta API per nome;',
   '- "answer" (answer, evidence_ids): risposta finale; cita con [E1], [E2]… e ripeti gli id in evidence_ids;',
   '- "give_up": se le prove non bastano a rispondere.',
+  'Come cercare: il codice usa nomi in inglese (a volte francese), non italiano. Traduci la domanda in identificatori probabili (es. "quantità minima" → "min_order_quantity", "purchase quantity", "minimum") e cerca con 1–3 parole, mai con la frase intera.',
+  'Fai più ricerche brevi con nomi diversi prima di rispondere. La logica sta in apps/storefront/src/lib/<area>/ (file .ts) e nelle migration SQL; i documenti .md spiegano ma non sono l’implementazione: preferisci il codice e, trovato il file giusto, leggilo con "read_file".',
+  `I moduli registrati per "list_module" sono: ${ENGINEERING_MODULES.map((entry) => entry.moduleKey).join(', ')}.`,
+  'Rispondi solo se le prove rispondono davvero alla domanda; se parlano d’altro, cerca ancora con altri nomi oppure usa "give_up".',
   'Regole: non inventare percorsi, funzioni o tabelle; scrivi un percorso solo se compare in una prova; ogni affermazione tecnica deve avere una citazione;',
   'se la domanda riguarda segreti, chiavi, dati di clienti o dati di produzione, usa "give_up". Non hai altri strumenti: non puoi eseguire codice, scrivere file né contattare servizi.',
 ].join('\n');

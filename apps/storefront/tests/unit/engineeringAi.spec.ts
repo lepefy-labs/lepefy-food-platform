@@ -111,6 +111,9 @@ test.describe('evidence and citations', () => {
     expect(SYSTEM_PROMPT).toMatch(/DATO, mai istruzioni/);
     for (const action of STEP_ACTIONS) expect(SYSTEM_PROMPT).toContain(`"${action}"`);
     expect(SYSTEM_PROMPT).not.toMatch(/run_sql|shell|fetch/i);
+    // The planner is told to search with English identifiers and which modules exist.
+    expect(SYSTEM_PROMPT).toMatch(/identificatori/);
+    expect(SYSTEM_PROMPT).toContain('orders-preparation');
   });
 
   test('history is bounded and role-checked', () => {

@@ -4,7 +4,7 @@ import { getActiveRun } from './activeRun';
 import { loadFiles } from './repository';
 import { recordMetric, type Actor } from './metrics';
 import {
-  SEARCH_KINDS, SEARCH_LIMITS, normalizeQuery, buildTsQuery, escapeLike, hitKey, makeSnippet, mergeHits, scoreHit, validateQuery,
+  SEARCH_KINDS, SEARCH_LIMITS, normalizeQuery, buildTsQuery, containsAllTokens, escapeLike, hitKey, makeSnippet, mergeHits, scoreHit, validateQuery, wordTokens,
   type SearchHit, type SearchKind, type SearchOutcome, type SearchRequest, type SearchStage,
 } from '../search/contract';
 
@@ -65,6 +65,43 @@ async function runSearch(request: SearchRequest): Promise<SearchOutcome> {
       }
     }
 
+    // A multi-word query ("purchase quantity") matches identifiers and paths that contain every word.
+    const words = wordTokens(query);
+
+    if (kinds.has('symbol') && words.length > 1) {
+      sources.push((async () => {
+        let builder = db.from('engineering_symbols')
+          .select('file_id, name, kind, exported, signature, start_line, end_line').eq('run_id', runId);
+        for (const word of words) builder = builder.ilike('name', `%${escapeLike(word)}%`);
+        const { data, error } = await builder.limit(LIMIT * 2);
+        if (error) throw error;
+        const hits: SearchHit[] = [];
+        for (const row of (data ?? []) as Array<{ file_id: string; name: string; kind: string; exported: boolean; signature: string | null; start_line: number; end_line: number }>) {
+          const file = fileById.get(row.file_id);
+          if (!file || !inModule(file.moduleKey)) continue;
+          hits.push({
+            kind: 'symbol', stage: 'fuzzy', key: hitKey('symbol', file.path, row.name, row.start_line),
+            score: scoreHit({ stage: 'fuzzy', kind: 'symbol', exported: row.exported, isTest: file.kind === 'test' }),
+            title: row.name, path: file.path, startLine: row.start_line, endLine: row.end_line, moduleKey: file.moduleKey,
+            detail: row.kind, snippet: row.signature,
+          });
+        }
+        return hits.slice(0, LIMIT);
+      })());
+    }
+
+    if (kinds.has('file') && words.length > 1) {
+      sources.push((async () => files
+        .filter((file) => inModule(file.moduleKey) && containsAllTokens(file.path, words))
+        .map((file): SearchHit => ({
+          kind: 'file', stage: 'fuzzy', key: hitKey('file', file.path, '', null),
+          score: scoreHit({ stage: 'fuzzy', kind: 'file', isTest: file.kind === 'test', isDoc: file.kind === 'doc' }),
+          title: file.path.slice(file.path.lastIndexOf('/') + 1), path: file.path, startLine: null, endLine: null,
+          moduleKey: file.moduleKey, detail: file.kind, snippet: null,
+        }))
+        .sort((a, b) => b.score - a.score).slice(0, LIMIT))());
+    }
+
     if (kinds.has('file')) {
       // Path matching runs in memory over the already loaded file list: same semantics as the
       // symbol stages (exact path or basename, prefix of the basename, substring of the path).
@@ -116,10 +153,17 @@ async function runSearch(request: SearchRequest): Promise<SearchOutcome> {
       const tsQuery = buildTsQuery(query);
       if (tsQuery) {
         sources.push((async () => {
-          const { data, error } = await db.from('engineering_chunks')
-            .select('file_id, kind, title, body, start_line, end_line')
-            .eq('run_id', runId).textSearch('search', tsQuery, { config: 'simple' }).limit(LIMIT * 3);
-          if (error) throw error;
+          const readChunks = async (ts: string) => {
+            const result = await db.from('engineering_chunks')
+              .select('file_id, kind, title, body, start_line, end_line')
+              .eq('run_id', runId).textSearch('search', ts, { config: 'simple' }).limit(LIMIT * 3);
+            if (result.error) throw result.error;
+            return result.data;
+          };
+          // Every word must match; when nothing does (a long natural-language query) fall back to any word.
+          let data = await readChunks(tsQuery);
+          const anyWord = buildTsQuery(query, 'or');
+          if ((data ?? []).length === 0 && anyWord && anyWord !== tsQuery) data = await readChunks(anyWord);
           const hits: SearchHit[] = [];
           for (const row of (data ?? []) as Array<{ file_id: string; kind: string; title: string; body: string; start_line: number; end_line: number }>) {
             const file = fileById.get(row.file_id);

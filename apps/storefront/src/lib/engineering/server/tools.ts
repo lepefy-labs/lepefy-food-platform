@@ -3,7 +3,7 @@ import { ENGINEERING_MODULES } from '../moduleRegistry';
 import { sanitizeRepoPath } from '../explorer';
 import { ASK_LIMITS, type AiTool, type EvidenceLedger, type PlannerStep } from '../ai/contract';
 import { ToolInputError } from '../ai/orchestrator';
-import { escapeLike } from '../search/contract';
+import { escapeLike, pickToolHits } from '../search/contract';
 import type { ActiveRun } from './activeRun';
 import { loadDocuments, loadFileSource, loadFiles, loadReferencesTo } from './repository';
 import { searchEngineering } from './search';
@@ -40,7 +40,7 @@ export function createToolRunner(run: ActiveRun) {
       const outcome = await searchEngineering({ query: step.query, moduleKey });
       if (outcome.state !== 'ok') return `search "${step.query}": indice non disponibile`;
       let added = 0;
-      for (const hit of outcome.hits.slice(0, 6)) {
+      for (const hit of pickToolHits(outcome.hits, 6)) {
         let text = hit.snippet ?? hit.title;
         let from = hit.startLine;
         let to = hit.endLine;

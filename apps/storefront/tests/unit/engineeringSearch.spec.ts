@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
-  buildTsQuery, escapeLike, makeSnippet, mergeHits, normalizeQuery, queryTokens, scoreHit, validateQuery, type SearchHit,
+  buildTsQuery, containsAllTokens, escapeLike, makeSnippet, mergeHits, normalizeQuery, pickToolHits, queryTokens, scoreHit, validateQuery, wordTokens, type SearchHit,
 } from '../../src/lib/engineering/search/contract';
 import {
   docNeedsRecheck, listDirectory, moduleDependencies, moduleDocStatus, parentDirectory, sameCommit, sanitizeRepoPath, summarizeModule, topLevelAreas,
@@ -21,6 +21,26 @@ function hit(partial: Partial<SearchHit> & Pick<SearchHit, 'key' | 'score'>): Se
 }
 
 test.describe('search contract', () => {
+  test('multi-word queries match identifiers and paths word by word', () => {
+    expect(buildTsQuery('purchase quantity', 'or')).toBe('purchase:* | quantity:*');
+    expect(wordTokens('purchase quantity rules')).toEqual(['purchase', 'quantity', 'rules']);
+    expect(wordTokens('validateCheckoutItems')).toEqual([]);
+    expect(containsAllTokens('apps/storefront/src/lib/purchaseQuantityRules.ts', ['purchase', 'quantity'])).toBe(true);
+    expect(containsAllTokens('apps/storefront/src/lib/cart/cartStore.ts', ['purchase', 'quantity'])).toBe(false);
+    expect(containsAllTokens('a.ts', [])).toBe(false);
+  });
+
+  test('AI tools prefer code over prose but keep prose as a fallback', () => {
+    const code = (n: number) => hit({ key: `c${n}`, score: 40 - n, path: `src/lib/f${n}.ts`, kind: 'symbol' });
+    const doc = (n: number) => hit({ key: `d${n}`, score: 60 - n, path: `docs/D${n}.md`, kind: 'chunk', detail: 'doc' });
+    const mixed = [doc(1), doc(2), doc(3), doc(4), code(1), code(2), code(3), code(4), code(5)];
+    const picked = pickToolHits(mixed, 6).map((entry) => entry.key);
+    expect(picked.filter((key) => key.startsWith('c')).length).toBeGreaterThanOrEqual(4);
+    expect(picked.length).toBe(6);
+    expect(pickToolHits([doc(1), doc(2)], 6).map((entry) => entry.key)).toEqual(['d1', 'd2']);
+    expect(pickToolHits([code(1), code(2), code(3)], 2).length).toBe(2);
+  });
+
   test('queries are normalized, bounded and validated', () => {
     expect(normalizeQuery('  foo \n\t bar\u0000 ')).toBe('foo bar');
     expect(normalizeQuery(42)).toBe('');
