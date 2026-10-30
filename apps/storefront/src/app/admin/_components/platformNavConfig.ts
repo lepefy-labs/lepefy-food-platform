@@ -1,5 +1,5 @@
 import { isHrefActive, type AdminNavBadgeKey } from '@/lib/admin/navigation';
-import { IconBell, IconBook2, IconBrandWhatsapp, IconBriefcase, IconReceipt, IconDeviceMobile, IconLifebuoy, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
+import { IconBell, IconBook2, IconBrandWhatsapp, IconBriefcase, IconCode, IconReceipt, IconDeviceMobile, IconLifebuoy, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
 
 /**
  * Platform-owner navigation, single source of truth for the sidebar groups and
@@ -69,6 +69,7 @@ export const PLATFORM_NAV: PlatformNavGroup[] = [
       { label: 'Démo', href: '/admin/platform/demo' },
     ],
   },
+  { id: 'engineering', label: 'Engineering Hub', icon: IconCode, href: '/admin/platform/engineering' },
 ];
 
 /** Same active-state rule as the main navigation registry. */
