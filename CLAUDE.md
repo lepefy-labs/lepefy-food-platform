@@ -128,7 +128,7 @@ The shipping logic is the most complex part of the codebase:
 ### Engineering Hub (internal technical index, platform owner) — `docs/engineering/README.md`
 
 - Separate bounded context `src/lib/engineering/` (pure indexer + `server/` guard and active-run reader), tables `engineering_*` (migration 175: RLS forced, no policy, service role only, no tenant column), routes only under `/admin/platform/engineering` and `/api/admin/platform/engineering/**` with `requireEngineeringApi` (= `requirePlatformOwner`); absent from `adminApiPermissions.ts`. Never use `canAdmin()` for `engineering.*`.
-- `pnpm engineering:index` builds a deterministic snapshot of committed files (TypeScript Compiler API, conservative SQL and Markdown extraction, only demonstrated relations); secrets/personal data/binaries exclude the whole file. Runs are written only while `running`, verified against a manifest, activated atomically (`engineering_activate_run`), rolled back with `engineering_rollback`; the Hub reads only the `active` run. UI (overview/architecture/modules/code/search), search and the AI assistant exist (migration 176: AI off by default — needs BOTH `engineering_settings.ai_enabled` and the `engineering/structured_chat` routing policy; the gateway runs tenant-less only for consumer `engineering` with a usage sink; citations are verified server-side; machine API `/api/engineering/v1/*` with hashed bearer tokens; `docs/engineering/AI_RETRIEVAL.md`). Snapshot upload/sync comes in unit D.
+- `pnpm engineering:index` builds a deterministic snapshot of committed files (TypeScript Compiler API, conservative SQL and Markdown extraction, only demonstrated relations); secrets/personal data/binaries exclude the whole file. Runs are written only while `running`, verified against a manifest, activated atomically (`engineering_activate_run`), rolled back with `engineering_rollback`; the Hub reads only the `active` run. UI (overview/architecture/modules/code/search), search and the AI assistant exist (migration 176: AI off by default — needs BOTH `engineering_settings.ai_enabled` and the `engineering/structured_chat` routing policy; the gateway runs tenant-less only for consumer `engineering` with a usage sink; citations are verified server-side; machine API `/api/engineering/v1/*` with hashed bearer tokens; `docs/engineering/AI_RETRIEVAL.md`). Snapshot upload: `pnpm engineering:sync` / workflow `engineering-sync.yml` → `POST /api/internal/engineering/ingest` (bearer `ENGINEERING_INGEST_TOKEN`, never the service-role key); `pnpm engineering:docs-check` (CI job) fails on invalid or drifted module cards; Metriche page; `docs/engineering/RUNBOOK.md` and `CONTRIBUTING.md`. Engineering scripts run under Node type stripping (no `@/`, enums or constructor parameter properties in the indexer/ingest files).
 
 ### Admin Operations V3: Aujourd'hui, Commandes, preparation modes — `docs/ORDER_PREPARATION.md`
 
@@ -355,6 +355,9 @@ DEMO_INTERNAL_TOKEN=                 # bearer of POST /api/internal/demo/revalid
 
 # Assistance (migration 163, optional)
 SUPPORT_NOTIFY_EMAILS=               # Lepefy addresses notified of new requests / shop messages, comma-separated
+
+# Engineering Hub (docs/engineering/RUNBOOK.md)
+ENGINEERING_INGEST_TOKEN=            # bearer of POST /api/internal/engineering/ingest (>= 32 chars; also a GitHub Actions secret). Unset = ingest disabled
 ```
 
 ## Conventions

@@ -1,0 +1,80 @@
+name: Engineering Hub sync
+
+# Uploads the technical index of `main` to the Hub. Uses a dedicated ingest token, never the
+# Supabase service-role key. Skipped (green) while the secret or the URL is not configured.
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # Weekly full re-index (re-sends every blob); pushes are incremental.
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'incremental (only missing blobs) or full (re-send everything)'
+        required: false
+        default: incremental
+        type: choice
+        options:
+          - incremental
+          - full
+
+concurrency:
+  group: engineering-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Build and upload the index
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ENGINEERING_INGEST_URL: ${{ vars.ENGINEERING_INGEST_URL }}
+      ENGINEERING_INGEST_TOKEN: ${{ secrets.ENGINEERING_INGEST_TOKEN }}
+    steps:
+      - name: Check configuration
+        id: config
+        run: |
+          if [ -z "$ENGINEERING_INGEST_URL" ] || [ -z "$ENGINEERING_INGEST_TOKEN" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "ENGINEERING_INGEST_URL / ENGINEERING_INGEST_TOKEN not configured: sync skipped."
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.config.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        if: steps.config.outputs.enabled == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.0
+          run_install: false
+
+      - name: Setup Node.js
+        if: steps.config.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        if: steps.config.outputs.enabled == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Upload the index of this commit
+        if: steps.config.outputs.enabled == 'true'
+        run: |
+          MODE="${{ github.event.inputs.mode }}"
+          TRIGGER="push"
+          if [ "${{ github.event_name }}" = "schedule" ]; then MODE="full"; TRIGGER="schedule"; fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then TRIGGER="manual"; fi
+          pnpm engineering:sync -- --ref "${{ github.sha }}" --branch main --mode "${MODE:-incremental}" --trigger "$TRIGGER"

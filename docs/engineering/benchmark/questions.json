@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "note": "Domande con le fonti che una buona risposta deve citare. Verificate dal test engineeringBenchmark.spec.ts contro l'indice reale: se un file viene spostato il test fallisce e la domanda va aggiornata.",
+  "questions": [
+    { "id": "q01", "question": "Dove viene validata la quantità minima e il passo di acquisto di un prodotto?", "expectedPaths": ["apps/storefront/src/lib/purchaseQuantityRules.ts"] },
+    { "id": "q02", "question": "Quale funzione valida il carrello al checkout e cosa richiede come quarto argomento?", "expectedPaths": ["apps/storefront/src/lib/checkout/validateCheckoutItems.ts"] },
+    { "id": "q03", "question": "Come si decide se un carrello deve essere ritirato in negozio o spedito?", "expectedPaths": ["apps/storefront/src/lib/fulfillment/fulfillmentPolicy.ts"] },
+    { "id": "q04", "question": "Dove si calcola il costo di spedizione con Packlink e quanti colli servono?", "expectedPaths": ["apps/storefront/src/lib/shipping/calculateShipping.ts"] },
+    { "id": "q05", "question": "Quale RPC converte una sessione di checkout in ordine e chi la chiama?", "expectedPaths": ["apps/storefront/src/lib/orders/convertCheckoutSessionToOrder.ts", "supabase/migrations/128_assisted_orders.sql"] },
+    { "id": "q06", "question": "Dove sono le regole che dicono se un ordine è preparato o imballato?", "expectedPaths": ["apps/storefront/src/lib/orders/preparation/preparationPolicy.ts"] },
+    { "id": "q07", "question": "Come si chiude o annulla un ordine dall'admin?", "expectedPaths": ["apps/storefront/src/lib/orders/closure/orderClosureService.ts"] },
+    { "id": "q08", "question": "Quale guardia protegge le API admin e come decide quali ruoli passano?", "expectedPaths": ["apps/storefront/src/lib/auth/requireAdmin.ts"] },
+    { "id": "q09", "question": "Come si stabilisce se un negozio è sospeso o un modulo è disponibile?", "expectedPaths": ["apps/storefront/src/lib/billing/tenantServiceState.ts"] },
+    { "id": "q10", "question": "Come si determina se una promozione è attiva?", "expectedPaths": ["apps/storefront/src/lib/catalog/promotions.ts"] },
+    { "id": "q11", "question": "Quale codice invia gli avvisi interni allo staff e su quali canali?", "expectedPaths": ["apps/storefront/src/lib/notifications/staff/dispatcher.ts"] },
+    { "id": "q12", "question": "Come funziona la sincronizzazione del carrello tra dispositivi?", "expectedPaths": ["apps/storefront/src/lib/cart/cartSyncEngine.ts"] },
+    { "id": "q13", "question": "Come viene creata una bozza di spedizione sul provider?", "expectedPaths": ["apps/storefront/src/lib/shipping/shipmentDraft/shipmentDraftService.ts"] },
+    { "id": "q14", "question": "Come si decide il livello del Help Center per un negozio?", "expectedPaths": ["apps/storefront/src/lib/helpCenter/rules.ts"] },
+    { "id": "q15", "question": "Come si protegge l'accesso alle pagine di Gestion du commerce?", "expectedPaths": ["apps/storefront/src/lib/gestion/featureGate.ts"] },
+    { "id": "q16", "question": "Quali campi del tenant arrivano al client e come si evita di esporre le chiavi?", "expectedPaths": ["apps/storefront/src/lib/tenant/publicTenant.ts"] }
+  ]
+}
