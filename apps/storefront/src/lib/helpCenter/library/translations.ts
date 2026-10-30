@@ -1,4 +1,4 @@
-import type { HelpBlock, HelpLocale } from '../domain';
+﻿import type { HelpBlock, HelpLocale } from '../domain';
 
 /**
  * Italian and English versions of the initial library. Same blocks, same order
@@ -527,8 +527,8 @@ export const LIBRARY_TRANSLATIONS: Record<string, Record<Locale, LibraryTranslat
         p('In alto nella pagina **Abonnement**, il blocco di pagamento indica l\'importo, la data « Payé jusqu\'au » e il mese coperto dal prossimo pagamento.'),
         steps(
           'Aprite **Abonnement** nel menu.',
+          'Con PayPal (consigliato, se il pulsante è presente): cliccate su **Payer avec PayPal** e indicate la **Note à indiquer dans PayPal**. Lepefy proroga la scadenza dopo aver verificato il pagamento.',
           'Con carta: cliccate su **Payer par carte**. Il pagamento è gestito da Stripe e la scadenza viene prorogata automaticamente alla sua conferma.',
-          'Con PayPal (se il pulsante è presente): cliccate su **Payer avec PayPal** e indicate la **Note à indiquer dans PayPal**. Lepefy proroga la scadenza dopo aver verificato il pagamento.',
           'Con bonifico: aprite **Virement bancaire** (**Voir les coordonnées bancaires**), copiate IBAN, importo e **Référence**, poi effettuate il bonifico dalla vostra banca.',
         ),
         info('Indicate esattamente la causale: identifica il vostro esercizio e il mese pagato. Un bonifico viene registrato da Lepefy alla ricezione (1-2 giorni lavorativi).'),
@@ -542,8 +542,8 @@ export const LIBRARY_TRANSLATIONS: Record<string, Record<Locale, LibraryTranslat
         p('At the top of the **Abonnement** page, the payment block shows the amount, the « Payé jusqu\'au » date and the month your next payment covers.'),
         steps(
           'Open **Abonnement** in the menu.',
+          'By PayPal (recommended, if the button is shown): click **Payer avec PayPal** and enter the **Note à indiquer dans PayPal**. Lepefy extends the due date after checking the payment.',
           'By card: click **Payer par carte**. Stripe processes the payment and the due date is extended automatically once it is confirmed.',
-          'By PayPal (if the button is shown): click **Payer avec PayPal** and enter the **Note à indiquer dans PayPal**. Lepefy extends the due date after checking the payment.',
           'By bank transfer: open **Virement bancaire** (**Voir les coordonnées bancaires**), copy the IBAN, the amount and the **Référence**, then make the transfer from your bank.',
         ),
         info('Enter the reference exactly: it identifies your business and the month paid. Lepefy records a bank transfer when it is received (1 to 2 working days).'),

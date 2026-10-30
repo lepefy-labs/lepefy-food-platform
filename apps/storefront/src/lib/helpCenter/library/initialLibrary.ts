@@ -381,8 +381,8 @@ export const INITIAL_LIBRARY: LibraryGuide[] = [
       p('En haut de la page **Abonnement**, le bloc de paiement indique le montant, la date « Payé jusqu’au » et le mois que votre prochain paiement couvre.'),
       steps(
         'Ouvrez **Abonnement** dans le menu.',
+        'Par PayPal (mode recommandé, si le bouton est présent) : cliquez sur **Payer avec PayPal** et indiquez la **Note à indiquer dans PayPal**. Lepefy prolonge l’échéance après avoir vérifié le paiement.',
         'Par carte : cliquez sur **Payer par carte**. Le paiement est traité par Stripe et l’échéance est prolongée automatiquement dès sa confirmation.',
-        'Par PayPal (si le bouton est présent) : cliquez sur **Payer avec PayPal** et indiquez la **Note à indiquer dans PayPal**. Lepefy prolonge l’échéance après avoir vérifié le paiement.',
         'Par virement : ouvrez **Virement bancaire** (**Voir les coordonnées bancaires**), copiez l’IBAN, le montant et la **Référence**, puis effectuez le virement depuis votre banque.',
       ),
       info('Indiquez exactement la référence : elle identifie votre établissement et le mois payé. Un virement est enregistré par Lepefy à réception (1 à 2 jours ouvrés).'),
