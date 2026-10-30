@@ -93,13 +93,50 @@ async function loadModelCandidate(modelKey: string, capability: string, timeoutM
   };
 }
 
+/** Usage of a tenant-less consumer (the Engineering Hub): reported to the consumer's own table, never to ai_usage_log. */
+export interface AiUsageEvent {
+  endpoint: string;
+  provider: string;
+  model: string;
+  status: 'success' | 'error' | 'rate_limited';
+  inputTokens?: number;
+  outputTokens?: number;
+  latencyMs: number;
+  fallbackUsed: boolean;
+  fallbackReason: string | null;
+}
+
+/** The only consumer allowed to run without a tenant. */
+export const TENANTLESS_AI_CONSUMER = 'engineering';
+
+function assertTenantScope(params: { tenantId: string | null; consumer: string; usageSink?: unknown }) {
+  if (params.tenantId !== null) return;
+  // A missing tenant is never a default: only the engineering consumer, with its own usage sink.
+  if (params.consumer !== TENANTLESS_AI_CONSUMER || typeof params.usageSink !== 'function') {
+    throw new AiRoutingError(['tenant_required']);
+  }
+}
+
 async function recordGatewayTelemetry(params: {
-  tenantId: string;
+  tenantId: string | null;
   endpoint: string;
   consumer: string;
   capability: string;
+  usageSink?: (event: AiUsageEvent) => Promise<void>;
 }, event: AttemptTelemetry, updateHealth = true) {
-  await logAiUsage({
+  if (params.tenantId === null) {
+    await params.usageSink?.({
+      endpoint: params.endpoint,
+      provider: event.candidate.provider.key,
+      model: event.candidate.model.provider_model_id,
+      status: event.status,
+      inputTokens: event.inputTokens,
+      outputTokens: event.outputTokens,
+      latencyMs: event.latencyMs,
+      fallbackUsed: event.fallbackUsed,
+      fallbackReason: event.fallbackReason,
+    });
+  } else await logAiUsage({
     tenantId: params.tenantId,
     endpoint: params.endpoint,
     provider: event.candidate.provider.key,
@@ -145,12 +182,15 @@ export async function assertAiRouteReady(consumer: string, capability: string): 
 }
 
 export async function runAi<T>(params: {
-  tenantId: string;
+  /** null only for the engineering consumer, which must pass a usageSink. */
+  tenantId: string | null;
   endpoint: string;
   consumer: string;
   capability: string;
   request: AiRequest<T>;
+  usageSink?: (event: AiUsageEvent) => Promise<void>;
 }) {
+  assertTenantScope(params);
   let candidates: AiCandidate[];
   try {
     candidates = await loadCandidates(params.consumer, params.capability);

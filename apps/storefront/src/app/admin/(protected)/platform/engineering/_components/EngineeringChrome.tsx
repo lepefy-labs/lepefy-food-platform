@@ -17,6 +17,8 @@ const TABS = [
   { key: 'moduli', label: 'Moduli', href: `${ENGINEERING_PATH}/moduli` },
   { key: 'codice', label: 'Codice', href: `${ENGINEERING_PATH}/codice` },
   { key: 'ricerca', label: 'Ricerca', href: `${ENGINEERING_PATH}/ricerca` },
+  { key: 'ai', label: 'AI', href: `${ENGINEERING_PATH}/ai` },
+  { key: 'accessi', label: 'Accessi', href: `${ENGINEERING_PATH}/accessi` },
 ] as const;
 export type EngineeringTab = (typeof TABS)[number]['key'];
 

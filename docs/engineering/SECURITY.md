@@ -10,7 +10,7 @@ Base verificata: `main` @ `1703e3ea`.
 | Membro IT (ruolo `engineering_member`, scope `platform`) | **no**: ruolo e permessi esistono dopo la 175 ma nessuna membership è assegnata e `MEMBER_ACCESS_ENABLED = false` |
 | `tenant_admin`, cassiere, altri ruoli tenant | no |
 | Anonimo | 401 |
-| Integrazioni macchina | non esistono ancora (unità C: token con scope, hash, scadenza, revoca) |
+| Integrazioni macchina | token `lpe_eng_…` con scope (`search`/`read`/`ask`), solo SHA-256 salvato, scadenza ≤ 1 anno, revoca; mai cookie né tenant (AI_RETRIEVAL.md §6) |
 
 Permessi seminati dalla 175: `engineering.view`, `engineering.ai.use` (assegnati al ruolo IT), `engineering.manage`, `engineering.admin` (solo owner; rischio `critical`).
 

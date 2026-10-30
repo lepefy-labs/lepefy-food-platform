@@ -1,5 +1,7 @@
 import 'server-only';
+import { cookies } from 'next/headers';
 import type { NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import type { EngineeringPermission } from '../access';
 
@@ -16,4 +18,21 @@ import type { EngineeringPermission } from '../access';
  */
 export async function requireEngineeringApi(_permission: EngineeringPermission): Promise<NextResponse | null> {
   return requirePlatformOwner();
+}
+
+/** Id of the signed-in Platform Owner (to attribute a credential to a person); null when unknown. */
+export async function currentOwnerId(): Promise<string | null> {
+  const cookieStore = cookies();
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    cookies: {
+      getAll() { return cookieStore.getAll(); },
+      setAll() {},
+      get(name: string) { return cookieStore.get(name)?.value; },
+      set() {},
+      remove() {},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any,
+  });
+  const { data } = await supabase.auth.getUser();
+  return data.user?.id ?? null;
 }

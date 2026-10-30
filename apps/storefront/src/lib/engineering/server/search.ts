@@ -2,8 +2,9 @@ import 'server-only';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getActiveRun } from './activeRun';
 import { loadFiles } from './repository';
+import { recordMetric, type Actor } from './metrics';
 import {
-  SEARCH_KINDS, SEARCH_LIMITS, buildTsQuery, escapeLike, hitKey, makeSnippet, mergeHits, scoreHit, validateQuery,
+  SEARCH_KINDS, SEARCH_LIMITS, normalizeQuery, buildTsQuery, escapeLike, hitKey, makeSnippet, mergeHits, scoreHit, validateQuery,
   type SearchHit, type SearchKind, type SearchOutcome, type SearchRequest, type SearchStage,
 } from '../search/contract';
 
@@ -21,7 +22,7 @@ function stagePattern(stage: 'exact' | 'prefix' | 'fuzzy', query: string): strin
  * active run; an index that is missing, empty or unreadable is reported as such, never as
  * "no results".
  */
-export async function searchEngineering(request: SearchRequest): Promise<SearchOutcome> {
+async function runSearch(request: SearchRequest): Promise<SearchOutcome> {
   const checked = validateQuery(request.query);
   if (!checked.ok) return { state: 'invalid', reason: checked.reason };
   const query = checked.query;
@@ -141,4 +142,20 @@ export async function searchEngineering(request: SearchRequest): Promise<SearchO
     console.error('[engineering/search] failed:', (error as { code?: string })?.code ?? 'unknown');
     return { state: 'unavailable' };
   }
+}
+
+/** Search entry point. When an actor is given (HTTP routes) the query is recorded as a metric (hash only). */
+export async function searchEngineering(request: SearchRequest, options: { actor?: Actor } = {}): Promise<SearchOutcome> {
+  const started = Date.now();
+  const outcome = await runSearch(request);
+  if (options.actor && outcome.state !== 'invalid') {
+    const active = await getActiveRun();
+    if (active.state === 'ready') {
+      await recordMetric({
+        repositoryId: active.run.repositoryId, runId: active.run.runId, actor: options.actor, kind: 'search', question: normalizeQuery(request.query),
+        outcome: outcome.state === 'ok' ? 'ok' : 'error', latencyMs: Date.now() - started, resultCount: outcome.state === 'ok' ? outcome.total : null,
+      });
+    }
+  }
+  return outcome;
 }

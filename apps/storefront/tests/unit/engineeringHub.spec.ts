@@ -446,7 +446,8 @@ test.describe('migration 175 contract', () => {
   test('CI runs the migration chain twice', () => {
     const ci = readFileSync(resolve(REPO, '.github/workflows/ci.yml'), 'utf8');
     expect(ci).toContain('supabase/tests/175_engineering_hub.fixture.sql');
-    expect(ci.split('supabase/migrations/175_engineering_hub.sql').length - 1).toBe(2);
+    // twice in its own step, once more as the base of the unit C (176) chain
+    expect(ci.split('supabase/migrations/175_engineering_hub.sql').length - 1).toBe(3);
     expect(ci).toContain('supabase/tests/175_engineering_hub.test.sql');
   });
 });

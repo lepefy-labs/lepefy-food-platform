@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const kinds = (params.get('kind') ?? '').split(',').filter((kind): kind is SearchKind => (SEARCH_KINDS as readonly string[]).includes(kind));
   const moduleKey = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(params.get('module') ?? '') ? params.get('module') : null;
 
-  const outcome = await searchEngineering({ query: params.get('q') ?? '', moduleKey, kinds });
+  const outcome = await searchEngineering({ query: params.get('q') ?? '', moduleKey, kinds }, { actor: { kind: 'owner', clientId: null } });
   if (outcome.state === 'invalid') return NextResponse.json({ error: 'Query too short', reason: outcome.reason }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
   if (outcome.state === 'unavailable') return NextResponse.json({ error: 'Index unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   return NextResponse.json(outcome, { headers: { 'Cache-Control': 'no-store' } });

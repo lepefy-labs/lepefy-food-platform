@@ -149,3 +149,13 @@ export async function loadFileSource(repositoryId: string, runId: string, path: 
     content: blob.content as string,
   };
 }
+
+/** Files that demonstrably use a table / RPC / API route by name (case-insensitive exact match on the target). */
+export async function loadReferencesTo(runId: string, escapedName: string): Promise<Array<{ fromFileId: string; kind: RelationKind; targetRef: string; evidenceLine: number | null }>> {
+  const { data, error } = await db().from('engineering_relations')
+    .select('from_file_id, kind, target_ref, evidence_line').eq('run_id', runId)
+    .in('kind', ['uses_table', 'calls_rpc', 'calls_api', 'defines_object']).ilike('target_ref', escapedName).limit(40);
+  if (error) throw error;
+  return ((data ?? []) as Array<{ from_file_id: string; kind: RelationKind; target_ref: string; evidence_line: number | null }>)
+    .map((row) => ({ fromFileId: row.from_file_id, kind: row.kind, targetRef: row.target_ref, evidenceLine: row.evidence_line }));
+}
