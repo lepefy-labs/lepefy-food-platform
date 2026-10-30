@@ -1,7 +1,7 @@
 import type { HelpBlock } from '../domain';
 
 /**
- * Initial French library of the Help Center: 17 short guides written ONLY from
+ * Initial French library of the Help Center: 18 short guides written ONLY from
  * features and labels that exist in the repository (verified against the admin
  * screens and docs on 30/10/2026). They are imported as DRAFTS by the platform
  * owner (POST /api/admin/platform/knowledge/import-library) and published only
@@ -366,6 +366,27 @@ export const INITIAL_LIBRARY: LibraryGuide[] = [
         'Utilisez les sections **Fournisseurs**, **Achats**, **Stocks** et **Trésorerie** selon votre besoin.',
       ),
       info('Le stock affiché dans la boutique reste celui des produits : une réception d’achat l’augmente et enregistre un mouvement de stock. Seuls les paiements fournisseurs vérifiés réduisent la dette envers un fournisseur.'),
+    ],
+  },
+  // ─── Abonnement ───────────────────────────────────────────────────────────
+  {
+    slug: 'payer-mon-abonnement',
+    module: 'general',
+    title: 'Comment payer mon abonnement ?',
+    summary: 'Régler l’abonnement par carte, PayPal ou virement et savoir quand l’échéance est prolongée.',
+    requiredPermission: 'billing.view',
+    contexts: ['/admin/billing'],
+    watch: ['app/admin/(protected)/billing', 'lib/billing', 'docs/SUBSCRIPTION_LIFECYCLE.md'],
+    blocks: [
+      p('En haut de la page **Abonnement**, le bloc de paiement indique le montant, la date « Payé jusqu’au » et le mois que votre prochain paiement couvre.'),
+      steps(
+        'Ouvrez **Abonnement** dans le menu.',
+        'Par carte : cliquez sur **Payer par carte**. Le paiement est traité par Stripe et l’échéance est prolongée automatiquement dès sa confirmation.',
+        'Par PayPal (si le bouton est présent) : cliquez sur **Payer avec PayPal** et indiquez la **Note à indiquer dans PayPal**. Lepefy prolonge l’échéance après avoir vérifié le paiement.',
+        'Par virement : ouvrez **Virement bancaire** (**Voir les coordonnées bancaires**), copiez l’IBAN, le montant et la **Référence**, puis effectuez le virement depuis votre banque.',
+      ),
+      info('Indiquez exactement la référence : elle identifie votre établissement et le mois payé. Un virement est enregistré par Lepefy à réception (1 à 2 jours ouvrés).'),
+      warn('Si l’abonnement est suspendu, seul le paiement par carte rétablit le service dès la confirmation de Stripe. PayPal et virement le rétablissent après vérification par Lepefy.'),
     ],
   },
 ];

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { IconBrandPaypal, IconBuildingBank, IconCreditCard, IconPlayerPause, IconAlertTriangle } from '@tabler/icons-react';
+import { IconBrandPaypal, IconBuildingBank, IconCreditCard, IconChevronDown } from '@tabler/icons-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { aggregateTenantAiUsage, type AiRawUsageRow } from '@/lib/ai/productUsage';
 import { formatPlanPrice, getTenantBillingSnapshot } from '@/lib/admin/platformBilling';
@@ -20,6 +20,8 @@ import {
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import CopyableValue from '../../_components/ui/CopyableValue';
 import Badge from '../../_components/ui/Badge';
+import InlineAlert from '../../_components/ui/InlineAlert';
+import { ButtonAnchor } from '../../_components/ui/Button';
 import { SUBSCRIPTION_STATE_META } from '@/lib/admin/statusRegistry';
 import { applyLinkAmount } from '@/lib/payments/externalPaymentLink';
 
@@ -85,122 +87,143 @@ export default async function BillingPage() {
   // PayPal.me: the plan amount is prefilled; any other PayPal link is used as is.
   const paypalLink = billing.paypalUrl ? applyLinkAmount('paypal', billing.paypalUrl, billing.monthlyPriceCents / 100, billing.currency) : null;
 
+  const mailSupport = <a href={`mailto:${billing.supportEmail}`} className="font-semibold underline">Contactez Lepefy</a>;
+  const needsPayment = state.kind === 'suspended' || state.kind === 'overdue' || state.kind === 'due_soon';
+  const paidUntilLabel = subscription.paid_until ? formatBillingDate(subscription.paid_until) : null;
+
   return (
     <div className="max-w-3xl">
       <AdminPageHeader title="Abonnement" description={`${billing.planName} · ${price} HT / mois`} />
 
       {state.kind === 'suspended' && (
-        <div role="alert" className="mb-5 flex items-start gap-2 rounded-xl border border-tone-danger-border bg-tone-danger-bg px-4 py-3 text-sm text-tone-danger-fg">
-          <IconPlayerPause size={18} stroke={1.8} className="mt-0.5 shrink-0" aria-hidden="true" />
-          <p>
-            <strong>Abonnement suspendu{state.suspendedBy === 'automatic' ? ' automatiquement' : ''}.</strong> Boutique, événementiel, carte digitale,
-            paiements en ligne, Nala et avis sont hors ligne. Un paiement par carte rétablit le service immédiatement ; un virement, dès sa réception par Lepefy.
-            {serviceState.suspensionReason && <span className="block text-xs">Motif : {serviceState.suspensionReason}</span>}
-          </p>
-        </div>
+        <InlineAlert tone="danger" className="mb-4" title={`Abonnement suspendu${state.suspendedBy === 'automatic' ? ' automatiquement' : ''}`}>
+          Boutique, événementiel, carte digitale, paiements en ligne, Nala et avis sont hors ligne. Un paiement par carte rétablit le service dès sa confirmation par Stripe ;
+          un paiement PayPal ou un virement le rétablit après vérification par Lepefy.
+          {serviceState.suspensionReason && <span className="mt-1 block text-xs">Motif : {serviceState.suspensionReason}</span>}
+        </InlineAlert>
       )}
       {state.kind === 'overdue' && (
-        <div role="alert" className="mb-5 flex items-start gap-2 rounded-xl border border-tone-warning-border bg-tone-warning-bg px-4 py-3 text-sm text-tone-warning-fg">
-          <IconAlertTriangle size={18} stroke={1.8} className="mt-0.5 shrink-0" aria-hidden="true" />
-          <p>
-            <strong>Échéance dépassée depuis {plural(state.daysOverdue, 'jour')}</strong> ({formatBillingDate(subscription.paid_until)}).{' '}
-            {state.autoSuspendAt
-              ? <>Sans paiement, le service sera suspendu le <strong>{formatBillingDate(state.autoSuspendAt)}</strong>.</>
-              : <>Votre service reste actif pour l&apos;instant : réglez l&apos;abonnement pour éviter une suspension.</>}
-          </p>
-        </div>
+        <InlineAlert tone="warning" className="mb-4" title={`Échéance dépassée depuis ${plural(state.daysOverdue, 'jour')} (${formatBillingDate(subscription.paid_until)})`}>
+          {state.autoSuspendAt
+            ? <>Sans paiement, le service sera suspendu le <strong>{formatBillingDate(state.autoSuspendAt)}</strong>.</>
+            : <>Votre service reste actif pour l&apos;instant : réglez l&apos;abonnement pour éviter une suspension.</>}
+        </InlineAlert>
       )}
       {state.kind === 'due_soon' && state.daysLeft !== null && (
-        <div role="status" className="mb-5 rounded-xl border border-tone-warning-border bg-tone-warning-bg px-4 py-3 text-sm text-tone-warning-fg">
-          <strong>{state.daysLeft === 0 ? 'Échéance aujourd’hui' : `Échéance dans ${plural(state.daysLeft, 'jour')}`}</strong> ({formatBillingDate(subscription.paid_until)}).
+        <InlineAlert tone="warning" className="mb-4" title={`${state.daysLeft === 0 ? 'Échéance aujourd’hui' : `Échéance dans ${plural(state.daysLeft, 'jour')}`} (${formatBillingDate(subscription.paid_until)})`}>
           Réglez l&apos;abonnement pour éviter toute interruption.
-        </div>
+        </InlineAlert>
       )}
       {serviceState.suspendedModules.length > 0 && (
-        <p role="status" className="mb-5 rounded-xl border border-a-border bg-a-surface-2 px-4 py-3 text-sm text-a-text-2">
+        <InlineAlert tone="neutral" className="mb-4">
           Module{serviceState.suspendedModules.length > 1 ? 's' : ''} suspendu{serviceState.suspendedModules.length > 1 ? 's' : ''} par Lepefy :{' '}
           {serviceState.suspendedModules.map((module) => MODULE_LABELS[module]).join(', ')}.
-        </p>
+        </InlineAlert>
       )}
 
-      <div className="mb-5 rounded-2xl border border-a-border bg-a-surface p-5">
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <p className="text-sm font-semibold text-a-text">{tenant.name}</p>
+      <section aria-labelledby="pay-title" className="mb-5 rounded-2xl border border-a-border bg-a-surface p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <div>
+            <h2 id="pay-title" className="text-sm font-semibold text-a-text-2">{needsPayment ? 'Régler l’abonnement' : 'Prochain paiement'}</h2>
+            <p className="mt-1 text-3xl font-bold tabular-nums text-a-text">{price} <span className="text-sm font-medium text-a-text-3">HT / mois</span></p>
+          </div>
           <Badge tone={badgeTone} dot className="shrink-0">{STATE_LABEL[state.kind]}</Badge>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+
+        <dl className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <div className="rounded-xl bg-a-surface-2 p-3">
-            <p className="text-xs text-a-text-3">Payé jusqu&apos;au</p>
-            <p className="mt-0.5 font-semibold text-a-text">{formatBillingDate(subscription.paid_until)}</p>
+            <dt className="text-xs text-a-text-3">Payé jusqu&apos;au</dt>
+            <dd className="mt-0.5 font-semibold text-a-text">{paidUntilLabel ?? 'Échéance non définie'}</dd>
           </div>
           <div className="rounded-xl bg-a-surface-2 p-3">
-            <p className="text-xs text-a-text-3">Montant mensuel</p>
-            <p className="mt-0.5 font-semibold text-a-text">{price} HT</p>
+            <dt className="text-xs text-a-text-3">Ce paiement couvre</dt>
+            <dd className="mt-0.5 font-semibold capitalize text-a-text">{coveredLabel}</dd>
           </div>
-          <div className="rounded-xl bg-a-surface-2 p-3">
-            <p className="text-xs text-a-text-3">Prochain paiement</p>
-            <p className="mt-0.5 font-semibold capitalize text-a-text">{coveredLabel}</p>
+        </dl>
+        <p className="mt-2 text-xs text-a-text-3">Un paiement prolonge l&apos;abonnement jusqu&apos;à la fin de ce mois.</p>
+
+        <div className="mt-5 space-y-3">
+          <div className="rounded-2xl border-2 border-a-brand bg-a-surface p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-a-brand-soft text-a-brand-fg"><IconCreditCard size={22} stroke={1.8} aria-hidden="true" /></span>
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold text-a-text">Carte bancaire</h3>
+                <p className="mt-0.5 text-xs text-a-text-3">Paiement Stripe sécurisé. L&apos;échéance est prolongée automatiquement dès que Stripe confirme le paiement.</p>
+              </div>
+            </div>
+            {billing.stripePaymentLink ? (
+              <ButtonAnchor variant="primary" href={billing.stripePaymentLink} target="_blank" rel="noopener noreferrer" className="mt-4 min-h-12 w-full text-base">
+                Payer par carte · {price}
+              </ButtonAnchor>
+            ) : (
+              <InlineAlert tone="neutral" className="mt-4" title="Paiement par carte pas encore disponible">
+                Le lien de paiement n&apos;est pas encore configuré. Utilisez un autre moyen ci-dessous ou {mailSupport}.
+              </InlineAlert>
+            )}
           </div>
-        </div>
-        <div className="mt-4 border-t border-a-border pt-4">
-          <p className="mb-2 text-xs font-medium text-a-text-3">Modules inclus</p>
-          <div className="flex flex-wrap gap-2">
-            {billing.features.map((feature) => (
-              <span key={feature.key} className="inline-flex rounded-full border border-a-border bg-a-brand-soft px-2.5 py-1 text-xs font-medium text-a-brand-fg">
-                {feature.label}
+
+          {paypalLink && (
+            <div className="rounded-2xl border border-a-border p-4">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-a-surface-2 text-a-text-2"><IconBrandPaypal size={22} stroke={1.8} aria-hidden="true" /></span>
+                <div className="min-w-0">
+                  <h3 className="text-base font-semibold text-a-text">PayPal</h3>
+                  <p className="mt-0.5 text-xs text-a-text-3">L&apos;échéance est prolongée par Lepefy après vérification du paiement.</p>
+                </div>
+              </div>
+              <ButtonAnchor variant="secondary" href={paypalLink} target="_blank" rel="noopener noreferrer" className="mt-4 min-h-12 w-full text-base">
+                Payer avec PayPal · {price}
+              </ButtonAnchor>
+              <div className="mt-3 rounded-xl bg-a-surface-2 p-3">
+                <CopyableValue stacked label="Note à indiquer dans PayPal" value={reference} />
+              </div>
+            </div>
+          )}
+
+          <details className="group rounded-2xl border border-a-border">
+            <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-a-focus [&::-webkit-details-marker]:hidden">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-a-surface-2 text-a-text-2"><IconBuildingBank size={22} stroke={1.8} aria-hidden="true" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-base font-semibold text-a-text">Virement bancaire</span>
+                <span className="block text-xs text-a-text-3">Sans commission · <span className="font-semibold text-a-brand-fg">Voir les coordonnées bancaires</span></span>
               </span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <h2 className="mb-1 text-sm font-semibold text-a-text-2">Régler l&apos;abonnement</h2>
-      <p className="mb-3 text-xs text-a-text-3">
-        Un paiement couvre le mois de <strong className="font-medium text-a-text-2">{coveredLabel}</strong> : il prolonge l&apos;abonnement jusqu&apos;à la fin de ce mois.
-      </p>
-      <div className={`grid gap-3 ${paypalLink ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-        <div className="rounded-2xl border border-a-border bg-a-surface p-5">
-          <p className="flex items-center gap-2 text-sm font-semibold text-a-text"><IconCreditCard size={18} stroke={1.8} aria-hidden="true" />Carte bancaire</p>
-          <p className="mb-4 mt-1 text-xs text-a-text-3">Paiement Stripe sécurisé. L&apos;échéance est prolongée automatiquement dès le paiement.</p>
-          {billing.stripePaymentLink ? (
-            <a href={billing.stripePaymentLink} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center rounded-xl px-4 py-2.5 text-sm font-semibold text-a-on-brand hover:opacity-90" style={{ backgroundColor: 'var(--admin-primary)' }}>
-              Payer par carte — {price}
-            </a>
-          ) : (
-            <p className="text-xs italic text-a-text-3">Lien non encore configuré. <a href={`mailto:${billing.supportEmail}`} className="underline">Contactez Lepefy</a>.</p>
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-a-border bg-a-surface p-5">
-          <p className="flex items-center gap-2 text-sm font-semibold text-a-text"><IconBuildingBank size={18} stroke={1.8} aria-hidden="true" />Virement bancaire</p>
-          <p className="mb-3 mt-1 text-xs text-a-text-3">Sans commission. L&apos;échéance est prolongée par Lepefy à réception (1–2 jours ouvrés).</p>
-          {billing.bankIban ? (
-            <div className="space-y-1.5 rounded-xl bg-a-surface-2 p-3 text-xs">
-              {billing.bankBeneficiary && <p className="text-a-text-2"><span className="text-a-text-3">Bénéficiaire</span> {billing.bankBeneficiary}</p>}
-              <CopyableValue label="IBAN" value={billing.bankIban} />
-              {billing.bankBic && <CopyableValue label="BIC" value={billing.bankBic} />}
-              <CopyableValue label="Montant" value={amountPlain} />
-              <CopyableValue label="Référence" value={reference} />
-              <p className="pt-1 text-xs text-a-text-3">Indiquez exactement cette référence : elle identifie votre établissement et le mois payé.</p>
+              <IconChevronDown size={18} aria-hidden="true" className="shrink-0 text-a-text-3 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="border-t border-a-border p-4">
+              {billing.bankIban ? (
+                <div className="space-y-3 rounded-xl bg-a-surface-2 p-3">
+                  {billing.bankBeneficiary && <CopyableValue stacked label="Bénéficiaire" value={billing.bankBeneficiary} />}
+                  <CopyableValue stacked label="IBAN" value={billing.bankIban} />
+                  {billing.bankBic && <CopyableValue stacked label="BIC" value={billing.bankBic} />}
+                  <CopyableValue stacked label="Montant" value={amountPlain} />
+                  <CopyableValue stacked label="Référence" value={reference} />
+                  <p className="text-xs text-a-text-3">
+                    Indiquez exactement cette référence : elle identifie votre établissement et le mois payé.
+                    Lepefy prolonge l&apos;échéance à réception du virement (1 à 2 jours ouvrés).
+                  </p>
+                </div>
+              ) : (
+                <InlineAlert tone="neutral" title="Coordonnées bancaires pas encore disponibles">
+                  Elles ne sont pas encore configurées. {mailSupport}.
+                </InlineAlert>
+              )}
             </div>
-          ) : (
-            <p className="text-xs italic text-a-text-3">Coordonnées bancaires non encore configurées. <a href={`mailto:${billing.supportEmail}`} className="underline">Contactez Lepefy</a>.</p>
-          )}
+          </details>
         </div>
+      </section>
 
-        {paypalLink && (
-          <div className="rounded-2xl border border-a-border bg-a-surface p-5">
-            <p className="flex items-center gap-2 text-sm font-semibold text-a-text"><IconBrandPaypal size={18} stroke={1.8} aria-hidden="true" />PayPal</p>
-            <p className="mb-3 mt-1 text-xs text-a-text-3">L&apos;échéance est prolongée par Lepefy à réception du paiement.</p>
-            <a href={paypalLink} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center rounded-xl border border-a-border px-4 py-2.5 text-sm font-semibold text-a-text hover:bg-a-hover">
-              Payer avec PayPal — {price}
-            </a>
-            <div className="mt-3 rounded-xl bg-a-surface-2 p-3 text-xs">
-              <CopyableValue label="Note à indiquer" value={reference} />
-            </div>
-          </div>
-        )}
-      </div>
+      <section aria-labelledby="plan-title" className="mb-5 rounded-2xl border border-a-border bg-a-surface p-4 sm:p-5">
+        <h2 id="plan-title" className="text-sm font-semibold text-a-text-2">Votre abonnement</h2>
+        <p className="mt-1 text-sm text-a-text">{tenant.name} · {billing.planName}</p>
+        <p className="mb-2 mt-4 text-xs font-medium text-a-text-3">Modules inclus ({billing.features.length})</p>
+        <div className="flex flex-wrap gap-2">
+          {billing.features.map((feature) => (
+            <span key={feature.key} className="inline-flex rounded-full border border-a-border bg-a-brand-soft px-2.5 py-1 text-xs font-medium text-a-brand-fg">
+              {feature.label}
+            </span>
+          ))}
+        </div>
+      </section>
 
       {payments.length > 0 && (
         <section className="mt-6 rounded-2xl border border-a-border bg-a-surface p-5">

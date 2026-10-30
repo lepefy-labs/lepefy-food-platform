@@ -29,7 +29,7 @@ Moduli (`apps/storefront/src/lib/helpCenter/`):
 | `server/access.ts` | `getHelpLevel`, guardie `helpTenantApi` / `helpPlatformApi`, `requireHelpTenantPage` |
 | `server/service.ts` | letture tenant (contesto, catalogo, articolo, ricerca) e metriche |
 | `server/platformService.ts` | CRUD, workflow, revisioni, metriche per la console |
-| `library/initialLibrary.ts` | 17 guide iniziali in francese (importate come **bozze**) |
+| `library/initialLibrary.ts` | 18 guide iniziali in francese (importate come **bozze**; la 18ª `payer-mon-abonnement` è una bozza non ancora importata) |
 | `library/translations.ts` | versioni IT/EN delle stesse guide (copie di lavoro) |
 
 UI: `app/admin/_components/help/` (`HelpProvider`, `HelpDrawer`, `HelpHeaderButton`, `HelpArticleBody`, `HelpArticleFeedback`, `helpClient`), pagine `app/admin/(protected)/aide/**` e `platform/knowledge/**`.
