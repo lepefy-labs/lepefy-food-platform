@@ -40,7 +40,7 @@ export default async function KnowledgePage({ searchParams = {} }: { searchParam
   const statusParam = first(searchParams.status);
   const status = (HELP_STATUSES as readonly string[]).includes(statusParam) ? statusParam as HelpStatus : null;
   const moduleParam = first(searchParams.module);
-  const module = moduleParam in HELP_MODULES ? moduleParam : null;
+  const moduleKey = moduleParam in HELP_MODULES ? moduleParam : null;
   const search = first(searchParams.q).replace(/[^\p{L}\p{N} _-]/gu, ' ').trim().slice(0, 60);
   const page = Math.max(1, Number.parseInt(first(searchParams.page), 10) || 1);
 
@@ -50,7 +50,7 @@ export default async function KnowledgePage({ searchParams = {} }: { searchParam
   let failed = false;
   try {
     [list, counts, metrics] = await Promise.all([
-      tab === 'articles' ? listArticles({ search, status, module, page, size: PAGE_SIZE }) : Promise.resolve(null),
+      tab === 'articles' ? listArticles({ search, status, module: moduleKey, page, size: PAGE_SIZE }) : Promise.resolve(null),
       statusCounts(),
       helpMetrics(30),
     ]);
@@ -62,7 +62,7 @@ export default async function KnowledgePage({ searchParams = {} }: { searchParam
 
   const href = (patch: Record<string, string | number | null>) => {
     const params = new URLSearchParams();
-    const current: Record<string, string> = { tab: tab === 'articles' ? '' : tab, status: status ?? '', module: module ?? '', q: search };
+    const current: Record<string, string> = { tab: tab === 'articles' ? '' : tab, status: status ?? '', module: moduleKey ?? '', q: search };
     for (const [key, value] of Object.entries({ ...current, ...patch })) if (value !== '' && value !== null && value !== undefined) params.set(key, String(value));
     const query = params.toString();
     return query ? `${PATH}?${query}` : PATH;
@@ -121,13 +121,13 @@ export default async function KnowledgePage({ searchParams = {} }: { searchParam
             </div>
             <div>
               <label htmlFor="kb-module" className="sr-only">Module</label>
-              <Select id="kb-module" name="module" defaultValue={module ?? ''}>
+              <Select id="kb-module" name="module" defaultValue={moduleKey ?? ''}>
                 <option value="">Tous les modules</option>
                 {Object.entries(HELP_MODULES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
               </Select>
             </div>
             <Button type="submit" variant="secondary">Filtrer</Button>
-            {(search || status || module) && <ButtonLink href={PATH} variant="ghost">Tout effacer</ButtonLink>}
+            {(search || status || moduleKey) && <ButtonLink href={PATH} variant="ghost">Tout effacer</ButtonLink>}
           </form>
           <div className="overflow-hidden rounded-[10px] border border-a-border bg-a-surface">
             <DataTable<Row>
@@ -145,7 +145,7 @@ export default async function KnowledgePage({ searchParams = {} }: { searchParam
                   </Link>
                 );
               }}
-              empty={<EmptyState variant={search || status || module ? 'filtered' : 'empty'} title={search || status || module ? 'Aucun article' : 'Aucun article pour le moment'} description="Créez le premier brouillon ou importez la bibliothèque initiale." />}
+              empty={<EmptyState variant={search || status || moduleKey ? 'filtered' : 'empty'} title={search || status || moduleKey ? 'Aucun article' : 'Aucun article pour le moment'} description="Créez le premier brouillon ou importez la bibliothèque initiale." />}
             />
             <Pagination window={windowed} hrefForPage={(target) => href({ page: target })} noun="articles" />
           </div>

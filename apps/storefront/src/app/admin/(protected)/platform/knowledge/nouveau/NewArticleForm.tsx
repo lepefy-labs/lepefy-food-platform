@@ -14,13 +14,13 @@ export default function NewArticleForm() {
   const { run, pending, error } = useAdminMutation();
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
-  const [module, setModule] = useState('commandes');
+  const [moduleKey, setModuleKey] = useState('commandes');
   const [level, setLevel] = useState<'standard' | 'advanced'>('standard');
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     const result = await run<{ id: string }>('/api/admin/platform/knowledge/articles', {
-      body: { title, slug: slug || slugify(title), module, minLevel: level }, refresh: false,
+      body: { title, slug: slug || slugify(title), module: moduleKey, minLevel: level }, refresh: false,
     });
     if (result?.id) router.push(`/admin/platform/knowledge/${result.id}`);
   }
@@ -33,7 +33,7 @@ export default function NewArticleForm() {
         <Input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder={slugify(title) || 'preparer-une-commande'} maxLength={80} />
       </FormField>
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Module"><Select value={module} onChange={(event) => setModule(event.target.value)}>{Object.entries(HELP_MODULES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</Select></FormField>
+        <FormField label="Module"><Select value={moduleKey} onChange={(event) => setModuleKey(event.target.value)}>{Object.entries(HELP_MODULES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</Select></FormField>
         <FormField label="Niveau commercial" hint="Les guides « Avancé » ne sont servies qu’aux boutiques du niveau avancé (non activé aujourd’hui).">
           <Select value={level} onChange={(event) => setLevel(event.target.value as 'standard' | 'advanced')}><option value="standard">Standard</option><option value="advanced">Avancé</option></Select>
         </FormField>
