@@ -239,7 +239,7 @@ export function buildPacklinkDraftPayload(
       phone: from.phone, email: from.email,
     }),
     to: compact({
-      name: r.firstName, surname: r.lastName, street1: r.street1, street2: r.street2,
+      name: r.firstName, surname: r.lastName, company: r.company, street1: r.street1, street2: r.street2,
       zip_code: r.postalCode, city: r.city, country: r.country, state: locations.to?.postalZoneName, phone: r.phone, email: r.email,
     }),
     ...(Object.keys(additional).length ? { additional_data: additional } : {}),

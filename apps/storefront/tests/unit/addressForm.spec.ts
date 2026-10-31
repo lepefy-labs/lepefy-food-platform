@@ -59,7 +59,7 @@ test.describe('règles d\'adresse', () => {
     const errors = validateAddressDraft({ ...filled, houseNumber: '', postalCode: '4212' });
     expect(errors.houseNumber).toBe(ADDRESS_COPY.houseNumberRequired);
     expect(errors.postalCode).toBe('En Italie, le code postal a 5 chiffres. Exemple : 42121');
-    expect(firstErrorField(errors)).toBe('houseNumber');
+    expect(firstErrorField(errors)).toBe('postalCode');
     // Complément facultatif ; nom demandé seulement quand le formulaire l'affiche.
     expect(validateAddressDraft({ ...filled, line2: '' })).toEqual({});
     expect(validateAddressDraft(filled, { requireFullName: true }).fullName).toBe(ADDRESS_COPY.required);

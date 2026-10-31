@@ -73,6 +73,8 @@ export interface AssistedCartLine {
 /** Adresse de livraison saisie par l'opérateur (même forme que le checkout). */
 export interface AssistedShippingAddress {
   full_name: string;
+  /** Entreprise destinataire (facultatif), distincte du destinataire. */
+  company_name?: string;
   line1: string;
   line2?: string | null;
   city: string;

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconArrowLeft } from '@tabler/icons-react';
 import type { CountryCode } from 'libphonenumber-js';
-import { formatPhoneLive, toE164 } from '@/lib/utils/phone';
+import { toE164 } from '@/lib/utils/phone';
+import { InternationalPhoneField } from '@/components/ui/form/InternationalPhoneField';
 import { TextField } from '@/components/ui/form';
 
 
@@ -13,19 +14,6 @@ import { TextField } from '@/components/ui/form';
 // que le champ passe en rouge dès la première touche pressée.
 const MIN_DIGITS_BEFORE_VALIDATION = 3;
 
-// Exemples de format par marché desservi (mêmes pays que la liste COUNTRIES
-// de AdresseFormClient.tsx, pas de préfixe fixe type "+33..." pour un tenant
-// qui n'est pas français) — libphonenumber-js n'expose pas de générateur de
-// numéro d'exemple sans un jeu de métadonnées additionnel, d'où cette petite
-// table statique en repli.
-const COUNTRY_PLACEHOLDER: Partial<Record<CountryCode, string>> = {
-  IT: '+39 320 123 4567',
-  FR: '+33 6 12 34 56 78',
-  BE: '+32 470 12 34 56',
-  DE: '+49 151 12345678',
-  CH: '+41 78 123 45 67',
-};
-const FALLBACK_PLACEHOLDER = '+00 000 000 000';
 
 interface ModifierProfilClientProps {
   fullName:       string | null;
@@ -50,10 +38,6 @@ export function ModifierProfilClient({ fullName, phone, defaultCountry }: Modifi
         : toE164(phoneValue, defaultCountry)
           ? 'valid'
           : 'invalid';
-
-  function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setPhoneValue(formatPhoneLive(e.target.value, defaultCountry));
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -116,17 +100,12 @@ export function ModifierProfilClient({ fullName, phone, defaultCountry }: Modifi
               placeholder="Ex. : Marie Kamga"
               autoFocus
             />
-            <TextField
+            <InternationalPhoneField
               label="Téléphone"
               value={phoneValue}
-              onChange={handlePhoneChange}
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder={`Ex. : ${COUNTRY_PLACEHOLDER[defaultCountry] ?? FALLBACK_PLACEHOLDER}`}
-              hint="Avec l'indicatif du pays. Le livreur peut vous appeler."
-              error={phoneValidity === 'invalid' ? "Vérifiez le numéro de téléphone, avec l'indicatif du pays." : null}
-              message={phoneValidity === 'valid' ? { tone: 'success', text: 'Numéro valide.' } : null}
+              initialCountry={defaultCountry}
+              onChange={(next) => setPhoneValue(next)}
+              error={phoneValidity === 'invalid' ? 'Numéro invalide pour ce pays.' : null}
             />
             {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800" role="alert">{error}</p>}
 

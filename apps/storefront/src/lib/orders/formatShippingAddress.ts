@@ -9,6 +9,7 @@ export function formatShippingAddress(address: ShippingAddress | null | undefine
   if (!address) return null;
 
   const parts = [
+    address.company_name,
     address.line1,
     address.line2,
     [address.postal_code, address.city].filter(Boolean).join(' '),

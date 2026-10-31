@@ -148,6 +148,7 @@ export function AdresseFormClient({ address, defaultFullName, defaultCountry }: 
                   if (changed.some((field) => serverErrors[field])) setServerErrors({});
                 }}
                 showFullName
+                showCompany={false}
                 showAllErrors={submitted}
                 serverErrors={serverErrors}
                 searchMode={isEdit ? 'collapsed' : 'open'}

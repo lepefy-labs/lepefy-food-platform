@@ -14,6 +14,7 @@ import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/n
 import { buildExternalPaymentLink, isLinkPaymentMethod, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
 import type { ShippingAddress, TenantPaymentMethod } from '@lepefy/types';
 import { normalizeShippingAddress } from '@/lib/address/addressRules';
+import { normalizePhoneForStorage } from '@/lib/phone/internationalPhone';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 
 export const dynamic = 'force-dynamic';
@@ -272,7 +273,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             { status: 400 },
           );
         }
-        shippingAddress = normalizedAddress.address;
+        // Le téléphone de la session suit l'adresse (E.164), la normalisation ne le renvoie pas.
+        const sessionPhone = normalizePhoneForStorage(session.phone, normalizedAddress.address.country);
+        shippingAddress = sessionPhone.e164 ? { ...normalizedAddress.address, phone: sessionPhone.e164 } : normalizedAddress.address;
       }
     }
     const shippingDetails = body.shippingDetails !== undefined ? body.shippingDetails : session.shipping_details;

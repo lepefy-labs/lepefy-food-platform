@@ -27,11 +27,14 @@ export type DraftInputResult =
   | { ok: false; code: Extract<ShipmentDraftErrorCode, 'invalid_recipient' | 'invalid_parcel'>; detail: string };
 
 /**
- * The customer phone is persisted only as the `Téléphone: …` line written into
- * orders.notes by every order-creation path (Stripe webhook, conversion RPC
- * 128, in-store checkout).
+ * Customer phone: new orders carry it structured (E.164) in
+ * orders.shipping_address.phone; orders created before that only have the
+ * `Téléphone: …` line of orders.notes (Stripe webhook, conversion RPC 128,
+ * in-store checkout), which stays the legacy fallback.
  */
-export function orderContactPhone(notes: string | null | undefined): string | null {
+export function orderContactPhone(notes: string | null | undefined, shippingAddress?: { phone?: unknown } | null): string | null {
+  const structured = typeof shippingAddress?.phone === 'string' ? shippingAddress.phone.trim() : '';
+  if (structured.replace(/\D/g, '').length >= 6) return structured.slice(0, 40);
   const match = /(?:^|\n)\s*Téléphone\s*:\s*([^\n]+)/i.exec(notes ?? '');
   const phone = match?.[1]?.trim() ?? '';
   return phone.replace(/\D/g, '').length >= 6 ? phone.slice(0, 40) : null;
@@ -85,7 +88,8 @@ export function buildShipmentDraftInput({ order, items, productWeights, profiles
   const city = clean(address.city, 80);
   // Validated whole, never truncated: "ITA" is refused, not silently sent as "IT".
   const country = clean(address.country, 8).toUpperCase();
-  const phone = orderContactPhone(order.notes);
+  const phone = orderContactPhone(order.notes, address);
+  const company = clean(address.company_name, 80);
   const missing = [
     !fullName && 'nom', !street1 && 'adresse', !postalCode && 'code postal', !city && 'ville',
     !/^[A-Z]{2}$/.test(country) && 'pays', !phone && 'téléphone',
@@ -118,7 +122,7 @@ export function buildShipmentDraftInput({ order, items, productWeights, profiles
     input: {
       orderReference: shipmentOrderReference(order.id),
       recipient: {
-        firstName, lastName, street1, street2: clean(address.line2, 120) || null, postalCode, city, country, phone: phone!,
+        firstName, lastName, company: company || null, street1, street2: clean(address.line2, 120) || null, postalCode, city, country, phone: phone!,
         email: clean(order.email, 160) || null,
       },
       parcels,

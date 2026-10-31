@@ -14,6 +14,7 @@ import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/n
 import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
 import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
+import { normalizePhoneForStorage } from '@/lib/phone/internationalPhone';
 import { normalizeShippingAddress, type NormalizedShippingAddress } from '@/lib/address/addressRules';
 import { buildExternalPaymentLink, isLinkPaymentMethod, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
 import type { TenantPaymentMethod } from '@lepefy/types';
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     const body: CheckoutBody = await req.json();
     const {
       items: rawItems, shippingAddress: rawShippingAddress, fulfillmentType, email,
-      phone, fullName, shippingDetails, quoteToken, externalPaymentMethodId,
+      phone: rawPhone, fullName, shippingDetails, quoteToken, externalPaymentMethodId,
       termsAccepted, marketingOptIn, nalaAttributions,
     } = body;
 
@@ -105,6 +106,12 @@ export async function POST(req: NextRequest) {
       }
       shippingAddress = normalizedAddress.address;
     }
+
+    // Téléphone : E.164 quand il est valide (sinon texte conservé tel quel, comptes anciens),
+    // et copié dans l'adresse pour que les nouvelles commandes l'aient de façon structurée.
+    const normalizedPhone = normalizePhoneForStorage(rawPhone, shippingAddress?.country ?? 'IT');
+    const phone = normalizedPhone.value;
+    if (shippingAddress && normalizedPhone.e164) shippingAddress = { ...shippingAddress, phone: normalizedPhone.e164 };
 
     // All payment entry points, including recovery, share this DB-backed gate.
     const validated = await validateCheckoutItems(supabase, tenant.id, rawItems, {

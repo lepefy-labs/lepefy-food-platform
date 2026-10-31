@@ -30,6 +30,8 @@ export interface ProviderShipmentDraftInput {
   recipient: {
     firstName: string;
     lastName: string | null;
+    /** Entreprise destinataire (Packlink `to.company`) ; jamais à la place du nom. */
+    company?: string | null;
     street1: string;
     street2: string | null;
     postalCode: string;

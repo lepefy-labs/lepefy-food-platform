@@ -17,12 +17,13 @@ import {
   IconMapPin,
   IconTruck,
   IconUser,
-  IconPhone,
 } from '@tabler/icons-react';
 import { CustomerAddressForm, addressFieldId } from '@/components/address/CustomerAddressForm';
 import { NEW_ADDRESS, SavedAddressPicker, type SavedAddress } from '@/components/address/SavedAddressPicker';
 import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
 import { ErrorSummary, TextField } from '@/components/ui/form';
+import { InternationalPhoneField } from '@/components/ui/form/InternationalPhoneField';
+import { parseStoredPhone } from '@/lib/phone/internationalPhone';
 import { useBusyLock } from '@/lib/pwa/useBusyLock';
 import {
   PaymentOptionList,
@@ -80,7 +81,9 @@ const contactSchema = z.object({
   firstName: z.string().trim().min(1, FORM_COPY.firstNameRequired),
   lastName: z.string().trim().min(1, FORM_COPY.lastNameRequired),
   email: z.string().trim().email(FORM_COPY.emailInvalid),
-  phone: z.string().trim().min(6, FORM_COPY.phoneRequired),
+  phone: z.string().trim().min(6, FORM_COPY.phoneRequired)
+    // Numéro international (+…) : valide pour son pays ; un ancien numéro sans indicatif reste accepté.
+    .refine((value) => !value.startsWith('+') || parseStoredPhone(value, 'IT').e164 !== null, FORM_COPY.phoneRequired),
 });
 
 type ContactValues = z.infer<typeof contactSchema>;
@@ -235,6 +238,7 @@ export default function CheckoutFlow({
   const firstName = watch('firstName');
   const lastName = watch('lastName');
   const email = watch('email');
+  const hasVisibleErrors = addressSubmitted || Object.keys(errors).length > 0;
   const phone = watch('phone');
 
   // Set once the order exists: the cart is then emptied on purpose and the
@@ -540,7 +544,7 @@ export default function CheckoutFlow({
     if (!firstName?.trim()) setFocus('firstName');
     else if (!lastName?.trim()) setFocus('lastName');
     else if (!email?.trim()) setFocus('email');
-    else setFocus('phone');
+    else document.getElementById('checkout-phone')?.focus();
   }
 
   function buildSharedPayload() {
@@ -717,7 +721,8 @@ export default function CheckoutFlow({
 
   return (
     <div
-      data-typing={typing ? 'true' : undefined}
+      // Avec des erreurs affichées (focus renvoyé sur le premier champ en erreur), le bouton de paiement reste visible.
+      data-typing={typing && !hasVisibleErrors ? 'true' : undefined}
       onFocusCapture={(event) => setTyping(isTextEntry(event.target))}
       onBlurCapture={() => setTyping(false)}
       className={`mx-auto w-full px-4 py-4 pb-10 sm:px-6 sm:py-7 ${step === 'shipping' ? 'max-w-2xl lg:max-w-5xl' : 'max-w-2xl'}`}
@@ -893,8 +898,8 @@ export default function CheckoutFlow({
             </div>
             <div className="mt-4 space-y-4">
               <TextField {...register('email')} label="E-mail" type="email" inputMode="email" autoComplete="email" placeholder="Ex. : nom@gmail.com" enterKeyHint="next" error={errors.email?.message} />
-              <TextField {...register('phone')} label="Téléphone" type="tel" inputMode="tel" autoComplete="tel" placeholder="Ex. : +39 351 234 5678" hint="Avec l'indicatif du pays." enterKeyHint="done"
-                leading={<IconPhone size={18} />} error={errors.phone?.message} />
+              <InternationalPhoneField id="checkout-phone" label="Téléphone" value={phone ?? ''} initialCountry={address.country}
+                onChange={(next) => setValue('phone', next, { shouldValidate: Boolean(errors.phone), shouldDirty: true })} error={errors.phone?.message} />
             </div>
 
             <div className="mt-4">

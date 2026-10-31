@@ -74,6 +74,8 @@ export const ADDRESS_LIMITS = {
   line2: 120,
   city: 100,
   postalCode: 12,
+  /** Packlink : `to.company` ≤ 80 caractères. */
+  company: 80,
 } as const;
 
 /** Valeur enregistrée pour une adresse sans numéro (déjà lue par splitLine1). */
@@ -128,12 +130,16 @@ export interface AddressDraft {
   line2: string;
   /** Présent seulement quand le formulaire demande le destinataire (/compte). */
   fullName?: string;
+  /** « Livrer en entreprise » : l'entreprise s'ajoute au destinataire, elle ne le remplace jamais. */
+  deliverToCompany?: boolean;
+  /** Conservé quand la case est décochée (rien n'est perdu), mais jamais transmis dans ce cas. */
+  companyName?: string;
 }
 
-export type AddressField = 'fullName' | 'country' | 'street' | 'houseNumber' | 'postalCode' | 'city' | 'line2';
+export type AddressField = 'fullName' | 'country' | 'postalCode' | 'city' | 'street' | 'houseNumber' | 'line2' | 'companyName';
 
-/** Ordre d'affichage, utilisé pour le focus et le résumé des erreurs. */
-export const ADDRESS_FIELD_ORDER: AddressField[] = ['fullName', 'country', 'street', 'houseNumber', 'postalCode', 'city', 'line2'];
+/** Ordre d'affichage, utilisé pour le focus et le résumé des erreurs : pays → code postal → ville → rue → numéro → complément. */
+export const ADDRESS_FIELD_ORDER: AddressField[] = ['fullName', 'companyName', 'country', 'postalCode', 'city', 'street', 'houseNumber', 'line2'];
 
 export const ADDRESS_FIELD_LABELS: Record<AddressField, string> = {
   fullName: ADDRESS_COPY.fullName,
@@ -143,6 +149,7 @@ export const ADDRESS_FIELD_LABELS: Record<AddressField, string> = {
   postalCode: ADDRESS_COPY.postalCode,
   city: ADDRESS_COPY.city,
   line2: ADDRESS_COPY.line2,
+  companyName: ADDRESS_COPY.companyName,
 };
 
 export function emptyAddressDraft(country: string): AddressDraft {
@@ -176,6 +183,11 @@ export function validateAddressDraft(
   if (!collapse(draft.city)) errors.city = ADDRESS_COPY.required;
   else if (collapse(draft.city).length > ADDRESS_LIMITS.city) errors.city = ADDRESS_COPY.tooLong;
   if (collapse(draft.line2).length > ADDRESS_LIMITS.line2) errors.line2 = ADDRESS_COPY.tooLong;
+  if (draft.deliverToCompany) {
+    const company = collapse(draft.companyName ?? '');
+    if (!company) errors.companyName = ADDRESS_COPY.required;
+    else if (company.length > ADDRESS_LIMITS.company) errors.companyName = ADDRESS_COPY.tooLong;
+  }
   return errors;
 }
 
@@ -191,12 +203,18 @@ export interface NormalizedShippingAddress {
   city: string;
   postal_code: string;
   country: string;
+  /** Entreprise destinataire (facultatif) ; ne remplace jamais `full_name`, ne passe jamais par `line2`. */
+  company_name?: string;
+  /** Téléphone du destinataire en E.164 (commandes récentes) ; les anciennes commandes l'ont dans `notes`. */
+  phone?: string;
 }
 
 export function draftToShippingAddress(draft: AddressDraft, fullName: string): NormalizedShippingAddress {
   const line2 = collapse(draft.line2);
+  const company = draft.deliverToCompany ? collapse(draft.companyName ?? '') : '';
   return {
     full_name: collapse(fullName),
+    ...(company ? { company_name: company } : {}),
     line1: composeLine1(draft.street, draft.houseNumber),
     ...(line2 ? { line2 } : {}),
     city: collapse(draft.city),
@@ -207,9 +225,12 @@ export function draftToShippingAddress(draft: AddressDraft, fullName: string): N
 
 export function shippingAddressToDraft(address: {
   line1: string; line2?: string | null; city: string; postal_code: string; country: string; full_name?: string | null;
+  company_name?: string | null;
 }): AddressDraft {
   const { street, houseNumber } = splitLine1(address.line1);
+  const company = collapse(address.company_name ?? '');
   return {
+    ...(company ? { deliverToCompany: true, companyName: company } : {}),
     country: address.country,
     street,
     houseNumber,
@@ -239,6 +260,7 @@ export function normalizeShippingAddress(value: unknown): NormalizeShippingAddre
   const fullName = text('full_name');
   const line1 = text('line1');
   const line2 = text('line2');
+  const companyName = text('company_name');
   const city = text('city');
   const country = text('country').toUpperCase();
   const postalCode = normalizePostalCode(country, text('postal_code'));
@@ -255,11 +277,12 @@ export function normalizeShippingAddress(value: unknown): NormalizeShippingAddre
   if (line1.length > ADDRESS_LIMITS.line1) return tooLong('line1', ADDRESS_COPY.street);
   if (line2.length > ADDRESS_LIMITS.line2) return tooLong('line2', ADDRESS_COPY.line2);
   if (city.length > ADDRESS_LIMITS.city) return tooLong('city', ADDRESS_COPY.city);
+  if (companyName.length > ADDRESS_LIMITS.company) return tooLong('company_name', ADDRESS_COPY.companyName);
   if (!isValidPostalCode(country, postalCode)) return { ok: false, field: 'postal_code', error: postalCodeError(country) };
 
   return {
     ok: true,
-    address: { full_name: fullName, line1, ...(line2 ? { line2 } : {}), city, postal_code: postalCode, country },
+    address: { full_name: fullName, ...(companyName ? { company_name: companyName } : {}), line1, ...(line2 ? { line2 } : {}), city, postal_code: postalCode, country },
   };
 }
 

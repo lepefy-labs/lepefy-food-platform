@@ -121,6 +121,10 @@ export interface Order {
 
 export interface ShippingAddress {
   full_name: string;
+  /** Entreprise destinataire (facultatif), distincte du destinataire. */
+  company_name?: string;
+  /** Téléphone du destinataire en E.164 (commandes récentes). */
+  phone?: string;
   line1: string;
   line2?: string;
   city: string;

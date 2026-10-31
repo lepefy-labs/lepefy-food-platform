@@ -170,7 +170,8 @@ export function parseAssistedAddress(raw: unknown): AssistedShippingAddress | nu
   const country = text('country', 2)?.toUpperCase() ?? null;
   if (!fullName || !line1 || !city || !postalCode || !country || !/^[A-Z]{2}$/.test(country)) return null;
   const line2 = typeof value.line2 === 'string' && value.line2.trim() ? value.line2.trim().slice(0, 200) : null;
-  return { full_name: fullName, line1, line2, city, postal_code: postalCode, country };
+  const companyName = text('company_name', 80);
+  return { full_name: fullName, ...(companyName ? { company_name: companyName } : {}), line1, line2, city, postal_code: postalCode, country };
 }
 
 /** Date d'encaissement : ISO valide, jamais dans le futur (tolérance 5 min), sinon maintenant. */

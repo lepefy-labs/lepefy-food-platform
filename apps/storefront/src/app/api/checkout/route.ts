@@ -15,6 +15,7 @@ import { generateCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessi
 import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
 import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
+import { normalizePhoneForStorage } from '@/lib/phone/internationalPhone';
 import { normalizeShippingAddress, type NormalizedShippingAddress } from '@/lib/address/addressRules';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     const body: CheckoutBody = await req.json();
     const {
       items: rawItems, shippingAddress: rawShippingAddress, fulfillmentType, email,
-      phone, fullName, shippingDetails, quoteToken,
+      phone: rawPhone, fullName, shippingDetails, quoteToken,
       paymentMethod = 'stripe', termsAccepted, marketingOptIn, nalaAttributions,
     } = body;
 
@@ -97,6 +98,12 @@ export async function POST(req: NextRequest) {
       }
       shippingAddress = normalizedAddress.address;
     }
+
+    // Téléphone : E.164 quand il est valide (sinon texte conservé tel quel, comptes anciens),
+    // et copié dans l'adresse pour que les nouvelles commandes l'aient de façon structurée.
+    const normalizedPhone = normalizePhoneForStorage(rawPhone, shippingAddress?.country ?? 'IT');
+    const phone = normalizedPhone.value;
+    if (shippingAddress && normalizedPhone.e164) shippingAddress = { ...shippingAddress, phone: normalizedPhone.e164 };
 
     // All payment entry points, including recovery, share this DB-backed gate.
     // Mode de réception (migration 155) : vérifié ici, avant commande ou PaymentIntent.

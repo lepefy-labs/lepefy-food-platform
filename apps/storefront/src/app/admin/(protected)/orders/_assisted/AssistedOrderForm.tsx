@@ -27,7 +27,7 @@ type Mode = 'to_pay' | 'to_verify' | 'paid';
 
 interface Line { product: ProductOption; quantity: number }
 
-interface AddressForm { full_name: string; line1: string; line2: string; postal_code: string; city: string; country: string }
+interface AddressForm { full_name: string; company_name?: string; line1: string; line2: string; postal_code: string; city: string; country: string }
 
 interface Quote { key: string; token: string; total: number; details: Record<string, unknown> | null }
 
@@ -388,7 +388,7 @@ export default function AssistedOrderForm({
     const saved = savedAddresses.find((entry) => entry.id === id);
     if (saved) {
       setAddress({
-        full_name: saved.full_name, line1: saved.line1, line2: saved.line2 ?? '',
+        full_name: saved.full_name, company_name: undefined, line1: saved.line1, line2: saved.line2 ?? '',
         postal_code: saved.postal_code, city: saved.city, country: saved.country,
       });
     } else {
@@ -449,7 +449,7 @@ export default function AssistedOrderForm({
       items: lines.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
       fulfillmentType: fulfillment,
       shippingAddress: fulfillment === 'delivery'
-        ? { ...address, country: address.country.trim().toUpperCase(), line2: address.line2.trim() || null }
+        ? { ...address, company_name: address.company_name?.trim() || undefined, country: address.country.trim().toUpperCase(), line2: address.line2.trim() || null }
         : null,
       quoteToken: validQuote?.token ?? null,
       shippingDetails: validQuote?.details ?? null,
@@ -790,6 +790,7 @@ export default function AssistedOrderForm({
               )}
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="text-xs text-a-text-3 sm:col-span-2">Destinataire *<input value={address.full_name} onChange={(e) => setAddress({ ...address, full_name: e.target.value })} autoComplete="off" className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3 sm:col-span-2">Entreprise (facultatif)<input value={address.company_name ?? ''} maxLength={80} onChange={(e) => setAddress({ ...address, company_name: e.target.value })} autoComplete="off" className={`${inputClass} mt-1`} /></label>
                 <label className="text-xs text-a-text-3 sm:col-span-2">Adresse *<input value={address.line1} onChange={(e) => setAddress({ ...address, line1: e.target.value })} autoComplete="off" className={`${inputClass} mt-1`} /></label>
                 <label className="text-xs text-a-text-3 sm:col-span-2">Complément<input value={address.line2} onChange={(e) => setAddress({ ...address, line2: e.target.value })} autoComplete="off" className={`${inputClass} mt-1`} /></label>
                 <label className="text-xs text-a-text-3">Code postal *<input value={address.postal_code} onChange={(e) => setAddress({ ...address, postal_code: e.target.value })} inputMode="numeric" autoComplete="off" className={`${inputClass} mt-1`} /></label>
