@@ -10,7 +10,7 @@ const SEARCH_MIN_ENTRIES = 8;
 export function CountryFlag({ code, className = '' }: { code: string; className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element -- petit SVG statique de /public/flags
-    <img src={flagSrc(code)} alt="" aria-hidden="true" width={24} height={16} loading="lazy" decoding="async"
+    <img src={flagSrc(code)} alt="" aria-hidden="true" width={24} height={16} decoding="async"
       className={`h-4 w-6 shrink-0 rounded-[2px] object-cover ring-1 ring-black/10 ${className}`} />
   );
 }
@@ -136,7 +136,7 @@ export function CountryPicker({
 
       {open && (
         <div
-          className={`absolute left-0 z-40 mt-1 overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg ${compact ? 'w-[min(20rem,calc(100vw-2rem))]' : 'w-full'}`}
+          className={`absolute left-0 z-[60] mt-1 overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg ${compact ? 'w-[min(20rem,calc(100vw-2rem))]' : 'w-full'}`}
           onKeyDown={onKeyDown}
         >
           {searchable && (

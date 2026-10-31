@@ -42,7 +42,8 @@
   /* Pendant la saisie (clavier ouvert), les barres fixes se retirent : elles
      couvriraient le champ actif et les suggestions. Elles reviennent dès que
      le champ perd le focus. */
-  .checkoutFunnel :global([data-typing='true'] [data-checkout-sticky]) {
+  /* Sauf quand une erreur de champ est affichée : le bouton de paiement reste visible. */
+  .checkoutFunnel :global([data-typing='true']:not(:has([aria-invalid='true'])) [data-checkout-sticky]) {
     display: none;
   }
 }
