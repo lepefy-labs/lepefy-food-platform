@@ -6,6 +6,8 @@ export interface FieldShellProps {
   label: ReactNode;
   /** Ajoute « (facultatif) » au libellé. */
   optional?: boolean;
+  /** Astérisque rouge : champ obligatoire (lu « obligatoire » par les lecteurs d'écran). */
+  requiredMark?: boolean;
   /** Précision affichée en petit après le libellé, ex. « (non modifiable) ». */
   labelNote?: ReactNode;
   /** Masque le libellé à l'écran (reste lu par les lecteurs d'écran). */
@@ -37,13 +39,19 @@ export function describedBy(id: string, props: Pick<FieldShellProps, 'hint' | 'e
 
 /** Libellé + champ + aide + message : structure commune des champs du kit. */
 export function FieldShell({
-  id, label, optional, labelNote, hideLabel, hint, error, message, messagesOutside, className, children,
+  id, label, optional, requiredMark, labelNote, hideLabel, hint, error, message, messagesOutside, className, children,
 }: FieldShellProps & { id: string; children: ReactNode }) {
   const ids = fieldIds(id);
   return (
     <div className={`flex min-w-0 flex-col gap-1.5 ${className ?? ''}`}>
       <label htmlFor={id} className={hideLabel ? 'sr-only' : 'sf-label'}>
         {label}
+        {requiredMark && (
+          <>
+            <span aria-hidden="true" className="ml-0.5 font-bold text-red-600">*</span>
+            <span className="sr-only"> (obligatoire)</span>
+          </>
+        )}
         {optional && <span className="ml-1.5 text-[13px] font-normal text-[color:var(--field-hint)]">(facultatif)</span>}
         {labelNote && <span className="ml-1.5 text-[13px] font-normal text-[color:var(--field-hint)]">{labelNote}</span>}
       </label>

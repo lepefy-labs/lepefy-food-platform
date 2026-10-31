@@ -173,6 +173,7 @@ export function CustomerAddressForm({
         <TextField
           id={id('fullName')}
           label={ADDRESS_COPY.fullName}
+          requiredMark
           autoComplete={autoName(auto)}
           maxLength={ADDRESS_LIMITS.fullName}
           value={value.fullName ?? ''}
@@ -197,6 +198,7 @@ export function CustomerAddressForm({
             <TextField
               id={id('companyName')}
               label={ADDRESS_COPY.companyName}
+              requiredMark
               autoComplete={auto('organization')}
               maxLength={ADDRESS_LIMITS.company}
               value={value.companyName ?? ''}
@@ -211,6 +213,7 @@ export function CustomerAddressForm({
       <CountrySelect
         id={id('country')}
         label={ADDRESS_COPY.country}
+        requiredMark
         value={value.country}
         countries={options.map((entry) => entry.code)}
         hint={countryHint}
@@ -227,6 +230,7 @@ export function CustomerAddressForm({
       <TextField
         id={id('postalCode')}
         label={ADDRESS_COPY.postalCode}
+        requiredMark
         autoComplete={auto('postal-code')}
         inputMode="numeric"
         enterKeyHint="next"
@@ -268,6 +272,7 @@ export function CustomerAddressForm({
         <TextField
           id={id('city')}
           label={ADDRESS_COPY.city}
+          requiredMark
           autoComplete={auto('address-level2')}
           maxLength={ADDRESS_LIMITS.city}
           enterKeyHint="next"
@@ -296,6 +301,7 @@ export function CustomerAddressForm({
           <TextField
             id={id('street')}
             label={ADDRESS_COPY.street}
+            requiredMark
             autoComplete={auto('address-line1')}
             messagesOutside
             maxLength={ADDRESS_LIMITS.line1}
@@ -315,6 +321,7 @@ export function CustomerAddressForm({
           <TextField
             id={id('houseNumber')}
             label={ADDRESS_COPY.houseNumber}
+            requiredMark
             autoComplete="off"
             maxLength={12}
             enterKeyHint="next"

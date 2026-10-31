@@ -786,12 +786,11 @@ export default function CheckoutFlow({
               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${recipientComplete ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`} aria-hidden="true">{recipientComplete ? <IconCheck size={15} /> : '1'}</span>
               <div>
                 <h2 className="text-base font-bold text-gray-950">{isPickup ? 'Qui vient chercher la commande ?' : 'À quel nom livrer ?'}</h2>
-                <p className="mt-0.5 text-sm text-gray-700">Prénom et nom de la personne qui reçoit la commande.</p>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
-              <TextField {...register('firstName')} label="Prénom" autoComplete="given-name" placeholder="Ex. : Marie" enterKeyHint="next" error={errors.firstName?.message} />
-              <TextField {...register('lastName')} label="Nom" autoComplete="family-name" placeholder="Ex. : Kamga" enterKeyHint="next" error={errors.lastName?.message} />
+              <TextField {...register('firstName')} label="Prénom" requiredMark autoComplete="given-name" placeholder="Ex. : Marie" enterKeyHint="next" error={errors.firstName?.message} />
+              <TextField {...register('lastName')} label="Nom" requiredMark autoComplete="family-name" placeholder="Ex. : Kamga" enterKeyHint="next" error={errors.lastName?.message} />
             </div>
           </section>
 
@@ -812,9 +811,9 @@ export default function CheckoutFlow({
                 <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${quoteToken && hasCompleteAddress ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`} aria-hidden="true">{quoteToken && hasCompleteAddress ? <IconCheck size={15} /> : '2'}</span>
                 <div className="min-w-0 flex-1">
                   <h2 id="checkout-address-title" className="text-base font-bold text-gray-950">{ADDRESS_COPY.title}</h2>
-                  <p className="mt-0.5 text-sm leading-relaxed text-gray-700">
-                    {savedAddresses.length > 0 && !showAddressSummary ? ADDRESS_COPY.chooseSaved : ADDRESS_COPY.allRequired}
-                  </p>
+                  {savedAddresses.length > 0 && !showAddressSummary && (
+                    <p className="mt-0.5 text-sm leading-relaxed text-gray-700">{ADDRESS_COPY.chooseSaved}</p>
+                  )}
                 </div>
               </div>
 
@@ -893,12 +892,11 @@ export default function CheckoutFlow({
               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${contactComplete ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`} aria-hidden="true">{contactComplete ? <IconCheck size={15} /> : isPickup ? '2' : '3'}</span>
               <div>
                 <h2 className="text-base font-bold text-gray-950">Contact</h2>
-                <p className="mt-0.5 text-sm leading-relaxed text-gray-700">Le téléphone est obligatoire : le livreur ou la boutique peut vous appeler pour la remise.</p>
               </div>
             </div>
             <div className="mt-4 space-y-4">
-              <TextField {...register('email')} label="E-mail" type="email" inputMode="email" autoComplete="email" placeholder="Ex. : nom@gmail.com" enterKeyHint="next" error={errors.email?.message} />
-              <InternationalPhoneField id="checkout-phone" label="Téléphone" value={phone ?? ''} initialCountry={address.country}
+              <TextField {...register('email')} label="E-mail" requiredMark type="email" inputMode="email" autoComplete="email" placeholder="Ex. : nom@gmail.com" enterKeyHint="next" error={errors.email?.message} />
+              <InternationalPhoneField id="checkout-phone" label="Téléphone" requiredMark value={phone ?? ''} initialCountry={address.country}
                 onChange={(next) => setValue('phone', next, { shouldValidate: Boolean(errors.phone), shouldDirty: true })} error={errors.phone?.message} />
             </div>
 

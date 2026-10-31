@@ -24,7 +24,7 @@ export interface CountrySelectProps extends FieldShellProps {
  * donnés (jamais une liste mondiale pour une adresse de livraison).
  */
 export function CountrySelect({
-  id: idProp, label, optional, labelNote, hideLabel, hint, error, message, messagesOutside, className,
+  id: idProp, label, optional, requiredMark, labelNote, hideLabel, hint, error, message, messagesOutside, className,
   value, countries, onChange, locale = 'fr', searchPlaceholder = 'Rechercher un pays', emptyText = 'Aucun pays trouvé', disabled,
 }: CountrySelectProps) {
   const autoId = useId();
@@ -34,7 +34,7 @@ export function CountrySelect({
     [countries, locale],
   );
   return (
-    <FieldShell id={id} label={label} optional={optional} labelNote={labelNote} hideLabel={hideLabel}
+    <FieldShell id={id} label={label} optional={optional} requiredMark={requiredMark} labelNote={labelNote} hideLabel={hideLabel}
       hint={hint} error={error} message={message} messagesOutside={messagesOutside} className={className}>
       <CountryPicker
         id={id}

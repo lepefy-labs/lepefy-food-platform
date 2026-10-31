@@ -12,7 +12,6 @@
 
 export const ADDRESS_COPY = {
   title: 'Où doit-on livrer votre commande ?',
-  allRequired: 'Tous les champs sont obligatoires, sauf « facultatif ».',
   optional: '(facultatif)',
 
   country: 'Pays',

@@ -22,7 +22,7 @@ export interface TextFieldProps extends FieldShellProps, Omit<InputHTMLAttribute
  */
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
   {
-    id: idProp, label, optional, labelNote, hideLabel, hint, error, message, messagesOutside, className,
+    id: idProp, label, optional, requiredMark, labelNote, hideLabel, hint, error, message, messagesOutside, className,
     size = 'lg', leading, trailing, inputClassName, describedById, ...inputProps
   },
   ref,
@@ -30,7 +30,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
   const autoId = useId();
   const id = idProp ?? `field-${autoId.replace(/:/g, '')}`;
   return (
-    <FieldShell id={id} label={label} optional={optional} labelNote={labelNote} hideLabel={hideLabel}
+    <FieldShell id={id} label={label} optional={optional} requiredMark={requiredMark} labelNote={labelNote} hideLabel={hideLabel}
       hint={hint} error={error} message={message} messagesOutside={messagesOutside} className={className}>
       <div className="relative">
         {leading && (

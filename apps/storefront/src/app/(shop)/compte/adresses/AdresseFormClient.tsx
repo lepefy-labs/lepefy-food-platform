@@ -136,7 +136,6 @@ export function AdresseFormClient({ address, defaultFullName, defaultCountry }: 
               <h1 className="font-display text-lg font-bold text-gray-950">
                 {isEdit ? ADDRESS_COPY.editAddress : ADDRESS_COPY.newAddress}
               </h1>
-              <p className="mt-1 text-sm text-gray-700">{ADDRESS_COPY.allRequired}</p>
             </div>
 
             <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 px-5 pt-5 pb-6">

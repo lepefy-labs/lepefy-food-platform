@@ -33,7 +33,7 @@ export interface InternationalPhoneFieldProps extends FieldShellProps {
  * préfixe. La valeur remontée est l'E.164 dès que le numéro est valide.
  */
 export function InternationalPhoneField({
-  id: idProp, label, optional, labelNote, hideLabel, hint, error, message, messagesOutside, className,
+  id: idProp, label, optional, requiredMark, labelNote, hideLabel, hint, error, message, messagesOutside, className,
   value, onChange, onBlur, initialCountry, locale = 'fr', autoComplete = 'tel-national',
   searchPlaceholder = 'Pays ou indicatif', emptyText = 'Aucun résultat', invalidText = 'Numéro invalide pour ce pays.',
 }: InternationalPhoneFieldProps) {
@@ -64,7 +64,7 @@ export function InternationalPhoneField({
   const shownError = error ?? typedError;
 
   return (
-    <FieldShell id={id} label={label} optional={optional} labelNote={labelNote} hideLabel={hideLabel}
+    <FieldShell id={id} label={label} optional={optional} requiredMark={requiredMark} labelNote={labelNote} hideLabel={hideLabel}
       hint={hint} error={shownError} message={message} messagesOutside={messagesOutside} className={className}>
       <div className="flex items-stretch gap-2">
         <CountryPicker
