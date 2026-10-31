@@ -6,6 +6,7 @@ import { ADDRESS_COPY } from '@/lib/storefrontCopy/addressCopy';
 export interface SavedAddress {
   id: string;
   full_name: string;
+  company_name?: string | null;
   line1: string;
   line2: string | null;
   city: string;
@@ -57,6 +58,7 @@ export function SavedAddressPicker({
                     <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-bold text-gray-800">{ADDRESS_COPY.defaultBadge}</span>
                   )}
                 </span>
+                {address.company_name && <span className="block text-sm text-gray-700">{address.company_name}</span>}
                 {address.line2 && <span className="block text-sm text-gray-700">{address.line2}</span>}
                 <span className="block text-sm text-gray-700">{address.postal_code} {address.city} · {countryLabel(address.country)}</span>
                 <span className="block text-sm text-gray-700">{address.full_name}</span>

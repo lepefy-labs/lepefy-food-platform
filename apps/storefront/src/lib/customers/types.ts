@@ -4,6 +4,7 @@
 
 export interface CustomerDefaultAddress {
   fullName:   string;
+  companyName?: string | null;
   line1:      string;
   line2:      string | null;
   city:       string;

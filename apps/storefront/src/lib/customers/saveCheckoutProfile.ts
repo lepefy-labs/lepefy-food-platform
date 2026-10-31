@@ -1,7 +1,9 @@
 import { createServiceClient } from '@/lib/supabase/server';
+import { isMissingCompanyColumn } from './addressCompany';
 
 interface ShippingAddressPayload {
   full_name:   string;
+  company_name?: string | null;
   line1:       string;
   line2?:      string | null;
   city:        string;
@@ -91,7 +93,7 @@ export async function saveCheckoutProfile({
       return;
     }
 
-    const { error: addressError } = await supabase.rpc('upsert_default_address', {
+    const addressArgs = {
       p_customer_id: customerId,
       p_tenant_id:   tenantId,
       p_full_name:   nextFullName ?? shippingAddress.full_name ?? '',
@@ -100,7 +102,15 @@ export async function saveCheckoutProfile({
       p_city:        shippingAddress.city,
       p_postal_code: shippingAddress.postal_code,
       p_country:     shippingAddress.country || 'IT',
-    });
+    };
+    // p_company_name n'est envoyé que s'il y a une entreprise : sans elle l'appel reste celui
+    // d'avant (compatible avant et après la migration 177).
+    const company = clean(shippingAddress.company_name);
+    let { error: addressError } = await supabase.rpc('upsert_default_address',
+      company ? { ...addressArgs, p_company_name: company } : addressArgs);
+    if (company && addressError && (isMissingCompanyColumn(addressError) || addressError.code === 'PGRST202')) {
+      ({ error: addressError } = await supabase.rpc('upsert_default_address', addressArgs));
+    }
 
     if (addressError) {
       console.error('[saveCheckoutProfile] default address upsert failed:', addressError);

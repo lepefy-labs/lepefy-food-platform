@@ -9,6 +9,7 @@ import {
 import { countryDisplayName, dialCode, filterCountries, flagSrc, phoneCountries } from '../../src/lib/address/countries';
 import { normalizePhoneForStorage, parseStoredPhone, readPastedInternational, toE164Phone } from '../../src/lib/phone/internationalPhone';
 import { buildPacklinkDraftPayload, type PacklinkWarehouse } from '../../src/lib/shipping/providers/packlink';
+import { isMissingCompanyColumn } from '../../src/lib/customers/addressCompany';
 import { orderContactPhone } from '../../src/lib/shipping/shipmentDraft/buildDraftInput';
 
 const base = { country: 'IT', street: 'Via Roma', houseNumber: '25', postalCode: '42121', city: 'Reggio Emilia', line2: '' };
@@ -132,4 +133,11 @@ test.describe('payload Packlink', () => {
     const payload = buildPacklinkDraftPayload(from, input('ACME'), locations) as { additional_data: Record<string, unknown> };
     expect(payload.additional_data).toMatchObject({ zip_code_id_to: 'z1', postal_zone_id_to: '111' });
   });
+});
+
+test('migration 177 : colonne absente reconnue, autres erreurs non', () => {
+  expect(isMissingCompanyColumn({ code: '42703', message: 'column does not exist' })).toBe(true);
+  expect(isMissingCompanyColumn({ code: 'PGRST204', message: 'x' })).toBe(true);
+  expect(isMissingCompanyColumn({ code: '23505', message: 'duplicate key' })).toBe(false);
+  expect(isMissingCompanyColumn(null)).toBe(false);
 });

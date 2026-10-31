@@ -41,6 +41,8 @@ export interface Address {
   customer_id: string;
   tenant_id: string;
   full_name: string;
+  /** Entreprise destinataire (migration 177), distincte de full_name. */
+  company_name?: string | null;
   line1: string;
   line2: string | null;
   city: string;

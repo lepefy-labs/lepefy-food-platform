@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import type { CustomerProfile, CustomerDefaultAddress } from './types';
+import { isMissingCompanyColumn } from './addressCompany';
 
 interface CustomerRow {
   email:     string;
@@ -9,6 +10,7 @@ interface CustomerRow {
 
 interface AddressRow {
   full_name:   string;
+  company_name?: string | null;
   line1:       string;
   line2:       string | null;
   city:        string;
@@ -41,14 +43,18 @@ export async function getCustomerProfile(
 
   // L'indirizzo è una comodità: se la lettura fallisce si restituisce comunque
   // il profilo (nome/telefono pre-compilati), mai un 500.
-  const { data: address, error: addressError } = await supabase
+  const readDefaultAddress = (columns: string) => supabase
     .from('addresses')
-    .select('full_name, line1, line2, city, postal_code, country')
+    .select(columns)
     .eq('customer_id', customerId)
     .eq('tenant_id', tenantId)
     .eq('is_default', true)
     .limit(1)
     .maybeSingle<AddressRow>();
+  const baseColumns = 'full_name, line1, line2, city, postal_code, country';
+  let { data: address, error: addressError } = await readDefaultAddress(`${baseColumns}, company_name`);
+  // Migration 177 pas encore appliquée : lecture sans l'entreprise.
+  if (isMissingCompanyColumn(addressError)) ({ data: address, error: addressError } = await readDefaultAddress(baseColumns));
 
   if (addressError) {
     console.error('[customers/me] default address lookup error:', addressError);
@@ -57,6 +63,7 @@ export async function getCustomerProfile(
   const defaultAddress: CustomerDefaultAddress | null = address
     ? {
         fullName:   address.full_name,
+        companyName: address.company_name ?? null,
         line1:      address.line1,
         line2:      address.line2,
         city:       address.city,

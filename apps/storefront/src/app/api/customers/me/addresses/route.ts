@@ -3,11 +3,13 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
 import { normalizeShippingAddress } from '@/lib/address/addressRules';
+import { isMissingCompanyColumn } from '@/lib/customers/addressCompany';
 
 interface AddressBody {
   fullName?:   string;
   line1?:      string;
   line2?:      string | null;
+  companyName?: string | null;
   city?:       string;
   postalCode?: string;
   country?:    string;
@@ -25,14 +27,18 @@ export async function GET() {
     return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
   }
 
-  const { data, error } = await createServiceClient()
+  const readAddresses = (columns: string) => createServiceClient()
     .from('addresses')
-    .select('id, full_name, line1, line2, city, postal_code, country, is_default')
+    .select(columns)
     .eq('customer_id', sessionCustomer.id)
     .eq('tenant_id', tenant.id)
     .order('is_default', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(20);
+  const baseColumns = 'id, full_name, line1, line2, city, postal_code, country, is_default';
+  let { data, error } = await readAddresses(`${baseColumns}, company_name`);
+  // Migration 177 pas encore appliquée : lecture sans l'entreprise.
+  if (isMissingCompanyColumn(error)) ({ data, error } = await readAddresses(baseColumns));
 
   if (error) {
     console.error('[customers/me/addresses][GET] read failed:', error.message);
@@ -58,7 +64,7 @@ export async function POST(req: NextRequest) {
   // Même contrôle que le checkout : champs connus seulement, texte nettoyé,
   // longueurs et format du code postal.
   const normalized = normalizeShippingAddress({
-    full_name: body.fullName, line1: body.line1, line2: body.line2,
+    full_name: body.fullName, company_name: body.companyName, line1: body.line1, line2: body.line2,
     city: body.city, postal_code: body.postalCode, country: body.country,
   });
   if (!normalized.ok) {
@@ -92,21 +98,26 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { data, error } = await supabase
+  const row: Record<string, string | boolean | null> = {
+    customer_id: sessionCustomer.id,
+    tenant_id:   tenant.id,
+    full_name:   address.full_name,
+    line1:       address.line1,
+    line2:       address.line2 ?? null,
+    city:        address.city,
+    postal_code: address.postal_code,
+    country:     address.country,
+    is_default:  makeDefault,
+  };
+  let { data, error } = await supabase
     .from('addresses')
-    .insert({
-      customer_id: sessionCustomer.id,
-      tenant_id:   tenant.id,
-      full_name:   address.full_name,
-      line1:       address.line1,
-      line2:       address.line2 ?? null,
-      city:        address.city,
-      postal_code: address.postal_code,
-      country:     address.country,
-      is_default:  makeDefault,
-    })
+    .insert(address.company_name ? { ...row, company_name: address.company_name } : row)
     .select()
     .single();
+  // Migration 177 pas encore appliquée : l'adresse est enregistrée sans l'entreprise.
+  if (address.company_name && isMissingCompanyColumn(error)) {
+    ({ data, error } = await supabase.from('addresses').insert(row).select().single());
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -26,7 +26,7 @@ const ID_PREFIX = 'compte-adresse';
 
 /** Champ API (`line1`, `postal_code`…) → champ du formulaire. */
 const SERVER_FIELD: Record<string, keyof AddressErrors> = {
-  full_name: 'fullName', line1: 'street', line2: 'line2', city: 'city', postal_code: 'postalCode', country: 'country',
+  full_name: 'fullName', company_name: 'companyName', line1: 'street', line2: 'line2', city: 'city', postal_code: 'postalCode', country: 'country',
 };
 
 interface AdresseFormClientProps {
@@ -68,6 +68,8 @@ export function AdresseFormClient({ address, defaultFullName, defaultCountry }: 
     try {
       const body = {
         fullName:   (draft.fullName ?? '').trim(),
+        // null = case décochée : l'entreprise enregistrée est effacée.
+        companyName: draft.deliverToCompany ? (draft.companyName ?? '').trim() || null : null,
         line1:      composeLine1(draft.street, draft.houseNumber),
         line2:      draft.line2.trim() || null,
         city:       draft.city.trim(),
@@ -148,7 +150,6 @@ export function AdresseFormClient({ address, defaultFullName, defaultCountry }: 
                   if (changed.some((field) => serverErrors[field])) setServerErrors({});
                 }}
                 showFullName
-                showCompany={false}
                 showAllErrors={submitted}
                 serverErrors={serverErrors}
                 searchMode={isEdit ? 'collapsed' : 'open'}

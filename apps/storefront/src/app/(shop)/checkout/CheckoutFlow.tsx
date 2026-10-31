@@ -291,7 +291,7 @@ export default function CheckoutFlow({
         }
         if (saved.length === 0 && profile.defaultAddress) {
           saved = [{
-            id: 'default', full_name: profile.defaultAddress.fullName, line1: profile.defaultAddress.line1,
+            id: 'default', full_name: profile.defaultAddress.fullName, company_name: profile.defaultAddress.companyName ?? null, line1: profile.defaultAddress.line1,
             line2: profile.defaultAddress.line2, city: profile.defaultAddress.city,
             postal_code: profile.defaultAddress.postalCode, country: profile.defaultAddress.country, is_default: true,
           }];

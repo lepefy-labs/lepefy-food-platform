@@ -3,11 +3,13 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
 import { normalizeShippingAddress } from '@/lib/address/addressRules';
+import { isMissingCompanyColumn } from '@/lib/customers/addressCompany';
 
 interface AddressBody {
   fullName?:   string;
   line1?:      string;
   line2?:      string | null;
+  companyName?: string | null;
   city?:       string;
   postalCode?: string;
   country?:    string;
@@ -47,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const body = await req.json() as AddressBody;
 
   const update: Record<string, string | boolean | null> = {};
-  const touchesAddress = [body.fullName, body.line1, body.line2, body.city, body.postalCode, body.country]
+  const touchesAddress = [body.fullName, body.companyName, body.line1, body.line2, body.city, body.postalCode, body.country]
     .some((value) => value !== undefined);
 
   // Champs absents du corps = valeurs actuelles ; l'adresse résultante passe
@@ -56,6 +58,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (touchesAddress) {
     const normalized = normalizeShippingAddress({
       full_name:   body.fullName   !== undefined ? body.fullName   : existing.full_name,
+      company_name: body.companyName,
       line1:       body.line1      !== undefined ? body.line1      : existing.line1,
       line2:       body.line2      !== undefined ? body.line2      : existing.line2,
       city:        body.city       !== undefined ? body.city       : existing.city,
@@ -73,6 +76,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       postal_code: normalized.address.postal_code,
       country:     normalized.address.country,
     });
+    // Entreprise : seulement si le corps la mentionne (null = case décochée → effacée).
+    if (body.companyName !== undefined) update.company_name = normalized.address.company_name ?? null;
   }
 
   if (body.isDefault === true) {
@@ -90,14 +95,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     update.is_default = true;
   }
 
-  const { data, error } = await supabase
+  const writeUpdate = (patch: Record<string, string | boolean | null>) => supabase
     .from('addresses')
-    .update(update)
+    .update(patch)
     .eq('id', params.id)
     .eq('customer_id', sessionCustomer.id)
     .eq('tenant_id', tenant.id)
     .select()
     .single();
+  let { data, error } = await writeUpdate(update);
+  // Migration 177 pas encore appliquée : mise à jour sans l'entreprise.
+  if ('company_name' in update && isMissingCompanyColumn(error)) {
+    const { company_name: _ignored, ...withoutCompany } = update;
+    void _ignored;
+    ({ data, error } = await writeUpdate(withoutCompany));
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
