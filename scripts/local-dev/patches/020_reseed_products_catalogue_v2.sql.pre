@@ -1,0 +1,13 @@
+-- Le 7 categorie "storiche" del tenant pilota esistevano gia' in produzione (create fuori dalle
+-- migration). La 020 inserisce solo "Boissons" e collega i prodotti per slug: senza queste righe
+-- i prodotti resterebbero senza categoria. Qui le creiamo prima della 020.
+insert into categories (tenant_id, name, slug, position)
+select t.id, c.name, c.slug, c.position
+from tenants t
+cross join (values
+  ('Épices', 'epices', 1), ('Légumes', 'legumes', 2), ('Snacks', 'snacks', 3),
+  ('Sauces & Huiles', 'sauces-huiles', 4), ('Farines', 'farines', 5),
+  ('Poissons', 'poissons', 6), ('Viandes séchées', 'viandes-sechees', 7)
+) as c(name, slug, position)
+where t.slug = 'chloefood'
+on conflict (tenant_id, slug) do nothing;

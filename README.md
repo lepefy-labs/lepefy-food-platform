@@ -5,21 +5,13 @@ Multi-tenant food e-commerce SaaS for African food shops in Europe.
 ## Setup
 
 ```bash
-# 1. Install dependencies
 pnpm install
-
-# 2. Configure environment
-cp apps/storefront/.env.local.example apps/storefront/.env.local
-# Edit with your Supabase credentials and TENANT_SLUG
-
-# 3. Run database migrations (requires Supabase CLI)
-supabase start
-supabase db push
-supabase db seed --db-url postgresql://postgres:postgres@localhost:54321/postgres < supabase/seed.sql
-
-# 4. Start dev server
+cp apps/storefront/.env.local.example apps/storefront/.env.local   # valori di Supabase LOCALE
+scripts/local-db-bootstrap.sh --reset                               # ricostruisce il DB locale
 pnpm dev
 ```
+
+La procedura completa (WSL2, Docker, Supabase CLI, primo utente admin, differenze note tra repo e produzione) è in [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_DEVELOPMENT.md).
 
 ## Architecture
 
@@ -32,7 +24,7 @@ pnpm dev
 
 | Variable | Description |
 |----------|-------------|
-| `TENANT_SLUG` | Tenant identifier (e.g. `chloefood`) |
+| `NEXT_PUBLIC_TENANT_SLUG` | Tenant identifier (e.g. `chloefood`) |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server-only) |

@@ -1433,7 +1433,7 @@ supabase/migrations/*
 
 ## 17. Known technical debt
 
-- collisione storica prefisso migration `071`: non rinominare retroattivamente;
+- migration non riproducibili da sole (verificato su `main` @ 41722e73, 01/11/2026; ricostruzione locale via `scripts/local-db-bootstrap.sh`, vedi `docs/LOCAL_DEVELOPMENT.md`): (1) il tenant `chloefood` deve esistere prima della 003 e `supabase/seed.sql` usa colonne create più tardi (es. `google_maps_url`, 071); (2) due file `023_*` sono la stessa migration (`023_label_print_jobs_drafts_reprint.sql` originale, `023_label_job_drafts.sql` idempotente): l'originale va eseguita prima; (3) `tenants.hero_image_url` è usata dal codice e dalla 076 ma nessuna migration la crea; (4) prefissi duplicati in 7 coppie (006, 010, 011, 023, 031, 071, 109) più `003b`/`003c`, `supabase/` senza `config.toml`: `supabase db reset/push` sul repo non è il percorso supportato in locale; non rinominare retroattivamente;
 - telefono checkout non uniformemente server-enforced;
 - il webhook Stripe storefront (`payment_intent.succeeded` senza `metadata.type`) crea ancora l'ordine inline invece di usare la RPC `convert_checkout_session_to_order`: due implementazioni di scrittura ordine restano (idempotenza garantita dall'indice unico sul PaymentIntent);
 - ordini assistiti: nessuna riserva di stock durante la validità del link (per design) e indirizzi inseriti dall'operatore non salvati nella rubrica cliente;

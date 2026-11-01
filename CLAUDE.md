@@ -35,6 +35,8 @@ supabase db push                    # Apply migrations to remote
 supabase start                      # Start local Supabase instance
 ```
 
+Local development: use `scripts/local-db-bootstrap.sh --reset` (see `docs/LOCAL_DEVELOPMENT.md`); running `supabase db push`/`supabase start` directly on this repo is not the supported local path (duplicate migration prefixes, no `config.toml`).
+
 ## Architecture
 
 ### Monorepo Structure
