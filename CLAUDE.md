@@ -37,6 +37,8 @@ supabase start                      # Start local Supabase instance
 
 Local development: use `scripts/local-db-bootstrap.sh --reset` (see `docs/LOCAL_DEVELOPMENT.md`); running `supabase db push`/`supabase start` directly on this repo is not the supported local path (duplicate migration prefixes, no `config.toml`).
 
+Agent team (audit, triage, PR review): see `docs/agents/README.md`; `AGENTS.md` remains the contract of the interactive UI/UX agent.
+
 ## Architecture
 
 ### Monorepo Structure
