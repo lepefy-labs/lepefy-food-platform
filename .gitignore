@@ -151,3 +151,6 @@ playwright-report/
 
 # Artefatti locali (cataloghi esterni: dati reali, immagini di terzi) — mai versionati
 artifacts/
+
+# Report locali degli agenti AI (docs/agents/README.md)
+agent-reports/
