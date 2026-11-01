@@ -1,0 +1,7 @@
+-- Fixture locale: il tenant pilota deve esistere PRIMA della migration 003.
+-- Almeno 003, 003b, 003c, 006, 008, 009, 011, 013, 018, 019, 020 e altre fanno
+-- (select id from tenants where slug = 'chloefood'); in produzione il tenant era gia' presente.
+-- Colonne minime: le altre (es. google_maps_url) arrivano da migration successive.
+insert into tenants (slug, name, tagline, city, country, currency, locale, click_collect_enabled, click_collect_address)
+values ('chloefood', 'Chloé Food ETS', 'Les saveurs de chez nous', 'Reggio Emilia', 'IT', 'EUR', 'fr-FR', true, 'Via Angelo Zanti 1, 42122 Reggio Emilia, Italia')
+on conflict (slug) do nothing;
