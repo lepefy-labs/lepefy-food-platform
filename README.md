@@ -24,7 +24,7 @@ La procedura completa (WSL2, Docker, Supabase CLI, primo utente admin, differenz
 
 | Variable | Description |
 |----------|-------------|
-| `TENANT_SLUG` | Tenant identifier (e.g. `chloefood`) |
+| `NEXT_PUBLIC_TENANT_SLUG` | Tenant identifier (e.g. `chloefood`) |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server-only) |
