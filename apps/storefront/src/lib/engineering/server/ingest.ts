@@ -48,11 +48,13 @@ async function fileIdsByPath(runId: string): Promise<Map<string, string>> {
   return map;
 }
 
-function rpcError(error: { message?: string }): IngestError {
+function rpcError(error: { message?: string; code?: string }): IngestError {
   const message = error.message ?? '';
   const known = /engineering_[a-z_]+/.exec(message)?.[0];
   if (known === 'engineering_run_in_progress') return new IngestError(known, 409);
   if (known === 'engineering_branch_not_activatable' || known === 'engineering_run_not_staged' || known === 'engineering_run_closed') return new IngestError(known, 409);
+  // Codes only, never messages or values (docs/engineering/RUNBOOK.md): a bare `database_error` hid the cause.
+  console.error('[engineering/ingest] rpc failed:', error.code ?? 'unknown', known ?? '');
   return new IngestError('database_error', 500);
 }
 
