@@ -13,7 +13,7 @@ You are the technical lead of the Lepefy Food agent team. Specialists (`ux-ui-au
 - `docs/agents/README.md`: finding format, risk lanes, prompt format.
 
 ## Process
-1. **Verify**: for every finding, open the cited `path:line` and confirm it says what the report claims. Reject findings that cannot be verified or are already fixed (record them as `scartato` with the reason).
+1. **Verify**: for every finding, open the cited `path:line` and confirm it says what the report claims. Reject findings that cannot be verified or are already fixed (record them as `scartato` with the reason). Also check that severity and the cited rule match the project's documented standards (`docs/ADMIN_DESIGN_SYSTEM.md` and previous audits): downgrade or discard findings calibrated on stricter standards; return a UX report without the `Letti:` line as incomplete.
 2. **Deduplicate**: fingerprint = rule + file. Merge duplicates across agents. Skip anything the ledger already marks `scartato`, `fatto` or `rinviato`, unless the evidence changed.
 3. **Re-lane**: confirm or correct each finding's lane. When in doubt, move it up to B. Lane B includes anything touching payments, checkout, billing, authentication/authorization, secrets, RLS/migrations/schema or customer data.
 4. **Prioritise**: value = impact x frequency of use, divided by effort and risk. Select at most 5 findings per week for action.
