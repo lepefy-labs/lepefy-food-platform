@@ -21,7 +21,9 @@ export const INGEST_LIMITS = {
   maxBlobsPerBatch: 400,
   maxShasPerCall: 5000,
   maxRowsPerBatch: 3000,
-  maxChunkRowsPerBatch: 500,
+  // Each chunk row maintains a GIN full-text index and a per-row trigger: 500 rows could exceed the
+  // database statement timeout (422 after ~11 s on 2026-11-02), so batches stay small.
+  maxChunkRowsPerBatch: 150,
   triggers: ['manual', 'push', 'schedule', 'pull_request'],
 } as const;
 
