@@ -62,3 +62,18 @@ export function formatShopDate(iso: string, style: 'short' | 'long' = 'short', t
   const time = new Intl.DateTimeFormat('fr-FR', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
   return `${day} à ${time}`;
 }
+
+/**
+ * Début (00:00) du jour calendaire de la boutique contenant `now`, en ISO UTC.
+ * Ex. 2026-11-01T23:30Z (00:30 à Paris le 2) → 2026-11-01T23:00:00.000Z.
+ * Retourne toujours une chaîne ; lance une Error si le calcul est impossible
+ * (aucun repli silencieux : un filtre « aujourd'hui » faux est pire qu'une erreur).
+ */
+export function shopDayStartIso(now: Date = new Date(), timeZone = SHOP_TIME_ZONE): string {
+  const day = shopDay(now.toISOString(), timeZone);
+  const iso = shopLocalToIso(`${day}T00:00`, timeZone);
+  if (iso === null) {
+    throw new Error(`shopDayStartIso: impossible de calculer le début du jour (now=${String(now)}, timeZone=${timeZone})`);
+  }
+  return iso;
+}

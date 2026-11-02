@@ -13,6 +13,7 @@ import { buildPriorityItems, buildQuickActions, describeRecentOrder, type KpiCou
 import { formatDate, formatMoney, formatNumber, pluralize } from '@/lib/admin/format'
 import { PREPARATION_MODE_LABELS } from '@/lib/orders/preparation/preparationPolicy'
 import { cn } from '@/lib/utils/cn'
+import { shopDayStartIso } from '@/lib/time/shopTime'
 import { isMissingPreparationColumn, withoutPreparationColumns } from '@/lib/orders/preparation/compat'
 import AdminPageHeader from '../_components/ui/AdminPageHeader'
 import { ButtonLink } from '../_components/ui/Button'
@@ -56,7 +57,6 @@ export default async function AdminTodayPage({ searchParams }: { searchParams: R
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood')
   const supabase = createServiceClient()
   const now = new Date()
-  const dayStart = new Date(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now) + 'T00:00:00')
   const [access, operational] = await Promise.all([getCurrentAdminAccessContext(tenant.id), loadOrderOperationalContext(supabase, tenant)])
   const RECENT_COLUMNS = 'id, created_at, updated_at, status, payment_status, fulfillment_type, full_name, total, closure_type'
   const readRecent = (columns: string) => supabase.from('orders').select(columns).eq('tenant_id', tenant.id).order('updated_at', { ascending: false }).limit(8)
@@ -77,7 +77,7 @@ export default async function AdminTodayPage({ searchParams }: { searchParams: R
       .eq('payment_method', 'external_link').eq('origin', 'storefront').in('status', ['open', 'expired', 'awaiting_verification']).is('order_id', null),
     supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('origin', 'assisted').eq('status', 'awaiting_verification'),
     readRecentOrders(),
-    supabase.from('orders').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).gte('created_at', dayStart.toISOString()),
+    supabase.from('orders').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).gte('created_at', shopDayStartIso(now)),
   ])
 
   const kpis: KpiCounts = queue?.kpis ?? {}
