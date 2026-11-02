@@ -42,9 +42,13 @@ export default function PreparationSessionActions({ orderIds, canManage, default
         else window.location.href = pdf('picking-list', body.ready);
       } else tab?.close();
       const skipped = body.skipped.map((entry) => `#${entry.id.slice(0, 8).toUpperCase()} : ${START_SKIP_LABELS[entry.reason]}`);
-      toast.success(`${body.ready.length} commande${body.ready.length > 1 ? 's' : ''} en préparation`, {
-        description: [body.started.length ? `${body.started.length} démarrée${body.started.length > 1 ? 's' : ''} maintenant.` : null, skipped.length ? `Écartées : ${skipped.join(' · ')}` : null].filter(Boolean).join(' '),
-      });
+      if (body.ready.length === 0) {
+        toast.info('Aucune commande démarrée', { description: skipped.length ? skipped.join(' · ') : undefined });
+      } else {
+        toast.success(`${body.ready.length} commande${body.ready.length > 1 ? 's' : ''} en préparation`, {
+          description: [body.started.length ? `${body.started.length} démarrée${body.started.length > 1 ? 's' : ''} maintenant.` : null, skipped.length ? `Écartées : ${skipped.join(' · ')}` : null].filter(Boolean).join(' '),
+        });
+      }
       router.refresh();
     } catch (error) {
       tab?.close();
