@@ -175,7 +175,7 @@ export default function PreordersListClient({ currency, canManage }: { currency:
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link href={`/admin/orders/precommandes/${preorder.id}`} className="font-mono text-sm font-semibold text-a-text after:absolute after:inset-0 hover:underline focus-visible:outline-2 focus-visible:outline-a-focus">
-                          {preorder.reference}<span className="sr-only"> — ouvrir la précommande</span>
+                          {preorder.reference}<span className="sr-only"> : ouvrir la précommande</span>
                         </Link>
                         <PreorderStatusBadge status={preorder.status} />
                         {preorder.hasActiveLink && <span className="inline-flex items-center gap-1 text-xs font-semibold text-tone-info-fg"><IconLink size={13} aria-hidden="true" /> Lien actif</span>}
@@ -196,7 +196,7 @@ export default function PreordersListClient({ currency, canManage }: { currency:
                     ) : <span className="hidden sm:block" />}
                     <Link href={`/admin/orders/precommandes/${preorder.id}`}
                       className={`relative z-10 inline-flex min-h-11 w-full items-center justify-center rounded-lg px-3 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-a-focus sm:w-36 ${finished ? 'text-a-text-3 hover:bg-a-hover' : preorder.action.primary ? 'bg-a-brand text-a-on-brand hover:opacity-90' : 'border border-a-border bg-a-surface text-a-text-2 hover:bg-a-surface-2'}`}>
-                      {preorder.action.label}<span className="sr-only"> — précommande {preorder.reference}</span>
+                      {preorder.action.label}<span className="sr-only"> : précommande {preorder.reference}</span>
                     </Link>
                   </li>
                 </Fragment>

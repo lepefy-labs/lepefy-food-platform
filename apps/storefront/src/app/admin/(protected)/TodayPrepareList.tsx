@@ -71,7 +71,7 @@ export default function TodayPrepareList({ rows, total }: { rows: PrepareRow[]; 
                 {row.step && <PreparationStepBadge step={row.step} />}
               </div>
               <Link href={`/admin/orders/${row.id}`} className={buttonClasses({ variant: 'outline', size: 'sm', className: 'justify-self-start sm:justify-self-end' })}>
-                {row.action}<span className="sr-only"> — commande {row.ref}</span>
+                {row.action}<span className="sr-only"> : commande {row.ref}</span>
               </Link>
             </div>
           </li>

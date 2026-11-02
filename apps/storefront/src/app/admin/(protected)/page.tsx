@@ -144,7 +144,7 @@ export default async function AdminTodayPage({ searchParams }: { searchParams: R
                       <span className="block text-xs text-a-text-3">{item.detail}</span>
                     </span>
                     <b className="text-lg font-bold tabular-nums text-a-text">{formatNumber(item.count)}</b>
-                    <span className="text-sm font-semibold text-a-brand-fg">{item.cta}<span className="sr-only"> — {item.label}</span></span>
+                    <span className="text-sm font-semibold text-a-brand-fg">{item.cta}<span className="sr-only"> : {item.label}</span></span>
                   </Link>
                 </li>
               ))}

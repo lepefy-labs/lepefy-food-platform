@@ -247,8 +247,8 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
     // In the table the label may wrap on two lines: a long action (« Poursuivre la préparation »)
     // must not push the row wider than the page and hide the button behind a horizontal scroll.
     const className = buttonClasses({ variant, size: 'sm', className: full ? 'w-full' : 'w-[9.5rem] !whitespace-normal py-1 text-center leading-tight' });
-    if (trackingUrl) return <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className={className}>{label}<IconExternalLink size={14} aria-hidden="true" /><span className="sr-only"> (suivi client, nouvel onglet) — commande {shortId(order.id)}</span></a>;
-    return <Link href={`/admin/orders/${order.id}`} className={className}>{label}<span className="sr-only"> — commande {shortId(order.id)}</span></Link>;
+    if (trackingUrl) return <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className={className}>{label}<IconExternalLink size={14} aria-hidden="true" /><span className="sr-only"> (suivi client, nouvel onglet) : commande {shortId(order.id)}</span></a>;
+    return <Link href={`/admin/orders/${order.id}`} className={className}>{label}<span className="sr-only"> : commande {shortId(order.id)}</span></Link>;
   }
 
   function detailPanel(order: ListOrder, operation: OrderOperation) {
