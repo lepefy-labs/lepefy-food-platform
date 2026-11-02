@@ -86,7 +86,10 @@ export async function handleIngest(body: Record<string, unknown>): Promise<Recor
         blobs.map((blob) => ({ repository_id: repo.id, blob_sha: blob.sha, content: blob.content, size_bytes: Buffer.byteLength(blob.content, 'utf8') })),
         { onConflict: 'repository_id,blob_sha', ignoreDuplicates: true },
       );
-      if (error) throw new IngestError('database_error', 500);
+      if (error) {
+        console.error('[engineering/ingest] blobs upsert failed:', error.code ?? 'unknown');
+        throw new IngestError('database_error', 500);
+      }
       return { stored: blobs.length };
     }
     case 'rows': {
@@ -103,6 +106,8 @@ export async function handleIngest(body: Record<string, unknown>): Promise<Recor
       const rows = mapRows(table, body.rows, { runId, repositoryId: repo.id, fileIdByPath: needsFiles ? await fileIdsByPath(runId) : new Map(), docIdByKey });
       const target = { modules: 'engineering_modules', files: 'engineering_files', excluded: 'engineering_excluded_files', symbols: 'engineering_symbols', relations: 'engineering_relations', documents: 'engineering_documents', chunks: 'engineering_chunks' }[table];
       const { error } = await client.from(target).insert(rows);
+      // Codes only, never row contents (docs/engineering/RUNBOOK.md): a bare `database_error` hid the cause.
+      if (error) console.error('[engineering/ingest] rows insert failed:', target, error.code ?? 'unknown');
       if (error) throw new IngestError(error.code === '23503' ? 'missing_blob_or_reference' : error.code === '23505' ? 'duplicate_row' : 'database_error', error.code === '23505' ? 409 : 422);
       return { inserted: rows.length };
     }
