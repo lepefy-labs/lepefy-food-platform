@@ -25,7 +25,7 @@ The report MUST start with a line `Letti:` listing the documents and files you a
 - Tenant branding: colours come from tenant data (`tenant.primary_color`, CSS custom properties), never hardcoded hex or tenant-specific values.
 - Copy: UI strings in French (fr-FR), currency EUR; no em-dash in user-facing JSX (use a colon, a comma, or a middle dot for paired values).
 - Icons: `@tabler/icons-react` only (not Lucide).
-- Accessibility: `alt` on images, valid ARIA for the element's role, labels, focus order and visibility, touch target against the standard documented by the project (WCAG 2.2 AA 2.5.8, at least 24x24 px, see `docs/AUDIT_ADMIN_UIUX.md`), not against stricter generic guidelines; larger targets only as a low-severity suggestion, contrast, no text under 12px in admin.
+- Accessibility: `alt` on images, valid ARIA for the element's role, labels, focus order and visibility, contrast, no text under 12px in admin, and touch target against the standard documented by the project (WCAG 2.2 AA 2.5.8, at least 24x24 px, see `docs/AUDIT_ADMIN_UIUX.md`), not against stricter generic guidelines; larger targets only as a low-severity suggestion.
 - `<img>` instead of `next/image` is a performance finding, lane A, low priority unless it is above the fold.
 
 ## Hard rules
