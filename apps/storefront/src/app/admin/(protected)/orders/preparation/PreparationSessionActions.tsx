@@ -43,7 +43,7 @@ export default function PreparationSessionActions({ orderIds, canManage, default
       } else tab?.close();
       const skipped = body.skipped.map((entry) => `#${entry.id.slice(0, 8).toUpperCase()} : ${START_SKIP_LABELS[entry.reason]}`);
       toast.success(`${body.ready.length} commande${body.ready.length > 1 ? 's' : ''} en préparation`, {
-        description: [body.started.length ? `${body.started.length} démarrée${body.started.length > 1 ? 's' : ''} maintenant.` : null, skipped.length ? `Écartées — ${skipped.join(' · ')}` : null].filter(Boolean).join(' '),
+        description: [body.started.length ? `${body.started.length} démarrée${body.started.length > 1 ? 's' : ''} maintenant.` : null, skipped.length ? `Écartées : ${skipped.join(' · ')}` : null].filter(Boolean).join(' '),
       });
       router.refresh();
     } catch (error) {

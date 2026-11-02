@@ -126,7 +126,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { id: 'ambassadors', label: 'Ambassadeurs', href: '/admin/ambassadeurs', icon: IconStar, group: 'Croissance', workspace: 'shop', anyOf: ['growth.manage'], match: 'exact', keywords: ['commissions'] },
   { id: 'reviews', label: 'Avis clients', href: '/admin/avis', icon: IconMessageCircle, group: 'Croissance', workspace: 'shop', anyOf: ['reviews.view'], keywords: ['modération', 'notes'] },
   { id: 'nala-analytics', label: 'Nala Analytics', href: '/admin/nala-analytics', icon: IconSparkles, group: 'Croissance', workspace: 'shop', anyOf: ['ai_usage.view'], keywords: ['assistant', 'ia'] },
-  { id: 'ai-lab', label: 'IA — Base de connaissance', href: '/admin/ai-lab', icon: IconSparkles, group: 'Croissance', workspace: 'shop', anyOf: ['ai_knowledge.manage'], match: 'exact', keywords: ['nala', 'faq'] },
+  { id: 'ai-lab', label: 'IA : Base de connaissance', href: '/admin/ai-lab', icon: IconSparkles, group: 'Croissance', workspace: 'shop', anyOf: ['ai_knowledge.manage'], match: 'exact', keywords: ['nala', 'faq'] },
   // Canaux
   { id: 'whatsapp', label: 'WhatsApp', href: '/admin/canaux/whatsapp', icon: IconBrandWhatsapp, group: 'Canaux', workspace: 'shop', anyOf: ['whatsapp.view'], flag: 'whatsapp', keywords: ['conversations', 'messages'] },
   // Gestion

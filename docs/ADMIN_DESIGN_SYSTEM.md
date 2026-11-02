@@ -116,6 +116,7 @@ I moduli esistenti passano ai token con un codemod a regole fisse (una unità pe
 - su ogni file di `app/admin` rifiuta testo < 12 px, palette Tailwind diretta, varianti `dark:`, `var(--color-…)` e classi `bg-primary`/`text-secondary`… dello storefront, colori esadecimali in classi;
 - su tutto `app/admin` rifiuta già `confirm()` nativo e overlay `fixed inset-0` scritti a mano. Eccezione: il mirino fotocamera di `loyalty/scan/CameraScanButton.tsx` (vista a schermo intero, non un dialog).
 - su tutto `app/admin` rifiuta una costante di classi di campo (`*INPUT*`, `*SELECT*`, `*FIELD*`, `input`, `field`…) con `border-a-border(-strong)`: i campi usano `border-a-field`.
+- su `app/admin` e `lib/admin/navigation.ts` rifiuta il trattino lungo (—) nei testi, aria-label e testi `sr-only` (usare due punti, virgola o punto mediano; commenti e segnaposto isolato `'—'` ignorati). Baseline temporanea: mappa file → numero massimo di occorrenze nei moduli non ancora ripuliti; può solo diminuire, mai crescere (un file che la supera fa fallire il test).
 - `tests/unit/adminNavigation.spec.ts`: id unici, coerenza registry ↔ `adminRoutePermissions`, visibilità per ruolo, stato attivo, barra mobile.
 
 ## 6. Stato di adozione

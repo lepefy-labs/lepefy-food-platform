@@ -188,7 +188,7 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
     <div className="space-y-4">
       {notice === 'created' && !info && (
         <p className="flex items-center gap-2 rounded-xl border border-tone-success-border bg-tone-success-bg px-3 py-2.5 text-sm text-tone-success-fg">
-          <IconCircleCheck size={18} /> Précommande enregistrée{preorder.payUrl ? ' — envoyez maintenant le lien au client.' : '.'}
+          <IconCircleCheck size={18} /> Précommande enregistrée{preorder.payUrl ? ' : envoyez maintenant le lien au client.' : '.'}
         </p>
       )}
       {notice === 'updated' && !info && (
@@ -257,7 +257,7 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
 
               {preorder.payUrl && actions.includes('share_link') && (
                 <div className="mt-3">
-                  <p className="mb-2 text-xs text-a-text-3">Lien de paiement (version {preorder.payLinkVersion}) — à envoyer au client :</p>
+                  <p className="mb-2 text-xs text-a-text-3">Lien de paiement (version {preorder.payLinkVersion}) : à envoyer au client :</p>
                   <ShareLinkActions url={preorder.payUrl} phone={preorder.phone} message={payMessage} />
                 </div>
               )}

@@ -548,7 +548,7 @@ export default function AssistedOrderForm({
             <li key={step.key}>
               <button type="button" onClick={() => goToStep(step.key)} className={`flex min-h-7 w-full items-start gap-1.5 text-left ${step.done ? 'text-tone-success-fg' : 'text-tone-warning-fg'}`}>
                 {step.done ? <IconCheck size={13} aria-hidden="true" className="mt-0.5 shrink-0" /> : <span aria-hidden="true" className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full border border-current" />}
-                <span>{step.label}{!step.done && step.issues[0] ? ` — ${step.issues[0]}` : ''}</span>
+                <span>{step.label}{!step.done && step.issues[0] ? ` : ${step.issues[0]}` : ''}</span>
               </button>
             </li>
           ))}
@@ -672,7 +672,7 @@ export default function AssistedOrderForm({
 
         {/* 3. Produits */}
         <section id={stepAnchor('products')} tabIndex={-1} className={`${sectionClass} scroll-mt-4 outline-none`}>
-          <SectionTitle step={3} title="Produits" helper="Catalogue réel du tenant — minimums, pas et groupes appliqués automatiquement." done={stepOf('products')?.done} summary={stepOf('products')?.summary} />
+          <SectionTitle step={3} title="Produits" helper="Catalogue réel de la boutique : minimums, pas et groupes appliqués automatiquement." done={stepOf('products')?.done} summary={stepOf('products')?.summary} />
           <div className="relative">
             <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" />
             <input
@@ -804,7 +804,7 @@ export default function AssistedOrderForm({
                 <p className="text-sm text-a-text-2">
                   {validQuote ? <>Frais : <strong>{validQuote.total === 0 ? 'Offerts' : formatPrice(validQuote.total, currency)}</strong> · selon la configuration de livraison du magasin</>
                     : quote && !validQuote ? 'Panier ou adresse modifié : recalculez les frais.'
-                      : 'Tarifs, zones et promotions du tenant appliqués.'}
+                      : 'Tarifs, zones et promotions de la boutique appliqués.'}
                 </p>
                 {quoteMessage && <p className="w-full text-xs text-tone-warning-fg" role="alert">{quoteMessage}</p>}
               </div>

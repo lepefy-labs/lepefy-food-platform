@@ -153,7 +153,7 @@ export default async function PreparationSessionPage({ searchParams }: { searchP
       {excluded.length > 0 && (
         <InlineAlert tone="warning" title={`${pluralize(excluded.length, 'commande écartée', 'commandes écartées')}`}>
           <ul className="mt-1 space-y-0.5">
-            {excluded.map((entry) => <li key={entry.id}><Link href={`/admin/orders/${entry.id}`} className="font-mono underline">#{entry.id.slice(0, 8).toUpperCase()}</Link> {entry.name ?? ''} — {entry.reason}</li>)}
+            {excluded.map((entry) => <li key={entry.id}><Link href={`/admin/orders/${entry.id}`} className="font-mono underline">#{entry.id.slice(0, 8).toUpperCase()}</Link> {entry.name ?? ''} : {entry.reason}</li>)}
           </ul>
         </InlineAlert>
       )}
