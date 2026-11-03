@@ -48,8 +48,8 @@ export interface PostalLocalityFieldProps {
 /**
  * One control for « Code postal et localité ». The customer types the postal
  * code only; the localities of the internal index for that exact code are
- * listed as « CAP - Localité ». Several answers: nothing is chosen for them.
- * One answer: preselected, visible and editable. No answer or no index: a
+ * listed as « CAP - Localité ». Nothing is ever chosen for the customer.
+ * One answer: still a list of one, the customer chooses. No answer or no index: a
  * manual locality field appears (controlled path, nothing is invented).
  * The form data stays `postalCode` + `city`.
  */
@@ -80,7 +80,6 @@ export function PostalLocalityField({
         .then((cities) => {
           setLookup({ status: 'done', key, cities });
           const action = reconcileLocality(cities, cityRef.current);
-          if (action.kind === 'select') onChangeRef.current({ city: action.city });
           if (action.kind === 'clear') onChangeRef.current({ city: '' });
           // The list always exists (even for one locality, plus « not listed »); it only opens by itself when a choice is missing.
           const needsChoice = cities.length > 0 && (action.kind === 'clear' || (action.kind === 'keep' && !cityRef.current.trim()));

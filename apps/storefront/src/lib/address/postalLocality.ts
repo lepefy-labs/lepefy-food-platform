@@ -24,19 +24,17 @@ export function postalDigitsFromInput(raw: string, maxDigits: number): string {
 
 export type LocalityAction =
   | { kind: 'keep' }
-  | { kind: 'select'; city: string }
   | { kind: 'clear' };
 
 /**
  * What to do with the current city once the index answered for the postal code.
  * - the city is one of the answers: keep (the pair is consistent);
- * - a single answer and no city (or a city we set ourselves): preselect it;
+ * - no city yet: keep (nothing is chosen for the customer, even with a single answer);
  * - several answers and a city that matches none: clear, the customer picks;
  * - no answer: keep (manual path, nothing is guessed).
  */
 export function reconcileLocality(cities: PostalLookupCity[], city: string): LocalityAction {
   if (cities.length === 0) return { kind: 'keep' };
   if (cities.some((entry) => sameLocality(entry.city, city))) return { kind: 'keep' };
-  if (cities.length === 1 && !city.trim()) return { kind: 'select', city: cities[0]!.city };
   return city.trim() ? { kind: 'clear' } : { kind: 'keep' };
 }
