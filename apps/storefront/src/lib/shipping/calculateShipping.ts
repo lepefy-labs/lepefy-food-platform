@@ -54,6 +54,12 @@ export interface ShippingInput {
   to:                 ShippingAddress;
   packagingSurcharge: PackagingSurcharge;
   vatRates:           VatRate[];
+  /**
+   * Preventivi internazionali: nessun peso convenzionale (400 g), IVA solo da
+   * risposta esplicita del provider o da una riga `shipping_vat_rates` del paese
+   * (o `*`), timeout provider. Assente = comportamento storico invariato.
+   */
+  strict?: { timeoutMs?: number };
 }
 
 export type ShippingResult =
@@ -77,9 +83,12 @@ export type ShippingResult =
     }
   | {
       available: false;
-      reason:  'packlink_error' | 'no_service';
+      reason:  'packlink_error' | 'no_service' | 'timeout' | 'missing_weight' | 'vat_unknown';
       message: string;
     };
+
+/** Esito del tentativo di lettura servizi: distingue errore API e timeout da «nessun servizio». */
+export interface PacklinkFetchFailure { kind?: 'api_error' | 'timeout' }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -146,6 +155,7 @@ export async function fetchAllPacklinkServices(
   from: ShippingAddress,
   to: ShippingAddress,
   parcels: Array<{ weight: number; width: number; height: number; length: number }>,
+  opts?: { timeoutMs?: number; failure?: PacklinkFetchFailure },
 ): Promise<PacklinkService[] | null> {
 
   const params = new URLSearchParams();
@@ -164,11 +174,22 @@ export async function fetchAllPacklinkServices(
   const url = `${PACKLINK_API_BASE}/services?${params}`;
   console.info('[calculateShipping] Packlink request — url:', url.replace(apiKey, '***'));
 
-  const res = await fetch(url, {
-    headers: { Authorization: apiKey },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { Authorization: apiKey },
+      ...(opts?.timeoutMs ? { signal: AbortSignal.timeout(opts.timeoutMs) } : {}),
+    });
+  } catch (err) {
+    if (!opts?.timeoutMs) throw err;
+    const timedOut = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
+    if (opts.failure) opts.failure.kind = timedOut ? 'timeout' : 'api_error';
+    console.error('[calculateShipping] Packlink request failed — timeout:', timedOut);
+    return null;
+  }
 
   if (!res.ok) {
+    if (opts?.failure) opts.failure.kind = 'api_error';
     let body = '';
     try { body = await res.text(); } catch { /* ignore */ }
     console.error('[calculateShipping] Packlink API error — status:', res.status, '— body:', body.slice(0, 500));
@@ -181,6 +202,7 @@ export async function fetchAllPacklinkServices(
     return services ?? [];
   } catch (parseErr) {
     console.error('[calculateShipping] Packlink response JSON parse error:', parseErr);
+    if (opts?.failure) opts.failure.kind = 'api_error';
     return null;
   }
 }
@@ -190,9 +212,10 @@ async function fetchPacklinkCost(
   from: ShippingAddress,
   to: ShippingAddress,
   parcels: Array<{ weight: number; width: number; height: number; length: number }>,
+  opts?: { timeoutMs?: number; failure?: PacklinkFetchFailure },
 ): Promise<{ cost: number; taxPrice: number; serviceId: number; serviceName: string; carrierName: string } | null> {
 
-  const services = await fetchAllPacklinkServices(apiKey, from, to, parcels);
+  const services = await fetchAllPacklinkServices(apiKey, from, to, parcels, opts);
 
   if (!services?.length) {
     console.info('[calculateShipping] Packlink returned 0 services for this destination');
@@ -242,6 +265,11 @@ export function resolveVatRate(country: string, vatRates: VatRate[]): number {
   return vatRates.find((v) => v.countries.includes('*'))?.vat_rate ?? 0;
 }
 
+/** Une riga IVA esiste per il paese o per «*»: nessuna aliquota dedotta dal solo paese. */
+export function hasExplicitVatRate(country: string, vatRates: VatRate[]): boolean {
+  return vatRates.some((v) => v.countries.includes(country) || v.countries.includes('*'));
+}
+
 export function calcPackagingSurcharge(
   surcharge: PackagingSurcharge,
   numParcels: number,
@@ -261,6 +289,15 @@ export async function calculateShipping(
   packlinkApiKey: string,
 ): Promise<ShippingResult> {
   const { cartItems, from, to, packagingSurcharge, vatRates } = input;
+
+  // 0. Modalità rigorosa: un peso mancante rende il preventivo inattendibile.
+  if (input.strict && cartItems.some((i) => typeof i.weight_grams !== 'number' || !Number.isFinite(i.weight_grams) || i.weight_grams <= 0)) {
+    return {
+      available: false,
+      reason: 'missing_weight',
+      message: 'Impossible de calculer les frais de livraison pour certains articles.',
+    };
+  }
 
   // 1. Peso totale e suddivisione pacchi
   const totalWeightG = cartItems.reduce(
@@ -283,6 +320,7 @@ export async function calculateShipping(
 
   // 4. Chiama Packlink PRO
   let packlinkResult: { cost: number; taxPrice: number; serviceId: number; serviceName: string; carrierName: string } | null = null;
+  const failure: PacklinkFetchFailure = {};
   try {
     packlinkResult = await fetchPacklinkCost(
       packlinkApiKey, from, to,
@@ -292,12 +330,21 @@ export async function calculateShipping(
         height: boxDimensions.height,
         length: boxDimensions.length,
       })),
+      input.strict ? { timeoutMs: input.strict.timeoutMs ?? 8000, failure } : undefined,
     );
   } catch (err) {
     console.error('[calculateShipping] fetchPacklinkCost threw unexpectedly:', err);
     return {
       available: false,
       reason: 'packlink_error',
+      message: 'Impossible de calculer les frais de livraison. Veuillez réessayer.',
+    };
+  }
+
+  if (!packlinkResult && failure.kind) {
+    return {
+      available: false,
+      reason: failure.kind === 'timeout' ? 'timeout' : 'packlink_error',
       message: 'Impossible de calculer les frais de livraison. Veuillez réessayer.',
     };
   }
@@ -320,6 +367,13 @@ export async function calculateShipping(
     vatRate   = parseFloat((vatAmount / packlinkResult.cost).toFixed(4));
     vatSource = 'packlink';
   } else {
+    if (input.strict && !hasExplicitVatRate(to.country, vatRates)) {
+      return {
+        available: false,
+        reason: 'vat_unknown',
+        message: 'Impossible de confirmer le tarif de livraison pour cette destination.',
+      };
+    }
     vatRate   = resolveVatRate(to.country, vatRates);
     vatAmount = parseFloat((packlinkResult.cost * vatRate).toFixed(2));
     vatSource = 'db';

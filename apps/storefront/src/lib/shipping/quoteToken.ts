@@ -118,6 +118,8 @@ export interface QuotePayloadV2 {
   /** corriere / servizio del preventivo provider (solo informativi) */
   cr: string | null;
   sv: string | null;
+  /** Empreinte de la politique géographique (migration 179); absent = jeton antérieur = « g0 ». */
+  gp?: string | null;
   e: number;
 }
 
@@ -156,6 +158,7 @@ export function signQuoteV2(input: QuoteV2Input, secret: string, now = Date.now(
     av: input.av,
     cr: input.cr,
     sv: input.sv,
+    gp: input.gp ?? 'g0',
     e: now + QUOTE_TTL_MS,
   };
   const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
@@ -191,7 +194,8 @@ export function verifyQuoteV2(token: string, secret: string, now = Date.now()): 
     || typeof payload.c !== 'string' || typeof payload.z !== 'string' || !Number.isInteger(payload.w)
     || typeof payload.h !== 'string' || (payload.m !== 'tariff' && payload.m !== 'provider_cost')
     || !strOrNull(payload.tid) || !intOrNull(payload.tv) || !intOrNull(payload.pq)
-    || !strOrNull(payload.av) || !strOrNull(payload.cr) || !strOrNull(payload.sv) || typeof payload.e !== 'number') {
+    || !strOrNull(payload.av) || !strOrNull(payload.cr) || !strOrNull(payload.sv)
+    || (payload.gp !== undefined && !strOrNull(payload.gp)) || typeof payload.e !== 'number') {
     return { valid: false, reason: 'malformed' };
   }
   if (now > payload.e) return { valid: false, reason: 'expired' };

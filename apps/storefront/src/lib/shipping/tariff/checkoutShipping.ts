@@ -20,7 +20,9 @@ import {
   cartFingerprint, isQuoteTokenV2, normalizeQuotePostalCode, verifyQuote, verifyQuoteV2,
 } from '@/lib/shipping/quoteToken';
 import { resolveCheckoutShippingDetails, stripShadowTariff } from './shadowTariff';
-import { buildTariffShippingDetails, computeTariffQuote, readTariffSnapshot } from './tariffQuote';
+import { buildTariffShippingDetails, computeTariffQuote, readTariffSnapshot, type TariffFallbackReason } from './tariffQuote';
+import { checkDeliveryGeo } from '@/lib/shipping/geo/geoPolicyServer';
+import { geoPolicyStamp, type GeoPolicy } from '@/lib/shipping/geo/geoPolicy';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -32,9 +34,14 @@ export interface CheckoutShippingTenant {
   shipping_pricing_mode?: ShippingPricingMode | string | null;
   shipping_tariff_fallback?: ShippingTariffFallback | string | null;
   click_collect_enabled?: boolean | null;
+  /** Pays de la boutique (règle de conservation « pays du magasin uniquement »). */
+  country?: string | null;
 }
 
-export type CheckoutShippingFailure = { ok: false; status: number; body: { error: string; code?: string } };
+export type CheckoutShippingFailure = {
+  ok: false; status: number;
+  body: { error: string; code?: string; blockedProducts?: Array<{ id: string; name: string }> };
+};
 export type CheckoutShippingResult =
   | { ok: true; shippingTotal: number; shippingDetails: Record<string, unknown> | null }
   | CheckoutShippingFailure;
@@ -47,6 +54,21 @@ export function effectivePricingMode(tenant: Pick<CheckoutShippingTenant, 'shipp
 
 export function tariffFallback(tenant: Pick<CheckoutShippingTenant, 'shipping_tariff_fallback'>): ShippingTariffFallback {
   return tenant.shipping_tariff_fallback === 'provider_cost' ? 'provider_cost' : 'unavailable';
+}
+
+/**
+ * Repli provider autorisé pour ce motif ? Le réglage historique du tenant couvre
+ * tous les motifs; le réglage de la politique géographique couvre uniquement
+ * l'absence de forfait actif du pays (jamais un forfait invalide, un poids
+ * manquant ou une zone exclue). La destination est déjà validée par checkDeliveryGeo.
+ */
+export function providerFallbackAllowed(
+  tenant: Pick<CheckoutShippingTenant, 'shipping_tariff_fallback'>,
+  policy: Pick<GeoPolicy, 'providerFallbackEnabled'>,
+  reason: TariffFallbackReason,
+): boolean {
+  if (tariffFallback(tenant) === 'provider_cost') return true;
+  return policy.providerFallbackEnabled && reason === 'no_active_tariff';
 }
 
 export function requote(message = REQUOTE_MESSAGE): CheckoutShippingFailure {
@@ -91,6 +113,15 @@ export async function verifyCheckoutShipping(input: VerifyCheckoutShippingInput)
     return { ok: false, status: 400, body: { error: 'Frais de livraison non calculés. Veuillez repasser par le panier.' } };
   }
 
+  // ── Politique géographique (destination + conservation), toujours relue en base ──
+  const geo = await checkDeliveryGeo({
+    supabase: input.supabase, tenant: input.tenant, country: input.address.country, quantityByProduct: input.quantityByProduct,
+  });
+  if (!geo.ok) {
+    return { ok: false, status: 422, body: { error: geo.message, code: geo.code, blockedProducts: geo.blockedProducts } };
+  }
+  const geoStamp = geoPolicyStamp(geo.policy);
+
   // ── Token V2 ───────────────────────────────────────────────────────────────
   if (isQuoteTokenV2(input.quoteToken)) {
     const verification = verifyQuoteV2(input.quoteToken, secret, input.now);
@@ -110,6 +141,8 @@ export async function verifyCheckoutShipping(input: VerifyCheckoutShippingInput)
       return requote('Votre panier a changé. Les frais de livraison doivent être recalculés.');
     }
     if (mode !== 'tariff') return requote();
+    // Politique modifiée depuis le devis (jeton antérieur à 179 = politique implicite g0).
+    if ((q.gp ?? 'g0') !== geoStamp) return requote();
 
     const outcome = await computeTariffQuote({
       supabase: input.supabase, tenantId: input.tenant.id,
@@ -140,7 +173,7 @@ export async function verifyCheckoutShipping(input: VerifyCheckoutShippingInput)
 
     // m = provider_cost : repli explicitement configuré, et seulement si le
     // forfait n'est toujours pas applicable à ce panier.
-    if (tariffFallback(input.tenant) !== 'provider_cost' || outcome.kind !== 'fallback') return requote();
+    if (outcome.kind !== 'fallback' || !providerFallbackAllowed(input.tenant, geo.policy, outcome.reason)) return requote();
     return {
       ok: true,
       shippingTotal: q.t / 100,
@@ -195,6 +228,14 @@ export async function revalidateSessionShipping(input: RevalidateSessionShipping
   Promise<{ ok: true; tariffManaged: boolean } | CheckoutShippingFailure> {
   if (input.fulfillmentType !== 'delivery') return { ok: true, tariffManaged: false };
   const mode = effectivePricingMode(input.tenant);
+  let geoPolicy: GeoPolicy | null = null;
+  if (input.address) {
+    const geo = await checkDeliveryGeo({
+      supabase: input.supabase, tenant: input.tenant, country: input.address.country, quantityByProduct: input.quantityByProduct,
+    });
+    if (!geo.ok) return { ok: false, status: 422, body: { error: geo.message, code: geo.code, blockedProducts: geo.blockedProducts } };
+    geoPolicy = geo.policy;
+  }
   const snapshot = readTariffSnapshot(input.shippingDetails);
   const isFallback = input.shippingDetails?.pricingMode === 'provider_cost_fallback';
 
@@ -221,7 +262,7 @@ export async function revalidateSessionShipping(input: RevalidateSessionShipping
       && cents(input.shippingTotal) === snapshot.finalCents;
     return same ? { ok: true, tariffManaged: true } : requote();
   }
-  return outcome.kind === 'fallback' && tariffFallback(input.tenant) === 'provider_cost'
+  return outcome.kind === 'fallback' && geoPolicy && providerFallbackAllowed(input.tenant, geoPolicy, outcome.reason)
     ? { ok: true, tariffManaged: true }
     : requote();
 }

@@ -816,3 +816,12 @@ Il ruolo `platform_owner` non è cambiato. La pagina tenant mostra un link « La
 3. Dopo una modifica reale: controllare la carta del paese (nuova versione), lo storico e un preventivo di prova
    (`orders.shipping_details.tariff.version` sull'ordine successivo).
 4. Rollback prezzi: « Rétablir cette version » sulla riga precedente dello storico.
+
+
+## 15. Destinazioni internazionali e repli provider per paese (migration 179, 03/11/2026)
+
+- Il forfait attivo resta prioritario e immutato. Senza forfait attivo del paese (`no_active_tariff`) il prezzo viene dal preventivo provider se il tenant lo consente: `tenants.shipping_tariff_fallback = 'provider_cost'` (storico, tutti i motivi) oppure `tenant_shipping_geo_policy.provider_fallback_enabled` (solo assenza di forfait; mai forfait non valido, peso mancante o zona esclusa). Il repli è ammesso solo per destinazioni consentite dalla politica del tenant.
+- Preventivo provider estero: pesi dal DB, nessun default 400 g, IVA esplicita, timeout; `no_service`, errore API e `timeout` distinti; senza servizio nessun prezzo e proposta di ritiro in negozio.
+- Il token V2 porta `gp` (versione della politica): cambiando la politica i preventivi aperti sono invalidati (409 `SHIPPING_REQUOTE_REQUIRED`). `verifyCheckoutShipping` e `revalidateSessionShipping` rieseguono `checkDeliveryGeo` (destinazione + conservazione) prima di ogni token.
+- Indirizzi: formati postali internazionali in `lib/address/addressRules.ts` (GB, US, CA, ES, PT, NL, …), paesi senza CAP obbligatorio (`postalCodeRequired`), località manuale fuori dai cinque paesi con indice CAP, Sicilia/Sardegna restano CAP italiani gestiti dalla zona Packlink.
+- Rollout Chloe Food: migration 179 → nessun effetto; poi, solo su richiesta esplicita, salvare la politica da Admin → Livraison. Rollback: eliminare la riga del tenant (torna il comportamento storico) o `drop table public.tenant_shipping_geo_policy`.

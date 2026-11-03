@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@6ae398de`
-> **Ultima verifica:** 20 ottobre 2026
+> **Base codice verificata:** `main@021e646f`
+> **Ultima verifica:** 3 novembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale) + `151_shipping_shipment_creation.sql` + `152_shipping_automation_content.sql` (brouillons d'expédition, §2.4) + `159_shipping_tariff_publish.sql` (pubblicazione atomica dei prezzi forfait, §18.6)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
@@ -1234,6 +1234,17 @@ Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decision
 36. Lepefy non elimina né annulla mai una bozza presso il provider; stacca una reference solo dopo che il provider conferma l'assenza (404) o l'annullamento della bozza.
 37. La modifica rapida cambia solo importi: pesi delle tranche, blocchi, zone, modalità delle maggiorazioni, colli, IVA e limite logistico sono sempre ricopiati dalla versione di base, sia nel codice (`buildEditedVersion`) sia in SQL (`publish_shipping_tariff_version`); una pubblicazione da una base non più attiva non scrive nulla.
 38. Simulatore, shadow, rétrotest, bozze e rapporto sugli ordini reali restano riservati al `platform_owner` lato server (`requirePlatformOwner()`); la pagina tenant non li importa né li chiama.
+
+---
+
+### 21.bis Destinazioni internazionali e restrizioni per conservazione (migration 179)
+
+- Tabella `tenant_shipping_geo_policy` (una riga per tenant, RLS forzata senza policy, solo service role): `destination_mode` (`current | eu | carrier_all | custom`), `included_countries`, `excluded_countries`, `provider_fallback_enabled`, `storage_rules` (`dry | fresh | frozen` → `none | store_country | eu | custom` + paesi) e `policy_version` (CAS a ogni scrittura). **Nessuna riga = comportamento storico**: nessuna restrizione di destinazione né di conservazione, nessun tenant attivato dalla migration.
+- Un solo punto di decisione: `lib/shipping/geo/geoPolicy.ts` (puro) + `geoPolicyServer.ts` (`checkDeliveryGeo`, rilegge politica e `products.storage_type` dal DB del tenant; un prodotto senza classificazione riconoscibile è bloccato appena esiste una restrizione). Chiamato da `/api/shipping/quote`, `verifyCheckoutShipping` e `revalidateSessionShipping`, quindi da ogni percorso di pagamento (Stripe, in-store, link esterno, assistiti, PATCH/create-intent). Errori: `DESTINATION_NOT_ALLOWED`, `STORAGE_RESTRICTED` (422 nel checkout, `blockedProducts` per nome).
+- Ordine di tariffazione: destinazione consentita → restrizioni conservazione → forfait attivo (invariato) → altrimenti `providerFallbackAllowed` (`shipping_tariff_fallback = 'provider_cost'` per ogni motivo, oppure `provider_fallback_enabled` solo per `no_active_tariff`) → preventivo Packlink → nessun servizio: nessun prezzo.
+- Preventivi provider per paesi fuori dall'elenco storico (IT FR BE DE CH): `calculateShipping({ strict })` con pesi riletti dal DB (nessun default 400 g, peso mancante = `missing_weight`), IVA solo da risposta Packlink o da una riga `shipping_vat_rates` esplicita (`vat_unknown` altrimenti), timeout 8 s; `no_service`, errore API e `timeout` sono distinti. Dazi/oneri doganali non sono mai sommati al totale.
+- Token V2: campo `gp` (`g<policy_version>`, assente = `g0`); una modifica della politica dopo il preventivo produce 409 `SHIPPING_REQUOTE_REQUIRED`.
+- UI: Admin → Livraison → `GeoPolicySection` (« Destinations et tarification », « Restrictions par conservation »), API `GET/PUT /api/admin/shipping-geo-policy` (`shipping.view`/`shipping.manage`).
 
 ---
 
