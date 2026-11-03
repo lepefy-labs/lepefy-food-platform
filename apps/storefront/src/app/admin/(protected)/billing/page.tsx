@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { IconBrandPaypal, IconBuildingBank, IconCreditCard, IconChevronDown } from '@tabler/icons-react';
+import { IconBrandPaypal, IconBuildingBank, IconCreditCard, IconChevronDown, IconArrowRight } from '@tabler/icons-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { aggregateTenantAiUsage, type AiRawUsageRow } from '@/lib/ai/productUsage';
 import { formatPlanPrice, getTenantBillingSnapshot } from '@/lib/admin/platformBilling';
@@ -13,7 +13,6 @@ import {
   formatBillingDate,
   formatBillingMonth,
   paymentSourceLabel,
-  plural,
   subscriptionState,
   transferReference,
   type SubscriptionRow,
@@ -47,7 +46,7 @@ function coveredBy(paidUntilAfter: string): Date {
 function MethodHeader({ icon, title, hint, highlighted = false }: { icon: ReactNode; title: string; hint: string; highlighted?: boolean }) {
   return (
     <div className="flex items-center gap-3">
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${highlighted ? 'bg-a-brand-soft text-a-brand-fg' : 'bg-a-surface-2 text-a-text-2'}`}>{icon}</span>
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${highlighted ? 'bg-a-surface text-a-brand-fg' : 'bg-a-brand-soft text-a-brand-fg'}`}>{icon}</span>
       <div className="min-w-0">
         <h3 className="text-base font-semibold text-a-text">{title}</h3>
         <p className="text-xs text-a-text-3">{hint}</p>
@@ -102,10 +101,11 @@ export default async function BillingPage() {
 
   const mailSupport = <a href={`mailto:${billing.supportEmail}`} className="font-semibold underline">Contactez Lepefy</a>;
   const paidUntilLabel = subscription.paid_until ? formatBillingDate(subscription.paid_until) : null;
+  const urgentRenewal = state.kind === 'overdue' || state.kind === 'due_soon';
 
   return (
     <div className="max-w-3xl">
-      <AdminPageHeader title="Abonnement" description={`${billing.planName} · ${price} HT / mois`} />
+      <AdminPageHeader title="Abonnement" description={billing.planName} />
 
       {state.kind === 'suspended' && (
         <InlineAlert tone="danger" className="mb-4" title={`Abonnement suspendu${state.suspendedBy === 'automatic' ? ' automatiquement' : ''}`}>
@@ -113,76 +113,62 @@ export default async function BillingPage() {
           {serviceState.suspensionReason && <span className="mt-1 block text-xs">Motif : {serviceState.suspensionReason}</span>}
         </InlineAlert>
       )}
-      {state.kind === 'overdue' && (
-        <InlineAlert tone="warning" className="mb-4" title={`Échéance dépassée depuis ${plural(state.daysOverdue, 'jour')}`}>
-          {state.autoSuspendAt
-            ? <>Suspension du service le <strong>{formatBillingDate(state.autoSuspendAt)}</strong> sans paiement.</>
-            : <>Réglez l&apos;abonnement pour éviter une suspension.</>}
-        </InlineAlert>
-      )}
-      {state.kind === 'due_soon' && state.daysLeft !== null && (
-        <InlineAlert tone="warning" className="mb-4" title={state.daysLeft === 0 ? 'Échéance aujourd’hui' : `Échéance dans ${plural(state.daysLeft, 'jour')}`} />
-      )}
       {serviceState.suspendedModules.length > 0 && (
         <InlineAlert tone="neutral" className="mb-4">
           Suspendu par Lepefy : {serviceState.suspendedModules.map((module) => MODULE_LABELS[module]).join(', ')}.
         </InlineAlert>
       )}
 
-      <section aria-labelledby="pay-title" className="mb-5 rounded-2xl border border-a-border bg-a-surface p-4 sm:p-5">
+      <section aria-labelledby="pay-title" className="mb-5 rounded-2xl border border-a-border bg-a-surface p-3 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div>
             <h2 id="pay-title" className="sr-only">Régler l&apos;abonnement</h2>
             <p className="text-3xl font-bold tabular-nums text-a-text">{price} <span className="text-sm font-medium text-a-text-3">HT / mois</span></p>
+            {urgentRenewal && (
+              <p className="mt-1 text-sm font-medium text-tone-warning-fg">
+                {state.kind === 'overdue' ? 'Échéance dépassée' : 'À renouveler'}
+                {state.autoSuspendAt && <> · Suspension prévue le {formatBillingDate(state.autoSuspendAt)}</>}
+              </p>
+            )}
           </div>
           <Badge tone={badgeTone} dot className="shrink-0">{STATE_LABEL[state.kind]}</Badge>
         </div>
 
-        <dl className="mt-4 grid grid-cols-2 gap-2">
-          <div className="rounded-xl bg-a-surface-2 p-3">
-            <dt className="text-xs text-a-text-3">Payé jusqu&apos;au</dt>
-            <dd className="mt-0.5 text-sm font-semibold text-a-text">{paidUntilLabel ?? 'Non défini'}</dd>
-          </div>
-          <div className="rounded-xl bg-a-surface-2 p-3">
-            <dt className="text-xs text-a-text-3">Ce paiement couvre</dt>
-            <dd className="mt-0.5 text-sm font-semibold capitalize text-a-text">{coveredLabel}</dd>
-          </div>
-        </dl>
 
-        <div className="mt-5 space-y-3">
+        <div className="mt-3 space-y-3">
           {paypalLink && (
-            <div className="rounded-2xl border-2 border-a-brand p-4">
+            <div className="rounded-2xl border-2 border-a-brand bg-a-brand-soft p-3 sm:p-4">
               <MethodHeader icon={<IconBrandPaypal size={22} stroke={1.8} aria-hidden="true" />} title="PayPal" hint="Confirmé par Lepefy après vérification" highlighted />
-              <ButtonAnchor variant="primary" href={paypalLink} target="_blank" rel="noopener noreferrer" className="mt-4 min-h-12 w-full text-base">
-                Payer avec PayPal · {price}
+              <ButtonAnchor variant="primary" href={paypalLink} target="_blank" rel="noopener noreferrer" className="mt-3 min-h-12 w-full justify-between text-base">
+                <span>Payer avec PayPal · {price}</span><IconArrowRight size={18} aria-hidden="true" />
               </ButtonAnchor>
-              <div className="mt-3 rounded-xl bg-a-surface-2 p-3">
+              <div className="mt-3 rounded-xl border border-a-border bg-a-surface p-3">
                 <CopyableValue stacked label="Note à indiquer dans PayPal" value={reference} />
               </div>
             </div>
           )}
 
-          <div className={`rounded-2xl p-4 ${paypalLink ? 'border border-a-border' : 'border-2 border-a-brand'}`}>
-            <MethodHeader icon={<IconCreditCard size={22} stroke={1.8} aria-hidden="true" />} title="Carte bancaire" hint="Confirmation automatique" highlighted={!paypalLink} />
+          <div className={`rounded-2xl p-3 sm:p-4 ${paypalLink ? 'border-2 border-a-brand bg-a-brand-soft' : 'border-2 border-a-brand bg-a-brand-soft'}`}>
+            <MethodHeader icon={<IconCreditCard size={22} stroke={1.8} aria-hidden="true" />} title="Carte bancaire" hint="Confirmation automatique" highlighted />
             {billing.stripePaymentLink ? (
-              <ButtonAnchor variant={paypalLink ? 'secondary' : 'primary'} href={billing.stripePaymentLink} target="_blank" rel="noopener noreferrer" className="mt-4 min-h-12 w-full text-base">
-                Payer par carte · {price}
+              <ButtonAnchor variant={paypalLink ? 'outline' : 'primary'} href={billing.stripePaymentLink} target="_blank" rel="noopener noreferrer" className="mt-3 min-h-12 w-full justify-between bg-a-surface text-base">
+                <span>Payer par carte · {price}</span><IconArrowRight size={18} aria-hidden="true" />
               </ButtonAnchor>
             ) : (
               <p className="mt-3 text-sm text-a-text-2">Indisponible pour le moment. {mailSupport}.</p>
             )}
           </div>
 
-          <details className="group rounded-2xl border border-a-border">
+          <details className="group rounded-2xl border-2 border-a-brand bg-a-brand-soft">
             <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-a-focus [&::-webkit-details-marker]:hidden">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-a-surface-2 text-a-text-2"><IconBuildingBank size={22} stroke={1.8} aria-hidden="true" /></span>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-a-surface text-a-brand-fg"><IconBuildingBank size={22} stroke={1.8} aria-hidden="true" /></span>
               <span className="min-w-0 flex-1">
                 <span className="block text-base font-semibold text-a-text">Virement bancaire</span>
-                <span className="block text-xs font-semibold text-a-brand-fg">Voir les coordonnées bancaires</span>
+                <span className="block text-sm font-semibold text-a-brand-fg">Voir les coordonnées bancaires</span>
               </span>
               <IconChevronDown size={18} aria-hidden="true" className="shrink-0 text-a-text-3 transition-transform group-open:rotate-180" />
             </summary>
-            <div className="border-t border-a-border p-4">
+            <div className="border-t border-a-border bg-a-surface p-3 sm:p-4">
               {billing.bankIban ? (
                 <div className="space-y-3 rounded-xl bg-a-surface-2 p-3">
                   {billing.bankBeneficiary && <CopyableValue stacked label="Bénéficiaire" value={billing.bankBeneficiary} />}
@@ -198,6 +184,18 @@ export default async function BillingPage() {
             </div>
           </details>
         </div>
+
+        <dl className="mt-4 grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-a-border bg-a-surface p-3">
+            <dt className="text-xs text-a-text-3">Payé jusqu&apos;au</dt>
+            <dd className="mt-0.5 text-sm font-semibold text-a-text">{paidUntilLabel ?? 'Non défini'}</dd>
+          </div>
+          <div className="rounded-xl border border-a-border bg-a-surface p-3">
+            <dt className="text-xs text-a-text-3">Ce paiement couvre</dt>
+            <dd className="mt-0.5 text-sm font-semibold capitalize text-a-text">{coveredLabel}</dd>
+          </div>
+        </dl>
+
       </section>
 
       <section aria-labelledby="plan-title" className="mb-5 rounded-2xl border border-a-border bg-a-surface p-4 sm:p-5">
