@@ -158,8 +158,12 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           header={<AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} canShop={canShop} canEvents={canEvents} adminEmail={user.email ?? ''} adminDisplayName={displayName} support={supportEnabled} help={helpEnabled} />}
         >
           <AdminWorkspaceMemory workspace={workspace} />
-          <SubscriptionBanner serviceState={serviceState} canViewBilling={canAdmin(access, 'billing.view')} />
-          <AdminInstallPrompt />
+          {requestedPath !== '/admin/billing' && (
+            <>
+              <SubscriptionBanner serviceState={serviceState} canViewBilling={canAdmin(access, 'billing.view')} />
+              <AdminInstallPrompt />
+            </>
+          )}
           {access.roleCode === DEMO_VISITOR_ROLE && <DemoVisitorBanner userId={access.userId} />}
           {children}
         </AdminShell>
