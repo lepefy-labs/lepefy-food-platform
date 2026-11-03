@@ -25,6 +25,7 @@ import type { AdminSearchScope, AdminShellNav } from '../_components/shell/shell
 import { canSee, navItemsById, resolveAdminNavigation } from '@/lib/admin/navigation';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
 import SubscriptionBanner from '../_components/SubscriptionBanner';
+import AdminGlobalNotices from '../_components/AdminGlobalNotices';
 import DemoVisitorBanner from '../_components/demo/DemoVisitorBanner';
 import { DEMO_VISITOR_ROLE } from '@/lib/demo/visitorPermissions';
 import { AdminToaster } from '../_components/ui/Toaster';
@@ -158,12 +159,10 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           header={<AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} canShop={canShop} canEvents={canEvents} adminEmail={user.email ?? ''} adminDisplayName={displayName} support={supportEnabled} help={helpEnabled} />}
         >
           <AdminWorkspaceMemory workspace={workspace} />
-          {requestedPath !== '/admin/billing' && (
-            <>
-              <SubscriptionBanner serviceState={serviceState} canViewBilling={canAdmin(access, 'billing.view')} />
-              <AdminInstallPrompt />
-            </>
-          )}
+          <AdminGlobalNotices>
+            <SubscriptionBanner serviceState={serviceState} canViewBilling={canAdmin(access, 'billing.view')} />
+            <AdminInstallPrompt />
+          </AdminGlobalNotices>
           {access.roleCode === DEMO_VISITOR_ROLE && <DemoVisitorBanner userId={access.userId} />}
           {children}
         </AdminShell>
