@@ -379,7 +379,7 @@ export const INITIAL_LIBRARY: LibraryGuide[] = [
     watch: ['app/admin/(protected)/billing', 'lib/billing', 'docs/SUBSCRIPTION_LIFECYCLE.md'],
     blocks: [
       p('Si une alerte d’échéance apparaît dans l’administration, cliquez sur **Régler maintenant** pour accéder directement à **Abonnement**.'),
-      p('En haut de la page **Abonnement**, le bloc de paiement indique le montant, la date « Payé jusqu’au » et le mois que votre prochain paiement couvre.'),
+      p('En haut de **Abonnement**, le montant et les moyens de paiement apparaissent en premier, avec **PayPal** en priorité, puis **Carte bancaire** et **Virement bancaire**. Les dates « Payé jusqu’au » et « Ce paiement couvre » sont placées sous les moyens de paiement.'),
       steps(
         'Ouvrez **Abonnement** dans le menu.',
         'Par PayPal (mode recommandé, si le bouton est présent) : cliquez sur **Payer avec PayPal** et indiquez la **Note à indiquer dans PayPal**. Lepefy prolonge l’échéance après avoir vérifié le paiement.',
