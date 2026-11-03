@@ -97,7 +97,8 @@ export function PostalLocalityField({
   const current = lookup.status !== 'idle' && lookup.key === key ? lookup : { status: 'idle' as const };
   const cities = current.status === 'done' ? current.cities : [];
   const items: Item[] = cities.length > 0 ? [...cities, { notListed: true }] : [];
-  const showManual = manual || (current.status === 'done' && cities.length === 0) || current.status === 'unavailable';
+  // Pays sans index CAP/localité: saisie manuelle de la localité, jamais d'association inventée.
+  const showManual = !deliverable || manual || (current.status === 'done' && cities.length === 0) || current.status === 'unavailable';
   const selected = Boolean(key && city.trim()) && !showManual;
   const text = selected ? localityLabel(normalizePostalCode(country, postalCode), city) : postalCode;
   const loading = current.status === 'loading';

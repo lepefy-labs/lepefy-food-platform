@@ -36,9 +36,12 @@ import { cartFingerprint, signQuote, signQuoteV2 } from '@/lib/shipping/quoteTok
 import { resolveCountryRule, applyCountryRule, type ShippingCountryRule } from '@/lib/shipping/resolveCountryRule';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import type { Tenant } from '@lepefy/types';
-import { effectivePricingMode, tariffFallback } from '@/lib/shipping/tariff/checkoutShipping';
+import { effectivePricingMode, providerFallbackAllowed } from '@/lib/shipping/tariff/checkoutShipping';
+import { postalCodeRequired } from '@/lib/address/addressRules';
+import { checkDeliveryGeo } from '@/lib/shipping/geo/geoPolicyServer';
+import { LEGACY_DELIVERY_COUNTRIES, geoPolicyStamp, type GeoPolicy } from '@/lib/shipping/geo/geoPolicy';
 import {
-  MISSING_WEIGHT_MESSAGE, NO_TARIFF_MESSAGE, ZONE_NOT_COVERED_MESSAGE,
+  MISSING_WEIGHT_MESSAGE, NO_TARIFF_MESSAGE, ZONE_NOT_COVERED_MESSAGE, type TariffUnavailableCode,
   buildTariffShippingDetails, checkTariffAvailability, computeTariffQuote, quantitiesFromItems, tariffUnavailableMessage,
 } from '@/lib/shipping/tariff/tariffQuote';
 
@@ -85,7 +88,37 @@ function mergeCountryRuleDetails(
 
 type ProviderQuote =
   | { available: true; shippingTotal: number; shippingDetails: Record<string, unknown> | null; freeShipping: FreeShippingInfo }
-  | { available: false; message: string; status?: number };
+  | { available: false; message: string; status?: number; reason?: ProviderFailureReason };
+
+type ProviderFailureReason = 'no_service' | 'api_error' | 'timeout' | 'missing_weight' | 'vat_unknown';
+
+/** Destination hors des pays historiques: devis rigoureux (poids serveur, TVA explicite, timeout). */
+function isInternationalQuote(country: string): boolean {
+  return !LEGACY_DELIVERY_COUNTRIES.includes(country.trim().toUpperCase());
+}
+
+/** Lignes avec les poids lus en base (jamais ceux du navigateur). null = produit inconnu du tenant. */
+async function serverWeightedItems(
+  supabase: ServiceClient, tenantId: string, quantityByProduct: ReadonlyMap<string, number>,
+): Promise<QuoteItem[] | null> {
+  const ids = [...quantityByProduct.keys()];
+  const { data, error } = await supabase.from('products').select('id, weight_grams')
+    .eq('tenant_id', tenantId).eq('active', true).in('id', ids) as
+    { data: Array<{ id: string; weight_grams: number | null }> | null; error: unknown };
+  if (error) throw new Error('quote_weight_lookup_failed');
+  const byId = new Map((data ?? []).map((p) => [p.id, p.weight_grams]));
+  if (ids.some((id) => !byId.has(id))) return null;
+  return ids.map((id) => ({ product_id: id, weight_grams: byId.get(id) ?? null, quantity: quantityByProduct.get(id)! }));
+}
+
+/** Motif de non-disponibilité provider → message client (sans détail technique). */
+function providerFailureMessage(reason: ProviderFailureReason | undefined, clickCollect: boolean, fallback: string): string {
+  if (reason === 'no_service') return tariffUnavailableMessage('no_service', clickCollect);
+  if (reason === 'api_error' || reason === 'timeout') return tariffUnavailableMessage('provider_unavailable', clickCollect);
+  if (reason === 'missing_weight') return MISSING_WEIGHT_MESSAGE(clickCollect);
+  if (reason === 'vat_unknown') return tariffUnavailableMessage('vat_rate_missing', clickCollect);
+  return fallback;
+}
 
 /** Preventivo «costo provider» — flusso storico, invariato. */
 async function quoteProviderCost(
@@ -93,6 +126,7 @@ async function quoteProviderCost(
   tenant: Tenant,
   items: QuoteItem[],
   to: { country: string; zip_code: string },
+  strict = false,
 ): Promise<ProviderQuote> {
   // ── Règles commerciales par pays (shipping_country_rules) ────────────────────
   const { data: countryRulesRaw, error: countryRulesError } = await supabase
@@ -229,6 +263,7 @@ async function quoteProviderCost(
           to,
           packagingSurcharge: surcharge,
           vatRates: vatRates ?? [],
+          ...(strict ? { strict: {} } : {}),
         },
         packlinkApiKey,
       );
@@ -242,7 +277,12 @@ async function quoteProviderCost(
         const message = territory
           ? extraCustomsUnavailableMessage(territory, Boolean(tenant.click_collect_enabled))
           : result.message;
-        return { available: false, message };
+        const reason: ProviderFailureReason = result.reason === 'packlink_error' ? 'api_error' : result.reason;
+        return {
+          available: false,
+          message: strict ? providerFailureMessage(reason, Boolean(tenant.click_collect_enabled), message) : message,
+          reason,
+        };
       }
 
       const applied = applyCountryRule(result.shippingTotal, cartSubtotal, rule);
@@ -263,6 +303,7 @@ async function quoteTariff(
   items: QuoteItem[],
   to: { country: string; zip_code: string },
   quoteSecret: string,
+  geoPolicy: GeoPolicy,
 ): Promise<NextResponse> {
   const clickCollect = Boolean(tenant.click_collect_enabled);
   const quantityByProduct = quantitiesFromItems(items);
@@ -294,7 +335,7 @@ async function quoteTariff(
 
   if (outcome.kind === 'fallback') {
     console.info('[shipping/quote] tariff fallback — tenant:', tenant.id, '— reason:', outcome.reason);
-    if (tariffFallback(tenant) !== 'provider_cost') {
+    if (!providerFallbackAllowed(tenant, geoPolicy, outcome.reason)) {
       return NextResponse.json({
         available: false,
         message: outcome.reason === 'missing_product_weight' ? MISSING_WEIGHT_MESSAGE(clickCollect)
@@ -302,8 +343,17 @@ async function quoteTariff(
           : NO_TARIFF_MESSAGE(clickCollect),
       });
     }
-    const provider = await quoteProviderCost(supabase, tenant, items, to);
-    if (!provider.available) return NextResponse.json({ available: false, message: provider.message }, provider.status ? { status: provider.status } : undefined);
+    // Destination internationale: poids lus en base, TVA explicite, timeout (jamais le poids du navigateur).
+    const strict = isInternationalQuote(to.country);
+    const providerItems = strict ? await serverWeightedItems(supabase, tenant.id, quantityByProduct) : items;
+    if (!providerItems) return NextResponse.json({ available: false, message: tariffUnavailableMessage('product_unavailable', clickCollect) });
+    const provider = await quoteProviderCost(supabase, tenant, providerItems, to, strict);
+    if (!provider.available) {
+      return NextResponse.json(
+        { available: false, message: provider.message, ...(provider.reason ? { reason: provider.reason } : {}) },
+        provider.status ? { status: provider.status } : undefined,
+      );
+    }
     const details = { ...(provider.shippingDetails ?? {}), pricingMode: 'provider_cost_fallback', tariffFallback: { reason: outcome.reason } };
     return NextResponse.json({
       available: true,
@@ -314,7 +364,7 @@ async function quoteTariff(
       quoteToken: signQuoteV2({
         ten: tenant.id, t: Math.round(provider.shippingTotal * 100), c: to.country, z: to.zip_code, w: 0,
         h: cartFingerprint(quantityByProduct), m: 'provider_cost', tid: null, tv: null, pq: null, av: 'provider_cost_fallback',
-        cr: null, sv: null,
+        cr: null, sv: null, gp: geoPolicyStamp(geoPolicy),
       }, quoteSecret),
     });
   }
@@ -366,6 +416,7 @@ async function quoteTariff(
       w: outcome.weightG, h: cartFingerprint(quantityByProduct), m: 'tariff',
       tid: outcome.version.id, tv: outcome.version.version,
       pq: snapshot.providerQuoteTtcCents, av: snapshot.source, cr: snapshot.carrier, sv: snapshot.service,
+      gp: geoPolicyStamp(geoPolicy),
     }, quoteSecret),
   });
 }
@@ -378,7 +429,8 @@ export async function POST(request: Request) {
       to: { country: string; zip_code: string };
     };
 
-    if (!items?.length || !to?.country || !to?.zip_code) {
+    const zipMissing = !to?.zip_code && (!to?.country || postalCodeRequired(to.country));
+    if (!items?.length || !to?.country || zipMissing) {
       return NextResponse.json(
         { available: false, message: 'Écrivez votre pays et votre code postal pour calculer la livraison.' },
         { status: 400 },
@@ -420,13 +472,34 @@ export async function POST(request: Request) {
       });
     }
 
-    if (effectivePricingMode(tenant) === 'tariff') {
-      return await quoteTariff(supabase, tenant, items, to, quoteSecret);
+    // Politique géographique (destination + conservation): relue en base, avant tout devis.
+    const geo = await checkDeliveryGeo({
+      supabase, tenant, country: to.country.trim().toUpperCase(),
+      quantityByProduct: quantitiesFromItems(items) ?? new Map(),
+    });
+    if (!geo.ok) {
+      console.info('[shipping/quote] geo policy blocked — tenant:', tenant.id, '— code:', geo.code);
+      return NextResponse.json({ available: false, message: geo.message, code: geo.code, blockedProducts: geo.blockedProducts });
     }
 
-    const provider = await quoteProviderCost(supabase, tenant, items, to);
+    if (effectivePricingMode(tenant) === 'tariff') {
+      return await quoteTariff(supabase, tenant, items, to, quoteSecret, geo.policy);
+    }
+
+    const strict = isInternationalQuote(to.country);
+    let providerItems = items;
+    if (strict) {
+      const qty = quantitiesFromItems(items);
+      const weighted = qty ? await serverWeightedItems(supabase, tenant.id, qty) : null;
+      if (!weighted) return NextResponse.json({ available: false, message: ERROR_COPY.invalidItem }, { status: 400 });
+      providerItems = weighted;
+    }
+    const provider = await quoteProviderCost(supabase, tenant, providerItems, to, strict);
     if (!provider.available) {
-      return NextResponse.json({ available: false, message: provider.message }, provider.status ? { status: provider.status } : undefined);
+      return NextResponse.json(
+        { available: false, message: provider.message, ...(provider.reason ? { reason: provider.reason } : {}) },
+        provider.status ? { status: provider.status } : undefined,
+      );
     }
     return NextResponse.json({
       available: true,

@@ -4,6 +4,9 @@ import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { ShippingCountryRulesSection } from './ShippingCountryRulesSection';
 import { ZonesSection } from './ZonesSection';
+import { GeoPolicySection } from './GeoPolicySection';
+import { loadConfiguredCountries, loadGeoPolicy } from '@/lib/shipping/geo/geoPolicyServer';
+import { defaultGeoPolicy } from '@/lib/shipping/geo/geoPolicy';
 import type { ShippingCountryRuleRow, ShippingZoneRow } from '@lepefy/types';
 import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { loadPricingMode } from '@/lib/shipping/tariff/adminData';
@@ -44,6 +47,14 @@ export default async function AdminLivraisonPage() {
     .eq('tenant_id', tenant.id)
     .order('position', { ascending: true }) as unknown as { data: ShippingZoneRow[] | null };
 
+  // Migration 179 absente → la table ne répond pas; la section reste en lecture seule.
+  const geoProbe = await supabase.from('tenant_shipping_geo_policy').select('tenant_id').eq('tenant_id', tenant.id).maybeSingle();
+  const geoMigrationReady = !geoProbe.error;
+  const [geoPolicy, configuredCountries] = await Promise.all([
+    geoMigrationReady ? loadGeoPolicy(supabase, tenant.id) : Promise.resolve(defaultGeoPolicy()),
+    loadConfiguredCountries(supabase, tenant.id),
+  ]);
+
   return (
     <div className="mx-auto w-full max-w-5xl pb-10">
       <AdminPageHeader
@@ -66,6 +77,8 @@ export default async function AdminLivraisonPage() {
       <AdminBlockAccent tone="info">
         <ShippingCountryRulesSection initialRules={rules ?? []} currency={tenant.currency} canManage={canManage} />
       </AdminBlockAccent>
+
+      <GeoPolicySection initial={geoPolicy} configuredCountries={configuredCountries} canManage={canManage} migrationReady={geoMigrationReady} />
 
       <ZonesSection initialZones={zones ?? []} canManage={canManage} tariffMode={pricingMode === 'tariff'} />
     </div>

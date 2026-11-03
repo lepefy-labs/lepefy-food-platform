@@ -147,7 +147,10 @@ export default function CheckoutFlow({
   externalPaymentMethods = [],
   consentState,
   isE2ETest = false,
+  deliveryCountries,
 }: {
+  /** Pays proposés (politique géographique du tenant, calculée côté serveur). Absent = liste historique. */
+  deliveryCountries?: string[];
   tenant: PublicTenant;
   externalPaymentMethods?: TenantPaymentMethod[];
   consentState: CheckoutConsentState;
@@ -176,7 +179,9 @@ export default function CheckoutFlow({
   const [step, setStep] = useState<Step>('shipping');
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>(initialDraft?.fulfillmentType ?? 'delivery');
   // Pays proposé par défaut : celui de la boutique s'il est livré, sinon le premier de la liste.
-  const defaultCountry = defaultDeliveryCountry(tenant.country);
+  const defaultCountry = deliveryCountries?.length
+    ? (deliveryCountries.includes((tenant.country ?? '').toUpperCase()) ? (tenant.country as string).toUpperCase() : deliveryCountries[0]!)
+    : defaultDeliveryCountry(tenant.country);
   const [address, setAddress] = useState<AddressDraft>(() => (initialDraft && initialDraft.fulfillmentType === 'delivery' && initialDraft.street
     ? {
       country: initialDraft.country || defaultCountry, street: initialDraft.street, houseNumber: initialDraft.houseNumber,
@@ -202,6 +207,8 @@ export default function CheckoutFlow({
   );
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingError, setShippingError] = useState<string | null>(null);
+  // Destination ou produits bloqués par la politique du tenant: le panier et l'adresse restent intacts.
+  const [geoBlocked, setGeoBlocked] = useState(false);
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('stripe');
   const [selectedExternalMethodId, setSelectedExternalMethodId] = useState<string | null>(null);
@@ -375,6 +382,7 @@ export default function CheckoutFlow({
     if (!isValidPostalCode(destinationCountry, zip)) return;
     setShippingLoading(true);
     setShippingError(null);
+    setGeoBlocked(false);
     try {
       const response = await fetch('/api/shipping/quote', {
         method: 'POST',
@@ -384,7 +392,11 @@ export default function CheckoutFlow({
       const data = await response.json();
       if (!response.ok || !data.available) {
         setQuoteToken(null);
-        setShippingError(data.message ?? ADDRESS_COPY.deliveryUnavailable);
+        const blocked = data.code === 'STORAGE_RESTRICTED' && Array.isArray(data.blockedProducts) && data.blockedProducts.length > 0
+          ? ` (${data.blockedProducts.map((p: { name: string }) => p.name).join(', ')})`
+          : '';
+        setGeoBlocked(data.code === 'STORAGE_RESTRICTED' || data.code === 'DESTINATION_NOT_ALLOWED');
+        setShippingError(`${data.message ?? ADDRESS_COPY.deliveryUnavailable}${blocked}`);
         return;
       }
       setShippingTotal(data.shippingTotal);
@@ -844,6 +856,7 @@ export default function CheckoutFlow({
                           showAllErrors={addressSubmitted}
                           searchMode={editingSaved ? 'collapsed' : 'open'}
                           autofillSection="shipping"
+                          countries={deliveryCountries}
                         />
                       </>
                     )}
@@ -860,7 +873,11 @@ export default function CheckoutFlow({
                   )}
                   {!shippingLoading && shippingError && (
                     <p className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm font-semibold text-red-800" role="alert">
-                      <IconAlertTriangle size={18} className="mt-px shrink-0" aria-hidden="true" />{shippingError}
+                      <IconAlertTriangle size={18} className="mt-px shrink-0" aria-hidden="true" />
+                      <span>
+                        {shippingError}
+                        {geoBlocked && <> <Link href="/cart" className="inline-flex min-h-11 items-center font-bold underline">Modifier mon panier</Link></>}
+                      </span>
                     </p>
                   )}
                   {!shippingLoading && quoteToken && (

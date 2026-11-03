@@ -83,6 +83,8 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path === '/api/admin/shipping-tariff-versions/publish') return method.toUpperCase() === 'POST' ? 'shipping.manage' : null;
   if (path === '/api/admin/shipping-tariff-versions') return read ? 'shipping.view' : null;
   if (path === '/api/admin/shipping-pricing-mode') return read ? 'shipping.view' : 'shipping.manage';
+  // Destinations internationales et restrictions par conservation (migration 179).
+  if (path === '/api/admin/shipping-geo-policy') return read ? 'shipping.view' : 'shipping.manage';
   // Création des brouillons d'expédition (migration 151) : réglage transport, pas un réglage boutique.
   if (path === '/api/admin/shipping-automation') return read ? 'shipping.view' : 'shipping.manage';
   if (path === '/api/admin/tenant') return read ? 'tenant_settings.view' : 'tenant_settings.manage';

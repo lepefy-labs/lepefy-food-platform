@@ -147,6 +147,10 @@ The shipping logic is the most complex part of the codebase:
 - Customer communication is the admin's choice: none, the standard « annulée » email (key `order-cancelled:<id>`), or a custom message (key `order-closure-message:<id>`); `runOrderTransitionSideEffects({ customerEmail: false })` suppresses the standard one. Never change `payment_status`, refund, restock or touch Packlink on closure.
 - Statistics: count commercial cancellations as `status = 'cancelled' and coalesce(closure_type, 'cancelled') = 'cancelled'`; an external closure is neither a lost sale nor platform revenue.
 
+### International destinations and storage restrictions (migration 179) — `docs/SHIPPING_INTELLIGENCE.md` §21.bis
+
+- `tenant_shipping_geo_policy` (service role only; no row = historical behaviour). Single decision point `lib/shipping/geo/` (`checkDeliveryGeo`), called by the quote route, `verifyCheckoutShipping` and `revalidateSessionShipping`; storage class always re-read from `products.storage_type`, never from the browser. Provider fallback for countries without a tariff: `providerFallbackAllowed`; foreign provider quotes use DB weights, explicit VAT and a timeout (`calculateShipping({ strict })`). Quote token V2 carries `gp` (policy version).
+
 ### Shipment drafts (provider-neutral, Packlink first) — `docs/SHIPPING_INTELLIGENCE.md` §2.4
 
 - Lepefy only creates an unpurchased provider **draft** (Packlink `POST /v1/shipments`, no `service_id`); purchase stays in Packlink PRO. Never touches customer shipping price, never sets `shipped`, never emails.

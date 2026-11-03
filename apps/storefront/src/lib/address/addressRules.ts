@@ -81,24 +81,63 @@ export const ADDRESS_LIMITS = {
 /** Valeur enregistrée pour une adresse sans numéro (déjà lue par splitLine1). */
 export const NO_HOUSE_NUMBER = 's.n.';
 
+/**
+ * Formats postaux internationaux connus (après normalisation: majuscules,
+ * espaces simples). Un pays absent de la table garde le format générique
+ * alphanumérique: on ne devine jamais un format numérique.
+ */
+const INTERNATIONAL_POSTAL_FORMATS: Record<string, { pattern: RegExp; example: string }> = {
+  GB: { pattern: /^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/, example: 'SW1A 1AA' },
+  US: { pattern: /^\d{5}(-\d{4})?$/, example: '10001' },
+  CA: { pattern: /^[A-Z]\d[A-Z] ?\d[A-Z]\d$/, example: 'K1A 0B1' },
+  ES: { pattern: /^\d{5}$/, example: '28013' },
+  PT: { pattern: /^\d{4}-\d{3}$/, example: '1000-001' },
+  NL: { pattern: /^\d{4} ?[A-Z]{2}$/, example: '1011 AB' },
+  AT: { pattern: /^\d{4}$/, example: '1010' },
+  LU: { pattern: /^\d{4}$/, example: '1111' },
+  PL: { pattern: /^\d{2}-\d{3}$/, example: '00-950' },
+  SE: { pattern: /^\d{3} ?\d{2}$/, example: '111 22' },
+  DK: { pattern: /^\d{4}$/, example: '1050' },
+  IE: { pattern: /^[A-Z]\d{2} ?[A-Z\d]{4}$/, example: 'D02 X285' },
+  CZ: { pattern: /^\d{3} ?\d{2}$/, example: '110 00' },
+  JP: { pattern: /^\d{3}-?\d{4}$/, example: '100-0001' },
+  BR: { pattern: /^\d{5}-?\d{3}$/, example: '01310-100' },
+};
+
+/** Pays sans code postal obligatoire (liste volontairement courte et sûre). */
+const NO_POSTAL_CODE_COUNTRIES: ReadonlySet<string> = new Set([
+  'AE', 'QA', 'HK', 'AO', 'BS', 'BZ', 'BW', 'BF', 'BI', 'CM', 'CF', 'KM', 'CG', 'CD', 'DJ', 'DM', 'ER', 'FJ',
+  'GM', 'GH', 'GD', 'GY', 'KI', 'LY', 'MW', 'ML', 'MR', 'NR', 'NU', 'KP', 'PA', 'RW', 'KN', 'LC', 'ST', 'SC',
+  'SL', 'SB', 'SR', 'SY', 'TL', 'TG', 'TO', 'TT', 'TV', 'UG', 'VU', 'YE', 'ZW',
+]);
+
+export function postalCodeRequired(country: string): boolean {
+  return !NO_POSTAL_CODE_COUNTRIES.has(country.trim().toUpperCase());
+}
+
 /** Même forme que le serveur et le jeton de devis : majuscules, espaces simples. */
 export function normalizePostalCode(country: string, value: string): string {
   const cleaned = value.trim().toUpperCase().replace(/\s+/g, ' ');
-  // Codes purement numériques (tous les pays proposés) : aucun espace.
+  // Codes purement numériques (pays historiques) : aucun espace. Les autres
+  // pays gardent lettres, tirets et espaces significatifs (zéros initiaux inclus).
   return isDeliveryCountry(country) ? cleaned.replace(/\s/g, '') : cleaned;
 }
 
 export function isValidPostalCode(country: string, value: string): boolean {
   const normalized = normalizePostalCode(country, value);
+  if (!normalized) return !postalCodeRequired(country);
   if (isDeliveryCountry(country)) {
     return new RegExp(`^\\d{${COUNTRY_ADDRESS_RULES[country].postalDigits}}$`).test(normalized);
   }
+  const known = INTERNATIONAL_POSTAL_FORMATS[country.trim().toUpperCase()];
+  if (known) return known.pattern.test(normalized);
   return /^[A-Z0-9][A-Z0-9 -]{1,9}$/.test(normalized);
 }
 
 export function postalCodeError(country: string): string {
   const digits = isDeliveryCountry(country) ? COUNTRY_ADDRESS_RULES[country].postalDigits : null;
-  return postalCodeFormatMessage(countryLabel(country), digits, addressExample(country).postalCode);
+  const example = INTERNATIONAL_POSTAL_FORMATS[country.trim().toUpperCase()]?.example ?? addressExample(country).postalCode;
+  return postalCodeFormatMessage(countryLabel(country), digits, example);
 }
 
 /** « Via Roma 25 » → rue + numéro (numéro = dernier mot s'il contient un chiffre, ou « s.n. »). */
@@ -178,8 +217,9 @@ export function validateAddressDraft(
   if (!errors.street && !errors.houseNumber && composeLine1(draft.street, draft.houseNumber).length > ADDRESS_LIMITS.line1) {
     errors.street = ADDRESS_COPY.tooLong;
   }
-  if (!draft.postalCode.trim()) errors.postalCode = ADDRESS_COPY.required;
-  else if (!isValidPostalCode(draft.country, draft.postalCode)) errors.postalCode = postalCodeError(draft.country);
+  if (!draft.postalCode.trim()) {
+    if (postalCodeRequired(draft.country)) errors.postalCode = ADDRESS_COPY.required;
+  } else if (!isValidPostalCode(draft.country, draft.postalCode)) errors.postalCode = postalCodeError(draft.country);
   if (!collapse(draft.city)) errors.city = ADDRESS_COPY.required;
   else if (collapse(draft.city).length > ADDRESS_LIMITS.city) errors.city = ADDRESS_COPY.tooLong;
   if (collapse(draft.line2).length > ADDRESS_LIMITS.line2) errors.line2 = ADDRESS_COPY.tooLong;
@@ -268,7 +308,7 @@ export function normalizeShippingAddress(value: unknown): NormalizeShippingAddre
   const missing = (field: string, label: string) => ({ ok: false as const, field, error: `${label} : ${ADDRESS_COPY.required.toLowerCase()}` });
   if (!fullName) return missing('full_name', ADDRESS_COPY.fullName);
   if (!line1) return missing('line1', ADDRESS_COPY.street);
-  if (!postalCode) return missing('postal_code', ADDRESS_COPY.postalCode);
+  if (!postalCode && postalCodeRequired(country)) return missing('postal_code', ADDRESS_COPY.postalCode);
   if (!city) return missing('city', ADDRESS_COPY.city);
   if (!/^[A-Z]{2}$/.test(country)) return { ok: false, field: 'country', error: ADDRESS_COPY.countryUnsupported };
 
