@@ -82,8 +82,10 @@ export function PostalLocalityField({
           const action = reconcileLocality(cities, cityRef.current);
           if (action.kind === 'select') onChangeRef.current({ city: action.city });
           if (action.kind === 'clear') onChangeRef.current({ city: '' });
-          const needsChoice = cities.length > 1 && (action.kind === 'clear' || !cityRef.current.trim());
-          dispatch({ type: 'results', count: needsChoice ? cities.length + 1 : 0 });
+          // The list always exists (even for one locality, plus « not listed »); it only opens by itself when a choice is missing.
+          const needsChoice = cities.length > 0 && (action.kind === 'clear' || (action.kind === 'keep' && !cityRef.current.trim()));
+          dispatch({ type: 'results', count: cities.length > 0 ? cities.length + 1 : 0 });
+          if (!needsChoice) dispatch({ type: 'close' });
         })
         .catch((failure: unknown) => {
           if ((failure as { name?: string }).name === 'AbortError') return;
@@ -95,7 +97,7 @@ export function PostalLocalityField({
 
   const current = lookup.status !== 'idle' && lookup.key === key ? lookup : { status: 'idle' as const };
   const cities = current.status === 'done' ? current.cities : [];
-  const items: Item[] = cities.length > 1 ? [...cities, { notListed: true }] : cities;
+  const items: Item[] = cities.length > 0 ? [...cities, { notListed: true }] : [];
   const showManual = manual || (current.status === 'done' && cities.length === 0) || current.status === 'unavailable';
   const selected = Boolean(key && city.trim()) && !showManual;
   const text = selected ? localityLabel(normalizePostalCode(country, postalCode), city) : postalCode;
@@ -120,15 +122,16 @@ export function PostalLocalityField({
     // Any edit drops the previous choice: the pair is only valid for the code the customer did not change.
     const digits = deliverable ? postalDigitsFromInput(raw, postalDigits) : raw;
     onChange({ postalCode: digits, ...(city ? { city: '' } : {}) });
+    if (city) dispatch({ type: 'reopen' });
   }
 
   const announce = loading ? ADDRESS_COPY.postalLookupLoading
-    : cities.length > 1 && !selected ? ADDRESS_COPY.postalLocalityPick : '';
+    : cities.length > 0 && !selected ? ADDRESS_COPY.postalLocalityPick : '';
   const message = current.status === 'done' && cities.length === 0
     ? { tone: 'info' as const, text: ADDRESS_COPY.postalLocalityNoResult }
     : current.status === 'unavailable' ? { tone: 'info' as const, text: ADDRESS_COPY.postalLocalityUnavailable }
     : loading ? { tone: 'info' as const, text: ADDRESS_COPY.postalLookupLoading } : null;
-  const pickError = !selected && !showManual && !combo.open && cities.length > 1 && cityError ? ADDRESS_COPY.postalLocalityChoose : undefined;
+  const pickError = !selected && !showManual && !combo.open && cities.length > 0 && cityError ? ADDRESS_COPY.postalLocalityChoose : undefined;
 
   return (
     <div className="flex flex-col gap-2">
@@ -147,6 +150,7 @@ export function PostalLocalityField({
         describedById={`${listId}-status`}
         onChange={(event) => onInput(event.target.value)}
         onFocus={() => dispatch({ type: 'reopen' })}
+        onClick={() => dispatch({ type: 'reopen' })}
         onBlur={() => {
           onTouch('postalCode');
           if (!showManual) onTouch('city');
