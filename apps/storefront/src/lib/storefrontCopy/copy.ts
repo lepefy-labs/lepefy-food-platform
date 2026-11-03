@@ -30,7 +30,7 @@ export function totalWithPendingShipping(subtotal: number, currency = 'EUR'): st
 
 export const ACTION_COPY = {
   goToShipping: 'Livraison et paiement',
-  choosePayment: 'Choisir le paiement',
+  choosePayment: 'Continuer vers le paiement',
   orderAndPay: 'Commander et payer',
   orderPayAtPickup: 'Commander, je paie au retrait',
   processing: 'Un instant…',

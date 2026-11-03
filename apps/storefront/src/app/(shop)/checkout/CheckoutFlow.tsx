@@ -1,5 +1,6 @@
 'use client';
 
+import { useVirtualKeyboard } from '@/hooks/useVirtualKeyboard';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -141,11 +142,6 @@ function savedToDraft(saved: SavedAddress): AddressDraft {
   return draft;
 }
 
-function isTextEntry(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement
-    && (target.matches('input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"])') || target.tagName === 'TEXTAREA');
-}
-
 export default function CheckoutFlow({
   tenant,
   externalPaymentMethods = [],
@@ -194,7 +190,8 @@ export default function CheckoutFlow({
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [savedSelection, setSavedSelection] = useState<string>(NEW_ADDRESS);
   const [editingSaved, setEditingSaved] = useState(false);
-  const [typing, setTyping] = useState(false);
+  // La barre fixe se retire seulement quand le clavier est réellement ouvert (pas au simple focus).
+  const keyboard = useVirtualKeyboard(step === 'shipping');
   const addressSummaryRef = useRef<HTMLDivElement>(null);
   const [shippingTotal, setShippingTotal] = useState(initialDraft?.shippingTotal ?? 0);
   const [shippingDetails, setShippingDetails] = useState<Record<string, unknown> | null>(initialDraft?.shippingDetails ?? null);
@@ -238,7 +235,6 @@ export default function CheckoutFlow({
   const firstName = watch('firstName');
   const lastName = watch('lastName');
   const email = watch('email');
-  const hasVisibleErrors = addressSubmitted || Object.keys(errors).length > 0;
   const phone = watch('phone');
 
   // Set once the order exists: the cart is then emptied on purpose and the
@@ -721,10 +717,7 @@ export default function CheckoutFlow({
 
   return (
     <div
-      // Avec des erreurs affichées (focus renvoyé sur le premier champ en erreur), le bouton de paiement reste visible.
-      data-typing={typing && !hasVisibleErrors ? 'true' : undefined}
-      onFocusCapture={(event) => setTyping(isTextEntry(event.target))}
-      onBlurCapture={() => setTyping(false)}
+      data-keyboard={keyboard.open ? 'open' : undefined}
       className={`mx-auto w-full px-4 py-4 pb-10 sm:px-6 sm:py-7 ${step === 'shipping' ? 'max-w-2xl lg:max-w-5xl' : 'max-w-2xl'}`}
     >
       <CheckoutProgressIndicator currentStep={step} />

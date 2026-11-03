@@ -39,11 +39,12 @@
       0 0 0 12px rgba(255, 255, 255, 0.96);
   }
 
-  /* Pendant la saisie (clavier ouvert), les barres fixes se retirent : elles
-     couvriraient le champ actif et les suggestions. Elles reviennent dès que
-     le champ perd le focus. */
-  /* Sauf quand une erreur de champ est affichée : le bouton de paiement reste visible. */
-  .checkoutFunnel :global([data-typing='true']:not(:has([aria-invalid='true'])) [data-checkout-sticky]) {
+  /* Clavier virtuel réellement ouvert (useVirtualKeyboard, visualViewport) : les
+     barres fixes se retirent, elles couvriraient le champ actif et les
+     suggestions. Elles reviennent d'elles-mêmes à la fermeture du clavier,
+     sans blur ni tap, que le champ garde le focus ou non. Un simple focus ne
+     les retire jamais (sans visualViewport, elles restent visibles). */
+  .checkoutFunnel :global([data-keyboard='open'] [data-checkout-sticky]) {
     display: none;
   }
 }

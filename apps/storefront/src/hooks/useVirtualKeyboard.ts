@@ -5,6 +5,23 @@ import { useEffect, useState } from 'react';
 /** Écart minimal (px) entre la hauteur de référence et la zone visible pour parler de clavier ouvert. */
 const KEYBOARD_THRESHOLD = 150;
 
+export interface KeyboardBaseline { width: number; height: number }
+
+/**
+ * Pure reading of the keyboard from the viewport sizes. The baseline is the
+ * tallest view seen for the current width (a width change = rotation = new
+ * baseline), so it works whether the browser resizes the layout viewport
+ * (Android PWA) or only the visual one (Chrome Android, iOS).
+ */
+export function readKeyboard(
+  baseline: KeyboardBaseline,
+  sizes: { innerWidth: number; innerHeight: number; visibleHeight: number },
+): { open: boolean; baseline: KeyboardBaseline } {
+  const base = sizes.innerWidth !== baseline.width ? 0 : baseline.height;
+  const height = Math.max(base, sizes.innerHeight, sizes.visibleHeight);
+  return { open: height - sizes.visibleHeight > KEYBOARD_THRESHOLD, baseline: { width: sizes.innerWidth, height } };
+}
+
 export interface VirtualKeyboardState {
   /** Clavier virtuel ouvert (zone visible nettement plus basse que l'écran). */
   open: boolean;
@@ -35,17 +52,12 @@ export function useVirtualKeyboard(enabled: boolean): VirtualKeyboardState {
       setState({ open: false, viewportHeight: null, supported: false });
       return;
     }
-    let baselineWidth = window.innerWidth;
-    let baseline = Math.max(window.innerHeight, viewport.height * viewport.scale);
+    let baseline: KeyboardBaseline = { width: window.innerWidth, height: Math.max(window.innerHeight, viewport.height * viewport.scale) };
     function update() {
       if (!viewport) return;
-      if (window.innerWidth !== baselineWidth) {
-        baselineWidth = window.innerWidth;
-        baseline = 0;
-      }
-      const visible = viewport.height * viewport.scale;
-      baseline = Math.max(baseline, window.innerHeight, visible);
-      const open = baseline - visible > KEYBOARD_THRESHOLD;
+      const reading = readKeyboard(baseline, { innerWidth: window.innerWidth, innerHeight: window.innerHeight, visibleHeight: viewport.height * viewport.scale });
+      baseline = reading.baseline;
+      const open = reading.open;
       setState((current) => (current.open === open && current.viewportHeight === viewport.height && current.supported
         ? current
         : { open, viewportHeight: viewport.height, supported: true }));
