@@ -525,7 +525,7 @@ export const LIBRARY_TRANSLATIONS: Record<string, Record<Locale, LibraryTranslat
       summary: 'Pagare l\'abbonamento con carta, PayPal o bonifico e sapere quando la scadenza viene prorogata.',
       blocks: [
         p('Se compare un avviso di scadenza nell’amministrazione, cliccate su **Régler maintenant** per aprire direttamente **Abonnement**.'),
-        p('In alto nella pagina **Abonnement**, il blocco di pagamento indica l\'importo, la data « Payé jusqu\'au » e il mese coperto dal prossimo pagamento.'),
+        p('In alto in **Abonnement** compaiono prima importo e modalità di pagamento: **PayPal**, **Carte bancaire** e **Virement bancaire**. Le date « Payé jusqu\'au » e « Ce paiement couvre » sono mostrate sotto i metodi di pagamento.'),
         steps(
           'Aprite **Abonnement** nel menu.',
           'Con PayPal (consigliato, se il pulsante è presente): cliccate su **Payer avec PayPal** e indicate la **Note à indiquer dans PayPal**. Lepefy proroga la scadenza dopo aver verificato il pagamento.',
@@ -541,7 +541,7 @@ export const LIBRARY_TRANSLATIONS: Record<string, Record<Locale, LibraryTranslat
       summary: 'Pay the subscription by card, PayPal or bank transfer and know when the due date is extended.',
       blocks: [
         p('When a subscription warning appears in the admin, select **Régler maintenant** to open **Abonnement** directly.'),
-        p('At the top of the **Abonnement** page, the payment block shows the amount, the « Payé jusqu\'au » date and the month your next payment covers.'),
+        p('At the top of **Abonnement**, the amount and payment methods come first: **PayPal**, **Carte bancaire** and **Virement bancaire**. The « Payé jusqu\'au » and « Ce paiement couvre » dates appear below the payment methods.'),
         steps(
           'Open **Abonnement** in the menu.',
           'By PayPal (recommended, if the button is shown): click **Payer avec PayPal** and enter the **Note à indiquer dans PayPal**. Lepefy extends the due date after checking the payment.',
