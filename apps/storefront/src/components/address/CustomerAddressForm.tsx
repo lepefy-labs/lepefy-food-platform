@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { CheckboxField, FieldMessage, TextField } from '@/components/ui/form';
+import { PostalLocalityField } from './PostalLocalityField';
 import { CountrySelect } from '@/components/ui/form/CountrySelect';
 import { fieldIds } from '@/components/ui/form/FieldShell';
 import {
@@ -11,15 +12,12 @@ import {
   countryOptions,
   isDeliveryCountry,
   isNoHouseNumber,
-  isValidPostalCode,
-  normalizePostalCode,
   splitLine1,
   validateAddressDraft,
   type AddressDraft,
   type AddressErrors,
   type AddressField,
 } from '@/lib/address/addressRules';
-import type { PostalLookupCity } from '@/lib/address/postalLookup';
 import { ADDRESS_COPY } from '@/lib/storefrontCopy/addressCopy';
 
 export function addressFieldId(idPrefix: string, field: AddressField): string {
@@ -51,24 +49,6 @@ export interface CustomerAddressFormProps {
   countryHint?: string;
 }
 
-type LookupState =
-  | { status: 'idle' }
-  | { status: 'loading'; key: string }
-  | { status: 'error'; key: string }
-  | { status: 'done'; key: string; cities: PostalLookupCity[] };
-
-async function lookupPostal(country: string, postalCode: string, signal: AbortSignal): Promise<PostalLookupCity[]> {
-  const res = await fetch(`/api/address/postal-lookup?${new URLSearchParams({ country, postalCode }).toString()}`, { signal });
-  if (!res.ok) throw new Error('lookup_failed');
-  const data = await res.json() as { cities?: PostalLookupCity[] };
-  return Array.isArray(data.cities) ? data.cities : [];
-}
-
-function sameCity(a: string, b: string) {
-  const norm = (text: string) => text.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  return norm(a) === norm(b);
-}
-
 /**
  * Formulaire d'adresse unique du storefront (checkout, compte, reprise).
  * Ordre : pays → code postal → ville → rue → numéro → complément. Le code
@@ -89,15 +69,8 @@ export function CustomerAddressForm({
   countryHint,
 }: CustomerAddressFormProps) {
   const [touched, setTouched] = useState<Set<AddressField>>(() => new Set());
-  const [lookup, setLookup] = useState<LookupState>({ status: 'idle' });
-  const [retry, setRetry] = useState(0);
-  // Ville posée par la recherche : seule celle-ci est revalidée quand le code change.
-  const cityFromLookupRef = useRef(false);
   const valueRef = useRef(value);
   valueRef.current = value;
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-
   const id = (field: AddressField) => addressFieldId(idPrefix, field);
   const auto = (token: string) => (autofillSection ? `${autofillSection} ${token}` : token);
   const postalDigits = isDeliveryCountry(value.country) ? COUNTRY_ADDRESS_RULES[value.country].postalDigits : ADDRESS_LIMITS.postalCode;
@@ -121,50 +94,6 @@ export function CustomerAddressForm({
     window.requestAnimationFrame(() => document.getElementById(id(field))?.focus());
   }
 
-  // Code postal valide → villes de l'index. Une réponse périmée (pays ou code
-  // changé entre-temps) est abandonnée par AbortController.
-  const postalKey = isValidPostalCode(value.country, value.postalCode) && isDeliveryCountry(value.country)
-    ? `${value.country}:${normalizePostalCode(value.country, value.postalCode)}` : '';
-  useEffect(() => {
-    if (!postalKey) { setLookup({ status: 'idle' }); return; }
-    const controller = new AbortController();
-    setLookup({ status: 'loading', key: postalKey });
-    const timer = window.setTimeout(() => {
-      const [country, postalCode] = postalKey.split(':') as [string, string];
-      lookupPostal(country, postalCode, controller.signal)
-        .then((cities) => {
-          setLookup({ status: 'done', key: postalKey, cities });
-          const current = valueRef.current;
-          if (cities.some((city) => sameCity(city.city, current.city))) return;
-          if (cities.length === 1 && (!current.city.trim() || cityFromLookupRef.current)) {
-            // Correspondance unique : présélectionnée, toujours modifiable.
-            cityFromLookupRef.current = true;
-            onChangeRef.current({ ...current, city: cities[0]!.city }, ['city']);
-          } else if (cities.length > 0 && cityFromLookupRef.current) {
-            // Ville d'un ancien code postal : à rechoisir, sans rien inventer.
-            cityFromLookupRef.current = false;
-            onChangeRef.current({ ...current, city: '' }, ['city']);
-          }
-        })
-        .catch((error: unknown) => {
-          if ((error as { name?: string }).name === 'AbortError') return;
-          setLookup({ status: 'error', key: postalKey });
-        });
-    }, 250);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [postalKey, retry]);
-
-  function chooseCity(city: PostalLookupCity) {
-    cityFromLookupRef.current = true;
-    update({ city: city.city });
-    touch('city');
-    focusField('street');
-  }
-
-  const cities = lookup.status === 'done' && lookup.key === postalKey ? lookup.cities : [];
   const company = Boolean(value.deliverToCompany);
 
   return (
@@ -219,82 +148,31 @@ export function CustomerAddressForm({
         hint={countryHint}
         error={errorFor('country')}
         onChange={(code) => {
-          // Le code postal saisi n'est plus supposé valide : il est revérifié avec les règles du nouveau pays.
-          setLookup({ status: 'idle' });
-          update({ country: code, ...(cityFromLookupRef.current ? { city: '' } : {}) });
-          cityFromLookupRef.current = false;
+          // Le code postal saisi n'est plus supposé valide et la localité choisie non plus : tout est revérifié pour le nouveau pays.
+          update({ country: code, city: '' });
           if (value.postalCode) touch('postalCode');
         }}
       />
 
-      <TextField
+      <PostalLocalityField
         id={id('postalCode')}
-        label={ADDRESS_COPY.postalCode}
-        requiredMark
+        cityId={id('city')}
+        country={value.country}
+        postalCode={value.postalCode}
+        city={value.city}
+        postalDigits={postalDigits}
         autoComplete={auto('postal-code')}
-        inputMode="numeric"
-        enterKeyHint="next"
-        maxLength={postalDigits}
-        value={value.postalCode}
         error={errorFor('postalCode')}
-        onChange={(event) => {
-          const raw = event.target.value;
-          update({ postalCode: isDeliveryCountry(value.country) ? raw.replace(/\D/g, '').slice(0, postalDigits) : raw });
+        cityError={errorFor('city')}
+        onChange={(patch) => {
+          // Une saisie de code postal annule la localité choisie ; seul le formulaire écrit dans `value`.
+          const next = { ...valueRef.current, ...patch };
+          onChange(next, Object.keys(patch) as AddressField[]);
+          valueRef.current = next;
         }}
-        onBlur={() => {
-          touch('postalCode');
-          const normalized = normalizePostalCode(value.country, value.postalCode);
-          if (normalized !== value.postalCode) update({ postalCode: normalized });
-        }}
+        onTouch={touch}
+        onChosen={() => focusField('street')}
       />
-
-      {cities.length > 1 && (
-        <div role="radiogroup" aria-label={ADDRESS_COPY.cityPick} className="flex flex-col gap-2">
-          <p className="sf-label">{ADDRESS_COPY.cityPick}</p>
-          <div className="flex max-h-72 flex-col gap-2 overflow-y-auto overscroll-contain">
-            {cities.map((city) => {
-              const selected = sameCity(city.city, value.city);
-              return (
-                <button key={`${city.city}|${city.area ?? ''}`} type="button" role="radio" aria-checked={selected}
-                  onClick={() => chooseCity(city)}
-                  className={`min-h-11 rounded-xl border-[1.5px] px-4 py-2 text-left ${selected ? 'border-[color:var(--color-primary)] bg-gray-50' : 'bg-white hover:bg-gray-50'}`}
-                  style={selected ? undefined : { borderColor: 'var(--field-border)' }}>
-                  <span className="block text-[15px] font-semibold text-gray-950">{city.city}</span>
-                  {city.area && <span className="block text-[13px] text-gray-700">{city.area}</span>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <TextField
-          id={id('city')}
-          label={ADDRESS_COPY.city}
-          requiredMark
-          autoComplete={auto('address-level2')}
-          maxLength={ADDRESS_LIMITS.city}
-          enterKeyHint="next"
-          value={value.city}
-          error={errorFor('city')}
-          message={lookup.status === 'loading' && lookup.key === postalKey ? { tone: 'info', text: ADDRESS_COPY.postalLookupLoading } : null}
-          onChange={(event) => {
-            cityFromLookupRef.current = false;
-            update({ city: event.target.value });
-          }}
-          onBlur={() => touch('city')}
-        />
-        {lookup.status === 'error' && lookup.key === postalKey && (
-          <div className="flex flex-wrap items-center gap-3">
-            <FieldMessage tone="info">{ADDRESS_COPY.postalLookupFailed}</FieldMessage>
-            <button type="button" className="min-h-11 font-bold text-[color:var(--color-primary-dark)] underline underline-offset-4"
-              onClick={() => setRetry((n) => n + 1)}>
-              {ADDRESS_COPY.postalLookupRetry}
-            </button>
-          </div>
-        )}
-      </div>
 
       <div className="flex flex-col gap-1.5">
         <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] items-start gap-3">

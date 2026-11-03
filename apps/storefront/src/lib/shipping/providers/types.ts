@@ -85,7 +85,8 @@ export class ShippingProviderError extends Error {
 export type ShipmentDraftErrorCode =
   | 'missing_configuration' | 'invalid_recipient' | 'invalid_parcel'
   | 'provider_timeout' | 'provider_unavailable' | 'provider_rejected'
-  | 'invalid_provider_response' | 'ambiguous_creation';
+  | 'invalid_provider_response' | 'ambiguous_creation'
+  | 'destination_unresolved';
 
 export class ShipmentDraftError extends Error {
   constructor(public readonly code: ShipmentDraftErrorCode) { super(code); }

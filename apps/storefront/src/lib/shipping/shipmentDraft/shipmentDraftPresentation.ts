@@ -14,7 +14,7 @@ export function shipmentOrderReference(orderId: string): string {
 
 const CODES: readonly ShipmentDraftErrorCode[] = [
   'missing_configuration', 'invalid_recipient', 'invalid_parcel', 'provider_timeout', 'provider_unavailable',
-  'provider_rejected', 'invalid_provider_response', 'ambiguous_creation',
+  'provider_rejected', 'invalid_provider_response', 'ambiguous_creation', 'destination_unresolved',
 ];
 
 export function shipmentDraftErrorCode(raw: string | null | undefined): ShipmentDraftErrorCode | null {
@@ -31,6 +31,7 @@ const MESSAGES: Record<ShipmentDraftErrorCode, string> = {
   provider_rejected: 'Le transporteur a refusé le brouillon : vérifiez l’adresse et les colis.',
   invalid_provider_response: 'Réponse inattendue du transporteur : le brouillon a peut-être été créé.',
   ambiguous_creation: 'Résultat incertain : le brouillon a peut-être été créé chez le transporteur.',
+  destination_unresolved: 'Zone de destination Packlink non confirmée (Sicile ou Sardaigne) : aucun brouillon créé, créez-le dans Packlink PRO.',
 };
 
 const DETAILS: Record<string, string> = {
