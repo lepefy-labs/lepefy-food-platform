@@ -134,7 +134,6 @@ export default async function BillingPage() {
           <Badge tone={badgeTone} dot className="shrink-0">{STATE_LABEL[state.kind]}</Badge>
         </div>
 
-
         <div className="mt-3 space-y-3">
           {paypalLink && (
             <div className="rounded-2xl border-2 border-a-brand bg-a-brand-soft p-3 sm:p-4">
@@ -148,7 +147,7 @@ export default async function BillingPage() {
             </div>
           )}
 
-          <div className={`rounded-2xl p-3 sm:p-4 ${paypalLink ? 'border-2 border-a-brand bg-a-brand-soft' : 'border-2 border-a-brand bg-a-brand-soft'}`}>
+          <div className="rounded-2xl border-2 border-a-brand bg-a-brand-soft p-3 sm:p-4">
             <MethodHeader icon={<IconCreditCard size={22} stroke={1.8} aria-hidden="true" />} title="Carte bancaire" hint="Confirmation automatique" highlighted />
             {billing.stripePaymentLink ? (
               <ButtonAnchor variant={paypalLink ? 'outline' : 'primary'} href={billing.stripePaymentLink} target="_blank" rel="noopener noreferrer" className="mt-3 min-h-12 w-full justify-between bg-a-surface text-base">
@@ -195,7 +194,6 @@ export default async function BillingPage() {
             <dd className="mt-0.5 text-sm font-semibold capitalize text-a-text">{coveredLabel}</dd>
           </div>
         </dl>
-
       </section>
 
       <section aria-labelledby="plan-title" className="mb-5 rounded-2xl border border-a-border bg-a-surface p-4 sm:p-5">
