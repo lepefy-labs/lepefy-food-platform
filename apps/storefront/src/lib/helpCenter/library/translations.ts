@@ -524,6 +524,7 @@ export const LIBRARY_TRANSLATIONS: Record<string, Record<Locale, LibraryTranslat
       title: 'Come pagare il mio abbonamento?',
       summary: 'Pagare l\'abbonamento con carta, PayPal o bonifico e sapere quando la scadenza viene prorogata.',
       blocks: [
+        p('Se compare un avviso di scadenza nell’amministrazione, cliccate su **Régler maintenant** per aprire direttamente **Abonnement**.'),
         p('In alto nella pagina **Abonnement**, il blocco di pagamento indica l\'importo, la data « Payé jusqu\'au » e il mese coperto dal prossimo pagamento.'),
         steps(
           'Aprite **Abonnement** nel menu.',
@@ -539,6 +540,7 @@ export const LIBRARY_TRANSLATIONS: Record<string, Record<Locale, LibraryTranslat
       title: 'How do I pay my subscription?',
       summary: 'Pay the subscription by card, PayPal or bank transfer and know when the due date is extended.',
       blocks: [
+        p('When a subscription warning appears in the admin, select **Régler maintenant** to open **Abonnement** directly.'),
         p('At the top of the **Abonnement** page, the payment block shows the amount, the « Payé jusqu\'au » date and the month your next payment covers.'),
         steps(
           'Open **Abonnement** in the menu.',
