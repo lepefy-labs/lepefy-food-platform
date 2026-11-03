@@ -378,6 +378,7 @@ export const INITIAL_LIBRARY: LibraryGuide[] = [
     contexts: ['/admin/billing'],
     watch: ['app/admin/(protected)/billing', 'lib/billing', 'docs/SUBSCRIPTION_LIFECYCLE.md'],
     blocks: [
+      p('Si une alerte d’échéance apparaît dans l’administration, cliquez sur **Régler maintenant** pour accéder directement à **Abonnement**.'),
       p('En haut de la page **Abonnement**, le bloc de paiement indique le montant, la date « Payé jusqu’au » et le mois que votre prochain paiement couvre.'),
       steps(
         'Ouvrez **Abonnement** dans le menu.',
