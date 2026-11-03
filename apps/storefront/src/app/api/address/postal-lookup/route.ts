@@ -13,9 +13,10 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { isDeliveryCountry, isValidPostalCode, normalizePostalCode } from '@/lib/address/addressRules';
-import { buildPostalLookupCities, cityQueryKey } from '@/lib/address/postalLookup';
+import { MAX_LOCALITIES_PER_POSTAL_CODE, buildPostalLookupCities, cityQueryKey } from '@/lib/address/postalLookup';
 
 const ROW_LIMIT = 1000;
+const POSTAL_ROW_LIMIT = 300;
 const CACHE_HEADERS = { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800' };
 const COLUMNS = 'place_name, place_name_normalized, admin_name1, admin_code1, admin_name2, admin_code2, postal_code';
 
@@ -40,9 +41,10 @@ export async function GET(request: Request) {
         .select(COLUMNS)
         .eq('country', country)
         .eq('postal_code', postalCode)
-        .limit(50);
+        .order('place_name_normalized', { ascending: true })
+        .limit(POSTAL_ROW_LIMIT);
       if (error) throw new Error(error.message);
-      return NextResponse.json({ cities: buildPostalLookupCities(data ?? [], country) }, { headers: CACHE_HEADERS });
+      return NextResponse.json({ cities: buildPostalLookupCities(data ?? [], country, '', MAX_LOCALITIES_PER_POSTAL_CODE) }, { headers: CACHE_HEADERS });
     }
 
     const query = cityQueryKey(cityParam ?? '');

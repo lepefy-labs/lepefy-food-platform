@@ -26,6 +26,8 @@ export interface PostalLookupCity {
 }
 
 export const MAX_CITIES = 8;
+/** A complete postal code lists all its localities (00132 has 25): never cut to the city-search cap. */
+export const MAX_LOCALITIES_PER_POSTAL_CODE = 100;
 export const MAX_POSTAL_CODES = 30;
 
 /** Texte de recherche d'une ville : normalisé comme l'index, sans jokers SQL. */
@@ -58,6 +60,7 @@ export function buildPostalLookupCities(
   rows: Array<PostalAdminRow & { place_name_normalized?: string }>,
   country: string,
   query = '',
+  maxCities = MAX_CITIES,
 ): PostalLookupCity[] {
   const byName = new Map<string, PostalAdminRow[]>();
   for (const row of rows) {
@@ -90,6 +93,6 @@ export function buildPostalLookupCities(
       if (b.postalCodeCount !== a.postalCodeCount) return b.postalCodeCount - a.postalCodeCount;
       return a.city.localeCompare(b.city, 'fr');
     })
-    .slice(0, MAX_CITIES)
+    .slice(0, maxCities)
     .map((entry) => ({ city: entry.city, area: entry.area, postalCodes: entry.postalCodes, postalCodeCount: entry.postalCodeCount }));
 }

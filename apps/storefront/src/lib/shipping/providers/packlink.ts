@@ -1,4 +1,5 @@
 import { resolvePacklinkApiKey } from '@/lib/shipping/packlinkApiKey';
+import { checkPacklinkDestination } from './packlinkDestination';
 import {
   ShipmentDraftError, ShippingProviderError,
   type NormalizedShipmentStatus, type ProviderShipmentDraftInput, type ProviderShipmentSnapshot, type ShippingProviderAdapter,
@@ -298,7 +299,12 @@ async function loadDraftLocations(apiKey: string, from: PacklinkAddress, to: { p
     const record = selectPacklinkPostalCode(payload, zip, city);
     return record ? { ...record, postalZoneName: packlinkPostalZoneName(zones, record.postalZoneId) } : null;
   };
-  return { from: locate(fromCodes, from.zip_code, from.city), to: locate(toCodes, to.postalCode, to.city) };
+  const toLocation = locate(toCodes, to.postalCode, to.city);
+  // Before any POST: an Italian island address without a matching provider zone creates no draft.
+  if (!checkPacklinkDestination(to.country, to.postalCode, toLocation?.postalZoneName).ok) {
+    throw new ShipmentDraftError('destination_unresolved');
+  }
+  return { from: locate(fromCodes, from.zip_code, from.city), to: toLocation };
 }
 
 async function loadDefaultWarehouse(apiKey: string): Promise<PacklinkWarehouse> {

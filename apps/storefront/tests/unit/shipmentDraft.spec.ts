@@ -4,6 +4,7 @@ import {
   buildPacklinkDraftPayload, classifyPacklinkDraftStatus, packlinkAdapter, packlinkPostalZoneName, selectPacklinkPostalCode,
   selectPacklinkWarehouse,
 } from '../../src/lib/shipping/providers/packlink';
+import { checkPacklinkDestination, italianIslandOfPostalCode, italianIslandOfZoneName } from '../../src/lib/shipping/providers/packlinkDestination';
 import { getShippingProvider } from '../../src/lib/shipping/providers/registry';
 import { ShippingProviderError, type ShippingProviderAdapter } from '../../src/lib/shipping/providers/types';
 import {
@@ -110,8 +111,14 @@ const WAREHOUSES = [
 const POSTAL_CODES: Record<string, unknown[]> = {
   'IT/42122': [{ id: 'zc-42122', zipcode: '42122', zipcodeCity: "42122 - Reggio nell'Emilia", postalZoneId: 113, city: { name: "Reggio nell'Emilia" } }],
   'IT/42121': [{ id: 'zc-42121', zipcode: '42121', zipcodeCity: "42121 - Reggio nell'Emilia", postalZoneId: 113, city: { name: "Reggio nell'Emilia" } }],
+  'IT/90133': [{ id: 'zc-90133', zipcode: '90133', postalZoneId: 115, city: { name: 'Palermo' } }],
+  'IT/09121': [{ id: 'zc-09121', zipcode: '09121', postalZoneId: 114, city: { name: 'Cagliari' } }],
+  // Island CAP the provider (wrongly) puts in the mainland zone, and a zone id missing from the zone list.
+  'IT/95100': [{ id: 'zc-95100', zipcode: '95100', postalZoneId: 113, city: { name: 'Catania' } }],
+  'IT/98100': [{ id: 'zc-98100', zipcode: '98100', postalZoneId: 999, city: { name: 'Messina' } }],
+  'IT/00144': [{ id: 'zc-00144', zipcode: '00144', postalZoneId: 113, city: { name: 'Roma' } }],
 };
-const POSTAL_ZONES = [{ id: '113', name: 'Italia', isoCode: 'IT' }, { id: '115', name: 'Sicilia- Italia', isoCode: 'IT' }, { id: '76', name: 'Francia', isoCode: 'FR' }];
+const POSTAL_ZONES = [{ id: '113', name: 'Italia', isoCode: 'IT' }, { id: '115', name: 'Sicilia- Italia', isoCode: 'IT' }, { id: '114', name: 'Sardegna- Italia', isoCode: 'IT' }, { id: '76', name: 'Francia', isoCode: 'FR' }];
 type DraftReply = { status: number; body?: unknown } | 'timeout' | 'network';
 /** Stubs global fetch for the Packlink API only; any other host fails the test (no email, no network). */
 function packlink(reply: DraftReply = { status: 200, body: { reference: 'IT2026PRO0006415025' } }, lookups: 'ok' | 'down' = 'ok') {
@@ -665,4 +672,90 @@ test('regression: an unpurchased draft (shipment 200, /track 404) still exists �
     await expect(packlinkAdapter.resolveShipment({ tenantId: 'tenant-a', tenant: { packlink_api_key: 'k' } }, 'IT2026PRO0000000404'))
       .rejects.toThrow('shipment_not_found');
   } finally { globalThis.fetch = original; }
+});
+
+// ─── Sicily and Sardinia: provider zones, Italy untouched on the Lepefy side ─────
+test('island CAP ranges and zone names (official CAP ranges, account language and English)', () => {
+  expect(italianIslandOfPostalCode('IT', '90133')).toBe('sicily');
+  expect(italianIslandOfPostalCode('IT', '98168')).toBe('sicily');
+  expect(italianIslandOfPostalCode('IT', '07100')).toBe('sardinia');
+  expect(italianIslandOfPostalCode('IT', '09100')).toBe('sardinia');
+  for (const zip of ['00144', '42121', '89900', '99999', '06100', '10100', '9013']) expect(italianIslandOfPostalCode('IT', zip)).toBeNull();
+  expect(italianIslandOfPostalCode('FR', '90133')).toBeNull();
+  expect(italianIslandOfZoneName('Sicilia- Italia')).toBe('sicily');
+  expect(italianIslandOfZoneName('Sardegna- Italia')).toBe('sardinia');
+  expect(italianIslandOfZoneName('Italia - Cerdeña')).toBe('sardinia');
+  expect(italianIslandOfZoneName('Sicily - Italy')).toBe('sicily');
+  expect(italianIslandOfZoneName('Italia')).toBeNull();
+  expect(italianIslandOfZoneName(null)).toBeNull();
+});
+
+test('destination check: island needs its own zone, mainland never lands in one, other countries untouched', () => {
+  expect(checkPacklinkDestination('IT', '90133', 'Sicilia- Italia')).toEqual({ ok: true });
+  expect(checkPacklinkDestination('IT', '09121', 'Sardegna- Italia')).toEqual({ ok: true });
+  expect(checkPacklinkDestination('IT', '00144', 'Italia')).toEqual({ ok: true });
+  expect(checkPacklinkDestination('IT', '00144', null)).toEqual({ ok: true });
+  expect(checkPacklinkDestination('IT', '90133', 'Italia')).toEqual({ ok: false, reason: 'island_zone_mismatch' });
+  expect(checkPacklinkDestination('IT', '90133', 'Sardegna- Italia')).toEqual({ ok: false, reason: 'island_zone_mismatch' });
+  expect(checkPacklinkDestination('IT', '90133', null)).toEqual({ ok: false, reason: 'island_zone_unresolved' });
+  expect(checkPacklinkDestination('IT', '00144', 'Sicilia- Italia')).toEqual({ ok: false, reason: 'island_zone_mismatch' });
+  expect(checkPacklinkDestination('FR', '75001', null)).toEqual({ ok: true });
+});
+
+const addressOrder = (city: string, zip: string) => baseOrder({
+  shipping_creation_status: 'pending',
+  shipping_address: { full_name: 'Awa Marie Diallo', line1: 'Via Roma 1', city, postal_code: zip, country: 'IT' } as unknown as Order['shipping_address'],
+});
+
+for (const [label, zip, city, zoneId, zoneName] of [
+  ['Sicily', '90133', 'Palermo', '115', 'Sicilia- Italia'],
+  ['Sardinia', '09121', 'Cagliari', '114', 'Sardegna- Italia'],
+  ['mainland Italy', '00144', 'Roma', '113', 'Italia'],
+] as const) {
+  test(`adapter: ${label} draft keeps country IT, CAP, city, provider zone and zip_code_id_to`, async () => {
+    const http = mock();
+    const db = fakeDb(addressOrder(city, zip));
+    await createShipmentDraftForOrder(db.service, 'tenant-a', ORDER_ID, { mode: 'manual' }, deps());
+    expect(db.order().shipping_creation_status).toBe('draft_created');
+    expect(http.posts()).toHaveLength(1);
+    expect(http.posts()[0]!.body).toMatchObject({
+      to: { zip_code: zip, city, country: 'IT', state: zoneName },
+      additional_data: { postal_zone_id_to: zoneId, postal_zone_name_to: zoneName, zip_code_id_to: `zc-${zip}` },
+    });
+  });
+}
+
+for (const [label, zip, city] of [
+  ['island CAP in the mainland zone', '95100', 'Catania'],
+  ['island zone id absent from the zone list', '98100', 'Messina'],
+  ['island CAP unknown to the provider', '90999', 'Palermo'],
+] as const) {
+  test(`adapter: ${label} creates no draft, order status untouched, never retried`, async () => {
+    const http = mock();
+    const db = fakeDb(addressOrder(city, zip));
+    await createShipmentDraftForOrder(db.service, 'tenant-a', ORDER_ID, { mode: 'manual' }, deps());
+    expect(http.posts()).toHaveLength(0);
+    expect(db.order()).toMatchObject({ shipping_creation_status: 'failed', shipping_creation_error: 'destination_unresolved', status: 'preparing' });
+    expect(shipmentDraftErrorMessage('destination_unresolved')).toContain('Packlink PRO');
+    expect(await runShipmentDraftBatch(db.service, deps(undefined, undefined, new Date('2026-10-10T10:00:00Z')))).toMatchObject({ processed: 0 });
+    expect(http.posts()).toHaveLength(0);
+  });
+}
+
+test('adapter: geographic API outage on an island address stops before the POST', async () => {
+  const down = mock(undefined, 'down');
+  const db = fakeDb(addressOrder('Palermo', '90133'));
+  await createShipmentDraftForOrder(db.service, 'tenant-a', ORDER_ID, { mode: 'manual' }, deps());
+  expect(db.order().shipping_creation_error).toBe('destination_unresolved');
+  expect(down.posts()).toHaveLength(0);
+});
+
+test('draft payload carries no price: customer price and provider cost stay out of the Packlink draft', () => {
+  const built = draftFor({ postal_code: '90133', city: 'Palermo', country: 'IT' });
+  if (!built.ok) throw new Error('draft input');
+  const payload = buildPacklinkDraftPayload(selectPacklinkWarehouse(WAREHOUSES)!, built.input, {
+    from: null, to: { zipCodeId: 'zc-90133', postalZoneId: '115', postalZoneName: 'Sicilia- Italia' },
+  });
+  expect(JSON.stringify(payload)).not.toMatch(/shipping_cost|service_id|price/i);
+  expect(built.input.recipient.country).toBe('IT');
 });
