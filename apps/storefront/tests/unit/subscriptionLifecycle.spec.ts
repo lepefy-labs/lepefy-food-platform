@@ -69,18 +69,23 @@ test.describe('suspension', () => {
     expect(overdue.kind).toBe('overdue');
     expect(overdue.daysOverdue).toBe(4);
     expect(overdue.autoSuspendAt).toBeNull();
-    expect(shouldWarnTenant(overdue)).toBe(false);
+    expect(shouldWarnTenant(overdue)).toBe(true);
 
     const auto = subscriptionState(row({ suspension_mode: 'automatic', grace_days: 7 }), now);
     expect(auto.kind).toBe('overdue');
     expect(auto.daysUntilAutoSuspend).toBe(4);
     expect(shouldWarnTenant(auto)).toBe(true);
 
-    expect(subscriptionState(row({ paid_until: '2026-10-08T23:59:59Z' }), now).kind).toBe('due_soon');
+    const dueSoon = subscriptionState(row({ paid_until: '2026-10-08T23:59:59Z' }), now);
+    expect(dueSoon.kind).toBe('due_soon');
+    expect(shouldWarnTenant(dueSoon)).toBe(true);
     expect(subscriptionState(row({ paid_until: '2026-10-04T23:59:59Z' }), now).daysLeft).toBe(0);
-    expect(subscriptionState(row({ paid_until: '2026-12-31T23:59:59Z' }), now).kind).toBe('active');
+    const active = subscriptionState(row({ paid_until: '2026-12-31T23:59:59Z' }), now);
+    expect(active.kind).toBe('active');
+    expect(shouldWarnTenant(active)).toBe(false);
     expect(subscriptionState(row({ paid_until: null }), now).kind).toBe('undefined');
     expect(subscriptionState(null, now).kind).toBe('undefined');
+    expect(shouldWarnTenant(subscriptionState(null, now))).toBe(false);
     const suspended = subscriptionState(row({ status: 'suspended', suspended_at: '2026-10-01T00:00:00Z' }), now);
     expect(suspended.kind).toBe('suspended');
     expect(shouldWarnTenant(suspended)).toBe(true);

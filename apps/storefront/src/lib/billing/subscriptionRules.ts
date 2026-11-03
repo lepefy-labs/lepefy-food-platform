@@ -118,10 +118,9 @@ export function subscriptionState(row: SubscriptionRow | null, now: Date = new D
   return { kind: 'active', ...base };
 }
 
-/** Admin banner: suspended, or an automatic suspension within the warning window. */
+/** Billing warning in every admin workspace, regardless of manual/automatic suspension policy. */
 export function shouldWarnTenant(state: SubscriptionState): boolean {
-  if (state.kind === 'suspended') return true;
-  return state.daysUntilAutoSuspend !== null && state.daysUntilAutoSuspend <= SUSPENSION_WARNING_DAYS;
+  return state.kind === 'suspended' || state.kind === 'overdue' || state.kind === 'due_soon';
 }
 
 export function plural(count: number, singular: string, pluralForm = `${singular}s`): string {

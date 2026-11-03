@@ -43,7 +43,7 @@ Motore unico: `lib/billing/tenantServiceState.ts` → `getTenantServiceState(ten
 | Webhook Stripe, job interni | **mai bloccati**: un pagamento già avviato viene sempre processato |
 | `platform_owner` | mai limitato |
 
-Un modulo sospeso singolarmente applica le stesse regole solo alle sue superfici. Nell'admin un banner (`SubscriptionBanner`) mostra la sospensione, il conto alla rovescia nei 7 giorni prima della sospensione automatica e i moduli sospesi.
+Un modulo sospeso singolarmente applica le stesse regole solo alle sue superfici. Nell'admin il banner (`SubscriptionBanner`) segnala già da D-7 la scadenza dell'abbonamento, anche in modalità manuale; resta visibile in caso di `overdue` e distingue il ritardo dalla sospensione effettiva. Se la sospensione automatica è prevista entro 7 giorni, indica anche conto alla rovescia e data. CTA primaria «Régler maintenant» per chi ha `billing.view`, verso `/admin/billing`; il banner precede il suggerimento PWA. Continua a mostrare separatamente i moduli sospesi.
 
 ## 4. Pagamenti
 
