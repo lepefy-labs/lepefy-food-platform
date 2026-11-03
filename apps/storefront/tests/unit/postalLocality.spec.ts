@@ -24,8 +24,8 @@ test('same locality ignores case and accents (variants, saved addresses)', () =>
   expect(sameLocality("Reggio nell'Emilia", 'Reggio Emilia')).toBe(false);
 });
 
-test('reconcile: one answer is preselected, several are never chosen for the customer', () => {
-  expect(reconcileLocality([city('Palermo')], '')).toEqual({ kind: 'select', city: 'Palermo' });
+test('reconcile: nothing is ever chosen for the customer, even with a single answer', () => {
+  expect(reconcileLocality([city('Palermo')], '')).toEqual({ kind: 'keep' });
   expect(reconcileLocality([city('Palermo')], 'Palermo')).toEqual({ kind: 'keep' });
   expect(reconcileLocality([city('Roma'), city('Ostia')], '')).toEqual({ kind: 'keep' });
   expect(reconcileLocality([city('Roma'), city('Ostia')], 'ostia')).toEqual({ kind: 'keep' });
