@@ -304,7 +304,9 @@ test.describe('garde-fous des formulaires clients (Form Readability V2)', () => 
     const css = readFileSync('src/app/(shop)/checkout/checkoutSticky.module.css', 'utf8');
     expect(css).not.toMatch(/min-h-12|rounded-2xl|\.mx-auto/);
     expect(css).toContain("[data-checkout-sticky='cta']");
-    expect(css).toContain("[data-typing='true']:not(:has([aria-invalid='true'])) [data-checkout-sticky]");
+    expect(css).toContain("[data-keyboard='open'] [data-checkout-sticky]");
+    expect(css).not.toContain('data-typing');
+    expect(css).not.toContain(':has(');
   });
 
   test('location : pays choisi dans une liste, jamais en texte libre', () => {
