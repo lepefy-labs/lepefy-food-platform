@@ -40,7 +40,7 @@ export interface PostalLocalityFieldProps {
   error?: string;
   cityError?: string;
   onChange: (patch: { postalCode?: string; city?: string }) => void;
-  onTouch: () => void;
+  onTouch: (field: 'postalCode' | 'city') => void;
   /** The customer chose a locality: move on to the street. */
   onChosen: () => void;
 }
@@ -111,7 +111,8 @@ export function PostalLocalityField({
     }
     onChange({ city: item.city });
     dispatch({ type: 'close' });
-    onTouch();
+    onTouch('postalCode');
+    onTouch('city');
     onChosen();
   }
 
@@ -127,7 +128,7 @@ export function PostalLocalityField({
     ? { tone: 'info' as const, text: ADDRESS_COPY.postalLocalityNoResult }
     : current.status === 'unavailable' ? { tone: 'info' as const, text: ADDRESS_COPY.postalLocalityUnavailable }
     : loading ? { tone: 'info' as const, text: ADDRESS_COPY.postalLookupLoading } : null;
-  const pickError = !selected && !showManual && cities.length > 1 && cityError ? ADDRESS_COPY.postalLocalityChoose : undefined;
+  const pickError = !selected && !showManual && !combo.open && cities.length > 1 && cityError ? ADDRESS_COPY.postalLocalityChoose : undefined;
 
   return (
     <div className="flex flex-col gap-2">
@@ -147,7 +148,8 @@ export function PostalLocalityField({
         onChange={(event) => onInput(event.target.value)}
         onFocus={() => dispatch({ type: 'reopen' })}
         onBlur={() => {
-          onTouch();
+          onTouch('postalCode');
+          if (!showManual) onTouch('city');
           dispatch({ type: 'close' });
           const normalized = normalizePostalCode(country, postalCode);
           if (!city && normalized !== postalCode) onChange({ postalCode: normalized });
@@ -169,6 +171,7 @@ export function PostalLocalityField({
         getKey={(item) => ('notListed' in item ? '__other' : `${item.city}|${item.area ?? ''}`)}
         onChoose={choose}
         onHover={(index) => dispatch({ type: 'hover', index })}
+        className="max-h-[min(18rem,40dvh)] overflow-y-auto overscroll-contain"
         render={(item) => ('notListed' in item
           ? <span className="text-[15px] font-semibold text-[color:var(--color-primary-dark)]">{ADDRESS_COPY.localityNotListed}</span>
           : (
@@ -195,7 +198,7 @@ export function PostalLocalityField({
           value={city}
           error={cityError}
           onChange={(event) => onChange({ city: event.target.value })}
-          onBlur={onTouch}
+          onBlur={() => onTouch('city')}
         />
       )}
     </div>

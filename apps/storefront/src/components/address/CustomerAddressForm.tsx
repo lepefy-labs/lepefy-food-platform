@@ -170,7 +170,7 @@ export function CustomerAddressForm({
           onChange(next, Object.keys(patch) as AddressField[]);
           valueRef.current = next;
         }}
-        onTouch={() => { touch('postalCode'); touch('city'); }}
+        onTouch={touch}
         onChosen={() => focusField('street')}
       />
 

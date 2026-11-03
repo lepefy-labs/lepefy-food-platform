@@ -27,6 +27,8 @@ interface SuggestionListProps<T> {
   render: (item: T) => ReactNode;
   onChoose: (item: T) => void;
   onHover: (index: number) => void;
+  /** Extra classes of the list (e.g. a max height with its own scroll). */
+  className?: string;
 }
 
 /**
@@ -34,14 +36,14 @@ interface SuggestionListProps<T> {
  * lieu de passer sous la barre fixe ou le clavier). Options de 48 px ;
  * mousedown n'enlève pas le focus du champ.
  */
-export function SuggestionList<T>({ id, label, items, state, getKey, render, onChoose, onHover }: SuggestionListProps<T>) {
+export function SuggestionList<T>({ id, label, items, state, getKey, render, onChoose, onHover, className }: SuggestionListProps<T>) {
   return (
     <ul
       id={id}
       role="listbox"
       aria-label={label}
       hidden={!state.open || items.length === 0}
-      className="overflow-hidden rounded-xl border-[1.5px] bg-white"
+      className={`rounded-xl border-[1.5px] bg-white ${className ?? 'overflow-hidden'}`}
       style={{ borderColor: 'var(--field-border)' }}
     >
       {items.map((item, index) => {
