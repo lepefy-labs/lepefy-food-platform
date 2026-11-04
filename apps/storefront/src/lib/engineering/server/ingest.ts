@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { gitBlobSha } from '../indexer/buildSnapshot';
 import {
-  INGEST_ACTIONS, IngestError, ROW_TABLES, mapRows, parseBlobs, parseManifest, parseShas, parseStart, parseUuid, runKey,
+  INGEST_ACTIONS, IngestError, ROW_TABLES, mapRows, parseBlobs, parseManifest, parseShas, parseStart, parseUuid, rowsInsertError, runKey,
   type IngestAction, type RowTable,
 } from '../ingest/protocol';
 import { ENGINEERING_REPOSITORY } from './activeRun';
@@ -110,7 +110,7 @@ export async function handleIngest(body: Record<string, unknown>): Promise<Recor
       const { error } = await client.from(target).insert(rows);
       // Codes only, never row contents (docs/engineering/RUNBOOK.md): a bare `database_error` hid the cause.
       if (error) console.error('[engineering/ingest] rows insert failed:', target, error.code ?? 'unknown');
-      if (error) throw new IngestError(error.code === '23503' ? 'missing_blob_or_reference' : error.code === '23505' ? 'duplicate_row' : 'database_error', error.code === '23505' ? 409 : 422);
+      if (error) throw rowsInsertError(error.code);
       return { inserted: rows.length };
     }
     case 'complete': {
