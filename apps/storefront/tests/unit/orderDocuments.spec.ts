@@ -204,8 +204,8 @@ test('header date: weekday written out, Paris time, big above the picking title 
     expect(pickingHtml).toContain('<div class="pl-date">Lundi 05/10/2026 · 09:14</div>');
     expect(pickingHtml.indexOf('pl-date">')).toBeLessThan(pickingHtml.indexOf('LISTE DE PRÉPARATION'));
     // Order number written small with the shop name, no big reference line any more.
-    expect(pickingHtml).toContain('<div class="pl-meta pl-when">Commande #163835B8</div>');
-    expect(pickingHtml).not.toContain('pl-ref');
+    expect(pickingHtml).toContain('<div class="pl-meta pl-when pl-ref-line"><span>Commande #163835B8</span><span class="pl-mode">EXPÉDITION</span></div>');
+    expect(pickingHtml).not.toContain('class="pl-ref"');
     const slipHtml = packingSlipHtml([slip], format);
     expect(slipHtml).toContain('RÉCAPITULATIF DE COMMANDE</span><span class="ps-date">Lundi 05/10/2026 · 09:14</span>');
     expect(slipHtml).not.toContain(' du lundi');
@@ -251,7 +251,7 @@ test('picking A5 uses print-safe compact spacing without shrinking picking check
   const vm = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'T' }, carton: null });
   const a5 = pickingListHtml([vm], 'a5');
   const a4 = pickingListHtml([vm], 'a4');
-  expect(a5).toContain('.format-a5 .pl-follow-row { min-height: 7mm; }');
+  expect(a5).toContain('.format-a5 .pl-follow-row { min-height: 7.5mm; }');
   expect(a5).toContain('.format-a5 .pl-box { width: 6mm; height: 6mm; }');
   expect(a5).toContain('.format-a5 .pl-items td { padding-top: 0.9mm; padding-bottom: 0.9mm; }');
   expect(a4).toContain('.format-a4 .pl-items td { padding-top: 2.6mm; padding-bottom: 2.6mm;');
@@ -506,7 +506,7 @@ test('render: punched margins sent to Gotenberg for the picking list only, logo 
     expect(calls[2]!.get('marginLeft')).toBe('0.354');
     expect(await htmlOf(calls[0]!)).toContain('src="https://cdn.example.com/logo.png"');
     const footer = await (calls[0]!.getAll('files')[1] as Blob).text();
-    expect(footer).toContain('padding: 0 9mm 0 22mm');
-    expect(await (calls[2]!.getAll('files')[1] as Blob).text()).toContain('padding: 0 9mm 0 9mm');
+    expect(footer).toContain('padding-left: 22mm');
+    expect(await (calls[2]!.getAll('files')[1] as Blob).text()).toContain('padding-left: 9mm');
   });
 });

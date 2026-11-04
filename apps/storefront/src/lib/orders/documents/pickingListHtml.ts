@@ -41,8 +41,10 @@ const CSS = `
 .pl-customer { font-weight: 700; line-height: 1.25; }
 .pl-address { line-height: 1.3; }
 .pl-postal-city { font-weight: 700; line-height: 1.25; overflow-wrap: break-word; word-break: normal; }
-.pl-route { font-weight: 700; letter-spacing: 0.04em; line-height: 1.3; }
-.pl-badge { display: inline-block; border: 0.4mm solid #111; font-weight: 700; letter-spacing: 0.06em; padding: 0 1.6mm; }
+.pl-route { font-weight: 700; line-height: 1.3; }
+.pl-ref-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 2mm; }
+.pl-mode { display: inline-block; white-space: nowrap; border: 0.35mm solid #111; font-weight: 800; letter-spacing: 0.06em; padding: 0 1.4mm; line-height: 1.25; }
+.pl-nb { white-space: nowrap; }
 .pl-missing { font-weight: 700; }
 .pl-section { font-weight: 800; letter-spacing: 0.1em; margin: 3.5mm 0 1.5mm; }
 table.pl-items { width: 100%; border-collapse: collapse; }
@@ -77,12 +79,12 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .pl-follow-title { font-weight: 800; letter-spacing: 0.08em; border-bottom: 0.3mm solid #111; padding-bottom: 1mm; margin-bottom: 1.5mm; }
 .pl-follow-head, .pl-follow-row { display: grid; grid-template-columns: 1.6fr 1fr 0.75fr; gap: 3mm; align-items: center; }
 .pl-follow-head { font-size: 10pt; font-weight: 700; }
-.pl-follow-row { min-height: 9mm; }
+.pl-follow-row { min-height: 10mm; }
 .pl-follow-stage { display: flex; align-items: center; gap: 2mm; font-weight: 700; }
 .pl-follow-check { display: inline-block; width: 5mm; height: 5mm; border: 0.45mm solid #111; background: #fff; flex-shrink: 0; }
-.pl-follow-line { display: block; height: 7mm; border-bottom: 0.3mm solid #111; }
+.pl-follow-line { display: block; height: 8mm; border-bottom: 0.3mm solid #111; }
 .pl-sign span { flex: 1; border-bottom: 0.3mm solid #111; padding-bottom: 6mm; }
-.pl-follow-sign span { padding-bottom: 5mm; }
+.pl-follow-sign span { padding-bottom: 7mm; }
 .pl-notes { height: 24mm; background: repeating-linear-gradient(transparent 0 7.7mm, #999 7.7mm 8mm); }
 
 /* A5 : compact, une colonne d'information par ligne */
@@ -92,7 +94,7 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .format-a5 .pl-logo { max-width: 34mm; max-height: 14mm; }
 .format-a5 .pl-brand { font-size: 13pt; }
 .format-a5 .pl-postal-city { font-size: 11pt; }
-.format-a5 .pl-badge, .format-a5 .pl-route { font-size: 10pt; }
+.format-a5 .pl-mode, .format-a5 .pl-route { font-size: 10pt; }
 .format-a5 .pl-section, .format-a5 .pl-items thead th { font-size: 10pt; }
 .format-a5 .pl-items td { padding-top: 1.6mm; padding-bottom: 1.6mm; }
 .format-a5 .pl-box { width: 6mm; height: 6mm; }
@@ -119,10 +121,10 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .format-a5 .pl-follow { margin-top: 2mm; }
 .format-a5 .pl-follow-title { padding-bottom: 0.5mm; margin-bottom: 0.8mm; }
 .format-a5 .pl-follow-head { font-size: 10pt; }
-.format-a5 .pl-follow-row { min-height: 7mm; }
-.format-a5 .pl-follow-line { height: 6mm; }
+.format-a5 .pl-follow-row { min-height: 7.5mm; }
+.format-a5 .pl-follow-line { height: 6.5mm; }
 .format-a5 .pl-sign { margin-top: 1.5mm; }
-.format-a5 .pl-follow-sign span { padding-bottom: 4mm; }
+.format-a5 .pl-follow-sign span { padding-bottom: 5mm; }
 
 
 /* A4 : lignes aérées, colonnes conservation/emplacement, notes */
@@ -132,7 +134,7 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .format-a4 .pl-logo { max-width: 48mm; max-height: 18mm; }
 .format-a4 .pl-brand { font-size: 16pt; }
 .format-a4 .pl-postal-city { font-size: 12pt; }
-.format-a4 .pl-badge, .format-a4 .pl-route { font-size: 10.5pt; }
+.format-a4 .pl-mode, .format-a4 .pl-route { font-size: 10.5pt; }
 .format-a4 .pl-section, .format-a4 .pl-items thead th { font-size: 10pt; }
 .format-a4 .pl-items td { padding-top: 2.6mm; padding-bottom: 2.6mm; vertical-align: middle; }
 .format-a4 .pl-box { width: 7mm; height: 7mm; }
@@ -179,13 +181,28 @@ function itemsTableA4(vm: InternalOrderDocumentViewModel): string {
   return `<table class="pl-items"><thead><tr><th>✓</th><th>QTÉ</th><th>ARTICLE <span class="pl-cont">· #${escapeHtml(vm.ref)}</span></th><th>CONSERV.</th><th>EMPL.</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+/** Groupe insécable (dimensions « 35 × 25 × 22 cm », poids « 1,58 kg ») : jamais coupé, le retour à la ligne se fait avant le groupe. */
+function nb(value: string | null): string {
+  return value ? `<span class="pl-nb">${escapeHtml(value).replace(/ /g, ' ')}</span>` : '';
+}
+
+/**
+ * « 35 × 25 × 22 cm · 1,58 kg » reste d'un seul tenant quand c'est un seul poids (retour à la ligne
+ * avant tout le groupe) ; plusieurs poids : les dimensions restent insécables, les poids vont à la ligne
+ * entre eux.
+ */
+function dimsAndWeights(dimensions: string | null, weights: string): string {
+  if (dimensions && !weights.includes(' + ')) return nb(`${dimensions} · ${weights}`);
+  return `${nb(dimensions)} · ${weights.split(' + ').map((w) => nb(w)).join(' + ')}`;
+}
+
 function cartonBlock(vm: InternalOrderDocumentViewModel, format: OrderDocumentFormat): string {
   if (vm.fulfillment !== 'delivery' || !vm.cartons) return '';
   const c = vm.cartons;
   const detail = format === 'a4'
-    ? c.parcels.map((p) => `<div><b>Colis ${p.index}</b> — ${escapeHtml(p.weight)} → ${p.carton ? `<b>${escapeHtml(p.carton)}</b> ${escapeHtml(p.dimensions ?? '')}` : 'aucun carton configuré pour ce poids'}</div>`).join('')
+    ? c.parcels.map((p) => `<div><b>Colis ${p.index}</b> — ${nb(p.weight)} → ${p.carton ? `<b>${escapeHtml(p.carton)}</b> ${nb(p.dimensions)}` : 'aucun carton configuré pour ce poids'}</div>`).join('')
     : c.lines.map((l) => `<div><span class="pl-box" style="width:3.5mm;height:3.5mm;vertical-align:-0.5mm"></span> ${l.name
-      ? `<b>${l.count} × ${escapeHtml(l.name)}</b> ${escapeHtml(l.dimensions ?? '')} · ${escapeHtml(l.weights)}`
+      ? `<b>${l.count} × ${escapeHtml(l.name)}</b> ${dimsAndWeights(l.dimensions, l.weights)}`
       : `${l.count} colis (${escapeHtml(l.weights)}) : aucun carton configuré pour ce poids`}</div>`).join('');
   const alternatives = c.alternatives.length ? `<div>Si volumineux : ${escapeHtml(c.alternatives.join(', '))}</div>` : '';
   const footer = [`Poids total ${c.totalWeight}`, `${c.parcels.length} colis`, format === 'a4' ? c.maxParcelNote : null].filter(Boolean).join(' · ');
@@ -231,22 +248,22 @@ function brandBlock(vm: InternalOrderDocumentViewModel): string {
 function addressBlock(vm: InternalOrderDocumentViewModel): string {
   const lines = (vm.deliveryAddress ?? []).map((line) => `<div class="pl-address">${escapeHtml(line)}</div>`).join('');
   if (vm.fulfillment === 'pickup') {
-    return `<div class="pl-addr"><div class="pl-customer">${escapeHtml(vm.customerName)}</div><div class="pl-route">${vm.fulfillmentLabel} · Retrait en boutique</div></div>`;
+    return `<div class="pl-addr"><div class="pl-customer">${escapeHtml(vm.customerName)}</div></div>`;
   }
   const parts = vm.destinationParts;
   const postalCity = [parts?.postalCode, parts?.city].filter(Boolean).join(' ');
   const place = postalCity
     ? `<div class="pl-postal-city">${escapeHtml(postalCity)}</div>`
     : '<div class="pl-postal-city pl-missing">Destination non renseignée</div>';
-  const route = [parts?.country, vm.fulfillmentLabel].filter(Boolean).map((part) => escapeHtml(part)).join(' · ');
-  return `<div class="pl-addr"><div class="pl-customer">${escapeHtml(vm.customerName)}</div>${lines}${place}<div class="pl-route">${route}</div></div>`;
+  const country = parts?.country ? `<div class="pl-route">${escapeHtml(parts.country)}</div>` : '';
+  return `<div class="pl-addr"><div class="pl-customer">${escapeHtml(vm.customerName)}</div>${lines}${place}${country}</div>`;
 }
 
 function header(vm: InternalOrderDocumentViewModel): string {
   const when = vm.createdAt ? `<div class="pl-date">${escapeHtml(vm.createdAt)}</div>` : '';
   return `<div class="pl-head">
 <div class="pl-id">${when}<p class="pl-title">LISTE DE PRÉPARATION</p>
-<div class="pl-meta pl-when">Commande #${escapeHtml(vm.ref)}</div>${addressBlock(vm)}</div>
+<div class="pl-meta pl-when pl-ref-line"><span>Commande #${escapeHtml(vm.ref)}</span><span class="pl-mode">${escapeHtml(vm.fulfillmentBadge)}</span></div>${addressBlock(vm)}</div>
 ${brandBlock(vm)}
 </div>`;
 }
