@@ -100,6 +100,8 @@ export interface InternalOrderDocumentViewModel {
   createdAt: string;
   fulfillment: 'delivery' | 'pickup';
   fulfillmentLabel: string;
+  /** Mode d'évasion imprimé à côté de la référence : « EXPÉDITION » ou « RETRAIT » (libellé de document uniquement, le mode de la commande ne change pas). */
+  fulfillmentBadge: string;
   tenantName: string;
   /** Logo du tenant (https uniquement) ; null → le nom du tenant le remplace dans l'en-tête. */
   logoUrl: string | null;
@@ -235,6 +237,7 @@ export function buildPickingListViewModel(input: {
     createdAt: formatDocumentDate(order.created_at, 'weekday'),
     fulfillment: isPickup ? 'pickup' : 'delivery',
     fulfillmentLabel: isPickup ? 'RETRAIT' : 'LIVRAISON',
+    fulfillmentBadge: isPickup ? 'RETRAIT' : 'EXPÉDITION',
     tenantName: tenant.name,
     logoUrl: safeImageUrl(tenant.logo_url),
     customerName: order.full_name?.trim() || 'Client',

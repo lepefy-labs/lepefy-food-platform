@@ -70,13 +70,13 @@ test('picking header: date, title and reference on the left, address block with 
     const { left } = headParts(html);
     expect(left.indexOf('pl-date')).toBeLessThan(left.indexOf('LISTE DE PRÉPARATION'));
     expect(left).toContain('<div class="pl-date">Lundi 05/10/2026 · 09:14</div>');
-    expect(left).toContain('<div class="pl-meta pl-when">Commande #163835B8</div>');
+    expect(left).toContain('<div class="pl-meta pl-when pl-ref-line"><span>Commande #163835B8</span><span class="pl-mode">EXPÉDITION</span></div>');
     expect(left).toContain('<div class="pl-customer">Awa Diallo</div>');
     const street = left.indexOf('12 rue Oberkampf');
     const postalCity = left.indexOf('<div class="pl-postal-city">75011 Paris</div>');
     expect(street).toBeGreaterThan(-1);
     expect(postalCity).toBeGreaterThan(street);
-    expect(left).toContain('<div class="pl-route">France · LIVRAISON</div>');
+    expect(left).toContain('<div class="pl-route">France</div>');
     expect(html).not.toContain('pl-dest');
   }
   const a5 = pickingListHtml([picking(order(ORDER_A))], 'a5');
@@ -105,11 +105,11 @@ test('picking header: postal code and city stay when the full address is disable
 test('picking header: leading zeros and alphanumeric postal codes kept verbatim, countries compact', () => {
   const rome = headParts(pickingListHtml([picking(withAddress({ line1: 'Via Prenestina 1', postal_code: '00132', city: 'Roma', country: 'IT' }))], 'a5')).left;
   expect(rome).toContain('<div class="pl-postal-city">00132 Roma</div>');
-  expect(rome).toContain('<div class="pl-route">Italie · LIVRAISON</div>');
+  expect(rome).toContain('<div class="pl-route">Italie</div>');
   const london = headParts(pickingListHtml([picking(withAddress({ postal_code: 'SW1A 1AA', city: 'London', country: 'GB' }))], 'a4')).left;
   expect(london).toContain('SW1A 1AA London');
   const free = headParts(pickingListHtml([picking(withAddress({ postal_code: '1000', city: 'Bruxelles', country: 'Belgique' }))], 'a5')).left;
-  expect(free).toContain('Belgique · LIVRAISON');
+  expect(free).toContain('<div class="pl-route">Belgique</div>');
   // Un CP numérique en JSON reste lisible (ses zéros perdus ne sont jamais inventés).
   const numeric = picking(withAddress({ postal_code: 6100, city: 'Bergamo', country: 'IT' }));
   expect(numeric.destinationParts).toEqual({ postalCode: '6100', city: 'Bergamo', country: 'Italie' });
@@ -148,7 +148,7 @@ test('picking header: incomplete address degrades without inventing anything', (
     const { left } = headParts(html);
     expect(left).toContain('Destination non renseignée');
     expect(left).not.toContain('class="pl-address"');
-    expect(left).toContain('<div class="pl-route">LIVRAISON</div>');
+    expect(left).toContain('pl-mode">EXPÉDITION');
   }
 });
 
@@ -159,7 +159,7 @@ test('picking header: pickup shows RETRAIT, no destination and no postal code', 
     const { left } = headParts(pickingListHtml([vm], format));
     expect(left).not.toContain('75011');
     expect(left).not.toContain('pl-postal-city');
-    expect(left).toContain('<div class="pl-route">RETRAIT · Retrait en boutique</div>');
+    expect(left).toContain('pl-mode">RETRAIT');
     expect(left).toContain('Awa Diallo');
   }
 });
@@ -211,8 +211,8 @@ test('punched margins: picking list only, centralised, applied by Gotenberg and 
   expect(Object.fromEntries(gotenbergOptionFields({ marginsMm: documentMarginsMm('picking_list', 'a4') }))).toMatchObject({ marginLeft: '0.984', marginRight: '0.551' });
   // Marges Gotenberg uniquement : aucun padding CSS gauche dans le document.
   expect(pickingListHtml([picking(order(ORDER_A))], 'a5')).not.toMatch(/padding-left|margin-left: (?!auto)/);
-  expect(documentFooterHtml('x', { left: 22, right: 9 })).toContain('padding: 0 9mm 0 22mm');
-  expect(documentFooterHtml('x')).toContain('padding: 0 9mm 0 9mm');
+  expect(documentFooterHtml('x', { left: 22, right: 9 })).toContain('padding-left: 22mm');
+  expect(documentFooterHtml('x')).toContain('padding-left: 9mm');
 });
 
 test('French weekday starts with a capital; only the first letter changes, other dates untouched', () => {
@@ -430,4 +430,79 @@ test('picking list: purchased format from the order line, catalogue weight only 
     expect(html).toContain('Format : Pot &lt;b&gt;&quot;200&quot;&lt;/b&gt;');
     expect(html).not.toContain('<b>"200"</b>');
   }
+});
+
+// ─── C. Rifinitura UX : modalità accanto alla réf., footer, cartone, suivi ─────
+
+test('picking header: fulfilment badge next to the order reference, country line carries no mode, stored mode untouched', () => {
+  for (const format of ['a5', 'a4'] as const) {
+    const ship = headParts(pickingListHtml([picking(order(ORDER_A), true)], format)).left;
+    expect(ship).toContain('<span>Commande #163835B8</span><span class="pl-mode">EXPÉDITION</span>');
+    expect(ship).toContain('<div class="pl-route">France</div>');
+    expect(ship).not.toContain('LIVRAISON');
+    const pickup = headParts(pickingListHtml([picking(order(ORDER_A, { fulfillment_type: 'pickup' }), true)], format)).left;
+    expect(pickup).toContain('<span>Commande #163835B8</span><span class="pl-mode">RETRAIT</span>');
+    expect(pickup).not.toContain('pl-route');
+  }
+  // Badge lisible en noir et blanc : cadre fin, pas de fond sombre.
+  const css = pickingListHtml([picking(order(ORDER_A))], 'a5');
+  const modeRule = /\.pl-mode \{[^}]*\}/.exec(css)![0];
+  expect(modeRule).toContain('border: 0.35mm solid #111');
+  expect(modeRule).toContain('white-space: nowrap');
+  expect(modeRule).not.toContain('background');
+  // Seule l'étiquette imprimée change : le mode du view-model et les autres libellés restent.
+  const vm = picking(order(ORDER_A));
+  expect(vm.fulfillment).toBe('delivery');
+  expect(vm.fulfillmentLabel).toBe('LIVRAISON');
+  expect(vm.fulfillmentBadge).toBe('EXPÉDITION');
+  expect(pickingListHtml([vm], 'a5')).toContain('COÛT LIVRAISON');
+});
+
+test('footer: label left and page number right, truly separated, aligned on the punched margin', () => {
+  const html = documentFooterHtml('#BAB5D42F · Liste de préparation', { left: 22, right: 9 });
+  expect(html).toContain('<td class="l">#BAB5D42F · Liste de préparation</td>');
+  expect(html).toContain('<td class="r">Page <span class="pageNumber"></span>/<span class="totalPages"></span></td>');
+  expect(html).toContain('td.l { text-align: left; padding-left: 22mm; padding-right: 6mm; }');
+  expect(html).toContain('td.r { text-align: right; padding-right: 9mm; white-space: nowrap;');
+  expect(html).not.toContain('display: flex');
+  expect(documentFooterHtml('x', { left: 25, right: 14 })).toContain('padding-left: 25mm');
+});
+
+test('packaging block: dimensions never split from their unit, weight kept with them, long names wrap before the group', () => {
+  const cartons = {
+    lines: [{ count: 1, name: 'Carton S commerce', dimensions: '35 × 25 × 22 cm', weights: '1,58 kg' }, { count: 2, name: 'Grand carton', dimensions: '60 × 40 × 40 cm', weights: '19,5 kg + 18,25 kg' }],
+    parcels: [{ index: 1, weight: '1,58 kg', carton: 'Carton S commerce', dimensions: '35 × 25 × 22 cm' }],
+    alternatives: [], totalWeight: '1,58 kg', maxParcelNote: null,
+  };
+  const vm = { ...picking(order(ORDER_A)), cartons };
+  const a5 = pickingListHtml([vm], 'a5');
+  expect(a5).toContain('<span class="pl-nb">35 × 25 × 22 cm · 1,58 kg</span>');
+  expect(a5).toContain('<span class="pl-nb">60 × 40 × 40 cm</span> · <span class="pl-nb">19,5 kg</span> + <span class="pl-nb">18,25 kg</span>');
+  expect(a5).toContain('.pl-nb { white-space: nowrap; }');
+  expect(a5).toContain('.pl-shipping-grid .pl-carton { overflow-wrap: anywhere; }');
+  expect(a5).toContain('COÛT LIVRAISON');
+  const a4 = pickingListHtml([vm], 'a4');
+  expect(a4).toContain('<span class="pl-nb">35 × 25 × 22 cm</span>');
+});
+
+test('follow-up block: more room for handwriting with fixed, content-independent heights', () => {
+  const a5 = pickingListHtml([picking(order(ORDER_A))], 'a5');
+  const a4 = pickingListHtml([picking(order(ORDER_A))], 'a4');
+  expect(a5).toContain('.format-a5 .pl-follow-row { min-height: 7.5mm; }');
+  expect(a5).toContain('.format-a5 .pl-follow-line { height: 6.5mm; }');
+  expect(a5).toContain('.format-a5 .pl-follow-sign span { padding-bottom: 5mm; }');
+  expect(a4).toContain('.pl-follow-row { min-height: 10mm; }');
+  expect(a4).toContain('.pl-follow-line { display: block; height: 8mm;');
+  expect(a4).toContain('.pl-follow-sign span { padding-bottom: 7mm; }');
+  // Le bloc reste insécable et ne dépend pas de l'espace restant de la page.
+  expect(a5).toContain('.pl-follow { break-inside: avoid;');
+  expect(a5).not.toMatch(/\.pl-follow[^{]*\{[^}]*(vh|calc\(|flex-grow|height: 100%)/);
+  expect(a5).toContain('.pl-follow-check { display: inline-block; width: 5mm; height: 5mm;');
+});
+
+test('packing slip is not touched by the picking-list polish', () => {
+  const slip = packingSlipHtml([buildPackingSlipViewModel({ order: order(ORDER_A), items: ITEMS, tenant: DOC_TENANT, settings: ORDER_DOCUMENTS_DEFAULTS, qr: null })], 'a5');
+  expect(slip).not.toContain('pl-mode');
+  expect(slip).not.toContain('EXPÉDITION');
+  expect(slip).not.toContain('pl-nb');
 });

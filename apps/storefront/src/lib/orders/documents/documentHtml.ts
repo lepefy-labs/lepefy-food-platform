@@ -145,7 +145,14 @@ ${body}
  * gauche/droit suivent les marges du document (perforation comprise).
  */
 export function documentFooterHtml(label: string, margins: { left: number; right: number } = { left: 9, right: 9 }): string {
+  // Table pleine largeur : label à gauche, pagination à droite, séparés même sans place (min 6 mm).
+  // Le pied de page de Chromium n'hérite pas du CSS du document et un flex sans largeur résolue
+  // collait les deux textes (« …préparationPage 1/1 »).
   return `<!doctype html><html><head><style>
-body { margin: 0; padding: 0 ${margins.right}mm 0 ${margins.left}mm; box-sizing: border-box; font-family: ${DOCUMENT_FONT_STACK}; font-size: 8pt; color: #444; display: flex; justify-content: space-between; width: 100%; -webkit-print-color-adjust: exact; }
-</style></head><body><span>${escapeHtml(label)}</span><span>Page <span class="pageNumber"></span>/<span class="totalPages"></span></span></body></html>`;
+html, body { margin: 0; padding: 0; width: 100%; }
+table { width: 100%; border-collapse: collapse; table-layout: auto; font-family: ${DOCUMENT_FONT_STACK}; font-size: 8pt; color: #444; -webkit-print-color-adjust: exact; }
+td { padding: 0; vertical-align: top; }
+td.l { text-align: left; padding-left: ${margins.left}mm; padding-right: 6mm; }
+td.r { text-align: right; padding-right: ${margins.right}mm; white-space: nowrap; width: 1%; }
+</style></head><body><table><tr><td class="l">${escapeHtml(label)}</td><td class="r">Page <span class="pageNumber"></span>/<span class="totalPages"></span></td></tr></table></body></html>`;
 }
