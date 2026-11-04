@@ -8,7 +8,7 @@ import {
 } from '@/lib/orders/portal/orderPublicToken';
 import { documentFooterHtml, escapeHtml, orderShortRef } from './documentHtml';
 import { qrSvg } from './documentQr';
-import { MAX_BULK_ORDER_DOCUMENTS, ORDER_DOCUMENT_FORMATS, type OrderDocumentFormat } from './formats';
+import { documentMarginsMm, MAX_BULK_ORDER_DOCUMENTS, ORDER_DOCUMENT_FORMATS, type OrderDocumentFormat } from './formats';
 
 export { MAX_BULK_ORDER_DOCUMENTS };
 import { loadOrderDocumentData, OrderDocumentDataError } from './loadOrderDocumentData';
@@ -171,7 +171,7 @@ export async function renderOrderDocuments(input: {
   let html: string;
   let footerLabel: string;
   if (kind === 'picking_list') {
-    const vms = printable.map(({ order, items, carton, productWeights }) => buildPickingListViewModel({ order, items, tenant: { name: tenant.name, currency: tenant.currency }, carton, productWeights, showDeliveryAddress: settings.picking_list_show_delivery_address }));
+    const vms = printable.map(({ order, items, carton, productWeights }) => buildPickingListViewModel({ order, items, tenant: { name: tenant.name, currency: tenant.currency, logo_url: tenant.logo_url }, carton, productWeights, showDeliveryAddress: settings.picking_list_show_delivery_address }));
     html = pickingListHtml(vms, format);
     footerLabel = vms.length === 1 ? `#${vms[0]!.ref} · Liste de préparation` : `Listes de préparation · ${vms.length} commandes`;
   } else if (kind === 'preparation_summary') {
@@ -190,14 +190,15 @@ export async function renderOrderDocuments(input: {
     footerLabel = vms.length === 1 ? `Commande #${vms[0]!.ref}` : '';
   }
 
+  const margins = documentMarginsMm(kind, format);
   let pdf: Buffer;
   try {
     pdf = await htmlToPdf(html, {
       paperWidthMm: spec.widthMm,
       paperHeightMm: spec.heightMm,
-      marginsMm: spec.marginsMm,
+      marginsMm: margins,
       printBackground: true,
-      footerHtml: documentFooterHtml(footerLabel),
+      footerHtml: documentFooterHtml(footerLabel, kind === 'picking_list' ? margins : undefined),
       timeoutMs: GOTENBERG_TIMEOUT_MS,
     });
   } catch (error) {

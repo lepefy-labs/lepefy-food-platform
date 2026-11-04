@@ -194,21 +194,22 @@ test('packing slip shows historical order prices only when enabled', () => {
 });
 
 test('header date: weekday written out, Paris time, big above the picking title and under the slip title (shop requests 1001/1002)', () => {
-  expect(formatDocumentDate('2026-10-22T16:38:00Z', 'weekday')).toBe('jeudi 22/10/2026 · 18:38');
-  expect(formatDocumentDate('2026-10-05T07:14:00Z', 'weekday')).toBe('lundi 05/10/2026 · 09:14');
+  expect(formatDocumentDate('2026-10-22T16:38:00Z', 'weekday')).toBe('Jeudi 22/10/2026 · 18:38');
+  expect(formatDocumentDate('2026-10-05T07:14:00Z', 'weekday')).toBe('Lundi 05/10/2026 · 09:14');
   expect(formatDocumentDate('not a date', 'weekday')).toBe('');
   const picking = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'T' }, carton: null });
   const slip = buildPackingSlipViewModel({ order: order(ORDER_A), items: ITEMS, tenant: DOC_TENANT, settings: ORDER_DOCUMENTS_DEFAULTS, qr: null });
   for (const format of ['a5', 'a4'] as const) {
     const pickingHtml = pickingListHtml([picking], format);
-    expect(pickingHtml).toContain('<div class="pl-date">lundi 05/10/2026 · 09:14</div>');
+    expect(pickingHtml).toContain('<div class="pl-date">Lundi 05/10/2026 · 09:14</div>');
     expect(pickingHtml.indexOf('pl-date">')).toBeLessThan(pickingHtml.indexOf('LISTE DE PRÉPARATION'));
     // Order number written small with the shop name, no big reference line any more.
-    expect(pickingHtml).toContain('<div class="pl-meta pl-when">Commande #163835B8 - T</div>');
+    expect(pickingHtml).toContain('<div class="pl-meta pl-when">Commande #163835B8</div>');
     expect(pickingHtml).not.toContain('pl-ref');
     const slipHtml = packingSlipHtml([slip], format);
-    expect(slipHtml).toContain('RÉCAPITULATIF DE COMMANDE</span><span class="ps-date">lundi 05/10/2026 · 09:14</span>');
+    expect(slipHtml).toContain('RÉCAPITULATIF DE COMMANDE</span><span class="ps-date">Lundi 05/10/2026 · 09:14</span>');
     expect(slipHtml).not.toContain(' du lundi');
+    expect(slipHtml).not.toContain('>lundi');
   }
 });
 
@@ -490,4 +491,22 @@ test('security: document routes need orders.view, settings need tenant_settings.
   expect(permissionForAdminApi('/api/admin/orders/documents/packing-slip', 'GET')).toBe('orders.view');
   expect(permissionForAdminApi('/api/admin/order-documents/settings', 'GET')).toBe('tenant_settings.view');
   expect(permissionForAdminApi('/api/admin/order-documents/settings', 'PATCH')).toBe('tenant_settings.manage');
+});
+
+test('render: punched margins sent to Gotenberg for the picking list only, logo from the tenant, packing slip unchanged', async () => {
+  await withGotenberg(async (calls) => {
+    const base = { db: documentsDb() as never, tenant: { ...TENANT, logo_url: 'https://cdn.example.com/logo.png' } as never, format: 'a5' as const, bulk: false, orderIds: [ORDER_A], settings: ORDER_DOCUMENTS_DEFAULTS };
+    await renderOrderDocuments({ ...base, kind: 'picking_list' });
+    await renderOrderDocuments({ ...base, kind: 'picking_list', format: 'a4' });
+    await renderOrderDocuments({ ...base, kind: 'packing_slip' });
+    expect(calls[0]!.get('marginLeft')).toBe('0.866');
+    expect(calls[0]!.get('marginRight')).toBe('0.354');
+    expect(calls[1]!.get('marginLeft')).toBe('0.984');
+    expect(calls[1]!.get('marginRight')).toBe('0.551');
+    expect(calls[2]!.get('marginLeft')).toBe('0.354');
+    expect(await htmlOf(calls[0]!)).toContain('src="https://cdn.example.com/logo.png"');
+    const footer = await (calls[0]!.getAll('files')[1] as Blob).text();
+    expect(footer).toContain('padding: 0 9mm 0 22mm');
+    expect(await (calls[2]!.getAll('files')[1] as Blob).text()).toContain('padding: 0 9mm 0 9mm');
+  });
 });

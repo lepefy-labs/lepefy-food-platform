@@ -67,10 +67,28 @@ export function safeImageUrl(url: string | null | undefined): string | null {
   }
 }
 
+/** Première lettre en majuscule (français) ; le reste du texte n'est jamais modifié. */
+export function capitalizeFirst(text: string): string {
+  return text ? text.charAt(0).toLocaleUpperCase('fr-FR') + text.slice(1) : text;
+}
+
+/** Pays compact : code ISO à deux lettres traduit en français (« IT » → « Italie »), toute autre valeur telle que saisie. */
+export function displayCountry(value: string | null): string | null {
+  if (!value) return null;
+  if (!/^[A-Za-z]{2}$/.test(value)) return value;
+  try {
+    const name = new Intl.DisplayNames(['fr-FR'], { type: 'region' }).of(value.toUpperCase());
+    return name && name.toUpperCase() !== value.toUpperCase() ? name : value.toUpperCase();
+  } catch {
+    return value.toUpperCase();
+  }
+}
+
 /**
- * `weekday` = « jeudi 22/10/2026 · 18:38 » : date d'en-tête des documents, le
- * jour de la semaine écrit en toutes lettres (demandé par les boutiques pour
- * repérer la commande au premier coup d'œil).
+ * `weekday` = « Jeudi 22/10/2026 · 18:38 » : date d'en-tête des documents, le
+ * jour de la semaine écrit en toutes lettres avec une majuscule (demandé par
+ * les boutiques pour repérer la commande au premier coup d'œil). Seule la
+ * première lettre du jour est touchée, jamais un nom, une ville ou un code.
  */
 export function formatDocumentDate(iso: string, style: 'short' | 'long' | 'weekday', timeZone = 'Europe/Paris'): string {
   const date = new Date(iso);
@@ -79,7 +97,7 @@ export function formatDocumentDate(iso: string, style: 'short' | 'long' | 'weekd
     const parts = Object.fromEntries(new Intl.DateTimeFormat('fr-FR', {
       weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone,
     }).formatToParts(date).map((part) => [part.type, part.value]));
-    return `${parts.weekday} ${parts.day}/${parts.month}/${parts.year} · ${parts.hour}:${parts.minute}`;
+    return `${capitalizeFirst(parts.weekday ?? '')} ${parts.day}/${parts.month}/${parts.year} · ${parts.hour}:${parts.minute}`;
   }
   return style === 'long'
     ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone }).format(date)
@@ -122,9 +140,12 @@ ${body}
 </html>`;
 }
 
-/** Pied de page Gotenberg (rendu par Chromium dans la marge basse). */
-export function documentFooterHtml(label: string): string {
+/**
+ * Pied de page Gotenberg (rendu par Chromium dans la marge basse). Ses retraits
+ * gauche/droit suivent les marges du document (perforation comprise).
+ */
+export function documentFooterHtml(label: string, margins: { left: number; right: number } = { left: 9, right: 9 }): string {
   return `<!doctype html><html><head><style>
-body { margin: 0 9mm; font-family: ${DOCUMENT_FONT_STACK}; font-size: 8pt; color: #444; display: flex; justify-content: space-between; width: 100%; -webkit-print-color-adjust: exact; }
+body { margin: 0; padding: 0 ${margins.right}mm 0 ${margins.left}mm; box-sizing: border-box; font-family: ${DOCUMENT_FONT_STACK}; font-size: 8pt; color: #444; display: flex; justify-content: space-between; width: 100%; -webkit-print-color-adjust: exact; }
 </style></head><body><span>${escapeHtml(label)}</span><span>Page <span class="pageNumber"></span>/<span class="totalPages"></span></span></body></html>`;
 }

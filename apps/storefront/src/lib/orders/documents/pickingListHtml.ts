@@ -1,4 +1,4 @@
-import { documentShell, escapeHtml } from './documentHtml';
+import { documentShell, escapeAttr, escapeHtml } from './documentHtml';
 import type { OrderDocumentFormat } from './formats';
 import type { InternalOrderDocumentViewModel, PickingItemVM } from './viewModels';
 
@@ -9,11 +9,17 @@ import type { InternalOrderDocumentViewModel, PickingItemVM } from './viewModels
  * référence de la commande et sert d'en-tête réduit de continuation.
  * Aucun texte informatif sous 10 pt ; cases dessinées de 6/7 mm.
  *
- * En-tête sur deux colonnes : à gauche l'identification (titre, réf., date,
- * client, rue/complément) ; à droite, pour une livraison, l'encadré de
- * destination (CP très grand, ville en gras, code pays en petit) lisible d'un
- * coup d'œil pour trier les colis. La ville n'est jamais tronquée : sa taille
- * baisse par paliers selon sa longueur, puis elle passe à la ligne.
+ * Impression pour classeur à anneaux : les marges de perforation (gauche large)
+ * sont appliquées par Gotenberg (`documentMarginsMm('picking_list', format)`),
+ * jamais par un padding CSS, donc identiques sur chaque page.
+ *
+ * En-tête : à gauche date et heure de la commande (jour de la semaine avec
+ * majuscule), titre, référence, puis le bloc adresse (client, destinataire,
+ * entreprise, rue, complément selon les réglages du tenant, puis CP et ville
+ * en gras juste sous la rue, pays et mode en ligne compacte) ; à droite le
+ * logo du tenant (proportions conservées, sans cadre) ou, à défaut, son nom.
+ * CP et ville sont toujours imprimés pour une livraison ; la ville n'est
+ * jamais tronquée (retour à la ligne).
  */
 
 const STORAGE_LABEL: Record<NonNullable<PickingItemVM['storage']>, string> = {
@@ -24,22 +30,20 @@ const STORAGE_LABEL: Record<NonNullable<PickingItemVM['storage']>, string> = {
 const CSS = `
 .pl-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 4mm; border-bottom: 0.6mm solid #111; padding-bottom: 2.5mm; margin-bottom: 2.5mm; }
 .pl-id { min-width: 0; overflow-wrap: anywhere; }
+.pl-brandbox { max-width: 40%; text-align: right; min-width: 0; }
+.pl-logo { display: block; margin-left: auto; width: auto; height: auto; object-fit: contain; background: none; border: 0; padding: 0; }
+.pl-brand { display: block; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
 .pl-title { font-weight: 900; letter-spacing: 0.08em; margin: 0; }
-.pl-badge { display: inline-block; border: 0.4mm solid #111; font-weight: 700; letter-spacing: 0.06em; padding: 0.6mm 2mm; }
 .pl-meta { line-height: 1.4; }
 .pl-when { color: #333; }
-.pl-date { font-weight: 900; line-height: 1.1; color: #000; margin-bottom: 1mm; }
-.pl-customer { font-weight: 700; line-height: 1.25; margin-top: 0.8mm; }
+.pl-date { font-weight: 900; line-height: 1.1; color: #000; margin-bottom: 1mm; overflow-wrap: break-word; }
+.pl-addr { margin-top: 1.6mm; line-height: 1.3; }
+.pl-customer { font-weight: 700; line-height: 1.25; }
 .pl-address { line-height: 1.3; }
-.pl-dest { border: 0.6mm solid #111; padding: 1.4mm 2.2mm 1.6mm; min-width: 0; }
-.pl-dest-top { display: flex; justify-content: space-between; align-items: center; gap: 2mm; }
-.pl-dest .pl-badge { background: #111; color: #fff; border-color: #111; }
-.pl-dest-country { font-size: 9.5pt; font-weight: 700; letter-spacing: 0.08em; }
-.pl-dest-postal { font-weight: 700; line-height: 1; letter-spacing: 0.01em; white-space: nowrap; margin-top: 1mm; }
-.pl-dest-city { font-weight: 700; line-height: 1.12; margin-top: 0.8mm; overflow-wrap: break-word; word-break: normal; }
-.pl-dest-missing { font-size: 10pt; font-weight: 700; margin-top: 1.2mm; }
-.pl-pickup { text-align: right; }
-.pl-pickup .pl-meta { margin-top: 1mm; }
+.pl-postal-city { font-weight: 700; line-height: 1.25; overflow-wrap: break-word; word-break: normal; }
+.pl-route { font-weight: 700; letter-spacing: 0.04em; line-height: 1.3; }
+.pl-badge { display: inline-block; border: 0.4mm solid #111; font-weight: 700; letter-spacing: 0.06em; padding: 0 1.6mm; }
+.pl-missing { font-weight: 700; }
 .pl-section { font-weight: 800; letter-spacing: 0.1em; margin: 3.5mm 0 1.5mm; }
 table.pl-items { width: 100%; border-collapse: collapse; }
 .pl-items thead th { text-align: left; font-weight: 700; letter-spacing: 0.06em; border-bottom: 0.4mm solid #111; padding: 1mm 1mm 1mm 0; }
@@ -84,8 +88,11 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 /* A5 : compact, une colonne d'information par ligne */
 .format-a5 { font-size: 10.5pt; }
 .format-a5 .pl-title { font-size: 12pt; }
-.format-a5 .pl-date { font-size: 17pt; }
-.format-a5 .pl-badge { font-size: 10pt; }
+.format-a5 .pl-date { font-size: 14pt; }
+.format-a5 .pl-logo { max-width: 34mm; max-height: 14mm; }
+.format-a5 .pl-brand { font-size: 13pt; }
+.format-a5 .pl-postal-city { font-size: 11pt; }
+.format-a5 .pl-badge, .format-a5 .pl-route { font-size: 10pt; }
 .format-a5 .pl-section, .format-a5 .pl-items thead th { font-size: 10pt; }
 .format-a5 .pl-items td { padding-top: 1.6mm; padding-bottom: 1.6mm; }
 .format-a5 .pl-box { width: 6mm; height: 6mm; }
@@ -95,14 +102,6 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .format-a5 .pl-loc { font-size: 11pt; }
 .format-a5 .pl-customer { font-size: 11pt; }
 .format-a5 .pl-address { font-size: 10pt; }
-.format-a5 .pl-dest { width: 52mm; }
-.format-a5 .pl-dest-postal { font-size: 26pt; }
-.format-a5 .pl-dest-postal--long { font-size: 22pt; }
-.format-a5 .pl-dest-postal--very-long { font-size: 18pt; }
-.format-a5 .pl-dest-city { font-size: 17pt; }
-.format-a5 .pl-dest-city--long { font-size: 15pt; }
-.format-a5 .pl-dest-city--very-long { font-size: 14pt; }
-.format-a5 .pl-dest-city--extra-long { font-size: 12.5pt; }
 /* A5: recupero spazio verticale senza sacrificare il carattere di 10pt
    o le caselle degli articoli (6 mm). In caso di contenuto lungo,
    Chromium continua a impaginare su più fogli. */
@@ -129,8 +128,11 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 /* A4 : lignes aérées, colonnes conservation/emplacement, notes */
 .format-a4 { font-size: 11pt; }
 .format-a4 .pl-title { font-size: 14pt; }
-.format-a4 .pl-date { font-size: 22pt; }
-.format-a4 .pl-badge { font-size: 11pt; }
+.format-a4 .pl-date { font-size: 20pt; }
+.format-a4 .pl-logo { max-width: 48mm; max-height: 18mm; }
+.format-a4 .pl-brand { font-size: 16pt; }
+.format-a4 .pl-postal-city { font-size: 12pt; }
+.format-a4 .pl-badge, .format-a4 .pl-route { font-size: 10.5pt; }
 .format-a4 .pl-section, .format-a4 .pl-items thead th { font-size: 10pt; }
 .format-a4 .pl-items td { padding-top: 2.6mm; padding-bottom: 2.6mm; vertical-align: middle; }
 .format-a4 .pl-box { width: 7mm; height: 7mm; }
@@ -140,15 +142,6 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .format-a4 .pl-loc { font-size: 12pt; }
 .format-a4 .pl-customer { font-size: 12.5pt; }
 .format-a4 .pl-address { font-size: 11pt; }
-.format-a4 .pl-dest { width: 72mm; padding: 2mm 3mm 2.2mm; }
-.format-a4 .pl-dest-postal { font-size: 32pt; }
-.format-a4 .pl-dest-postal--long { font-size: 27pt; }
-.format-a4 .pl-dest-postal--very-long { font-size: 22pt; }
-.format-a4 .pl-dest-city { font-size: 20pt; }
-.format-a4 .pl-dest-city--long { font-size: 18pt; }
-.format-a4 .pl-dest-city--very-long { font-size: 16pt; }
-.format-a4 .pl-dest-city--extra-long { font-size: 14pt; }
-.format-a4 .pl-dest-country { font-size: 10pt; }
 `;
 
 /** Format acheté (snapshot de la ligne) ; à défaut seulement, le poids du catalogue actuel. */
@@ -224,50 +217,37 @@ function followUpBlock(vm: InternalOrderDocumentViewModel): string {
   return `<div class="pl-follow avoid"><div class="pl-follow-title">SUIVI DE PRÉPARATION</div><div class="pl-follow-head"><span>ÉTAPE</span><span>DATE</span><span>HEURE</span></div>${rows}<div class="pl-sign pl-follow-sign"><span>Préparé par</span><span>Contrôlé par</span></div></div>`;
 }
 
-/** Palier de taille du CP : jamais coupé, plus petit seulement s'il est long (alphanumérique). */
-function postalSizeClass(postalCode: string): string {
-  const length = postalCode.length;
-  return length > 8 ? ' pl-dest-postal--very-long' : length > 6 ? ' pl-dest-postal--long' : '';
+const LOGO_FALLBACK = "var s=document.createElement('span');s.className='pl-brand';s.textContent=this.alt;this.replaceWith(s)";
+
+/** Logo du tenant (https uniquement, proportions conservées, sans cadre) ; sinon son nom. */
+function brandBlock(vm: InternalOrderDocumentViewModel): string {
+  if (vm.logoUrl) {
+    return `<div class="pl-brandbox"><img class="pl-logo" src="${escapeAttr(vm.logoUrl)}" alt="${escapeAttr(vm.tenantName)}" onerror="${LOGO_FALLBACK}"></div>`;
+  }
+  return vm.tenantName ? `<div class="pl-brandbox"><span class="pl-brand">${escapeHtml(vm.tenantName)}</span></div>` : '<div></div>';
 }
 
-/**
- * Palier de taille de la ville selon sa longueur (A5 17 → 12,5 pt) : réduite
- * seulement si nécessaire, jamais tronquée. Une ville longue garde au moins
- * 14 pt et passe à la ligne entre les mots plutôt que de devenir illisible.
- */
-export function citySizeClass(city: string): string {
-  const length = city.length;
-  if (length > 26) return ' pl-dest-city--extra-long';
-  if (length > 17) return ' pl-dest-city--very-long';
-  if (length > 12) return ' pl-dest-city--long';
-  return '';
-}
-
-function destinationBox(vm: InternalOrderDocumentViewModel): string {
+/** Bloc adresse : CP et ville en gras juste sous la rue/complément, pays et mode en ligne compacte. */
+function addressBlock(vm: InternalOrderDocumentViewModel): string {
+  const lines = (vm.deliveryAddress ?? []).map((line) => `<div class="pl-address">${escapeHtml(line)}</div>`).join('');
+  if (vm.fulfillment === 'pickup') {
+    return `<div class="pl-addr"><div class="pl-customer">${escapeHtml(vm.customerName)}</div><div class="pl-route">${vm.fulfillmentLabel} · Retrait en boutique</div></div>`;
+  }
   const parts = vm.destinationParts;
-  const country = parts?.country ? `<span class="pl-dest-country">${escapeHtml(parts.country)}</span>` : '';
-  const postal = parts?.postalCode
-    ? `<div class="pl-dest-postal${postalSizeClass(parts.postalCode)}">${escapeHtml(parts.postalCode)}</div>` : '';
-  const city = parts?.city
-    ? `<div class="pl-dest-city${citySizeClass(parts.city)}">${escapeHtml(parts.city)}</div>` : '';
-  const missing = !postal && !city ? '<div class="pl-dest-missing">Destination non renseignée</div>' : '';
-  return `<div class="pl-dest"><div class="pl-dest-top"><span class="pl-badge">${vm.fulfillmentLabel}</span>${country}</div>${postal}${city}${missing}</div>`;
+  const postalCity = [parts?.postalCode, parts?.city].filter(Boolean).join(' ');
+  const place = postalCity
+    ? `<div class="pl-postal-city">${escapeHtml(postalCity)}</div>`
+    : '<div class="pl-postal-city pl-missing">Destination non renseignée</div>';
+  const route = [parts?.country, vm.fulfillmentLabel].filter(Boolean).map((part) => escapeHtml(part)).join(' · ');
+  return `<div class="pl-addr"><div class="pl-customer">${escapeHtml(vm.customerName)}</div>${lines}${place}<div class="pl-route">${route}</div></div>`;
 }
 
 function header(vm: InternalOrderDocumentViewModel): string {
-  const address = vm.deliveryAddress?.length
-    ? `<div class="pl-address">${vm.deliveryAddress.map(escapeHtml).join('<br>')}</div>` : '';
-  // Date de commande en tête, en gros caractères gras, au-dessus du titre (demande boutique n° 1001).
   const when = vm.createdAt ? `<div class="pl-date">${escapeHtml(vm.createdAt)}</div>` : '';
-  const identity = `<div class="pl-id">${when}<p class="pl-title">LISTE DE PRÉPARATION</p>
-<div class="pl-meta pl-when">${escapeHtml([`Commande #${vm.ref}`, vm.tenantName].filter(Boolean).join(' - '))}</div>
-<div class="pl-customer">${escapeHtml(vm.customerName)}</div>${address}</div>`;
-  const side = vm.fulfillment === 'delivery'
-    ? destinationBox(vm)
-    : `<div class="pl-pickup"><span class="pl-badge">${vm.fulfillmentLabel}</span><div class="pl-meta">Retrait en boutique</div></div>`;
   return `<div class="pl-head">
-${identity}
-${side}
+<div class="pl-id">${when}<p class="pl-title">LISTE DE PRÉPARATION</p>
+<div class="pl-meta pl-when">Commande #${escapeHtml(vm.ref)}</div>${addressBlock(vm)}</div>
+${brandBlock(vm)}
 </div>`;
 }
 

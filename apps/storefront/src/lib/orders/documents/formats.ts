@@ -43,6 +43,29 @@ export const ORDER_DOCUMENT_FORMATS: Record<OrderDocumentFormat, OrderDocumentFo
   },
 };
 
+/** Type de document pour la configuration d'impression par document. */
+export type OrderDocumentMarginKind = 'picking_list' | 'packing_slip' | 'preparation_summary';
+
+type MarginsMm = OrderDocumentFormatSpec['marginsMm'];
+
+/**
+ * Marges propres à un type de document (en plus de celles du format). La liste
+ * de préparation est imprimée pour des classeurs à anneaux : marge gauche
+ * élargie pour la perforation, appliquée par Gotenberg sur chaque page (jamais
+ * en padding CSS). Autres documents : marges du format, inchangées. Ajouter un
+ * type = une entrée ici.
+ */
+export const ORDER_DOCUMENT_MARGIN_OVERRIDES_MM: Partial<Record<OrderDocumentMarginKind, Record<OrderDocumentFormat, MarginsMm>>> = {
+  picking_list: {
+    a5: { top: 9, right: 9, bottom: 13, left: 22 },
+    a4: { top: 12, right: 14, bottom: 15, left: 25 },
+  },
+};
+
+export function documentMarginsMm(kind: OrderDocumentMarginKind, format: OrderDocumentFormat): MarginsMm {
+  return ORDER_DOCUMENT_MARGIN_OVERRIDES_MM[kind]?.[format] ?? ORDER_DOCUMENT_FORMATS[format].marginsMm;
+}
+
 export const DEFAULT_ORDER_DOCUMENT_FORMAT: OrderDocumentFormat = 'a5';
 
 export function isOrderDocumentFormat(value: unknown): value is OrderDocumentFormat {
