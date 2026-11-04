@@ -34,6 +34,19 @@ export class IngestError extends Error {
   constructor(code: string, status = 422) { super(code); this.name = 'IngestError'; this.code = code; this.status = status; }
 }
 
+/**
+ * A rows insert that failed. The SQLSTATE (five characters, never a message or a value) is part of the
+ * code so the CI log shows the cause. A single INSERT is atomic, so transient classes (query timeout,
+ * serialization, deadlock, resources, connection) answer 503: the sync client retries the same batch.
+ */
+export function rowsInsertError(pgCode: string | undefined): IngestError {
+  if (pgCode === '23503') return new IngestError('missing_blob_or_reference', 422);
+  if (pgCode === '23505') return new IngestError('duplicate_row', 409);
+  const state = pgCode && /^[0-9A-Z]{5}$/.test(pgCode) ? pgCode : 'unknown';
+  const transient = ['57014', '40001', '40P01'].includes(state) || /^(53|08|57P)/.test(state);
+  return new IngestError(`database_error_${state}`, transient ? 503 : 422);
+}
+
 type Obj = Record<string, unknown>;
 const isObj = (value: unknown): value is Obj => !!value && typeof value === 'object' && !Array.isArray(value);
 const str = (value: unknown, max: number, field: string): string => {

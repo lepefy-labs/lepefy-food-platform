@@ -41,6 +41,7 @@ Provare senza inviare nulla: `pnpm engineering:sync -- --dry-run` (stampa conteg
 | `engineering_run_in_progress` (409) | un altro run è `running` | attendere o 30 min per il timeout |
 | `engineering_branch_not_activatable` | si sta attivando un ramo non predefinito | atteso per le PR; non è un errore |
 | `blob_sha_mismatch` | contenuto alterato in transito o line-ending convertiti | non usare `autocrlf` nel checkout della Action |
+| `422 database_error_<SQLSTATE>` (es. `database_error_23514`) | l'INSERT di un lotto di righe è stato rifiutato dal DB; il codice è il solo SQLSTATE (mai messaggi o valori) | `57014` (timeout), `40001`, `40P01`, classi `53`/`08`/`57P` rispondono `503` e il client rilancia lo stesso lotto (l'INSERT è atomico); gli altri codici indicano dati o schema (es. `23514` check, `22001` lunghezza, `42501` permessi): cercare il codice, verificare che la 175/176/178 siano applicate |
 | `413` | lotto sopra 3,5 MB | non dovrebbe accadere (il piano limita i lotti); segnalare |
 
 Log dell'endpoint: solo il **codice** dell'errore, mai contenuti dei file.
