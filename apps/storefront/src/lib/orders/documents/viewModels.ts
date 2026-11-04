@@ -1,6 +1,6 @@
 import { formatPrice } from '@/lib/utils/format';
 import { groupSuggestedCartons, type CartonSuggestion } from '@/lib/shipping/cartonSuggestion';
-import { formatDocumentDate, formatKg, orderShortRef, readableBrandColor, safeColor, safeImageUrl } from './documentHtml';
+import { displayCountry, formatDocumentDate, formatKg, orderShortRef, readableBrandColor, safeColor, safeImageUrl } from './documentHtml';
 import { androidAppStatus } from '@/lib/mobileApp/androidApp';
 import { formatWhatsappDisplay } from '@/lib/orders/portal/supportChannels';
 import type { OrderDocumentsConfig } from './settings';
@@ -101,18 +101,21 @@ export interface InternalOrderDocumentViewModel {
   fulfillment: 'delivery' | 'pickup';
   fulfillmentLabel: string;
   tenantName: string;
+  /** Logo du tenant (https uniquement) ; null → le nom du tenant le remplace dans l'en-tête. */
+  logoUrl: string | null;
   customerName: string;
   destination: string | null;
   /**
-   * Destination de l'en-tête (livraison uniquement) : CP et ville en grand dans
-   * l'encadré de droite, code pays en petit. Valeurs telles que saisies (zéros
-   * initiaux et CP alphanumériques conservés), null si absentes.
+   * Destination de l'en-tête (livraison uniquement) : CP et ville toujours
+   * présents (indépendamment du réglage d'adresse complète), pays compact
+   * (code ISO traduit en français, autre valeur telle que saisie). CP et
+   * ville tels que saisis (zéros initiaux et CP alphanumériques conservés).
    */
   destinationParts: { postalCode: string | null; city: string | null; country: string | null } | null;
   /**
-   * Rue, complément et destinataire s'il diffère (livraison uniquement),
-   * seulement si le tenant l'a activé. CP et ville n'y figurent pas : ils sont
-   * dans l'encadré de destination.
+   * Destinataire s'il diffère, entreprise, rue et complément (livraison
+   * uniquement), seulement si le tenant l'a activé. CP, ville et pays n'y
+   * figurent pas : ils viennent de `destinationParts`.
    */
   deliveryAddress: string[] | null;
   items: PickingItemVM[];
@@ -185,7 +188,7 @@ function dims(carton: { box_length_cm: number; box_width_cm: number; box_height_
 export function buildPickingListViewModel(input: {
   order: DocumentOrderRow;
   items: DocumentItemRow[];
-  tenant: Pick<DocumentTenant, 'name'> & Partial<Pick<DocumentTenant, 'currency'>>;
+  tenant: Pick<DocumentTenant, 'name'> & Partial<Pick<DocumentTenant, 'currency' | 'logo_url'>>;
   carton: { suggestion: CartonSuggestion | null; missingWeightLines: number; maxParcelG?: number } | null;
   showDeliveryAddress?: boolean;
   productWeights?: ReadonlyMap<string, number>;
@@ -201,7 +204,7 @@ export function buildPickingListViewModel(input: {
     ...pickingLineFormat(item, input.productWeights),
   }));
   const a = address(order);
-  const parts = { postalCode: addressText(a.postal_code), city: addressText(a.city), country: addressText(a.country) };
+  const parts = { postalCode: addressText(a.postal_code), city: addressText(a.city), country: displayCountry(addressText(a.country)) };
   const destination = isPickup ? null : [[a.postal_code, a.city].filter(Boolean).join(' '), a.country].filter(Boolean).join(', ') || null;
   const suggestion = !isPickup ? carton?.suggestion ?? null : null;
   const checkoutWeight = Number((order.shipping_details as { totalWeightG?: unknown } | null)?.totalWeightG);
@@ -233,6 +236,7 @@ export function buildPickingListViewModel(input: {
     fulfillment: isPickup ? 'pickup' : 'delivery',
     fulfillmentLabel: isPickup ? 'RETRAIT' : 'LIVRAISON',
     tenantName: tenant.name,
+    logoUrl: safeImageUrl(tenant.logo_url),
     customerName: order.full_name?.trim() || 'Client',
     destination,
     destinationParts: isPickup ? null : parts,
