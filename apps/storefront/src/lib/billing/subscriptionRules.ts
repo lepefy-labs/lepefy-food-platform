@@ -92,12 +92,19 @@ export interface SubscriptionState {
   /** Whole days until paid_until (due_soon / active). */
   daysLeft: number | null;
   autoSuspendAt: Date | null;
-  /** Days until the automatic suspension, when it is scheduled and not reached. */
+  /** UTC calendar days until automatic suspension (the date displayed in the banner). */
   daysUntilAutoSuspend: number | null;
 }
 
 function wholeDays(fromMs: number, toMs: number): number {
   return Math.floor((toMs - fromMs) / DAY_MS);
+}
+
+/** Calendar-date difference in UTC, matching the dates shown to tenants and reminder emails. */
+function calendarDaysUtc(from: Date, to: Date): number {
+  const fromDay = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate());
+  const toDay = Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate());
+  return Math.round((toDay - fromDay) / DAY_MS);
 }
 
 export function subscriptionState(row: SubscriptionRow | null, now: Date = new Date()): SubscriptionState {
@@ -109,7 +116,7 @@ export function subscriptionState(row: SubscriptionRow | null, now: Date = new D
   const paidUntilMs = row.paid_until ? new Date(row.paid_until).getTime() : null;
   const daysOverdue = paidUntilMs !== null && now.getTime() > paidUntilMs ? Math.max(1, Math.ceil((now.getTime() - paidUntilMs) / DAY_MS)) : 0;
   const daysLeft = paidUntilMs !== null && now.getTime() <= paidUntilMs ? wholeDays(now.getTime(), paidUntilMs) : null;
-  const daysUntilAutoSuspend = auto && !suspended ? Math.max(0, Math.ceil((auto.getTime() - now.getTime()) / DAY_MS)) : null;
+  const daysUntilAutoSuspend = auto && !suspended ? Math.max(0, calendarDaysUtc(now, auto)) : null;
   const base = { suspendedBy: by, daysOverdue, daysLeft, autoSuspendAt: auto, daysUntilAutoSuspend };
   if (suspended) return { kind: 'suspended', ...base };
   if (paidUntilMs === null) return { kind: 'undefined', ...base };

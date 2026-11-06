@@ -40,7 +40,9 @@ export default function SubscriptionBanner({ serviceState, canViewBilling }: { s
   if (imminent && state.autoSuspendAt) {
     const suspension = state.daysUntilAutoSuspend === 0
       ? 'Suspension automatique aujourd’hui'
-      : `Suspension automatique dans ${plural(state.daysUntilAutoSuspend!, 'jour')}`;
+      : state.daysUntilAutoSuspend === 1
+        ? 'Suspension automatique demain'
+        : `Suspension automatique dans ${plural(state.daysUntilAutoSuspend!, 'jour')}`;
     detail = `${detail ? detail + ' ' : ''}${suspension} (${formatBillingDate(state.autoSuspendAt)}) sans paiement.`;
     title ??= 'Votre abonnement nécessite un paiement';
   }

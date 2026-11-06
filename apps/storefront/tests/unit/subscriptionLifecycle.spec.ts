@@ -73,7 +73,7 @@ test.describe('suspension', () => {
 
     const auto = subscriptionState(row({ suspension_mode: 'automatic', grace_days: 7 }), now);
     expect(auto.kind).toBe('overdue');
-    expect(auto.daysUntilAutoSuspend).toBe(4);
+    expect(auto.daysUntilAutoSuspend).toBe(3);
     expect(shouldWarnTenant(auto)).toBe(true);
 
     const dueSoon = subscriptionState(row({ paid_until: '2026-10-08T23:59:59Z' }), now);
@@ -89,6 +89,14 @@ test.describe('suspension', () => {
     const suspended = subscriptionState(row({ status: 'suspended', suspended_at: '2026-10-01T00:00:00Z' }), now);
     expect(suspended.kind).toBe('suspended');
     expect(shouldWarnTenant(suspended)).toBe(true);
+  });
+
+  test('automatic suspension countdown uses UTC calendar dates, not rounded-up hours', () => {
+    const november = row({ suspension_mode: 'automatic', paid_until: '2026-10-31T23:59:59Z', grace_days: 7 });
+    expect(subscriptionState(november, d('2026-11-06T06:45:00Z')).daysUntilAutoSuspend).toBe(1);
+    expect(subscriptionState(november, d('2026-11-07T00:01:00Z')).daysUntilAutoSuspend).toBe(0);
+    expect(subscriptionState(november, d('2026-11-07T23:59:58Z')).kind).toBe('overdue');
+    expect(subscriptionState(november, d('2026-11-08T00:00:00Z')).kind).toBe('suspended');
   });
 
   test('plural', () => {
