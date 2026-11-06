@@ -141,9 +141,6 @@ export default async function BillingPage() {
               <ButtonAnchor variant="primary" href={paypalLink} target="_blank" rel="noopener noreferrer" className="mt-3 min-h-12 w-full justify-between text-base">
                 <span>Payer avec PayPal · {price}</span><IconArrowRight size={18} aria-hidden="true" />
               </ButtonAnchor>
-              <div className="mt-3 rounded-xl border border-a-border bg-a-surface p-3">
-                <CopyableValue stacked label="Note à indiquer dans PayPal" value={reference} />
-              </div>
             </div>
           )}
 
