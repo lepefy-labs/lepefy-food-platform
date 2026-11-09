@@ -6,6 +6,7 @@ import {
   type ShippingProviderContext,
 } from '@/lib/shipping/providers/types';
 import { buildShipmentDraftInput, type DraftCartonProfile, type DraftItemRow, type DraftPackagingRow } from './buildDraftInput';
+import { loadPackagingWeightBands } from '@/lib/shipping/loadPackagingWeightBands';
 import { readShippingAutomationSettings, type ShippingAutomationSettings } from './settings';
 import { shipmentDraftErrorCode, shipmentDraftErrorMessage } from './shipmentDraftPresentation';
 import { notifyShipmentIssue } from '@/lib/notifications/staff/orderEvents';
@@ -159,7 +160,8 @@ async function loadDraftData(service: OrderService, order: Order) {
   if (itemsResult.error) throw new Error('items_unavailable');
   const items = (itemsResult.data ?? []) as DraftItemRow[];
   const productIds = [...new Set(items.map(item => item.product_id).filter((id): id is string => Boolean(id)))];
-  const [products, packaging, profiles] = await Promise.all([
+  const [packagingWeightBands, products, packaging, profiles] = await Promise.all([
+    loadPackagingWeightBands(service as unknown as Parameters<typeof loadPackagingWeightBands>[0], order.tenant_id),
     productIds.length
       ? service.from('products').select('id, weight_grams').eq('tenant_id', order.tenant_id).in('id', productIds)
       : Promise.resolve({ data: [], error: null }),
@@ -172,7 +174,7 @@ async function loadDraftData(service: OrderService, order: Order) {
     .map(product => [product.id, product.weight_grams]));
   return {
     items, productWeights, packaging: (packaging.data as DraftPackagingRow | null) ?? null,
-    profiles: (profiles.data ?? []) as DraftCartonProfile[],
+    profiles: (profiles.data ?? []) as DraftCartonProfile[], packagingWeightBands,
   };
 }
 

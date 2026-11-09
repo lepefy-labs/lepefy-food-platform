@@ -40,6 +40,8 @@ import {
   type ShippingCountryRule,
 } from '@/lib/shipping/resolveCountryRule';
 import { computeRequestHash } from '@/lib/shipping/intelligence/requestHash';
+import { loadPackagingWeightBands } from '@/lib/shipping/loadPackagingWeightBands';
+import { grossParcelWeights } from '@/lib/shipping/packagingWeight';
 import { resolveZoneCode } from '@/lib/shipping/intelligence/resolveZone';
 
 export const runtime = 'nodejs';
@@ -146,6 +148,10 @@ export async function POST(req: NextRequest) {
   const surcharge  = surchargeResult.data as PackagingSurcharge | null;
   const vatRates    = (vatRatesResult.data ?? []) as VatRate[];
   const countryRules = (countryRulesResult.data ?? []) as ShippingCountryRule[];
+  const packagingWeightBands = await loadPackagingWeightBands(supabase, tenant.id).catch(() => null);
+  if (!packagingWeightBands) {
+    return NextResponse.json({ available: false, message: 'Lecture du poids d\'emballage impossible. Réessayez.' }, { status: 500 });
+  }
 
   if (!surcharge) {
     console.error('[admin/shipping-simulator] packaging_surcharges manquant — tenant:', tenant.id);
@@ -157,9 +163,12 @@ export async function POST(req: NextRequest) {
 
   // ── Colis — même formule que le flux réel ────────────────────────────────
   const totalWeightG   = Math.round(weightKg * 1000);
-  const parcelWeightsG = splitIntoParcels(totalWeightG, surcharge.max_pack_kg);
-  const numParcels     = parcelWeightsG.length;
+  const netParcelWeightsG = splitIntoParcels(totalWeightG, surcharge.max_pack_kg);
+  const numParcels     = netParcelWeightsG.length;
   const packagingSurchargeTotal = calcPackagingSurcharge(surcharge, numParcels);
+  // Poids envoyé à Packlink : celui du devis réel (net + tranche d'emballage).
+  const parcelWeightsG = grossParcelWeights(netParcelWeightsG, packagingWeightBands);
+  const grossWeightG   = parcelWeightsG.reduce((sum, g) => sum + g, 0);
 
   const boxDimensions = {
     length: surcharge.box_length_cm,
@@ -283,7 +292,7 @@ export async function POST(req: NextRequest) {
         parcels:                 parcelWeightsG.map((g) => ({
           weight_g: g, length_cm: boxDimensions.length, width_cm: boxDimensions.width, height_cm: boxDimensions.height,
         })),
-        total_weight_g:          totalWeightG,
+        total_weight_g:          grossWeightG,
         packaging_profile_id:    (defaultProfile as { id: string } | null)?.id ?? null,
         service_id:              String(s.id),
         carrier:                 s.carrierName || null,
@@ -441,7 +450,7 @@ export async function POST(req: NextRequest) {
     available: true,
     input: {
       weightKg, country, postalCode,
-      totalWeightG, numParcels, packagingSurchargeTotal,
+      totalWeightG, grossWeightG, numParcels, packagingSurchargeTotal,
       boxDimensions,
     },
     services: simulatorServices,

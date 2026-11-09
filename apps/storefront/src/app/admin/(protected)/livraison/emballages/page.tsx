@@ -3,6 +3,10 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import AdminBlockAccent from '../../../_components/ui/AdminBlockAccent';
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
 import { PackagingProfilesSection } from './PackagingProfilesSection';
+import { PackagingWeightBandsSection } from './PackagingWeightBandsSection';
+import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
+import { isMissingPackagingWeightTable } from '@/lib/shipping/loadPackagingWeightBands';
+import { bandsFromRows, type PackagingWeightBandRow } from '@/lib/shipping/packagingWeight';
 import type { ShippingPackagingProfileRow } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +23,16 @@ export default async function AdminPackagingProfilesPage() {
     .eq('tenant_id', tenant.id)
     .order('position', { ascending: true }) as unknown as { data: ShippingPackagingProfileRow[] | null };
 
+  // UI hint only: the write route re-checks shipping.manage.
+  const access = await getCurrentAdminAccessContext(tenant.id);
+  const canManage = Boolean(access && canAdmin(access, 'shipping.manage'));
+  const bandsResult = await supabase
+    .from('shipping_packaging_weight_bands')
+    .select('min_weight_g_exclusive, max_weight_g_inclusive, added_weight_g')
+    .eq('tenant_id', tenant.id);
+  const migrationReady = !isMissingPackagingWeightTable(bandsResult.error as { code?: string } | null);
+  const bands = bandsFromRows((bandsResult.data ?? []) as PackagingWeightBandRow[]);
+
   return (
     <div className="mx-auto w-full max-w-5xl pb-10">
       <AdminPageHeader
@@ -27,6 +41,7 @@ export default async function AdminPackagingProfilesPage() {
         meta={`${(profiles ?? []).length} profil${(profiles ?? []).length !== 1 ? 's' : ''}`}
       />
 
+      <PackagingWeightBandsSection initial={bands} canManage={canManage} migrationReady={migrationReady} />
 
       <AdminBlockAccent tone="info">
         <PackagingProfilesSection initialProfiles={profiles ?? []} />

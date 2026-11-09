@@ -32,6 +32,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { calculateShipping, resolveVatRate, type VatRate } from '@/lib/shipping/calculateShipping';
 import { extraCustomsTerritory, extraCustomsUnavailableMessage } from '@/lib/shipping/extraCustomsTerritories';
+import { loadPackagingWeightBands } from '@/lib/shipping/loadPackagingWeightBands';
 import { cartFingerprint, signQuote, signQuoteV2 } from '@/lib/shipping/quoteToken';
 import { resolveCountryRule, applyCountryRule, type ShippingCountryRule } from '@/lib/shipping/resolveCountryRule';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
@@ -226,7 +227,8 @@ async function quoteProviderCost(
       }
 
       // ── DB config queries ─────────────────────────────────────────────────
-      const [surchargeResult, vatRatesResult] = await Promise.all([
+      const [packagingWeightBands, surchargeResult, vatRatesResult] = await Promise.all([
+        loadPackagingWeightBands(supabase, tenant.id).catch(() => null),
         supabase
           .from('packaging_surcharges')
           .select('surcharge_amount, surcharge_mode, max_pack_kg, box_length_cm, box_width_cm, box_height_cm')
@@ -251,7 +253,7 @@ async function quoteProviderCost(
       }
       console.info('[shipping/quote] surcharge row:', surcharge, '— vatRates count:', vatRates?.length ?? 0);
 
-      if (!surcharge) {
+      if (!surcharge || !packagingWeightBands) {
         return { available: false, message: ERROR_COPY.shippingUnavailableNow, status: 500 };
       }
 
@@ -262,6 +264,7 @@ async function quoteProviderCost(
           from: FROM_ADDRESS,
           to,
           packagingSurcharge: surcharge,
+          packagingWeightBands,
           vatRates: vatRates ?? [],
           ...(strict ? { strict: {} } : {}),
         },
@@ -294,6 +297,13 @@ async function quoteProviderCost(
       };
     }
   }
+}
+
+/** Poids transporteur de la commande au forfait : informatif, `totalWeightG` et le prix restent nets. */
+function packagingWeightDetails(parcels: Array<{ grossG: number }> | null, netWeightG: number, enabled: boolean): Record<string, number> {
+  if (!enabled || !parcels) return {};
+  const grossWeightG = parcels.reduce((sum, parcel) => sum + parcel.grossG, 0);
+  return { packagingWeightG: grossWeightG - netWeightG, grossWeightG };
 }
 
 /** Forfait commerciale (V1G): prezzo, disponibilità e token V2 — tutto server-side. */
@@ -370,7 +380,8 @@ async function quoteTariff(
   }
 
   // Disponibilité logistique : jamais déduite de la seule formule tarifaire.
-  const [profilesResult, surchargeResult, vatResult] = await Promise.all([
+  const [packagingWeightBands, profilesResult, surchargeResult, vatResult] = await Promise.all([
+    loadPackagingWeightBands(supabase, tenant.id),
     supabase.from('shipping_packaging_profiles').select('*').eq('tenant_id', tenant.id).eq('active', true),
     supabase.from('packaging_surcharges').select('box_length_cm, box_width_cm, box_height_cm')
       .eq('tenant_id', tenant.id).eq('active', true).maybeSingle(),
@@ -386,6 +397,7 @@ async function quoteTariff(
     vatRate: resolveVatRate(outcome.destination.country, (vatResult.data ?? []) as VatRate[]),
     profiles: (profilesResult.data ?? []) as never,
     defaultBox: box ? { length: box.box_length_cm, width: box.box_width_cm, height: box.box_height_cm } : null,
+    packagingWeightBands,
   });
   if (!availability.available) {
     console.info('[shipping/quote] tariff logistics unavailable — tenant:', tenant.id, '— reason:', availability.reason);
@@ -406,7 +418,7 @@ async function quoteTariff(
   return NextResponse.json({
     available: true,
     shippingTotal: outcome.finalCents / 100,
-    shippingDetails: buildTariffShippingDetails(outcome, snapshot),
+    shippingDetails: { ...buildTariffShippingDetails(outcome, snapshot), ...packagingWeightDetails(availability.parcels, outcome.weightG, packagingWeightBands.length > 0) },
     freeShipping,
     pricingMode: 'tariff',
     // Lien vers la grille publique seulement si la page est activée pour le tenant.

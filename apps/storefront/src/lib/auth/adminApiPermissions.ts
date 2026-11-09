@@ -71,6 +71,7 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   // deliberately absent from this tenant capability map.
   if (path.startsWith('/api/admin/shipping-rules')) return read ? 'shipping.view' : 'shipping.manage';
   if (path.startsWith('/api/admin/shipping-packaging-profiles')) return read ? 'shipping.view' : 'shipping.manage';
+  if (path === '/api/admin/shipping-packaging-weight') return read ? 'shipping.view' : 'shipping.manage';
   if (path.startsWith('/api/admin/shipping-zones')) return read ? 'shipping.view' : 'shipping.manage';
   if (path.startsWith('/api/admin/shipping-observations')) return 'shipping.view';
   if (path === '/api/admin/shipping-advisor') return 'shipping.view';

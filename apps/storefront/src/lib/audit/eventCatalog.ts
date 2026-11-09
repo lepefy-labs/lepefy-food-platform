@@ -36,6 +36,7 @@ export const AUDIT_EVENT_TYPES = {
   'orders.preparation.unverified_advance': { label: 'Commande avancée sans contrôle de préparation', module: 'orders', category: 'activity', severity: 'notice', retention: 'business' },
   'payments.payment.manually_confirmed': { label: 'Paiement confirmé manuellement', module: 'payments', category: 'activity', severity: 'notice', retention: 'business' },
   'payments.payment.status_changed': { label: 'Statut du paiement modifié', module: 'payments', category: 'activity', severity: 'info', retention: 'business' },
+  'shipping.packaging_weight.updated': { label: 'Poids d’emballage modifié', module: 'shipping', category: 'activity', severity: 'notice', retention: 'business' },
   'shipping.shipment.draft_requested': { label: 'Brouillon d’expédition demandé', module: 'shipping', category: 'automation', severity: 'info', retention: 'technical' },
   'shipping.shipment.draft_created': { label: 'Brouillon d’expédition créé', module: 'shipping', category: 'automation', severity: 'info', retention: 'business' },
   'shipping.shipment.creation_failed': { label: 'Création d’expédition échouée', module: 'shipping', category: 'automation', severity: 'warning', retention: 'business' },

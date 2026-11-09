@@ -153,7 +153,7 @@ interface SimulatorResult {
   message?:  string;
   input?: {
     weightKg: number; country: string; postalCode: string;
-    totalWeightG: number; numParcels: number; packagingSurchargeTotal: number;
+    totalWeightG: number; grossWeightG: number; numParcels: number; packagingSurchargeTotal: number;
   };
   services?:           SimulatorService[];
   chosenServiceId?:    number | null;
@@ -287,6 +287,7 @@ export function ShippingSimulator({ shippingProvider, currency }: ShippingSimula
           <section className="bg-a-surface rounded-xl border border-a-border p-5 overflow-x-auto">
             <p className="text-xs text-a-text-3 mb-3">
               {result.input?.numParcels} colis · surplus emballage total : {formatPrice(result.input?.packagingSurchargeTotal ?? 0, currency)}
+              {result.input && result.input.grossWeightG !== result.input.totalWeightG && ` · poids envoyé au transporteur : ${(result.input.grossWeightG / 1000).toLocaleString('fr-FR')} kg (emballage compris)`}
             </p>
             <table className="w-full text-sm">
               <thead>

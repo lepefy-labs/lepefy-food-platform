@@ -30,6 +30,7 @@ import {
 } from '@/lib/shipping/calculateShipping';
 import { extraCustomsTerritory, extraCustomsUnavailableMessage } from '@/lib/shipping/extraCustomsTerritories';
 import { cartonsForWeight, splitParcelWeightsFilled } from '@/lib/shipping/cartonSuggestion';
+import { grossParcelWeights, type PackagingWeightBand } from '@/lib/shipping/packagingWeight';
 import { resolveZoneCodeFromRows } from '@/lib/shipping/intelligence/resolveZone';
 import { requestPacklinkServices } from '@/lib/shipping/intelligence/packlinkQuote';
 import { computeRequestHash } from '@/lib/shipping/intelligence/requestHash';
@@ -236,27 +237,30 @@ type ProfileLike = Pick<ShippingPackagingProfileRow,
  * Colli pieni fino al limite della versione + resto (20 kg → 15 + 5), cartone
  * per collo con la stessa regola della card «Carton à utiliser» del dettaglio
  * ordine (`cartonsForWeight`), altrimenti profilo di default, altrimenti la
- * scatola `packaging_surcharges`. Tara sommata solo al peso lordo.
+ * scatola `packaging_surcharges`. Peso lordo = netto + tranche d'emballage
+ * (migration 180) se il tenant ne ha, altrimenti netto + tara del cartone.
  */
 export function planTariffParcels(
   weightG: number,
   maxParcelG: number,
   profiles: ProfileLike[],
   defaultBox: { length: number; width: number; height: number } | null,
+  packagingWeightBands: readonly PackagingWeightBand[] = [],
 ): PlannedParcel[] | null {
   const weights = splitParcelWeightsFilled(weightG, maxParcelG);
   const fallbackProfile = profiles.find((p) => p.active && p.is_default) ?? null;
+  const bandGross = packagingWeightBands.length > 0 ? grossParcelWeights(weights, packagingWeightBands) : null;
   const plan: PlannedParcel[] = [];
-  for (const netG of weights) {
+  for (const [index, netG] of weights.entries()) {
     const carton = cartonsForWeight(netG, profiles)[0] ?? fallbackProfile;
     if (carton) {
       plan.push({
-        netG, grossG: netG + Math.max(0, Math.round(carton.tare_g ?? 0)),
+        netG, grossG: bandGross ? bandGross[index]! : netG + Math.max(0, Math.round(carton.tare_g ?? 0)),
         lengthCm: Number(carton.box_length_cm), widthCm: Number(carton.box_width_cm), heightCm: Number(carton.box_height_cm),
         profileId: carton.id, profileName: carton.name,
       });
     } else if (defaultBox) {
-      plan.push({ netG, grossG: netG, lengthCm: defaultBox.length, widthCm: defaultBox.width, heightCm: defaultBox.height, profileId: null, profileName: null });
+      plan.push({ netG, grossG: bandGross ? bandGross[index]! : netG, lengthCm: defaultBox.length, widthCm: defaultBox.width, heightCm: defaultBox.height, profileId: null, profileName: null });
     } else {
       return null;
     }
@@ -314,6 +318,8 @@ export interface AvailabilityInput {
   vatRate: number;
   profiles: ProfileLike[];
   defaultBox: { length: number; width: number; height: number } | null;
+  /** Tranches d'emballage (migration 180) : poids envoyé au provider, jamais le prix du forfait. */
+  packagingWeightBands?: readonly PackagingWeightBand[];
   now?: number;
   timeoutMs?: number;
   /** Iniettabile nei test. */
@@ -334,7 +340,7 @@ export async function checkTariffAvailability(input: AvailabilityInput): Promise
     return { available: true, source: 'not_checked', providerQuoteTtcCents: null, carrier: null, service: null, parcels: null };
   }
 
-  const plan = planTariffParcels(priced.weightG, priced.tariff.maxParcelWeightG, input.profiles, input.defaultBox);
+  const plan = planTariffParcels(priced.weightG, priced.tariff.maxParcelWeightG, input.profiles, input.defaultBox, input.packagingWeightBands);
   const overVerifiedLimit = priced.tariff.logisticsVerifiedMaxWeightG !== null && priced.weightG > priced.tariff.logisticsVerifiedMaxWeightG;
   if (!plan) return { available: false, reason: 'provider_unavailable', parcels: null };
   const request = buildAvailabilityRequest(plan, priced.destination);

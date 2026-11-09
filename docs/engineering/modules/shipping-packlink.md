@@ -19,6 +19,7 @@ Preventivi di spedizione al checkout, tariffe a forfait per paese, bozze di sped
 ## Punti di ingresso
 
 - Calcolo con Packlink: `apps/storefront/src/lib/shipping/calculateShipping.ts` — `shippingTotal = prezzo_base_packlink + IVA + (supplemento × numero_colli)`, con `num_parcels = ceil(peso_totale_g / (max_pack_kg × 1000))`; sceglie il servizio idoneo più economico (solo consegna a domicilio).
+- Peso d'emballage: `apps/storefront/src/lib/shipping/packagingWeight.ts` — tranche sul netto totale dell'ordine (`shipping_packaging_weight_bands`, migration 180), aggiunta al peso inviato al provider; incide sul prezzo solo senza forfait.
 - Forfait: `tenants.shipping_pricing_mode = 'tariff'` addebita solo la versione `active` di un paese; le versioni (`shipping_tariff_versions`) sono immutabili (trigger 124). Pubblicazione: RPC `publish_shipping_tariff_version` (migration 159).
 - Stima per il carrello: `apps/storefront/src/lib/shipping/tariff/shippingEstimate.ts` (stesso motore e stessi pesi del preventivo; non espone mai griglia, costi o limiti di fascia).
 - Bozze Packlink: `apps/storefront/src/lib/shipping/shipmentDraft/shipmentDraftService.ts` — `requestShipmentDraft` accoda `pending` e non lancia né chiama il provider.

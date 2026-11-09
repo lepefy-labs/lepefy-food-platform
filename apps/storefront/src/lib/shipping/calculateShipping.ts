@@ -24,6 +24,8 @@
  * Tutto configurabile in DB — zero modifiche al codice per cambiare importi o logica.
  */
 
+import { grossParcelWeights, type PackagingWeightBand } from './packagingWeight';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type SurchargeMode = 'per_parcel' | 'per_order';
@@ -54,6 +56,8 @@ export interface ShippingInput {
   to:                 ShippingAddress;
   packagingSurcharge: PackagingSurcharge;
   vatRates:           VatRate[];
+  /** Tranches de poids d'emballage du tenant (migration 180). Absent/vide = poids net historique. */
+  packagingWeightBands?: PackagingWeightBand[];
   /**
    * Preventivi internazionali: nessun peso convenzionale (400 g), IVA solo da
    * risposta esplicita del provider o da una riga `shipping_vat_rates` del paese
@@ -67,7 +71,11 @@ export type ShippingResult =
       available: true;
       shippingTotal: number;
       _internal: {
+        /** Toujours le poids NET : relu par la bozza, le carton suggéré et les PDF. */
         totalWeightG:            number;
+        /** Présents seulement si le tenant a des tranches d'emballage. */
+        packagingWeightG?:       number;
+        grossWeightG?:           number;
         numParcels:              number;
         packlinkCost:            number;
         vatRate:                 number;
@@ -305,8 +313,12 @@ export async function calculateShipping(
   );
   const parcelWeightsG = splitIntoParcels(totalWeightG, packagingSurcharge.max_pack_kg);
   const numParcels = parcelWeightsG.length;
+  // Le découpage et le supplément restent sur le net ; seul le poids envoyé à Packlink change.
+  const packagingWeightBands = input.packagingWeightBands ?? [];
+  const grossWeightsG = grossParcelWeights(parcelWeightsG, packagingWeightBands);
+  const grossWeightG = grossWeightsG.reduce((sum, g) => sum + g, 0);
 
-  console.info('[calculateShipping] totalWeightG:', totalWeightG, '— numParcels:', numParcels, '— to:', to.country, to.zip_code);
+  console.info('[calculateShipping] totalWeightG:', totalWeightG, '— grossWeightG:', grossWeightG, '— numParcels:', numParcels, '— to:', to.country, to.zip_code);
 
   // 2. Surplus imballaggio
   const packagingSurchargeTotal = calcPackagingSurcharge(packagingSurcharge, numParcels);
@@ -324,7 +336,7 @@ export async function calculateShipping(
   try {
     packlinkResult = await fetchPacklinkCost(
       packlinkApiKey, from, to,
-      parcelWeightsG.map((g) => ({
+      grossWeightsG.map((g) => ({
         weight: parseFloat((g / 1000).toFixed(3)),
         width:  boxDimensions.width,
         height: boxDimensions.height,
@@ -391,6 +403,7 @@ export async function calculateShipping(
     shippingTotal,
     _internal: {
       totalWeightG,
+      ...(packagingWeightBands.length > 0 ? { packagingWeightG: grossWeightG - totalWeightG, grossWeightG } : {}),
       numParcels,
       packlinkCost:            packlinkResult.cost,
       vatRate,
