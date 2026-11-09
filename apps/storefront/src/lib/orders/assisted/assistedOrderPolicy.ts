@@ -17,6 +17,7 @@ import type {
   AssistedShippingAddress, CheckoutSessionStatus, ManualPaymentMethod, SalesChannel,
 } from '@lepefy/types';
 import { MANUAL_PAYMENT_METHOD_LABELS, SALES_CHANNEL_LABELS } from '@lepefy/types';
+import { distinctAddressLine2 } from '../../address/addressRules';
 
 /** Durée de validité d'un lien de paiement : prix et frais garantis pendant ce délai. */
 export const ASSISTED_PAY_LINK_TTL_HOURS = 72;
@@ -169,7 +170,7 @@ export function parseAssistedAddress(raw: unknown): AssistedShippingAddress | nu
   const postalCode = text('postal_code', 20);
   const country = text('country', 2)?.toUpperCase() ?? null;
   if (!fullName || !line1 || !city || !postalCode || !country || !/^[A-Z]{2}$/.test(country)) return null;
-  const line2 = typeof value.line2 === 'string' && value.line2.trim() ? value.line2.trim().slice(0, 200) : null;
+  const line2 = distinctAddressLine2(line1, value.line2)?.slice(0, 200) ?? null;
   const companyName = text('company_name', 80);
   return { full_name: fullName, ...(companyName ? { company_name: companyName } : {}), line1, line2, city, postal_code: postalCode, country };
 }

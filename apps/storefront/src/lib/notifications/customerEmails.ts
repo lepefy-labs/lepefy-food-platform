@@ -3,6 +3,7 @@ import type { RenderedEmail } from '@/lib/notifications/sendEmail';
 import { cardPaymentReference } from '@/lib/card/cardPaymentOutcome';
 import { orderLineDetail, resolveSellingFormat, type SellingFormatSource } from '@/lib/storefrontCopy/sellingFormat';
 import { SUMMARY_COPY } from '@/lib/storefrontCopy/copy';
+import { distinctAddressLine2 } from '@/lib/address/addressRules';
 
 export { cardPaymentReference };
 
@@ -200,7 +201,7 @@ export function orderConfirmedEmail(context: TenantNotificationContext, input: O
 }): RenderedEmail {
   const delivery = input.fulfillmentType === 'delivery';
   const address = delivery && input.shippingAddress
-    ? [input.shippingAddress.line1, input.shippingAddress.line2,
+    ? [input.shippingAddress.line1, distinctAddressLine2(input.shippingAddress.line1, input.shippingAddress.line2),
       [input.shippingAddress.postal_code, input.shippingAddress.city].filter(Boolean).join(' '), input.shippingAddress.country]
       .filter(Boolean).map(esc).join('<br>')
     : null;
