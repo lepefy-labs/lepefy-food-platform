@@ -71,6 +71,10 @@ export interface ShippingProviderAdapter {
   resolveShipment(context: ShippingProviderContext, providerReference: string): Promise<ProviderShipmentSnapshot>;
   /** Required when capabilities.createDraft; creates a draft only (never purchases). */
   createShipmentDraft?(context: ShippingProviderContext, input: ProviderShipmentDraftInput): Promise<ProviderShipmentDraftResult>;
+  /** True only for a shipment the provider still holds as an unpurchased draft; both draft-deletion members go together. */
+  isUnpurchasedDraft?(snapshot: ProviderShipmentSnapshot): boolean;
+  /** Deletes an unpurchased draft. A success is not a proof: the caller re-reads the shipment. Throws ShippingProviderError. */
+  deleteShipmentDraft?(context: ShippingProviderContext, providerReference: string): Promise<void>;
 }
 
 export class ShippingProviderError extends Error {

@@ -324,9 +324,45 @@ async function loadDefaultWarehouse(apiKey: string): Promise<PacklinkWarehouse> 
   return warehouse;
 }
 
+/**
+ * Pre-payment Packlink PRO states only. Allow-list on the raw state, not on the
+ * normalized `pending`: that one also covers paid shipments (READY_TO_PRINT…).
+ */
+const PACKLINK_UNPURCHASED_STATES = ['AWAITING_COMPLETION', 'DRAFT', 'READY_TO_PURCHASE'];
+
+export function isPacklinkUnpurchasedDraft(snapshot: Pick<ProviderShipmentSnapshot, 'providerStatus' | 'trackingCode' | 'events'>): boolean {
+  return PACKLINK_UNPURCHASED_STATES.includes(snapshot.providerStatus?.toUpperCase() ?? '')
+    && !snapshot.trackingCode && snapshot.events.length === 0;
+}
+
+/** Maps the draft DELETE status: 2xx and 404 (already gone) need no error, the caller re-reads the shipment anyway. */
+export function classifyPacklinkDraftDeletion(status: number): string | null {
+  if ((status >= 200 && status < 300) || status === 404) return null;
+  if (status === 401 || status === 403) return 'draft_delete_forbidden';
+  if (status === 429 || status >= 500) return 'shipping_provider_unavailable';
+  return 'draft_delete_rejected';
+}
+
 export const packlinkAdapter: ShippingProviderAdapter = {
   key: 'packlink', displayName: 'Packlink',
   capabilities: { providerReference: true, trackingTimeline: true, trackingUrl: true, webhooks: false, createDraft: true },
+  isUnpurchasedDraft: isPacklinkUnpurchasedDraft,
+  async deleteShipmentDraft(context, rawReference) {
+    const reference = rawReference.trim().toUpperCase();
+    if (!/^[A-Z0-9]{6,40}$/.test(reference)) throw new ShippingProviderError('shipment_reference_invalid');
+    const key = tenantApiKey(context);
+    if (!key) throw new ShippingProviderError('shipping_provider_not_configured');
+    let response: Response;
+    try {
+      response = await fetch(`${BASE}/shipments/${encodeURIComponent(reference)}`, {
+        method: 'DELETE', headers: { Authorization: key, Accept: 'application/json' },
+        cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(10_000),
+      });
+    } catch { throw new ShippingProviderError('shipping_provider_unavailable'); }
+    await response.body?.cancel();
+    const code = classifyPacklinkDraftDeletion(response.status);
+    if (code) throw new ShippingProviderError(code);
+  },
   async createShipmentDraft(context, input) {
     const key = tenantApiKey(context);
     if (!key) throw new ShipmentDraftError('missing_configuration');

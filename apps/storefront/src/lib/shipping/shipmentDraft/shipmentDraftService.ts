@@ -2,7 +2,8 @@ import type { Order, ShipmentCreationStatus } from '@lepefy/types';
 import type { OrderService } from '@/lib/orders/orderTransitionService';
 import { getShippingProvider } from '@/lib/shipping/providers/registry';
 import {
-  ShipmentDraftError, ShippingProviderError, type ShipmentDraftErrorCode, type ShippingProviderAdapter,
+  ShipmentDraftError, ShippingProviderError, type ProviderShipmentSnapshot, type ShipmentDraftErrorCode, type ShippingProviderAdapter,
+  type ShippingProviderContext,
 } from '@/lib/shipping/providers/types';
 import { buildShipmentDraftInput, type DraftCartonProfile, type DraftItemRow, type DraftPackagingRow } from './buildDraftInput';
 import { readShippingAutomationSettings, type ShippingAutomationSettings } from './settings';
@@ -64,7 +65,7 @@ export const defaultShipmentDraftDependencies: ShipmentDraftDependencies = {
   notifyIssue: (tenantId, orderId, kind, issue, occurrenceId) => notifyShipmentIssue(tenantId, orderId, kind, issue, occurrenceId),
 };
 
-type LogEvent = 'queued' | 'started' | 'created' | 'failed' | 'skipped_existing' | 'ambiguous' | 'linked' | 'released';
+type LogEvent = 'queued' | 'started' | 'created' | 'failed' | 'skipped_existing' | 'ambiguous' | 'linked' | 'released' | 'deleted';
 function log(event: LogEvent, order: { id: string; tenant_id: string }, provider: string | null, code?: string) {
   // Ids, provider and result code only: never address, phone, email, key or provider payload.
   const write = event === 'failed' || event === 'ambiguous' ? console.warn : console.info;
@@ -336,8 +337,12 @@ export type DraftReleaseOutcome =
  * resolveShipment (404, as the official connector's isDraftExpired) or a
  * cancelled shipment. A draft that still exists is never released.
  */
-export async function releaseDeletedShipmentDraft(service: OrderService, tenantId: string, orderId: string,
-  deps: ShipmentDraftDependencies = defaultShipmentDraftDependencies): Promise<DraftReleaseOutcome> {
+type DraftReleaseTarget = {
+  order: Order; reference: string; adapter: ShippingProviderAdapter; context: ShippingProviderContext;
+};
+
+async function loadDraftReleaseTarget(service: OrderService, tenantId: string, orderId: string,
+  deps: ShipmentDraftDependencies): Promise<DraftReleaseTarget | Extract<DraftReleaseOutcome, { outcome: 'skipped' }>> {
   const [order, tenant] = await Promise.all([loadOrder(service, tenantId, orderId), loadTenant(service, tenantId)]);
   if (!order || !tenant || order.tenant_id !== tenantId) return { outcome: 'skipped', reason: 'order_inactive' };
   const reference = order.shipping_provider_reference;
@@ -346,15 +351,55 @@ export async function releaseDeletedShipmentDraft(service: OrderService, tenantI
   if (!RELEASABLE_NORMALIZED.includes(order.shipping_normalized_status ?? null)) return { outcome: 'skipped', reason: 'in_transit' };
   const adapter = deps.adapterLookup(order.shipping_provider_key);
   if (!adapter?.capabilities.createDraft) return { outcome: 'skipped', reason: 'provider_unsupported' };
+  return { order, reference, adapter, context: { tenantId: order.tenant_id, tenant } };
+}
 
+/** The draft as the provider holds it; null once gone or cancelled. Only an explicit "not found" proves it is gone. */
+async function readProviderDraft({ adapter, context, reference }: DraftReleaseTarget): Promise<ProviderShipmentSnapshot | null> {
   try {
-    const snapshot = await adapter.resolveShipment({ tenantId: order.tenant_id, tenant }, reference);
-    if (snapshot.normalizedStatus !== 'cancelled') return { outcome: 'still_exists' };
+    const snapshot = await adapter.resolveShipment(context, reference);
+    return snapshot.normalizedStatus === 'cancelled' ? null : snapshot;
   } catch (error) {
-    // Only an explicit "not found" proves the deletion; any other failure keeps the draft.
-    if (!(error instanceof ShippingProviderError) || error.code !== 'shipment_not_found') throw error;
+    if (error instanceof ShippingProviderError && error.code === 'shipment_not_found') return null;
+    throw error;
   }
+}
 
+export async function releaseDeletedShipmentDraft(service: OrderService, tenantId: string, orderId: string,
+  deps: ShipmentDraftDependencies = defaultShipmentDraftDependencies): Promise<DraftReleaseOutcome> {
+  const target = await loadDraftReleaseTarget(service, tenantId, orderId, deps);
+  if ('outcome' in target) return target;
+  if (await readProviderDraft(target)) return { outcome: 'still_exists' };
+  return detachDraftReference(service, target, deps);
+}
+
+export type DraftDeletionOutcome = DraftReleaseOutcome | { outcome: 'skipped'; reason: 'not_deletable' };
+
+/**
+ * Deletes an unpurchased draft at the provider, then detaches it from the
+ * order. The state is re-read from the provider just before (never the stored
+ * status) and the reference is removed only once the provider no longer has
+ * the draft, whatever the DELETE answered. Safe to retry: a draft already gone
+ * goes straight to the detach.
+ */
+export async function deleteShipmentDraftAtProvider(service: OrderService, tenantId: string, orderId: string,
+  deps: ShipmentDraftDependencies = defaultShipmentDraftDependencies): Promise<DraftDeletionOutcome> {
+  const target = await loadDraftReleaseTarget(service, tenantId, orderId, deps);
+  if ('outcome' in target) return target;
+  const { adapter, context, reference, order } = target;
+  if (!adapter.deleteShipmentDraft || !adapter.isUnpurchasedDraft) return { outcome: 'skipped', reason: 'provider_unsupported' };
+  const current = await readProviderDraft(target);
+  if (current) {
+    if (!adapter.isUnpurchasedDraft(current)) return { outcome: 'skipped', reason: 'not_deletable' };
+    await adapter.deleteShipmentDraft(context, reference);
+    if (await readProviderDraft(target)) return { outcome: 'still_exists' };
+    log('deleted', order, adapter.key);
+  }
+  return detachDraftReference(service, target, deps);
+}
+
+async function detachDraftReference(service: OrderService, { order, reference, adapter }: DraftReleaseTarget,
+  deps: ShipmentDraftDependencies): Promise<DraftReleaseOutcome> {
   const query = service.from('orders').update({
     shipping_tracking_mode: null, shipping_provider_key: null, shipping_provider_reference: null,
     shipping_provider_status: null, shipping_normalized_status: null, shipping_provider_synced_at: null,
