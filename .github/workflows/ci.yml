@@ -595,6 +595,8 @@ jobs:
 
       - name: Packaging weight bands — atomic replacement, tenant isolation, privileges (180)
         if: ${{ !cancelled() }}
+        env:
+          PGPASSWORD: test
         run: |
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/180_shipping_packaging_weight_bands.fixture.sql
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/180_shipping_packaging_weight_bands.sql
