@@ -23,9 +23,18 @@ export interface ParcelCartonSuggestion {
   alternatives: CartonProfile[];
 }
 
+/** Poids que la bozza envoie au transporteur (même plan de colis), emballage compris. */
+export interface DeclaredWeight {
+  packagingG: number;
+  totalG: number;
+  parcelsG: number[];
+}
+
 export interface CartonSuggestion {
   totalWeightG: number;
   parcels: ParcelCartonSuggestion[];
+  /** Présent seulement quand il diffère du poids net. */
+  declared?: DeclaredWeight | null;
 }
 
 export function splitParcelWeightsFilled(totalWeightG: number, maxParcelG: number): number[] {

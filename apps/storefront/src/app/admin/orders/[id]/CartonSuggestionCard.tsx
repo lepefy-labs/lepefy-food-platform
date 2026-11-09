@@ -16,6 +16,7 @@ interface Props {
 
 export default function CartonSuggestionCard({ suggestion, missingWeightLines }: Props) {
   const groups = groupSuggestedCartons(suggestion);
+  const declared = suggestion.declared ?? null;
   const alternatives = Array.from(new Map(
     suggestion.parcels.flatMap((parcel) => parcel.alternatives).map((carton) => [carton.id, carton]),
   ).values());
@@ -66,8 +67,15 @@ export default function CartonSuggestionCard({ suggestion, missingWeightLines }:
         </p>
       )}
 
-      <p className="mt-3 text-xs text-a-text-3">
-        Poids total {kg(suggestion.totalWeightG)} · suggestion indicative, sans effet sur le prix facturé.
+      {declared && (
+        <p className="mt-3 text-xs text-a-text-2">
+          Poids net {kg(suggestion.totalWeightG)} · emballage +{kg(declared.packagingG)} ·{' '}
+          <strong className="font-semibold text-a-text">poids à déclarer {kg(declared.totalG)}</strong>
+          {declared.parcelsG.length > 1 && ` (${declared.parcelsG.map(kg).join(' + ')})`}
+        </p>
+      )}
+      <p className={`${declared ? 'mt-1' : 'mt-3'} text-xs text-a-text-3`}>
+        {declared ? '' : `Poids total ${kg(suggestion.totalWeightG)} · `}Suggestion indicative, sans effet sur le prix facturé.
       </p>
     </section>
   );

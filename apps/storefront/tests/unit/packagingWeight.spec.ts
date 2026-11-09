@@ -10,6 +10,7 @@ import { calculateShipping } from '../../src/lib/shipping/calculateShipping';
 import { planTariffParcels } from '../../src/lib/shipping/tariff/tariffQuote';
 import { buildShipmentDraftInput } from '../../src/lib/shipping/shipmentDraft/buildDraftInput';
 import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
+import { computeCartonSuggestion, declaredWeightFor } from '../../src/lib/shipping/loadCartonSuggestion';
 
 const BANDS: PackagingWeightBand[] = [
   { minWeightGExclusive: 0, maxWeightGInclusive: 5000, addedWeightG: 500 },
@@ -134,6 +135,39 @@ test.describe('plan de colis et bozza', () => {
     expect(built).toMatchObject({ ok: true, totalWeightG: 12300 });
     if (!built.ok) throw new Error('expected a draft');
     expect(built.input.parcels.map((p) => p.weightKg)).toEqual([13.8]);
+  });
+});
+
+test.describe('poids à déclarer sur la commande', () => {
+  const PROFILES = [
+    { id: 'S', name: 'S', box_length_cm: 35, box_width_cm: 25, box_height_cm: 22, active: true, position: 1, is_default: false, suggest_min_weight_g: 0, suggest_max_weight_g: 5000, tare_g: 200 },
+    { id: 'M', name: 'M', box_length_cm: 40, box_width_cm: 30, box_height_cm: 30, active: true, position: 2, is_default: true, suggest_min_weight_g: 5000, suggest_max_weight_g: 15000, tare_g: 400 },
+  ];
+  const context = (bands: PackagingWeightBand[] | null, profiles: unknown[] = PROFILES) => ({
+    profiles: profiles as never, maxParcelG: 15000, weightById: new Map(), packagingWeightBands: bands, defaultBox: null,
+  });
+
+  test('même plan que la bozza, net inchangé', () => {
+    const { suggestion } = computeCartonSuggestion(context(BANDS), [], 18000);
+    expect(suggestion?.totalWeightG).toBe(18000);
+    expect(suggestion?.parcels.map((parcel) => parcel.weightG)).toEqual([15000, 3000]);
+    expect(suggestion?.declared).toEqual({ packagingG: 1500, totalG: 19500, parcelsG: [16250, 3250] });
+    const plan = planTariffParcels(18000, 15000, PROFILES as never, null, BANDS)!;
+    expect(suggestion?.declared?.parcelsG).toEqual(plan.map((parcel) => parcel.grossG));
+  });
+
+  test('sans tranche : la tare du carton, comme la bozza', () => {
+    expect(declaredWeightFor(context([]), 18000)).toEqual({ packagingG: 600, totalG: 18600, parcelsG: [15400, 3200] });
+  });
+
+  test('aucune ligne si le poids envoyé est le net', () => {
+    const noTare = PROFILES.map((profile) => ({ ...profile, tare_g: null }));
+    expect(declaredWeightFor(context([], noTare), 12300)).toBeNull();
+  });
+
+  test('tranches illisibles : pas de chiffre affiché', () => {
+    expect(declaredWeightFor(context(null), 12300)).toBeNull();
+    expect(computeCartonSuggestion(context(null), [], 12300).suggestion?.declared).toBeNull();
   });
 });
 

@@ -205,10 +205,14 @@ function cartonBlock(vm: InternalOrderDocumentViewModel, format: OrderDocumentFo
       ? `<b>${l.count} × ${escapeHtml(l.name)}</b> ${dimsAndWeights(l.dimensions, l.weights)}`
       : `${l.count} colis (${escapeHtml(l.weights)}) : aucun carton configuré pour ce poids`}</div>`).join('');
   const alternatives = c.alternatives.length ? `<div>Si volumineux : ${escapeHtml(c.alternatives.join(', '))}</div>` : '';
-  const footer = [`Poids total ${c.totalWeight}`, `${c.parcels.length} colis`, format === 'a4' ? c.maxParcelNote : null].filter(Boolean).join(' · ');
+  const weightParts = c.declared
+    ? [escapeHtml(`Poids net ${c.totalWeight}`), escapeHtml(`Emballage +${c.declared.packaging}`),
+      `<b>${escapeHtml(`À déclarer ${c.declared.total}`)}</b>${c.declared.parcels ? ` (${escapeHtml(c.declared.parcels)})` : ''}`]
+    : [escapeHtml(`Poids total ${c.totalWeight}`)];
+  const footer = [...weightParts, `${c.parcels.length} colis`, format === 'a4' && c.maxParcelNote ? escapeHtml(c.maxParcelNote) : null].filter(Boolean).join(' · ');
   const warning = vm.missingWeightLines > 0
     ? `<div class="pl-warn">${vm.missingWeightLines} ligne${vm.missingWeightLines > 1 ? 's' : ''} sans poids : vérifier</div>` : '';
-  return `<div class="avoid"><div class="pl-section keep-next">EMBALLAGE SUGGÉRÉ</div><div class="pl-carton">${detail}${alternatives}<div>${escapeHtml(footer)}</div>${warning}</div></div>`;
+  return `<div class="avoid"><div class="pl-section keep-next">EMBALLAGE SUGGÉRÉ</div><div class="pl-carton">${detail}${alternatives}<div>${footer}</div>${warning}</div></div>`;
 }
 
 function shippingComparison(vm: InternalOrderDocumentViewModel): string {

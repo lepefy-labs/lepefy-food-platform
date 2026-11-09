@@ -485,6 +485,23 @@ test('packaging block: dimensions never split from their unit, weight kept with 
   expect(a4).toContain('<span class="pl-nb">35 × 25 × 22 cm</span>');
 });
 
+test('packaging block: weight to declare only when it differs from the net weight', () => {
+  const base = {
+    lines: [{ count: 2, name: 'Carton M', dimensions: '40 × 30 × 30 cm', weights: '15 kg + 3 kg' }],
+    parcels: [{ index: 1, weight: '15 kg', carton: 'Carton M', dimensions: '40 × 30 × 30 cm' }, { index: 2, weight: '3 kg', carton: 'Carton M', dimensions: '40 × 30 × 30 cm' }],
+    alternatives: [], totalWeight: '18 kg', maxParcelNote: 'Max. 15 kg par colis',
+  };
+  const declared = { packaging: '1,5 kg', total: '19,5 kg', parcels: '16,25 kg + 3,25 kg' };
+  const withDeclared = pickingListHtml([{ ...picking(order(ORDER_A)), cartons: { ...base, declared } }], 'a5');
+  expect(withDeclared).toContain('Poids net 18 kg · Emballage +1,5 kg · <b>À déclarer 19,5 kg</b> (16,25 kg + 3,25 kg) · 2 colis');
+  expect(withDeclared).not.toContain('Poids total');
+  const a4 = pickingListHtml([{ ...picking(order(ORDER_A)), cartons: { ...base, declared: { ...declared, parcels: null } } }], 'a4');
+  expect(a4).toContain('<b>À déclarer 19,5 kg</b> · 2 colis · Max. 15 kg par colis');
+  const netOnly = pickingListHtml([{ ...picking(order(ORDER_A)), cartons: base }], 'a5');
+  expect(netOnly).toContain('Poids total 18 kg · 2 colis');
+  expect(netOnly).not.toContain('À déclarer');
+});
+
 test('follow-up block: more room for handwriting with fixed, content-independent heights', () => {
   const a5 = pickingListHtml([picking(order(ORDER_A))], 'a5');
   const a4 = pickingListHtml([picking(order(ORDER_A))], 'a4');

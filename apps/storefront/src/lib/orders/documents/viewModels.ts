@@ -93,6 +93,8 @@ export interface PickingCartonVM {
   alternatives: string[];
   totalWeight: string;
   maxParcelNote: string | null;
+  /** Poids envoyé au transporteur : présent seulement s'il diffère du net. */
+  declared?: { packaging: string; total: string; parcels: string | null } | null;
 }
 
 export interface InternalOrderDocumentViewModel {
@@ -230,6 +232,11 @@ export function buildPickingListViewModel(input: {
       .map((c) => `${c.name} (${dims(c)})`),
     totalWeight: formatKg(suggestion.totalWeightG),
     maxParcelNote: carton?.maxParcelG ? `Max. ${formatKg(carton.maxParcelG)} par colis` : null,
+    declared: suggestion.declared ? {
+      packaging: formatKg(suggestion.declared.packagingG),
+      total: formatKg(suggestion.declared.totalG),
+      parcels: suggestion.declared.parcelsG.length > 1 ? suggestion.declared.parcelsG.map(formatKg).join(' + ') : null,
+    } : null,
   } : null;
 
   return {
