@@ -612,7 +612,8 @@ In modalità `tariff`, nell'ordine:
 6. **disponibilità logistica** (`checkTariffAvailability`), separata dal prezzo:
    - piano colli uguale a quello della preparazione (colli pieni al limite della versione + resto,
      cartone per collo con `cartonsForWeight`, altrimenti profilo di default o scatola
-     `packaging_surcharges`), peso lordo = netto + `tare_g`;
+     `packaging_surcharges`), peso lordo = netto + tranche d'emballage (migration 180) se configurata,
+     altrimenti netto + `tare_g`; il prezzo del forfait resta sempre sul peso netto;
    - preventivo **identico** (stesso CAP, stessi colli) ancora fresco (7 giorni) → disponibile senza chiamata;
    - altrimenti chiamata Packlink con timeout 6 s; servizi persistiti come osservazioni `real_quote`;
      rifiuto / nessun servizio / nessun servizio eleggibile → non disponibile;

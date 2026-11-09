@@ -123,6 +123,8 @@ The shipping logic is the most complex part of the codebase:
 - `shippingTotal = packlink_base_price + vat + (surcharge_amount × num_parcels)`
 - Selects the cheapest eligible service; detailed breakdown is hidden from the customer UI
 
+**Packaging weight bands** (migration 180, `shipping_packaging_weight_bands`, service role only, written only by RPC `replace_shipping_packaging_weight_bands`; no row = historical behaviour): one pure rule in `lib/shipping/packagingWeight.ts` — the band is picked on the order's NET total (`(min, max]`, last band open) and the added grams are split across parcels pro rata. It changes only the weight sent to the provider (`calculateShipping`, so the price without forfait; `planTariffParcels`, so availability and the Packlink draft; admin simulator). Never the forfait price, parcel count, suggested carton or `shipping_details.totalWeightG`, which stay net (draft and PDFs re-read it: adding there double-counts). With bands, the carton `tare_g` is ignored. Admin: `/admin/livraison/emballages`.
+
 ### Flat-rate shipping tariffs (forfait) — `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §12–14
 
 - `shipping_tariff_versions` rows are immutable (trigger 124); `tenants.shipping_pricing_mode = 'tariff'` charges only the `active` version of a country, verified on every payment path (token V2, `checkoutShipping.ts`). A changed version invalidates open quotes with 409 `SHIPPING_REQUOTE_REQUIRED`.

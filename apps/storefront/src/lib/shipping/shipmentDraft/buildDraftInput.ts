@@ -1,6 +1,7 @@
 import type { Order, ShippingPackagingProfileRow } from '@lepefy/types';
 import { planTariffParcels } from '@/lib/shipping/tariff/tariffQuote';
 import { distinctAddressLine2 } from '@/lib/address/addressRules';
+import type { PackagingWeightBand } from '@/lib/shipping/packagingWeight';
 import type { ProviderShipmentDraftInput, ShipmentDraftErrorCode } from '@/lib/shipping/providers/types';
 import { shipmentOrderReference } from './shipmentDraftPresentation';
 
@@ -70,7 +71,7 @@ export function resolveOrderWeightG(order: Pick<Order, 'shipping_details'>, item
 /** Same default as loadCartonContext when packaging_surcharges has no max_pack_kg. */
 const DEFAULT_MAX_PACK_KG = 15;
 
-export function buildShipmentDraftInput({ order, items, productWeights, profiles, packaging, content, currency }: {
+export function buildShipmentDraftInput({ order, items, productWeights, profiles, packaging, packagingWeightBands, content, currency }: {
   order: Order;
   items: DraftItemRow[];
   productWeights: ReadonlyMap<string, number | null>;
@@ -78,6 +79,8 @@ export function buildShipmentDraftInput({ order, items, productWeights, profiles
   profiles: DraftCartonProfile[];
   /** Active packaging_surcharges row: max parcel weight and last-resort box. */
   packaging: DraftPackagingRow | null;
+  /** Packaging weight bands (migration 180); when set they replace the carton tare. */
+  packagingWeightBands?: readonly PackagingWeightBand[];
   /** Tenant-declared content (shipping_automation.shipment_content). */
   content: string;
   currency: string;
@@ -101,13 +104,14 @@ export function buildShipmentDraftInput({ order, items, productWeights, profiles
   if (!totalWeightG) return { ok: false, code: 'invalid_parcel', detail: 'poids' };
   // Same physical plan as the order's « Carton à utiliser » card and the flat-rate
   // availability check: filled parcels up to max_pack_kg, suggested carton per
-  // parcel (then default profile, then the packaging_surcharges box), tare added
-  // to the gross weight sent to the provider.
+  // parcel (then default profile, then the packaging_surcharges box), packaging
+  // weight band (or, without bands, the carton tare) added to the gross weight
+  // sent to the provider.
   const maxPackKg = Number(packaging?.max_pack_kg) > 0 ? Number(packaging!.max_pack_kg) : DEFAULT_MAX_PACK_KG;
   const box = packaging && Number(packaging.box_length_cm) > 0 && Number(packaging.box_width_cm) > 0 && Number(packaging.box_height_cm) > 0
     ? { length: Number(packaging.box_length_cm), width: Number(packaging.box_width_cm), height: Number(packaging.box_height_cm) }
     : null;
-  const plan = planTariffParcels(totalWeightG, maxPackKg * 1000, profiles, box);
+  const plan = planTariffParcels(totalWeightG, maxPackKg * 1000, profiles, box, packagingWeightBands);
   if (!plan || plan.length === 0 || plan.some(parcel => !(parcel.lengthCm > 0 && parcel.widthCm > 0 && parcel.heightCm > 0))) {
     return { ok: false, code: 'invalid_parcel', detail: 'dimensions' };
   }

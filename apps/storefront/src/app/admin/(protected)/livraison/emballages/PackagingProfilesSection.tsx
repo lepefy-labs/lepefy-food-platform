@@ -122,7 +122,7 @@ function ProfileForm({
       <div>
         <label className={LABEL_CLS}>Tare du carton (g)</label>
         <input type="number" min={0} value={form.tare_g} onChange={(e) => set('tare_g', e.target.value)} placeholder="Ex. 450" className={INPUT_CLS} />
-        <p className="mt-1 text-xs text-a-text-3">Ajoutée au poids du colis pour vérifier la disponibilité Packlink au forfait. Jamais utilisée pour le prix client.</p>
+        <p className="mt-1 text-xs text-a-text-3">Ajoutée au poids du colis envoyé à Packlink, sauf si des tranches de poids d’emballage sont configurées. Jamais utilisée pour le prix client.</p>
       </div>
       <div className="flex items-center gap-4">
         <label className="flex items-center gap-2 text-sm text-a-text-2">
