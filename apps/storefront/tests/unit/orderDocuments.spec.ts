@@ -135,6 +135,11 @@ test('picking order: dry first, fresh second and frozen last; locations sorted w
 
 
 test('picking view-model keeps operational data: locations sorted, cold chain, cartons for delivery only', () => {
+  const repeated = buildPickingListViewModel({
+    order: order(ORDER_A, { shipping_address: { full_name: 'Awa Diallo', line1: '12 rue Oberkampf', line2: '12 Rue Oberkampf', postal_code: '75011', city: 'Paris', country: 'FR' } }),
+    items: ITEMS, tenant: { name: 'T' }, carton: null, showDeliveryAddress: true,
+  });
+  expect(repeated.deliveryAddress).toEqual(['12 rue Oberkampf']);
   const suggestion = suggestCartons(7400, PROFILES, 15000);
   const vm = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'Boutique Test' }, carton: { suggestion, missingWeightLines: 0, maxParcelG: 15000 } });
   expect(vm.ref).toBe('163835B8');

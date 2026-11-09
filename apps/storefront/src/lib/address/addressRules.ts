@@ -249,13 +249,28 @@ export interface NormalizedShippingAddress {
   phone?: string;
 }
 
+const addressLineKey = (value: string) => value.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+
+/**
+ * Complément réellement utile : vide, ou simple répétition de la rue (saisie
+ * ou remplissage automatique) → null. Casse, espaces et ponctuation ignorés.
+ * Seule règle pour tout ce qui écrit ou affiche `line2` d'une commande.
+ */
+export function distinctAddressLine2(line1: unknown, line2: unknown): string | null {
+  const complement = typeof line2 === 'string' ? line2.trim() : '';
+  if (!complement) return null;
+  const street = typeof line1 === 'string' ? addressLineKey(line1) : '';
+  return street && street === addressLineKey(complement) ? null : complement;
+}
+
 export function draftToShippingAddress(draft: AddressDraft, fullName: string): NormalizedShippingAddress {
-  const line2 = collapse(draft.line2);
+  const line1 = composeLine1(draft.street, draft.houseNumber);
+  const line2 = distinctAddressLine2(line1, collapse(draft.line2));
   const company = draft.deliverToCompany ? collapse(draft.companyName ?? '') : '';
   return {
     full_name: collapse(fullName),
     ...(company ? { company_name: company } : {}),
-    line1: composeLine1(draft.street, draft.houseNumber),
+    line1,
     ...(line2 ? { line2 } : {}),
     city: collapse(draft.city),
     postal_code: normalizePostalCode(draft.country, draft.postalCode),
@@ -299,7 +314,7 @@ export function normalizeShippingAddress(value: unknown): NormalizeShippingAddre
 
   const fullName = text('full_name');
   const line1 = text('line1');
-  const line2 = text('line2');
+  const line2 = distinctAddressLine2(line1, text('line2')) ?? '';
   const companyName = text('company_name');
   const city = text('city');
   const country = text('country').toUpperCase();

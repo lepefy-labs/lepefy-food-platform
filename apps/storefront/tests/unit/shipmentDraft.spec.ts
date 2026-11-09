@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import type { Order } from '@lepefy/types';
 import {
-  buildPacklinkDraftPayload, classifyPacklinkDraftStatus, packlinkAdapter, packlinkPostalZoneName, selectPacklinkPostalCode,
-  selectPacklinkWarehouse,
+  buildPacklinkDraftPayload, classifyPacklinkDraftDeletion, classifyPacklinkDraftStatus, isPacklinkUnpurchasedDraft, packlinkAdapter,
+  packlinkPostalZoneName, selectPacklinkPostalCode, selectPacklinkWarehouse,
 } from '../../src/lib/shipping/providers/packlink';
 import { checkPacklinkDestination, italianIslandOfPostalCode, italianIslandOfZoneName } from '../../src/lib/shipping/providers/packlinkDestination';
 import { getShippingProvider } from '../../src/lib/shipping/providers/registry';
@@ -12,7 +12,7 @@ import {
 } from '../../src/lib/shipping/shipmentDraft/buildDraftInput';
 import { resolveShippingAutomationSettings, type ShippingAutomationSettings } from '../../src/lib/shipping/shipmentDraft/settings';
 import {
-  createShipmentDraftForOrder, linkShipmentDraftReference, MAX_AUTOMATIC_ATTEMPTS, releaseDeletedShipmentDraft, requestShipmentDraft, runShipmentDraftBatch,
+  createShipmentDraftForOrder, deleteShipmentDraftAtProvider, linkShipmentDraftReference, MAX_AUTOMATIC_ATTEMPTS, releaseDeletedShipmentDraft, requestShipmentDraft, runShipmentDraftBatch,
   STALE_CREATING_MS, type ShipmentDraftDependencies,
 } from '../../src/lib/shipping/shipmentDraft/shipmentDraftService';
 import { shipmentDraftErrorMessage } from '../../src/lib/shipping/shipmentDraft/shipmentDraftPresentation';
@@ -618,6 +618,81 @@ const resolving = (outcome: 'missing' | 'exists' | 'cancelled' | 'down') => (key
     return { provider: 'packlink', providerReference: reference, carrier: null, trackingCode: null, trackingUrl: null, estimatedDeliveryAt: null,
       providerStatus: outcome === 'cancelled' ? 'CANCELLED' : 'AWAITING_COMPLETION', normalizedStatus: outcome === 'cancelled' ? 'cancelled' : 'pending', events: [] };
   } } as ShippingProviderAdapter : null;
+
+function deletingAdapter(states: Array<'exists' | 'missing' | 'purchased' | 'down'>, deleteError?: string) {
+  const deletes: string[] = [];
+  const lookup = (key: string | null | undefined) => key === 'packlink' ? {
+    ...packlinkAdapter,
+    async resolveShipment(_context: unknown, reference: string) {
+      const state = states.shift();
+      if (state === 'missing') throw new ShippingProviderError('shipment_not_found');
+      if (state === 'down' || !state) throw new ShippingProviderError('shipping_provider_unavailable');
+      return { provider: 'packlink', providerReference: reference, carrier: null, trackingCode: null, trackingUrl: null, estimatedDeliveryAt: null,
+        providerStatus: state === 'purchased' ? 'READY_TO_PRINT' : 'AWAITING_COMPLETION', normalizedStatus: 'pending', events: [] };
+    },
+    async deleteShipmentDraft(_context: unknown, reference: string) {
+      deletes.push(reference);
+      if (deleteError) throw new ShippingProviderError(deleteError);
+    },
+  } as ShippingProviderAdapter : null;
+  return { lookup, deletes };
+}
+
+test('delete draft: an unpurchased draft is deleted, then detached once the provider no longer has it', async () => {
+  const db = fakeDb(DRAFTED);
+  const { lookup, deletes } = deletingAdapter(['exists', 'missing']);
+  expect(await deleteShipmentDraftAtProvider(db.service, 'tenant-a', ORDER_ID, deps(undefined, lookup))).toEqual({ outcome: 'released' });
+  expect(deletes).toEqual(['IT2026PRO0006698079']);
+  expect(db.order()).toMatchObject({ shipping_provider_reference: null, shipping_creation_status: null });
+});
+
+test('delete draft: a draft already gone is only detached (safe retry)', async () => {
+  const db = fakeDb(DRAFTED);
+  const { lookup, deletes } = deletingAdapter(['missing']);
+  expect(await deleteShipmentDraftAtProvider(db.service, 'tenant-a', ORDER_ID, deps(undefined, lookup))).toEqual({ outcome: 'released' });
+  expect(deletes).toHaveLength(0);
+});
+
+test('delete draft: never a purchased shipment, and the reference stays without proof of deletion', async () => {
+  const purchased = deletingAdapter(['purchased']);
+  const db = fakeDb(DRAFTED);
+  expect(await deleteShipmentDraftAtProvider(db.service, 'tenant-a', ORDER_ID, deps(undefined, purchased.lookup)))
+    .toEqual({ outcome: 'skipped', reason: 'not_deletable' });
+  expect(purchased.deletes).toHaveLength(0);
+
+  const ignored = deletingAdapter(['exists', 'exists']);
+  expect(await deleteShipmentDraftAtProvider(db.service, 'tenant-a', ORDER_ID, deps(undefined, ignored.lookup))).toEqual({ outcome: 'still_exists' });
+
+  const unverifiable = deletingAdapter(['exists', 'down']);
+  await expect(deleteShipmentDraftAtProvider(db.service, 'tenant-a', ORDER_ID, deps(undefined, unverifiable.lookup))).rejects.toThrow('shipping_provider_unavailable');
+
+  const refused = deletingAdapter(['exists'], 'draft_delete_forbidden');
+  await expect(deleteShipmentDraftAtProvider(db.service, 'tenant-a', ORDER_ID, deps(undefined, refused.lookup))).rejects.toThrow('draft_delete_forbidden');
+
+  const down = deletingAdapter(['down']);
+  await expect(deleteShipmentDraftAtProvider(db.service, 'tenant-a', ORDER_ID, deps(undefined, down.lookup))).rejects.toThrow('shipping_provider_unavailable');
+  expect(down.deletes).toHaveLength(0);
+
+  const otherTenant = deletingAdapter(['exists', 'missing']);
+  expect(await deleteShipmentDraftAtProvider(db.service, 'tenant-b', ORDER_ID, deps(undefined, otherTenant.lookup)))
+    .toEqual({ outcome: 'skipped', reason: 'order_inactive' });
+  expect(otherTenant.deletes).toHaveLength(0);
+
+  expect(db.updates).toHaveLength(0);
+  expect(db.order().shipping_provider_reference).toBe('IT2026PRO0006698079');
+});
+
+test('delete draft: only pre-payment Packlink states qualify, the DELETE status is classified, orders.manage is required', () => {
+  const draft = { trackingCode: null, events: [] };
+  for (const providerStatus of ['AWAITING_COMPLETION', 'DRAFT', 'READY_TO_PURCHASE']) expect(isPacklinkUnpurchasedDraft({ ...draft, providerStatus })).toBe(true);
+  for (const providerStatus of ['READY_TO_PRINT', 'PROCESSING', 'CARRIER_PENDING', 'PENDING', 'IN_TRANSIT', null]) expect(isPacklinkUnpurchasedDraft({ ...draft, providerStatus })).toBe(false);
+  expect(isPacklinkUnpurchasedDraft({ ...draft, providerStatus: 'AWAITING_COMPLETION', trackingCode: 'X1' })).toBe(false);
+  expect([200, 204, 404].map(classifyPacklinkDraftDeletion)).toEqual([null, null, null]);
+  expect(classifyPacklinkDraftDeletion(403)).toBe('draft_delete_forbidden');
+  expect(classifyPacklinkDraftDeletion(405)).toBe('draft_delete_rejected');
+  expect(classifyPacklinkDraftDeletion(503)).toBe('shipping_provider_unavailable');
+  expect(permissionForAdminApi(`/api/admin/orders/${ORDER_ID}/shipment/delete-draft`, 'POST')).toBe('orders.manage');
+});
 
 test('release: a draft deleted in Packlink (404) is detached, then a corrected draft is created', async () => {
   const db = fakeDb(DRAFTED);

@@ -1,4 +1,5 @@
 import { formatPrice } from '@/lib/utils/format';
+import { distinctAddressLine2 } from '@/lib/address/addressRules';
 import { groupSuggestedCartons, type CartonSuggestion } from '@/lib/shipping/cartonSuggestion';
 import { displayCountry, formatDocumentDate, formatKg, orderShortRef, readableBrandColor, safeColor, safeImageUrl } from './documentHtml';
 import { androidAppStatus } from '@/lib/mobileApp/androidApp';
@@ -154,7 +155,7 @@ function address(order: DocumentOrderRow): Record<string, string | undefined> {
 /** Lignes d'adresse de livraison (nom, rue, complément, CP ville, pays), vides écartées. */
 function addressLines(order: DocumentOrderRow): string[] | null {
   const a = address(order);
-  const lines = [a.full_name ?? order.full_name ?? '', a.company_name ?? '', a.line1 ?? '', a.line2 ?? '', [a.postal_code, a.city].filter(Boolean).join(' '), a.country ?? '']
+  const lines = [a.full_name ?? order.full_name ?? '', a.company_name ?? '', a.line1 ?? '', distinctAddressLine2(a.line1, a.line2) ?? '', [a.postal_code, a.city].filter(Boolean).join(' '), a.country ?? '']
     .map((line) => String(line).trim()).filter(Boolean);
   return lines.length > 0 ? lines : null;
 }
@@ -171,7 +172,7 @@ function pickingAddressLines(order: DocumentOrderRow): string[] | null {
   const lines = [
     recipient && recipient.toLowerCase() !== customer?.toLowerCase() ? `Destinataire : ${recipient}` : '',
     a.company_name ? `Entreprise : ${a.company_name}` : '',
-    a.line1 ?? '', a.line2 ?? '',
+    a.line1 ?? '', distinctAddressLine2(a.line1, a.line2) ?? '',
   ].map((line) => String(line ?? '').trim()).filter(Boolean);
   return lines.length > 0 ? lines : null;
 }

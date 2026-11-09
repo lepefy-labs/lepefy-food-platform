@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { formatPrice } from '@/lib/utils/format';
+import { distinctAddressLine2 } from '@/lib/address/addressRules';
 import { IconLock } from '@tabler/icons-react';
 import type { FulfillmentKind } from '@/lib/orders/orderStatus';
 import type { NormalizedShipmentStatus, ShipmentTrackingEvent } from '@lepefy/types';
@@ -148,7 +149,7 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
   // Full delivery address with the recipient's name, as on the previous version of this page.
   const address = order.shipping_address;
   const cityLine = [address?.postal_code, address?.city].filter(Boolean).join(' ').trim();
-  const addressLines = [address?.full_name, address?.line1, address?.line2, cityLine, countryName(address?.country)]
+  const addressLines = [address?.full_name, address?.line1, distinctAddressLine2(address?.line1, address?.line2), cityLine, countryName(address?.country)]
     .map((line) => line?.trim())
     .filter((line): line is string => Boolean(line));
   const trackingAddress: TrackingAddress | null = addressLines.length ? { lines: addressLines } : null;

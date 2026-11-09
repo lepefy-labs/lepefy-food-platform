@@ -1,5 +1,6 @@
 import type { Order, ShippingPackagingProfileRow } from '@lepefy/types';
 import { planTariffParcels } from '@/lib/shipping/tariff/tariffQuote';
+import { distinctAddressLine2 } from '@/lib/address/addressRules';
 import type { ProviderShipmentDraftInput, ShipmentDraftErrorCode } from '@/lib/shipping/providers/types';
 import { shipmentOrderReference } from './shipmentDraftPresentation';
 
@@ -122,7 +123,7 @@ export function buildShipmentDraftInput({ order, items, productWeights, profiles
     input: {
       orderReference: shipmentOrderReference(order.id),
       recipient: {
-        firstName, lastName, company: company || null, street1, street2: clean(address.line2, 120) || null, postalCode, city, country, phone: phone!,
+        firstName, lastName, company: company || null, street1, street2: clean(distinctAddressLine2(street1, address.line2), 120) || null, postalCode, city, country, phone: phone!,
         email: clean(order.email, 160) || null,
       },
       parcels,

@@ -4,6 +4,7 @@ import {
   composeLine1,
   countryOptions,
   defaultDeliveryCountry,
+  distinctAddressLine2,
   draftToShippingAddress,
   emptyAddressDraft,
   firstErrorField,
@@ -82,6 +83,19 @@ test.describe('règles d\'adresse', () => {
 
 test.describe('contrôle serveur de l\'adresse (checkout, compte)', () => {
   const valid = { full_name: 'Marie Kamga', line1: 'Via Roma 25', city: 'Reggio Emilia', postal_code: '42121', country: 'it' };
+
+  test('un complément qui répète la rue est écarté, un vrai complément est gardé', () => {
+    expect(distinctAddressLine2('Via Roma 25', ' via  roma, 25. ')).toBeNull();
+    expect(distinctAddressLine2('Via Roma 25', '')).toBeNull();
+    expect(distinctAddressLine2('Via Roma 25', null)).toBeNull();
+    expect(distinctAddressLine2('Via Roma 25', 'Scala B')).toBe('Scala B');
+    expect(distinctAddressLine2(undefined, 'Scala B')).toBe('Scala B');
+    expect(normalizeShippingAddress({ ...valid, line2: 'VIA ROMA 25' })).toEqual({
+      ok: true,
+      address: { full_name: 'Marie Kamga', line1: 'Via Roma 25', city: 'Reggio Emilia', postal_code: '42121', country: 'IT' },
+    });
+    expect(draftToShippingAddress({ ...filled, line2: 'Via Roma 25' }, 'Marie Kamga').line2).toBeUndefined();
+  });
 
   test('ne garde que les champs connus, texte nettoyé', () => {
     const result = normalizeShippingAddress({ ...valid, line2: '  2e étage ', is_admin: true, notes: 'x', city: 'Reggio\nEmilia' });

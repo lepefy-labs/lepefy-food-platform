@@ -19,7 +19,7 @@ const MESSAGES: Record<string, string> = {
 /**
  * POST /api/admin/orders/[id]/shipment/release (orders.manage).
  * Retire la référence d'un brouillon supprimé chez le transporteur, après
- * vérification auprès du provider ; Lepefy ne supprime jamais de brouillon.
+ * vérification auprès du provider ; cette route ne supprime rien (voir delete-draft).
  */
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const headers = { 'Cache-Control': 'no-store' };

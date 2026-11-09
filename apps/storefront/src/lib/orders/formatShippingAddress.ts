@@ -1,4 +1,5 @@
 import type { ShippingAddress } from '@lepefy/types';
+import { distinctAddressLine2 } from '@/lib/address/addressRules';
 
 /**
  * Formatte un ShippingAddress en une seule ligne lisible pour email/notification.
@@ -11,7 +12,7 @@ export function formatShippingAddress(address: ShippingAddress | null | undefine
   const parts = [
     address.company_name,
     address.line1,
-    address.line2,
+    distinctAddressLine2(address.line1, address.line2),
     [address.postal_code, address.city].filter(Boolean).join(' '),
     address.country,
   ].filter((p): p is string => Boolean(p && p.trim() !== ''));
