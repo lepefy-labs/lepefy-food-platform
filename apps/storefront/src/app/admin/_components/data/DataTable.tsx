@@ -202,14 +202,22 @@ export default function DataTable<Row>({
                     </th>
                   </tr>
                 ))}
-                {!group.collapsed && group.rows.map((row) => {
+                {!group.collapsed && group.rows.map((row, rowIndex) => {
                   const id = rowKey(row);
                   const tone = rowTone?.(row);
                   const detail = rowDetail?.(row);
-                  // Queue: an open row and its detail share one background and one bottom separator.
-                  const cellBorder = queue && detail ? '' : rowBorder;
+                  const last = rowIndex === group.rows.length - 1;
+                  // Queue: orders are separated by a band (below), so only the last one closes the group with a line;
+                  // an open row and its detail share one background and one bottom separator.
+                  const cellBorder = queue ? (detail || !last ? '' : rowBorder) : rowBorder;
                   return (
                     <Fragment key={id}>
+                      {queue && rowIndex > 0 && (
+                        // Band in the page colour between two orders of the same group: each order reads as its own block.
+                        <tr aria-hidden="true" role="presentation">
+                          <td colSpan={colSpan} className="h-2 border-y border-a-border-strong bg-a-bg p-0" />
+                        </tr>
+                      )}
                       <tr className={cn('group/row', queue && detail ? 'bg-a-surface-2' : 'hover:bg-a-hover', onRowClick && 'cursor-pointer', rowClassName?.(row))}
                         onClick={onRowClick ? (event) => {
                           if ((event.target as HTMLElement).closest('a, button, input, select, textarea, label, [role="button"]')) return;
@@ -232,7 +240,7 @@ export default function DataTable<Row>({
                       {detail && (queue ? (
                         <tr>
                           {/* Framed on the row's background, with its stripe: the detail visibly belongs to the order above. */}
-                          <td colSpan={colSpan} className={cn('relative bg-a-surface-2 px-3 pb-3 pt-0', rowBorder)}>
+                          <td colSpan={colSpan} className={cn('relative bg-a-surface-2 px-3 pb-3 pt-0', last && rowBorder)}>
                             {tone && <span aria-hidden="true" className={cn('absolute inset-y-0 left-0', stripe, TONE_SOLID_BG_CLASS[tone])} />}
                             <div className="rounded-lg border border-a-border bg-a-surface">{detail}</div>
                           </td>
