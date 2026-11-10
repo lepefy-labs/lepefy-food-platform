@@ -15,9 +15,9 @@ test('group tones follow the work-queue table (semantic tones only)', () => {
   for (const group of PRIORITY_GROUP_ORDER) expect(PRIORITY_GROUP_TONE[group]).toBeTruthy();
 });
 
-test('general queue: groups needing the team open, regular shipments and finished orders collapsed', () => {
+test('general queue: every group open, finished orders collapsed (shipments in transit stay open)', () => {
   const collapsed = PRIORITY_GROUP_ORDER.filter((group) => defaultGroupCollapsed(group, general));
-  expect(collapsed).toEqual(['shipping', 'finished']);
+  expect(collapsed).toEqual(['finished']);
 });
 
 test('an explicit view or a targeted search opens every group', () => {

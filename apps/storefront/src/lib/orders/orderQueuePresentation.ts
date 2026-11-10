@@ -18,8 +18,11 @@ export const PRIORITY_GROUP_TONE: Record<PriorityGroup, AdminTone> = {
   finished: 'neutral',
 };
 
-/** Groups that follow their course without the team: collapsed in the general work queue. */
-const PASSIVE_GROUPS: ReadonlySet<PriorityGroup> = new Set<PriorityGroup>(['shipping', 'finished']);
+/**
+ * Groups collapsed in the general work queue: only finished orders. Shipments in
+ * transit stay open (the team follows them); the admin can still collapse any group.
+ */
+const PASSIVE_GROUPS: ReadonlySet<PriorityGroup> = new Set<PriorityGroup>(['finished']);
 
 export interface QueueGroupContext {
   /** Active `view` (KPI card, quick view or « Contrôles » chip); '' for the general queue. */
@@ -29,9 +32,8 @@ export interface QueueGroupContext {
 }
 
 /**
- * Initial state of a group: groups that need the team are open; regular
- * shipments in transit and finished orders start collapsed in the general
- * queue (count kept visible). An explicit view or a targeted search opens every group.
+ * Initial state of a group: every group is open except « Terminées » in the
+ * general queue (count kept visible). An explicit view or a targeted search opens every group.
  */
 export function defaultGroupCollapsed(group: PriorityGroup, context: QueueGroupContext): boolean {
   if (context.view || context.targeted) return false;
