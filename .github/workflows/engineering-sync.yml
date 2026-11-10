@@ -2,12 +2,13 @@ name: Engineering Hub sync
 
 # Uploads the technical index of `main` to the Hub. Uses a dedicated ingest token, never the
 # Supabase service-role key. Skipped (green) while the secret or the URL is not configured.
+# Not run on every push: one sync is dozens of calls to a Vercel Function (Active CPU), so the
+# index is refreshed on a schedule (and on demand, via workflow_dispatch) instead.
 on:
-  push:
-    branches:
-      - main
   schedule:
-    # Weekly full re-index (re-sends every blob); pushes are incremental.
+    # Incremental index of `main` once a day (Monday is covered by the full re-index below).
+    - cron: '23 3 * * 0,2-6'
+    # Weekly full re-index (re-sends every blob).
     - cron: '17 3 * * 1'
   workflow_dispatch:
     inputs:
@@ -74,7 +75,7 @@ jobs:
         if: steps.config.outputs.enabled == 'true'
         run: |
           MODE="${{ github.event.inputs.mode }}"
-          TRIGGER="push"
-          if [ "${{ github.event_name }}" = "schedule" ]; then MODE="full"; TRIGGER="schedule"; fi
+          TRIGGER="schedule"
+          if [ "${{ github.event.schedule }}" = "17 3 * * 1" ]; then MODE="full"; fi
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then TRIGGER="manual"; fi
           pnpm engineering:sync -- --ref "${{ github.sha }}" --branch main --mode "${MODE:-incremental}" --trigger "$TRIGGER"

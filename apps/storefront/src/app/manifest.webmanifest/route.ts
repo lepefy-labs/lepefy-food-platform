@@ -48,8 +48,13 @@ async function buildManifest(): Promise<MetadataRoute.Manifest> {
 // A route handler (not the app/manifest.ts file convention): the file
 // convention wins over the `manifest` metadata field, which would stop
 // /admin from declaring its own Lepefy Admin manifest. Same URL, same content.
+// Cached at the CDN (browsers still revalidate): every uncached hit is a Vercel Function
+// invocation, and the manifest only changes when the tenant name, colour or icon does.
 export async function GET() {
   return new NextResponse(JSON.stringify(await buildManifest()), {
-    headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=0, must-revalidate' },
+    headers: {
+      'Content-Type': 'application/manifest+json; charset=utf-8',
+      'Cache-Control': 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
+    },
   });
 }

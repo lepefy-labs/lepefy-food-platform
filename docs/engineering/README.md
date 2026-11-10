@@ -23,7 +23,7 @@ Portale tecnico-funzionale **interno** per l'équipe IT: indice del repository G
 | **A** (fatta) | migration 175, contratti TS, esclusioni, estrattori TS/SQL/Markdown, registro moduli, guardia di accesso, CLI `pnpm engineering:index`, test, passo CI |
 | **B** (fatta) | ricerca unica (esatta → prefisso → full text → parziale), UI Panoramica/Architettura/Moduli/Codice/Ricerca, `docs/engineering/modules/*.md` (10 schede, mai «Verificata») |
 | **C** (fatta) | migration 176 (client API, metriche, impostazioni, policy AI `engineering` disabilitata), gateway con `tenantId: null`, orchestratore con citazioni, chat, API macchina |
-| **D** (fatta) | `POST /api/internal/engineering/ingest` (token dedicato), `pnpm engineering:sync` + workflow `engineering-sync.yml` (push incrementale, settimanale completo, manuale), job CI `engineering:docs-check`, pagina Metriche (richieste, qualità, costi, sincronizzazioni), benchmark (spec sull'indice reale + `pnpm engineering:benchmark` a pagamento) |
+| **D** (fatta) | `POST /api/internal/engineering/ingest` (token dedicato), `pnpm engineering:sync` + workflow `engineering-sync.yml` (incrementale giornaliero, settimanale completo, manuale), job CI `engineering:docs-check`, pagina Metriche (richieste, qualità, costi, sincronizzazioni), benchmark (spec sull'indice reale + `pnpm engineering:benchmark` a pagamento) |
 
 ## Comandi
 
