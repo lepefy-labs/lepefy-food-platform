@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   classifyOrderOperation, compareOrders,
-  type OperationalOrder, type OperationalThresholds, type OrderSortKey, type PrioritizedOrder, type QueueKey,
+  type OperationalOrder, type OperationalThresholds, type OrderSortKey, type PrioritizedOrder, type PriorityGroup, type QueueKey,
 } from '@/lib/orders/adminOrderOperations';
 import type { OrderPreparationMode } from '@/lib/orders/preparation/preparationPolicy';
 import { isMissingPreparationColumn, withoutPreparationColumns } from '@/lib/orders/preparation/compat';
@@ -187,6 +187,18 @@ export interface WorkQueueResult {
   priorityAvailable: boolean;
   /** Sort actually applied (priority may fall back to newest). */
   appliedSort: OrderSortKey;
+  /**
+   * Orders of each priority group in the whole filtered list (not only the page), so a
+   * group header shows its real size. Empty when the list is not grouped (date/amount sorts).
+   */
+  groupCounts: Partial<Record<PriorityGroup, number>>;
+}
+
+/** Orders per priority group of a classified set. */
+export function countPriorityGroups(rows: readonly PrioritizedOrder[]): Partial<Record<PriorityGroup, number>> {
+  const counts: Partial<Record<PriorityGroup, number>> = {};
+  for (const { operation } of rows) counts[operation.group] = (counts[operation.group] ?? 0) + 1;
+  return counts;
 }
 
 interface Selects { light: string; full: string }
@@ -234,7 +246,7 @@ async function runWorkQueue(db: SupabaseClient, tenantId: string, input: WorkQue
       .sort((a, b) => compareOrders(sort, a, b));
     const window = planPriorityPage(matching.length, 0, input.page, pageSize);
     const ids = matching.slice(window.activeStart, window.activeEnd).map(({ order }) => order.id!);
-    return { ...base, rows: await loadFullRows(db, tenantId, ids, selects), total: matching.length, currentPage: window.currentPage, totalPages: window.totalPages };
+    return { ...base, rows: await loadFullRows(db, tenantId, ids, selects), total: matching.length, currentPage: window.currentPage, totalPages: window.totalPages, groupCounts: sort === 'priority' ? countPriorityGroups(matching) : {} };
   }
 
   // Priority on the whole list: sorted active orders first, then terminal ones.
@@ -258,6 +270,7 @@ async function runWorkQueue(db: SupabaseClient, tenantId: string, input: WorkQue
       total: active.length + (terminalTotal ?? 0),
       currentPage: window.currentPage,
       totalPages: window.totalPages,
+      groupCounts: { ...countPriorityGroups(active), ...(terminalTotal ? { finished: terminalTotal } : {}) },
     };
   }
 
@@ -274,7 +287,9 @@ async function runWorkQueue(db: SupabaseClient, tenantId: string, input: WorkQue
     if (retry.error) throw retry.error;
     data = (retry.data ?? []) as Array<Record<string, unknown>>;
   }
-  return { ...base, rows: await attachEvents(db, tenantId, data), total, currentPage: window.currentPage, totalPages: window.totalPages };
+  // « Terminés » with the priority sort is one group: its size is the total.
+  const groupCounts: WorkQueueResult['groupCounts'] = sort === 'priority' && filters.view === 'finished' ? { finished: total } : {};
+  return { ...base, rows: await attachEvents(db, tenantId, data), total, currentPage: window.currentPage, totalPages: window.totalPages, groupCounts };
 }
 
 /** Full rows of the page, in the given order, with their tracking events. */

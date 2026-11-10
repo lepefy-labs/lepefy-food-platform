@@ -8,7 +8,7 @@
 | Percorso | Ruolo |
 |---|---|
 | `/admin` | **Aujourd'hui** (workspace shop): saluto, «À régler en priorité», «Dernières mises à jour», «Que voulez-vous faire ?», «Commandes à préparer». Sul dominio événementiel `/admin` resta riscritto su `/admin/evenementiel`. |
-| `/admin/orders` | **Commandes**: il cockpit storico invariato (KPI, Contrôles, FilterBar, DataTable a gruppi, BulkBar, export, documenti, précommandes, pagamenti per link). |
+| `/admin/orders` | **Commandes**: il cockpit storico (KPI, Contrôles, FilterBar, DataTable `variant="queue"` a gruppi comprimibili, BulkBar, export, documenti, précommandes, pagamenti per link); presentazione della coda in `docs/SHIPPING_INTELLIGENCE.md` §3.0 « Riga e azioni ». |
 | `/admin/orders/preparation` | **Session de préparation** (stateless, `?ids=`): senza id elenca gli ordini da preparare; con id mostra la lista per articolo, gli ordini esclusi e i documenti. |
 | `/admin/orders/[id]` | Dettaglio: checklist digitale **oppure** pannello «Préparation sur papier» secondo la modalità dell'ordine. |
 | `/admin/parametres/preparation` | Paramètres → Commandes → **Préparation et emballage**. |

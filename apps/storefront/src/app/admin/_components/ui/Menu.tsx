@@ -127,8 +127,9 @@ export default function Menu({ trigger, label, align = 'end', header, children, 
 
 const ITEM_CLASS = 'flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm text-a-text hover:bg-a-hover focus:bg-a-hover focus:outline-none';
 
-export function MenuLink({ href, children, active = false, external = false }: { href: string; children: ReactNode; active?: boolean; external?: boolean }) {
+export function MenuLink({ href, children, active = false, external = false, newTab = false }: { href: string; children: ReactNode; active?: boolean; external?: boolean; /** Opens in a new tab (PDF, customer page); say so in the item text. */ newTab?: boolean }) {
   const className = cn(ITEM_CLASS, active && 'bg-a-selected font-semibold text-a-brand-fg');
+  if (newTab) return <a role="menuitem" href={href} target="_blank" rel="noopener noreferrer" className={className}>{children}</a>;
   // Workspace switches cross hosts: a plain anchor reloads the other app.
   return external
     ? <a role="menuitem" href={href} aria-current={active ? 'true' : undefined} className={className}>{children}</a>

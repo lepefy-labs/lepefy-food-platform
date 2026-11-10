@@ -4,14 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  IconAlertTriangle, IconBuildingStore, IconChevronDown, IconClipboardList, IconDownload, IconExternalLink,
-  IconFileTypePdf, IconLeaf, IconPrinter, IconSnowflake, IconTruck, IconTruckDelivery,
+  IconAlertOctagon, IconAlertTriangle, IconBuildingStore, IconChevronDown, IconCircleCheck, IconClipboardList, IconClockExclamation,
+  IconClockHour4, IconDotsVertical, IconDownload, IconExternalLink, IconEye, IconFileTypePdf, IconLeaf, IconPackage, IconPrinter,
+  IconSnowflake, IconTruck, IconTruckDelivery, type Icon as TablerIcon,
 } from '@tabler/icons-react';
 import { ORDER_DOCUMENT_FORMATS } from '@/lib/orders/documents/formats';
 import {
   classifyOrderOperation, formatSince, lastTrackingEventAt, PRIORITY_GROUP_LABELS, transportState,
-  type OperationalThresholds, type OrderOperation, type OrderSortKey,
+  type OperationalThresholds, type OrderOperation, type OrderSortKey, type PriorityGroup,
 } from '@/lib/orders/adminOrderOperations';
+import {
+  defaultGroupCollapsed, groupCountLabel, orderActionEmphasis, PRIORITY_GROUP_TONE, queueGroupContextKey, type QueueGroupContext,
+} from '@/lib/orders/orderQueuePresentation';
 import { carrierDisplayName, carrierTrackingLink, shipmentDate } from '@/lib/shipping/shipmentPresentation';
 import type { CartonSuggestion } from '@/lib/shipping/cartonSuggestion';
 import type { NormalizedShipmentStatus, OrderStatus, ShipmentTrackingEvent } from '@lepefy/types';
@@ -22,6 +26,7 @@ import Badge from '../../_components/ui/Badge';
 import Button, { ButtonAnchor, buttonClasses } from '../../_components/ui/Button';
 import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import CopyableValue from '../../_components/ui/CopyableValue';
+import Menu, { MenuButton, MenuLink } from '../../_components/ui/Menu';
 import StatusBadge from '../../_components/ui/StatusBadge';
 import { useAdminToast } from '../../_components/ui/Toaster';
 import BulkTrackingModal, { type PendingTrackingOrder } from '../../_components/ui/BulkTrackingModal';
@@ -65,9 +70,22 @@ interface Props {
   /** Link that clears every filter (empty state). */
   resetHref: string;
   hasFilters: boolean;
-  /** Start with the « Terminées » group collapsed (work queue without search, status filter or « Terminés » view). */
-  finishedCollapsed: boolean;
+  /** View and targeting of the list: decides which groups start collapsed (`defaultGroupCollapsed`). */
+  groupContext: QueueGroupContext;
+  /** Size of each priority group in the whole filtered list (header counts). */
+  groupCounts: Partial<Record<PriorityGroup, number>>;
 }
+
+const GROUP_ICON: Record<PriorityGroup, TablerIcon> = {
+  action_required: IconAlertOctagon,
+  preparation_overdue: IconClockExclamation,
+  pickup_overdue: IconClockHour4,
+  preparing: IconClipboardList,
+  to_ship: IconPackage,
+  shipping: IconTruckDelivery,
+  pickup_ready: IconBuildingStore,
+  finished: IconCircleCheck,
+};
 
 const shortId = (id: string) => `#${id.slice(0, 8).toUpperCase()}`;
 function compactAddress(order: ListOrder) {
@@ -81,6 +99,7 @@ function weightLabel(order: ListOrder) {
 }
 function customerTrackingHref(orderId: string) { return `/api/admin/orders/${orderId}/customer-tracking`; }
 function carrierOf(order: ListOrder) { return carrierDisplayName(order.tracking_carrier ?? order.shipping_details?.carrierName); }
+function unitCount(order: ListOrder) { return order.order_items.reduce((sum, item) => sum + item.quantity, 0); }
 function coldSummary(order: ListOrder) {
   return order.order_items.reduce((total, item) => {
     if (item.storage_type === 'fresh') total.fresh += item.quantity;
@@ -91,10 +110,6 @@ function coldSummary(order: ListOrder) {
 function formatEta(value: string | null) {
   return value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Rome' }).format(new Date(value)) : null;
 }
-
-const GROUP_TONE: Partial<Record<OrderOperation['group'], AdminTone>> = {
-  action_required: 'danger', preparation_overdue: 'urgent', pickup_overdue: 'urgent', finished: 'neutral',
-};
 
 function rowToneOf(operation: OrderOperation): AdminTone | undefined {
   if (operation.group === 'action_required') return 'danger';
@@ -108,7 +123,7 @@ function HandlingBadges({ operation }: { operation: OrderOperation }) {
   const { international, score } = operation.handling;
   if (!international && score !== 3) return null;
   return (
-    <span className="mt-1 flex flex-wrap gap-1" aria-label="Attention logistique">
+    <span className="mt-1.5 flex flex-wrap gap-1" aria-label="Attention logistique">
       {score === 3 && <Badge tone="danger">Priorité élevée</Badge>}
       {international && <Badge tone="info">International</Badge>}
     </span>
@@ -121,6 +136,17 @@ function OrderStateBadge({ order, operation }: { order: ListOrder; operation: Or
   return <StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} closureType={order.closure_type} />;
 }
 
+/** Anomaly first, in its own colour: never mistaken for a regular state. */
+function AnomalyLine({ operation }: { operation: OrderOperation }) {
+  if (!operation.anomaly) return null;
+  const danger = operation.flags.has('incidents') || operation.anomaly.code === 'stock_conflict';
+  return (
+    <p className={cn('flex items-start gap-1 text-sm font-semibold', danger ? 'text-tone-danger-fg' : 'text-tone-urgent-fg')}>
+      <IconAlertTriangle size={16} aria-hidden="true" className="mt-0.5 shrink-0" />{operation.anomaly.label}
+    </p>
+  );
+}
+
 function csvOf(rows: ListOrder[]) {
   const cell = (value: unknown) => `"${String(value ?? '').replace(/^([=+\-@])/, "'$1").replace(/"/g, '""')}"`;
   const lines = [['Commande', 'Date', 'Client', 'E-mail', 'Total', 'Statut', 'Paiement', 'Transporteur'].map(cell).join(';'),
@@ -128,15 +154,21 @@ function csvOf(rows: ListOrder[]) {
   return `﻿${lines.join('\r\n')}\r\n`;
 }
 
-export default function OrdersTable({ orders, tenantPreparationMode, tenantCurrency, carriers, thresholds, canManage, managedProviderAvailable, nowIso, originCountry, sort, documentDefaults, resetHref, hasFilters, finishedCollapsed }: Props) {
+export default function OrdersTable({ orders, tenantPreparationMode, tenantCurrency, carriers, thresholds, canManage, managedProviderAvailable, nowIso, originCountry, sort, documentDefaults, resetHref, hasFilters, groupContext, groupCounts }: Props) {
   const router = useRouter();
   const toast = useAdminToast();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  // Finished orders need no action: in the work queue their group starts
-  // collapsed (count kept visible); a search, a status filter or the
-  // « Terminés » view opens it. The choice survives polling refreshes.
-  const [finishedOpen, setFinishedOpen] = useState(!finishedCollapsed);
-  useEffect(() => { setFinishedOpen(!finishedCollapsed); }, [finishedCollapsed]);
+  // Open/closed choices of the user, per group. They survive polling refreshes
+  // (router.refresh keeps client state) and reset only when the view or the
+  // targeting changes, i.e. when the defaults themselves change.
+  const contextKey = queueGroupContextKey(groupContext);
+  const [groupChoices, setGroupChoices] = useState<{ key: string; collapsed: Partial<Record<PriorityGroup, boolean>> }>({ key: contextKey, collapsed: {} });
+  const choices = groupChoices.key === contextKey ? groupChoices.collapsed : {};
+  const isCollapsed = useCallback((group: PriorityGroup) => choices[group] ?? defaultGroupCollapsed(group, groupContext), [choices, groupContext]);
+  const toggleGroup = (group: PriorityGroup) => setGroupChoices(previous => {
+    const current = previous.key === contextKey ? previous.collapsed : {};
+    return { key: contextKey, collapsed: { ...current, [group]: !(current[group] ?? defaultGroupCollapsed(group, groupContext)) } };
+  });
   const [detail, setDetail] = useState<Record<string, DetailData>>({});
   const [detailError, setDetailError] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<Set<string>>(new Set());
@@ -147,8 +179,9 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const money = (value: number | null | undefined) => formatMoney(Number(value ?? 0), tenantCurrency || 'EUR');
   const operations = useMemo(() => new Map(orders.map(order => [order.id, classifyOrderOperation({ ...order, originCountry, managedProviderAvailable, tenantPreparationMode }, thresholds, now)])), [orders, originCountry, managedProviderAvailable, tenantPreparationMode, thresholds, now]);
-  // Rows of the collapsed « Terminées » group are off screen: they leave the selection (bulk actions never touch hidden orders).
-  const rowIds = useMemo(() => orders.filter(order => finishedOpen || sort !== 'priority' || operations.get(order.id)?.group !== 'finished').map(order => order.id), [orders, finishedOpen, sort, operations]);
+  const grouped = sort === 'priority';
+  // Rows of a collapsed group are off screen: they leave the selection (bulk actions never touch hidden orders).
+  const rowIds = useMemo(() => orders.filter(order => !grouped || !isCollapsed(operations.get(order.id)!.group)).map(order => order.id), [orders, grouped, isCollapsed, operations]);
   useEffect(() => { setExpanded(new Set()); setDetail({}); setDetailError(new Set()); }, [orders]);
 
   async function loadDetail(id: string) {
@@ -201,54 +234,78 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
   const operationOf = (order: ListOrder) => operations.get(order.id)!;
   const done = (order: ListOrder) => operationOf(order).group === 'finished';
 
-  function fulfillmentCell(order: ListOrder) {
+  /** Destination first (where the parcel goes), then carrier, parcels, weight, then copyable references. */
+  function fulfillmentCell(order: ListOrder, compact = false) {
     if (order.fulfillment_type === 'pickup') return <p className="inline-flex items-center gap-1.5 font-semibold"><IconBuildingStore size={16} aria-hidden="true" /> Retrait magasin</p>;
-    const carrier = carrierOf(order);
-    const meta = [carrier, parcelCount(order) != null && `${parcelCount(order)} colis`, weightLabel(order)].filter(Boolean).join(' · ');
+    const meta = [carrierOf(order), parcelCount(order) != null && `${parcelCount(order)} colis`, weightLabel(order)].filter(Boolean).join(' · ');
     return (
-      <div className="max-w-[240px] space-y-0.5">
-        <p className="flex items-center gap-1.5"><IconTruck size={16} aria-hidden="true" className="shrink-0" /><b className="font-semibold">Livraison</b><span className="truncate text-a-text-2">· {compactAddress(order) || 'Destination indisponible'}</span></p>
+      <div className={cn('space-y-0.5', !compact && 'max-w-[250px]')}>
+        <p className="flex min-w-0 items-center gap-1.5"><IconTruck size={16} aria-hidden="true" className="shrink-0 text-a-text-2" /><b className="shrink-0 font-semibold">Livraison</b><span className="truncate font-medium">· {compactAddress(order) || 'Destination indisponible'}</span></p>
         {meta && <p className="truncate text-xs text-a-text-3">{meta}</p>}
-        {order.shipping_provider_reference && <CopyableValue label="Réf." value={order.shipping_provider_reference} />}
-        {order.tracking_code && order.tracking_code !== order.shipping_provider_reference && <CopyableValue label="Suivi" value={order.tracking_code} />}
+        {!compact && order.shipping_provider_reference && <CopyableValue label="Réf." value={order.shipping_provider_reference} />}
+        {!compact && order.tracking_code && order.tracking_code !== order.shipping_provider_reference && <CopyableValue label="Suivi" value={order.tracking_code} />}
       </div>
     );
   }
 
-  function stateCell(order: ListOrder, operation: OrderOperation) {
+  /**
+   * State block, ordered by the situation: anomaly first; for a shipped order
+   * the carrier state leads (it is what moves), otherwise the order state. A
+   * « Transport : Non associée » on an order not started yet says nothing: hidden.
+   */
+  function stateBlock(order: ListOrder, operation: OrderOperation) {
     const transport = transportState(order);
+    const notStarted = (order.status === 'new' || order.status === 'stock_conflict') && !order.shipping_provider_reference && !order.shipping_sync_error && !order.tracking_code;
+    // A carrier incident is already the anomaly line (« Incident transporteur », « Synchronisation… »): no second « Transport : Incident ».
+    const transportBadge = transport && !done(order) && !notStarted && !operation.flags.has('incidents') ? <Badge tone={transport.tone}>Transport : {transport.label}</Badge> : null;
     const lastMove = lastTrackingEventAt(order);
     const eta = order.status === 'shipped' ? formatEta(order.shipping_estimated_delivery_at) : null;
+    const shipped = order.status === 'shipped';
     return (
-      <div className="flex flex-col items-start gap-1">
-        <OrderStateBadge order={order} operation={operation} />
+      <div className="flex min-w-0 flex-col items-start gap-1">
+        <AnomalyLine operation={operation} />
+        {shipped && transportBadge}
+        {/* « Conflit de stock » is both the status and the anomaly: said once, by the anomaly line. */}
+        {operation.anomaly?.code !== 'stock_conflict' && <OrderStateBadge order={order} operation={operation} />}
+        {!shipped && transportBadge}
         {order.closure_reason && <p className="text-xs text-a-text-3">{CLOSURE_REASON_LABELS[order.closure_reason as ClosureReason] ?? ''}</p>}
-        {transport && !done(order) && <Badge tone={transport.tone}>Transport : {transport.label}</Badge>}
-        {lastMove && order.status === 'shipped' && <p className="text-xs text-a-text-3">Mouvement {formatSince(lastMove, now)}</p>}
+        {lastMove && shipped && <p className="text-xs text-a-text-3">Mouvement {formatSince(lastMove, now)}</p>}
         {eta && <p className="text-xs text-a-text-3">Livraison estimée : {eta}</p>}
-        {operation.anomaly && (
-          <p className={cn('flex items-start gap-1 text-xs font-semibold', operation.flags.has('incidents') || operation.anomaly.code === 'stock_conflict' ? 'text-tone-danger-fg' : 'text-tone-urgent-fg')}>
-            <IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{operation.anomaly.label}
-          </p>
-        )}
         {operation.notice && <p className="flex items-start gap-1 text-xs font-semibold text-tone-warning-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{operation.notice}</p>}
-        {/* Below 1760 px the action column is hidden and the action sits under the state, so the row fits beside the sidebar without horizontal scroll. */}
-        <div className="mt-1 min-[1760px]:hidden">{actionLink(order, operation)}</div>
       </div>
     );
   }
 
+  /** Next action from the classifier; its weight comes from `orderActionEmphasis` (solid only when urgent). */
   function actionLink(order: ListOrder, operation: OrderOperation, full = false) {
     const { action } = operation;
     const label = canManage || action.intent === 'tracking' ? action.label : 'Voir la commande';
     // « Voir le suivi » opens what the customer sees (signed /orders/[id] page, built server-side).
     const trackingUrl = action.intent === 'tracking' ? customerTrackingHref(order.id) : null;
-    const variant = done(order) ? 'ghost' : action.primary && (canManage || action.intent === 'tracking') ? 'outline' : 'secondary';
-    // In the table the label may wrap on two lines: a long action (« Poursuivre la préparation »)
-    // must not push the row wider than the page and hide the button behind a horizontal scroll.
-    const className = buttonClasses({ variant, size: 'sm', className: full ? 'w-full' : 'w-[9.5rem] !whitespace-normal py-1 text-center leading-tight' });
+    const variant = orderActionEmphasis(operation, canManage);
+    // The label may wrap on two lines in the table: a long action must never widen the row into a horizontal scroll.
+    const className = buttonClasses({ variant, size: 'sm', className: full ? 'w-full min-h-10' : 'w-[9.5rem] !whitespace-normal py-1 text-center leading-tight' });
     if (trackingUrl) return <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className={className}>{label}<IconExternalLink size={14} aria-hidden="true" /><span className="sr-only"> (suivi client, nouvel onglet) : commande {shortId(order.id)}</span></a>;
     return <Link href={`/admin/orders/${order.id}`} className={className}>{label}<span className="sr-only"> : commande {shortId(order.id)}</span></Link>;
+  }
+
+  /** Accessory actions of a row (discreet level): same links as the detail panel, one click away. */
+  function rowMenu(order: ListOrder) {
+    const carrierUrl = carrierTrackingLink({ carrier: carrierOf(order), trackingCode: order.tracking_code, providerUrl: order.shipping_tracking_url });
+    const open = expanded.has(order.id);
+    return (
+      <Menu label={`Autres actions : commande ${shortId(order.id)}`} trigger={<IconDotsVertical size={18} aria-hidden="true" />}
+        triggerClassName="inline-flex h-10 w-10 md:h-9 md:w-9 items-center justify-center rounded-lg border border-a-border bg-a-surface text-a-text-2 hover:border-a-border-strong hover:text-a-text">
+        <MenuLink href={`/admin/orders/${order.id}`}><IconEye size={16} aria-hidden="true" />Voir la commande</MenuLink>
+        <MenuButton onSelect={() => toggleDetail(order)}>
+          <IconChevronDown size={16} aria-hidden="true" className={open ? 'rotate-180' : undefined} />{open ? 'Masquer le détail' : 'Afficher le détail'}
+        </MenuButton>
+        {order.status !== 'cancelled' && <MenuLink newTab href={`/api/admin/orders/${order.id}/documents/picking-list`}><IconPrinter size={16} aria-hidden="true" />Liste de préparation (PDF)</MenuLink>}
+        {order.status !== 'cancelled' && order.fulfillment_type === 'delivery' && documentDefaults.packingSlipEnabled && <MenuLink newTab href={`/api/admin/orders/${order.id}/documents/packing-slip`}><IconFileTypePdf size={16} aria-hidden="true" />Bon de colis (PDF)</MenuLink>}
+        {order.fulfillment_type === 'delivery' && (order.tracking_code || order.shipping_provider_reference) && <MenuLink newTab href={customerTrackingHref(order.id)}><IconExternalLink size={16} aria-hidden="true" />Suivi client</MenuLink>}
+        {carrierUrl && <MenuLink newTab href={carrierUrl}><IconTruckDelivery size={16} aria-hidden="true" />Suivi transporteur</MenuLink>}
+      </Menu>
+    );
   }
 
   function detailPanel(order: ListOrder, operation: OrderOperation) {
@@ -258,7 +315,7 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
     const eta = formatEta(order.shipping_estimated_delivery_at);
     const heading = 'mb-2 text-xs font-semibold text-a-text-2';
     return (
-      <div id={`order-detail-${order.id}`} className="grid gap-4 p-4 text-sm text-a-text md:grid-cols-3">
+      <div id={`order-detail-${order.id}`} role="region" aria-label={`Détail de la commande ${shortId(order.id)}`} className="grid gap-4 p-4 text-sm text-a-text md:grid-cols-3">
         <section aria-label="Préparation"><h3 className={heading}>Préparation</h3>
           <ul className="space-y-1">{order.order_items.map(item => <li key={item.id}><b className="font-semibold">×{item.quantity}</b> {item.name}{item.warehouse_location ? <span className="text-a-text-3"> · {item.warehouse_location}</span> : null}</li>)}</ul>
           {(weightLabel(order) || parcelCount(order) != null) && <p className="mt-2 text-a-text-2">{[weightLabel(order) && `Poids total ${weightLabel(order)}`, parcelCount(order) != null && `${parcelCount(order)} colis`].filter(Boolean).join(' · ')}</p>}
@@ -294,23 +351,29 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
     );
   }
 
-  function preparationSummary(order: ListOrder, compact = false) {
-    const count = order.order_items.reduce((sum, item) => sum + item.quantity, 0);
+  function coldTags(order: ListOrder) {
     const cold = coldSummary(order);
     return <>
-      <p className="flex flex-wrap items-center gap-x-2"><b className="font-semibold">{count} unité{count !== 1 ? 's' : ''}</b>
-        {compact && weightLabel(order) && <span className="text-a-text-3">· {weightLabel(order)}</span>}
-        {cold.fresh > 0 && <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-tone-success-fg"><IconLeaf size={13} aria-hidden="true" />{cold.fresh} frais</span>}
-        {cold.frozen > 0 && <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-tone-info-fg"><IconSnowflake size={13} aria-hidden="true" />{cold.frozen} surgelé{cold.frozen > 1 ? 's' : ''}</span>}
+      {cold.fresh > 0 && <span className="inline-flex items-center gap-0.5 rounded-full bg-tone-success-bg px-1.5 text-xs font-semibold text-tone-success-fg"><IconLeaf size={13} aria-hidden="true" />{cold.fresh} frais</span>}
+      {cold.frozen > 0 && <span className="inline-flex items-center gap-0.5 rounded-full bg-tone-info-bg px-1.5 text-xs font-semibold text-tone-info-fg"><IconSnowflake size={13} aria-hidden="true" />{cold.frozen} surgelé{cold.frozen > 1 ? 's' : ''}</span>}
+    </>;
+  }
+
+  function preparationSummary(order: ListOrder, compact = false) {
+    const count = unitCount(order);
+    const extra = order.order_items.length - 2;
+    return <>
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5"><b className="font-semibold">{count} unité{count !== 1 ? 's' : ''}</b>
+        {coldTags(order)}
       </p>
-      {order.order_items.slice(0, 2).map(item => <p key={item.id} className="truncate text-xs text-a-text-2">×{item.quantity} {item.name}</p>)}
-      {order.order_items.length > 2 && <p className="text-xs text-a-text-3">+{order.order_items.length - 2} autre{order.order_items.length - 2 > 1 ? 's' : ''}</p>}
+      {order.order_items.slice(0, 2).map(item => <p key={item.id} className={cn('text-xs text-a-text-2', compact ? 'line-clamp-1 break-words' : 'truncate')}>×{item.quantity} {item.name}</p>)}
+      {extra > 0 && <p className="text-xs text-a-text-3">+{extra} autre{extra > 1 ? 's' : ''} produit{extra > 1 ? 's' : ''}</p>}
     </>;
   }
 
   const columns: DataColumn<ListOrder>[] = [
     {
-      key: 'order', header: 'Commande', className: 'min-w-[200px]',
+      key: 'order', header: 'Commande', className: 'min-w-[190px]',
       cell: (order) => {
         const operation = operationOf(order);
         const open = expanded.has(order.id);
@@ -319,65 +382,85 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
           <div className="flex items-start gap-2">
             <button type="button" onClick={() => toggleDetail(order)} aria-expanded={open} aria-controls={`order-detail-${order.id}`}
               title={open ? 'Masquer le détail' : 'Afficher le détail'}
-              className={cn('mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus',
+              className={cn('mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus',
                 open ? 'border-a-brand bg-a-brand-soft text-a-brand-fg' : 'border-a-border-strong bg-a-surface text-a-text-2 group-hover/row:border-a-brand group-hover/row:text-a-brand-fg')}>
               <IconChevronDown size={16} aria-hidden="true" className={cn('transition-transform', !open && '-rotate-90')} />
               <span className="sr-only">{open ? 'Masquer' : 'Afficher'} le détail de {shortId(order.id)}</span>
             </button>
             <span className="min-w-0">
-              <span className="font-mono text-xs font-semibold text-a-text-2">{shortId(order.id)}</span>
-              <span className="block max-w-[200px] truncate font-semibold">{order.full_name ?? order.email ?? 'Client'}</span>
+              <span className="block font-mono text-xs font-semibold text-a-text-3">{shortId(order.id)}</span>
+              <span className="block max-w-[210px] truncate text-[15px] font-semibold leading-5">{order.full_name ?? order.email ?? 'Client'}</span>
+              <span className="block text-xs text-a-text-3"><time dateTime={order.created_at}>{formatDate(order.created_at, 'datetime')}</time></span>
             </span>
           </div>
-          <p className="mt-0.5 pl-9 text-xs text-a-text-3"><time dateTime={order.created_at}>{formatDate(order.created_at, 'datetime')}</time></p>
-          {operation.urgency && <p className="mt-1 flex items-start gap-1 pl-9 text-xs font-semibold text-tone-urgent-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{operation.urgency}</p>}
+          {operation.urgency && <p className="mt-1.5 flex items-start gap-1 pl-10 text-xs font-semibold text-tone-urgent-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{operation.urgency}</p>}
+          {/* Tablet: « À préparer » and « Livraison / Retrait » are hidden; the essentials stay here, the rest in the detail. */}
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pl-10 text-xs text-a-text-2 lg:hidden">
+            <b className="font-semibold text-a-text">{unitCount(order)} unité{unitCount(order) !== 1 ? 's' : ''}</b>{coldTags(order)}
+            <span>· {order.fulfillment_type === 'pickup' ? 'Retrait magasin' : compactAddress(order) || 'Livraison'}</span>
+          </p>
         </>;
       },
     },
-    { key: 'items', header: 'À préparer', className: 'max-w-[220px]', cell: (order) => <>{preparationSummary(order)}<HandlingBadges operation={operationOf(order)} /></> },
-    { key: 'fulfillment', header: 'Livraison / Retrait', cell: fulfillmentCell },
-    { key: 'state', header: 'État', cell: (order) => stateCell(order, operationOf(order)) },
-    { key: 'total', header: 'Total', align: 'right', cell: (order) => <span className="font-semibold">{money(order.total)}</span> },
-    { key: 'action', header: <span className="sr-only">Action</span>, align: 'right', hideBelow: 'wide', cell: (order) => actionLink(order, operationOf(order)) },
+    { key: 'items', header: 'À préparer', hideBelow: 'lg', className: 'max-w-[220px]', cell: (order) => <>{preparationSummary(order)}<HandlingBadges operation={operationOf(order)} /></> },
+    { key: 'fulfillment', header: 'Livraison / Retrait', hideBelow: 'lg', cell: (order) => fulfillmentCell(order) },
+    {
+      key: 'state', header: 'État / Action',
+      cell: (order) => {
+        const operation = operationOf(order);
+        // Side by side when the row is wide enough, the action under the state otherwise (never a horizontal scroll).
+        return (
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+            {stateBlock(order, operation)}
+            <div className="shrink-0">{actionLink(order, operation)}</div>
+          </div>
+        );
+      },
+    },
+    { key: 'total', header: 'Total', align: 'right', cell: (order) => <span className="font-semibold text-a-text">{money(order.total)}</span> },
+    { key: 'menu', header: <span className="sr-only">Autres actions</span>, align: 'right', className: 'w-12 !pl-0', cell: rowMenu },
   ];
 
-  const groups: DataRowGroup<ListOrder>[] | undefined = sort === 'priority'
+  const groups: DataRowGroup<ListOrder>[] | undefined = grouped
     ? orders.reduce<DataRowGroup<ListOrder>[]>((runs, order) => {
       const group = operationOf(order).group;
       const last = runs[runs.length - 1];
       if (last && last.id.startsWith(`${group}:`)) last.rows.push(order);
-      else runs.push({
-        id: `${group}:${runs.length}`, label: PRIORITY_GROUP_LABELS[group], tone: GROUP_TONE[group], rows: [order],
-        ...(group === 'finished' ? { collapsed: !finishedOpen, onToggle: () => setFinishedOpen((open) => !open) } : {}),
-      });
+      else runs.push({ id: `${group}:${runs.length}`, label: PRIORITY_GROUP_LABELS[group], tone: PRIORITY_GROUP_TONE[group], icon: GROUP_ICON[group], rows: [order] });
       return runs;
-    }, [])
+    }, []).map((run) => {
+      const group = run.id.split(':')[0] as PriorityGroup;
+      const { count, pageNote } = groupCountLabel(run.rows.length, groupCounts[group]);
+      return { ...run, total: count, note: pageNote, collapsed: isCollapsed(group), onToggle: () => toggleGroup(group) };
+    })
     : undefined;
 
   function mobileCard(order: ListOrder) {
     const operation = operationOf(order);
     const open = expanded.has(order.id);
-    const flag = operation.urgency ?? operation.anomaly?.label ?? null;
     return (
       <div className={cn('p-3 pl-4 text-sm', done(order) && 'text-a-text-2')}>
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <span className="font-mono text-xs font-semibold text-a-text-2">{shortId(order.id)}</span>
-            <p className="truncate font-semibold">{order.full_name ?? order.email ?? 'Client'}</p>
-            <p className="text-xs text-a-text-3">{formatDate(order.created_at, 'datetime')} · <b className="font-semibold text-a-text">{money(order.total)}</b></p>
+            <p className="text-xs text-a-text-3"><span className="font-mono font-semibold">{shortId(order.id)}</span> · <time dateTime={order.created_at}>{formatDate(order.created_at, 'datetime')}</time></p>
+            <p className="line-clamp-2 break-words text-[15px] font-semibold leading-5 text-a-text">{order.full_name ?? order.email ?? 'Client'}</p>
           </div>
-          <span className="flex flex-col items-end gap-1"><OrderStateBadge order={order} operation={operation} /></span>
+          <b className="shrink-0 font-semibold tabular-nums text-a-text">{money(order.total)}</b>
         </div>
-        {flag && <p className="mt-1.5 flex items-start gap-1 text-xs font-semibold text-tone-urgent-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{flag}</p>}
-        <div className="mt-2">{preparationSummary(order, true)}<HandlingBadges operation={operation} /></div>
-        <div className="mt-2">{fulfillmentCell(order)}</div>
-        <div className="mt-3 flex gap-2">
-          <div className="flex-1">{actionLink(order, operation, true)}</div>
-          <Button variant="secondary" size="sm" onClick={() => toggleDetail(order)} aria-expanded={open} aria-controls={`order-detail-${order.id}`} aria-label={`${open ? 'Masquer' : 'Afficher'} le détail de ${shortId(order.id)}`}>
+        {operation.urgency && <p className="mt-1.5 flex items-start gap-1 text-xs font-semibold text-tone-urgent-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{operation.urgency}</p>}
+        <div className="mt-2">{stateBlock(order, operation)}</div>
+        <div className="mt-2 space-y-1 border-t border-a-border pt-2">
+          {preparationSummary(order, true)}<HandlingBadges operation={operation} />
+          {fulfillmentCell(order, true)}
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <div className="min-w-0 flex-1">{actionLink(order, operation, true)}</div>
+          <Button variant="secondary" size="sm" className="min-h-10" onClick={() => toggleDetail(order)} aria-expanded={open} aria-controls={`order-detail-${order.id}`} aria-label={`${open ? 'Masquer' : 'Afficher'} le détail de ${shortId(order.id)}`}>
             <IconChevronDown size={16} aria-hidden="true" className={open ? 'rotate-180' : undefined} />
           </Button>
+          {rowMenu(order)}
         </div>
-        {open && <div className="-mx-3 mt-3 border-t border-a-border bg-a-surface-2">{detailPanel(order, operation)}</div>}
+        {open && <div className="-mx-3 -mb-3 mt-3 border-t border-a-border bg-a-surface-2">{detailPanel(order, operation)}</div>}
       </div>
     );
   }
@@ -386,6 +469,7 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
     <RowSelectionProvider rowIds={rowIds}>
       <AdminOrdersPoller onNewOrders={onNewOrders} isEditing={pendingTracking !== null || expanded.size > 0 || bulkIds !== null} />
       <DataTable<ListOrder>
+        variant="queue"
         caption={`Commandes, triées par ${sort === 'priority' ? 'priorité opérationnelle' : sort === 'newest' ? 'date décroissante' : sort === 'oldest' ? 'date croissante' : 'montant'}`}
         columns={columns}
         rowKey={(order) => order.id}

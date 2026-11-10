@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@021e646f`
-> **Ultima verifica:** 3 novembre 2026
+> **Base codice verificata:** `main@684a7587`
+> **Ultima verifica:** 10 novembre 2026 (§3.0 « Riga e azioni »: redesign work queue Commandes)
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale) + `151_shipping_shipment_creation.sql` + `152_shipping_automation_content.sql` (brouillons d'expédition, §2.4) + `159_shipping_tariff_publish.sql` (pubblicazione atomica dei prezzi forfait, §18.6)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
@@ -207,6 +207,7 @@ Le categorie possono sovrapporsi. Per i ritiri, `updated_at` è solo l'ultima at
 3. La classificazione produce i KPI tenant-wide.
 4. Con `sort=priority` gli attivi sono ordinati **prima** della paginazione. La finestra di pagina (`planPriorityPage`) prende gli id attivi del set ordinato, poi prosegue con i terminati letti dal DB (`updated_at` desc, `range`).
 5. Le righe complete (con items) si leggono solo per i ≤ 50 id della pagina.
+6. `groupCounts` (`countPriorityGroups`): ordini per gruppo di priorità nell'intera lista filtrata — attivi del set ordinato più `finished` = conteggio dei terminati —, così l'intestazione di gruppo mostra la dimensione reale anche quando la pagina ne contiene solo una parte (« 286 · 2 sur cette page »). Vuoto per gli ordinamenti data/importo (lista non raggruppata).
 
 Le viste di classificazione (`to_treat`, `urgent`, `incidents`, …) filtrano lo stesso set classificato, quindi coincidono con i KPI. Restano invece paginati dal DB `Terminés`, gli ordinamenti per data/importo e le viste di controllo legacy (`payment_pending`, `aged`, `picking_incomplete`, `packing_pending`, `tracking_missing`).
 
@@ -214,8 +215,13 @@ Le viste di classificazione (`to_treat`, `urgent`, `incidents`, …) filtrano lo
 
 **Query string.** Parametri: `view`, `status`, `fulfillment`, `payment`, `dateFrom`, `dateTo`, `q`, `sort`, `page`. `sort` accetta `priority` (default, omesso dall'URL), `newest`, `oldest`, `amount_desc`, `amount_asc`; i vecchi `date_desc`/`date_asc`/`total_desc`/`total_asc` restano alias. Esiste un solo sistema di filtri: i filtri rapidi (`Tous`, `Livraison`, `Retrait`, `Urgents`, `Incidents`, `Terminés`) più i select `Statut` / date / `Paiement`. Ogni filtro conserva gli altri parametri.
 
-**Riga e azioni**
+**Riga e azioni** (redesign work queue, novembre 2026: `DataTable variant="queue"`, regole pure in `lib/orders/orderQueuePresentation.ts`)
 
+- **Gruppi** (solo `sort=priority`): intestazione a fascia tinta nel tono del gruppo (`PRIORITY_GROUP_TONE`: Action requise danger, Préparation/Retrait en retard urgent, En préparation e À expédier warning, Expéditions en cours info, Retraits prêts success, Terminées neutral), icona, titolo, conteggio reale (`groupCounts`) e pulsante a tutta larghezza con `aria-expanded`. Tutti comprimibili: nella coda generale `Expéditions en cours` e `Terminées` partono chiusi (`defaultGroupCollapsed`), qualsiasi vista esplicita (`view`) o ricerca/filtro di statut/clôture apre tutto. La scelta dell'utente sopravvive al polling (`router.refresh` conserva lo stato client) e si azzera solo quando cambia il contesto (`queueGroupContextKey`). Le righe di un gruppo chiuso escono dalla selezione: « tout sélectionner » e le azioni di gruppo non toccano mai ordini nascosti.
+- **Colonne:** `Commande` (rif. · cliente in evidenza · data · urgenza; sotto `lg` anche unità, freddo e destinazione), `À préparer` e `Livraison / Retrait` (da `lg`; destinazione prima, poi transporteur · colis · poids, poi `Réf.`/`Suivi` copiabili), `État / Action`, `Total`, menu `⋮`.
+- **État / Action:** anomalia per prima, nel suo colore; per un ordine spedito lo stato transporteur precede lo stato ordine; niente `Transport : Non associée` su un ordine non avviato, niente secondo `Transport : Incident` quando l'anomalia è già un incidente, `Conflit de stock` detto una volta sola.
+- **Peso della CTA** (`orderActionEmphasis`, sull'azione di `nextOrderAction`): piena solo se l'ordine ha il flag `urgent` (ritardi, anomalie, internazionale + freddo, bozza provider in ritardo), contorno per il passo normale di un gruppo di lavoro, secondaria per la consultazione (`Voir le suivi`, o `Voir la commande` senza `orders.manage`), ghost per i terminati.
+- **Menu `⋮`** (azioni accessorie): Voir la commande, Afficher/Masquer le détail, Liste de préparation (PDF), Bon de colis (PDF) se attivo, Suivi client, Suivi transporteur.
 - **Durate:** `formatOperationalDuration` (ore sotto 48 h, poi giorni).
 - **Reference e tracking:** su righe separate (`Réf.` / `Suivi`), in monospace, copiabili.
 - **Avvisi:** solo per anomalie reali o per la nota `Expédition à associer` (delivery imballata, modalità managed, senza reference).
@@ -227,7 +233,7 @@ Le viste di classificazione (`to_treat`, `urgent`, `incidents`, …) filtrano lo
   - spedizione: destinazione, transporteur e servizio, provider, reference e tracking copiabili, stato provider con ultima synchro, ultimo movimento, ETA; per i ritiri: urgenza e contatto;
   - azioni esplicite: `Liste de préparation · A5` (PDF al formato di default del tenant, indicato nell'etichetta), per le consegne `Bon de colis · A5` se attivo, `Voir la commande`, `Voir le suivi transporteur`.
 - **Azione di gruppo `Documents…`:** dialog con documento (listes de préparation / bons de colis) e formato A5/A4 → un solo PDF (§3.1).
-- **Mobile:** card operative con CTA a tutta larghezza (44 px), pulsante di dettaglio e le stesse intestazioni di gruppo.
+- **Mobile:** card separate (bordo, banda di tono) con riferimento · data, cliente su due righe al massimo, totale, stato, unità e destinazione; CTA a tutta larghezza (40 px), dettaglio e `⋮`; stesse intestazioni di gruppo comprimibili. Riferimenti copiabili nel dettaglio.
 
 **Dettaglio ordine (`/admin/orders/[id]`).** Usa lo stesso classificatore della lista, con le stesse soglie tenant.
 

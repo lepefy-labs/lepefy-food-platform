@@ -45,7 +45,7 @@ export const INITIAL_LIBRARY: LibraryGuide[] = [
     blocks: [
       p('Une commande se prépare une fois payée. La session de préparation regroupe les articles de plusieurs commandes pour les prélever en une fois.'),
       steps(
-        'Ouvrez **Commandes** et cochez les commandes à préparer.',
+        'Ouvrez **Commandes** et cochez les commandes à préparer. Un groupe fermé (par exemple **Expéditions en cours**) s’ouvre d’un clic sur son titre ; ses commandes ne sont jamais sélectionnées tant qu’il est fermé.',
         'Dans la barre qui apparaît, cliquez sur **Préparer la sélection**.',
         'La session de préparation affiche la liste groupée par produit, avec le total et la répartition par commande. Les commandes exclues (non payées, annulées, conflit de stock) sont indiquées avec leur motif.',
         'Préparez les articles, puis confirmez la préparation selon le mode choisi par votre boutique (voir la guide sur le mode papier).',

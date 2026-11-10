@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
-import { IconArrowDown, IconArrowUp, IconArrowsSort, IconChevronDown } from '@tabler/icons-react';
+import { IconArrowDown, IconArrowUp, IconArrowsSort, IconChevronDown, type Icon as TablerIcon } from '@tabler/icons-react';
 import type { AdminTone } from '@/lib/admin/tokens';
 import { cn } from '@/lib/utils/cn';
-import { TONE_SOLID_BG_CLASS } from '../ui/Badge';
+import { TONE_BADGE_CLASS, TONE_SOLID_BG_CLASS } from '../ui/Badge';
 import { RowCheckbox, SelectAllCheckbox } from './RowSelection';
 
 export interface DataColumn<Row> {
@@ -28,6 +28,12 @@ export interface DataRowGroup<Row> {
   /** Collapsible group (controlled by a client caller): rows are not rendered while collapsed. */
   collapsed?: boolean;
   onToggle?: () => void;
+  /** `queue` variant: icon of the group header. */
+  icon?: TablerIcon;
+  /** `queue` variant: size of the whole group when the page shows only part of it. */
+  total?: number;
+  /** `queue` variant: short note after the count (e.g. « 4 sur cette page »). */
+  note?: ReactNode;
 }
 
 function GroupHeading<Row>({ group }: { group: DataRowGroup<Row> }) {
@@ -43,6 +49,37 @@ function GroupHeading<Row>({ group }: { group: DataRowGroup<Row> }) {
       <span className="inline-flex items-center gap-0.5 font-semibold text-a-brand-fg">
         {group.collapsed ? 'Afficher' : 'Masquer'}
         <IconChevronDown size={14} aria-hidden="true" className={cn('transition-transform', !group.collapsed && 'rotate-180')} />
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Header of a work-queue group (`variant="queue"`): band tinted in the group's
+ * tone, icon, bold title, visible count and a full-width toggle with
+ * `aria-expanded`. The tone is never the only signal: icon, title and count
+ * carry the same meaning.
+ */
+function QueueGroupHeading<Row>({ group }: { group: DataRowGroup<Row> }) {
+  const Icon = group.icon;
+  const count = group.total ?? group.rows.length;
+  const classes = cn('flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left', TONE_BADGE_CLASS[group.tone ?? 'neutral']);
+  const content = (
+    <span className="flex min-w-0 items-center gap-2.5">
+      {Icon && <Icon size={20} stroke={1.8} aria-hidden="true" className="shrink-0" />}
+      <span className="truncate text-base font-semibold">{group.label}</span>
+      <span className="shrink-0 rounded-full bg-a-surface px-2 text-sm font-semibold tabular-nums text-a-text">{count}</span>
+      {group.note && <span className="hidden truncate text-xs font-normal text-a-text-2 sm:inline">{group.note}</span>}
+    </span>
+  );
+  if (!group.onToggle) return <div className={classes}>{content}</div>;
+  return (
+    <button type="button" onClick={group.onToggle} aria-expanded={!group.collapsed}
+      className={cn(classes, 'min-h-11 hover:border-current focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-a-focus')}>
+      {content}
+      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold">
+        <span className="hidden sm:inline">{group.collapsed ? 'Afficher' : 'Masquer'}</span>
+        <IconChevronDown size={18} aria-hidden="true" className={cn('transition-transform', !group.collapsed && 'rotate-180')} />
       </span>
     </button>
   );
@@ -81,6 +118,13 @@ interface DataTableProps<Row> {
   onRowClick?: (row: Row) => void;
   empty?: ReactNode;
   density?: 'comfortable' | 'compact';
+  /**
+   * `queue`: operational work queue (Admin → Commandes). Tinted group headers
+   * with icon and count, space between groups, stronger row separators, a
+   * wider attention stripe, the open detail framed under its own row, and
+   * mobile cards as separate tiles. `default` is unchanged.
+   */
+  variant?: 'default' | 'queue';
   className?: string;
 }
 
@@ -105,14 +149,19 @@ function SortHeader({ column, sort }: { column: DataColumn<never>; sort: DataSor
  * through the URL. Selection checkboxes are small client islands.
  */
 export default function DataTable<Row>({
-  caption, columns, rowKey, rows, groups, rowTone, rowClassName, selectable, sort, mobileCard, rowDetail, onRowClick, empty, density = 'comfortable', className,
+  caption, columns, rowKey, rows, groups, rowTone, rowClassName, selectable, sort, mobileCard, rowDetail, onRowClick, empty, density = 'comfortable', variant = 'default', className,
 }: DataTableProps<Row>) {
+  const queue = variant === 'queue';
   const allGroups: DataRowGroup<Row>[] = groups ?? [{ id: 'all', label: null, rows: rows ?? [] }];
   const allRows = allGroups.flatMap((group) => group.rows);
   // Select-all only covers rows on screen, never those of a collapsed group.
   const ids = allGroups.flatMap((group) => (group.collapsed ? [] : group.rows)).map(rowKey);
-  const pad = density === 'compact' ? 'px-3 py-2' : 'px-3 py-3';
+  const pad = density === 'compact' ? 'px-3 py-2' : queue ? 'px-3 py-3.5' : 'px-3 py-3';
+  // Work queue: stronger separator and wider stripe, so adjacent orders never read as one surface.
+  const rowBorder = queue ? 'border-b border-a-border-strong' : 'border-b border-a-border';
+  const stripe = queue ? 'w-1' : 'w-[3px]';
   const colSpan = columns.length + (selectable ? 1 : 0);
+  const firstGroupId = allGroups.find((group) => group.label !== null && group.rows.length > 0)?.id;
 
   if (allRows.length === 0) return <>{empty}</>;
 
@@ -139,43 +188,60 @@ export default function DataTable<Row>({
           <tbody>
             {allGroups.map((group) => (
               <Fragment key={group.id}>
-                {group.label !== null && group.rows.length > 0 && (
+                {group.label !== null && group.rows.length > 0 && (queue ? (
+                  <tr>
+                    {/* Space above every group but the first: sections read as separate blocks. */}
+                    <th scope="colgroup" colSpan={colSpan} className={cn('px-2 pb-2 text-left font-normal', group.id === firstGroupId ? 'pt-2' : 'pt-6')}>
+                      <QueueGroupHeading group={group} />
+                    </th>
+                  </tr>
+                ) : (
                   <tr>
                     <th scope="colgroup" colSpan={colSpan} className="border-b border-a-border bg-a-surface-2 px-3 py-1.5 text-left text-xs font-semibold text-a-text-2">
                       <GroupHeading group={group} />
                     </th>
                   </tr>
-                )}
+                ))}
                 {!group.collapsed && group.rows.map((row) => {
                   const id = rowKey(row);
                   const tone = rowTone?.(row);
                   const detail = rowDetail?.(row);
+                  // Queue: an open row and its detail share one background and one bottom separator.
+                  const cellBorder = queue && detail ? '' : rowBorder;
                   return (
                     <Fragment key={id}>
-                      <tr className={cn('group/row hover:bg-a-hover', onRowClick && 'cursor-pointer', rowClassName?.(row))}
+                      <tr className={cn('group/row', queue && detail ? 'bg-a-surface-2' : 'hover:bg-a-hover', onRowClick && 'cursor-pointer', rowClassName?.(row))}
                         onClick={onRowClick ? (event) => {
                           if ((event.target as HTMLElement).closest('a, button, input, select, textarea, label, [role="button"]')) return;
                           if (window.getSelection()?.toString()) return;
                           onRowClick(row);
                         } : undefined}>
                         {selectable && (
-                          <td className={cn('relative w-10 border-b border-a-border align-top', pad)}>
-                            {tone && <span aria-hidden="true" className={cn('absolute inset-y-0 left-0 w-[3px]', TONE_SOLID_BG_CLASS[tone])} />}
+                          <td className={cn('relative w-10 align-top', cellBorder, pad)}>
+                            {tone && <span aria-hidden="true" className={cn('absolute inset-y-0 left-0', stripe, TONE_SOLID_BG_CLASS[tone])} />}
                             <RowCheckbox id={id} label={selectable.label(row)} />
                           </td>
                         )}
                         {columns.map((column, index) => (
-                          <td key={column.key} className={cn('relative border-b border-a-border align-top', pad, ALIGN[column.align ?? 'left'], column.align === 'right' && 'tabular-nums', column.hideBelow && HIDE[column.hideBelow], column.className)}>
-                            {!selectable && index === 0 && tone && <span aria-hidden="true" className={cn('absolute inset-y-0 left-0 w-[3px]', TONE_SOLID_BG_CLASS[tone])} />}
+                          <td key={column.key} className={cn('relative align-top', cellBorder, pad, ALIGN[column.align ?? 'left'], column.align === 'right' && 'tabular-nums', column.hideBelow && HIDE[column.hideBelow], column.className)}>
+                            {!selectable && index === 0 && tone && <span aria-hidden="true" className={cn('absolute inset-y-0 left-0', stripe, TONE_SOLID_BG_CLASS[tone])} />}
                             {column.cell(row)}
                           </td>
                         ))}
                       </tr>
-                      {detail && (
+                      {detail && (queue ? (
+                        <tr>
+                          {/* Framed on the row's background, with its stripe: the detail visibly belongs to the order above. */}
+                          <td colSpan={colSpan} className={cn('relative bg-a-surface-2 px-3 pb-3 pt-0', rowBorder)}>
+                            {tone && <span aria-hidden="true" className={cn('absolute inset-y-0 left-0', stripe, TONE_SOLID_BG_CLASS[tone])} />}
+                            <div className="rounded-lg border border-a-border bg-a-surface">{detail}</div>
+                          </td>
+                        </tr>
+                      ) : (
                         <tr>
                           <td colSpan={colSpan} className="border-b border-a-border bg-a-surface-2 p-0">{detail}</td>
                         </tr>
-                      )}
+                      ))}
                     </Fragment>
                   );
                 })}
@@ -185,8 +251,23 @@ export default function DataTable<Row>({
         </table>
       </div>
       {mobileCard && (
-        <div className="md:hidden">
-          {allGroups.map((group) => group.rows.length > 0 && (
+        <div className={cn('md:hidden', queue && 'space-y-4 px-2 py-3')}>
+          {allGroups.map((group) => group.rows.length > 0 && (queue ? (
+            <section key={group.id} aria-label={typeof group.label === 'string' ? group.label : undefined}>
+              {group.label !== null && <h3><QueueGroupHeading group={group} /></h3>}
+              {!group.collapsed && <ul className={cn('space-y-2', group.label !== null && 'mt-2')}>
+                {group.rows.map((row) => {
+                  const tone = rowTone?.(row);
+                  return (
+                    <li key={rowKey(row)} className="relative overflow-hidden rounded-lg border border-a-border-strong bg-a-surface">
+                      {tone && <span aria-hidden="true" className={cn('absolute inset-y-0 left-0', stripe, TONE_SOLID_BG_CLASS[tone])} />}
+                      {mobileCard(row)}
+                    </li>
+                  );
+                })}
+              </ul>}
+            </section>
+          ) : (
             <section key={group.id} aria-label={typeof group.label === 'string' ? group.label : undefined}>
               {group.label !== null && (
                 <h3 className="flex items-center gap-2 border-b border-a-border bg-a-surface-2 px-3 py-1.5 text-xs font-semibold text-a-text-2">
@@ -205,7 +286,7 @@ export default function DataTable<Row>({
                 })}
               </ul>}
             </section>
-          ))}
+          )))}
         </div>
       )}
     </div>

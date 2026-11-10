@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { IconDownload, IconPlus, IconSnowflake } from '@tabler/icons-react'
+import { IconAlertTriangle, IconBuildingStore, IconChefHat, IconDownload, IconHourglass, IconPackage, IconPlus, IconSnowflake, IconTruckDelivery, type Icon as TablerIcon } from '@tabler/icons-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenant } from '@/lib/tenant/getTenant'
 import { getCurrentAdminAccessContext, canAdmin } from '@/lib/auth/adminRbac'
@@ -33,13 +33,15 @@ const PAYMENT_LABELS: Record<string, string> = {
   stripe: 'Carte bancaire', satispay: 'Satispay', in_store: 'En magasin', external_link: 'Lien de paiement', cash: 'Espèces', manual: 'Manuel',
 }
 
-const OPERATIONAL_VIEWS: { key: Exclude<OrderView, ''> & QueueKey; label: string; helper: string; tone: AdminTone }[] = [
-  { key: 'to_treat', label: 'À traiter', helper: 'Une action de l’équipe est attendue', tone: 'info' },
-  { key: 'preparing', label: 'En préparation', helper: 'Préparation et emballage', tone: 'warning' },
-  { key: 'to_ship', label: 'À expédier', helper: 'Colis prêts à partir', tone: 'warning' },
-  { key: 'in_transit', label: 'En transit', helper: 'Confirmé par le transporteur', tone: 'info' },
-  { key: 'incidents', label: 'Incidents', helper: 'Signalés par le transporteur', tone: 'danger' },
-  { key: 'pickup_ready', label: 'Retraits prêts', helper: 'Client attendu en boutique', tone: 'success' },
+// Same counters as before (classifier flags), in the order of the daily flow, incidents last.
+// A card's tone is the tone of the matching priority group (PRIORITY_GROUP_TONE); icons tell them apart.
+const OPERATIONAL_VIEWS: { key: Exclude<OrderView, ''> & QueueKey; label: string; helper: string; tone: AdminTone; icon: TablerIcon }[] = [
+  { key: 'to_treat', label: 'À traiter', helper: 'Une action de l’équipe est attendue', tone: 'info', icon: IconHourglass },
+  { key: 'preparing', label: 'En préparation', helper: 'Préparation et emballage', tone: 'warning', icon: IconChefHat },
+  { key: 'to_ship', label: 'À expédier', helper: 'Colis prêts à partir', tone: 'warning', icon: IconPackage },
+  { key: 'in_transit', label: 'En transit', helper: 'Confirmé par le transporteur', tone: 'info', icon: IconTruckDelivery },
+  { key: 'pickup_ready', label: 'Retraits prêts', helper: 'Client attendu en boutique', tone: 'success', icon: IconBuildingStore },
+  { key: 'incidents', label: 'Incidents', helper: 'Signalés par le transporteur', tone: 'danger', icon: IconAlertTriangle },
 ]
 
 const VIEW_LABELS: Partial<Record<OrderView, string>> = {
@@ -107,8 +109,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
   const window = pageWindow(queue?.total ?? 0, queue?.currentPage ?? 1, values.pageSize)
   const view = filters.view
   const hasFilters = ORDER_LIST.activeCount(values, ['view', 'status', 'fulfillment', 'payment', 'dateFrom', 'dateTo', 'closure', 'reason']) > 0 || Boolean(filters.search)
-  // A search or a status filter often targets a closed order: show it. Livraison / Retrait / Urgents stay work queues.
-  const finishedCollapsed = !filters.search && !values.status && !values.closure && !values.reason && view !== 'finished'
+  // A search or a status/closure filter targets specific orders (often closed ones): every group opens.
+  // Livraison / Retrait, payment and dates keep the work-queue defaults (in transit and finished collapsed).
+  const groupContext = { view: view ?? '', targeted: Boolean(filters.search || values.status || values.closure || values.reason) }
   // Reset keeps the chosen sort and page size: they are preferences, not filters.
   const resetHref = ORDER_LIST.href('/admin/orders', { ...ORDER_LIST.parse({}), sort: values.sort, pageSize: values.pageSize }, {})
 
@@ -148,7 +151,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
       <AdminPageHeader
         title="Commandes"
         meta={pluralize(totalCount, 'commande')}
-        description="Traitez d’abord les commandes qui demandent votre attention."
+        description="Traitez en priorité les commandes qui nécessitent votre attention."
         actions={<>
           <ButtonAnchor href={`/api/admin/orders/export${exportQuery ? `?${exportQuery}` : ''}`} variant="secondary" title="Exporter la liste filtrée (CSV, 2 000 commandes max.)">
             <IconDownload size={17} aria-hidden="true" /> Exporter
@@ -172,9 +175,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
                   href={href({ view: active ? undefined : item.key, status: undefined })}
                   title={item.label}
                   value={formatNumber(kpi(item.key))}
-                  description={item.key === 'preparing' && kpi('to_ship') > 0 ? `Dont ${formatNumber(kpi('to_ship'))} prête${kpi('to_ship') > 1 ? 's' : ''} à expédier` : item.helper}
+                  description={<span className="hidden sm:inline">{active ? 'Filtre appliqué · cliquer pour retirer' : item.key === 'preparing' && kpi('to_ship') > 0 ? `Dont ${formatNumber(kpi('to_ship'))} prête${kpi('to_ship') > 1 ? 's' : ''} à expédier` : item.helper}</span>}
                   active={active}
                   tone={item.tone}
+                  icon={item.icon}
+                  tinted
                 />
               )
             })}
@@ -225,7 +230,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
           </Suspense>
           {!queue
             ? <ErrorState title="Impossible de charger les commandes." description="La file de travail n’a pas répondu. Les commandes ne sont pas perdues." action={<ButtonLink href={href({ page: window.page })}>Réessayer</ButtonLink>} />
-            : <OrdersTable orders={orderList} tenantPreparationMode={operational.preparationMode} tenantCurrency={tenant.currency} carriers={carriers} thresholds={operational.thresholds} canManage={canManage} managedProviderAvailable={operational.managedProviderAvailable} nowIso={now.toISOString()} originCountry={tenant.country} sort={queue.appliedSort} documentDefaults={documentDefaults} resetHref={resetHref} hasFilters={hasFilters} finishedCollapsed={finishedCollapsed} />}
+            : <OrdersTable orders={orderList} tenantPreparationMode={operational.preparationMode} tenantCurrency={tenant.currency} carriers={carriers} thresholds={operational.thresholds} canManage={canManage} managedProviderAvailable={operational.managedProviderAvailable} nowIso={now.toISOString()} originCountry={tenant.country} sort={queue.appliedSort} documentDefaults={documentDefaults} resetHref={resetHref} hasFilters={hasFilters} groupContext={groupContext} groupCounts={queue.groupCounts} />}
           {queue && window.total > 0 && (
             <Pagination
               window={window}
