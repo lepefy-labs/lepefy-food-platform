@@ -227,11 +227,18 @@ export function nextOrderAction(order: OperationalOrder, anomaly: OrderAnomaly |
   return action('Voir', 'detail', false, 'none');
 }
 
+const COUNTRY_NAME_CODES: Record<string, string> = { ITALIA: 'IT', ITALIE: 'IT', ITALY: 'IT', FRANCE: 'FR', GERMANY: 'DE', DEUTSCHLAND: 'DE', BELGIUM: 'BE', BELGIQUE: 'BE' };
+
+/** Country of an address as stored (ISO code or a few legacy names) → upper-case code; '' when empty. */
+export function normalizeCountryCode(value: string | null | undefined): string {
+  const upper = value?.trim().toUpperCase() ?? '';
+  return COUNTRY_NAME_CODES[upper] ?? upper;
+}
+
 export function orderHandlingFlags(order: OperationalOrder) {
-  const rawDestination = order.fulfillment_type === 'delivery' ? order.shipping_address?.country?.trim().toUpperCase() : null;
-  const rawOrigin = order.originCountry?.trim().toUpperCase();
-  const normalize = (value: string) => ({ ITALIA: 'IT', ITALIE: 'IT', ITALY: 'IT', FRANCE: 'FR', GERMANY: 'DE', DEUTSCHLAND: 'DE', BELGIUM: 'BE', BELGIQUE: 'BE' }[value] ?? value);
-  const international = Boolean(rawDestination && rawOrigin && normalize(rawDestination) !== normalize(rawOrigin));
+  const destination = order.fulfillment_type === 'delivery' ? normalizeCountryCode(order.shipping_address?.country) : '';
+  const origin = normalizeCountryCode(order.originCountry);
+  const international = Boolean(destination && origin && destination !== origin);
   const fresh = Boolean(order.order_items?.some(item => item.storage_type === 'fresh'));
   const frozen = Boolean(order.order_items?.some(item => item.storage_type === 'frozen'));
   const actionable = order.payment_status === 'paid' && ['new', 'preparing'].includes(order.status);

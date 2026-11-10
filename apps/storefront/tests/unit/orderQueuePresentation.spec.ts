@@ -70,3 +70,15 @@ test('countPriorityGroups counts every classified order once', () => {
   expect(countPriorityGroups(rows)).toEqual({ preparing: 2, shipping: 1, action_required: 1 });
   expect(countPriorityGroups([])).toEqual({});
 });
+
+test('destination country: ISO codes and legacy names map to one code (flag badge, international flag)', async () => {
+  const { normalizeCountryCode, orderHandlingFlags } = await import('../../src/lib/orders/adminOrderOperations');
+  expect(normalizeCountryCode(' be ')).toBe('BE');
+  expect(normalizeCountryCode('Belgique')).toBe('BE');
+  expect(normalizeCountryCode('Italia')).toBe('IT');
+  expect(normalizeCountryCode(null)).toBe('');
+  const base = { status: 'new' as const, payment_status: 'paid', created_at: '', updated_at: '', originCountry: 'IT' };
+  expect(orderHandlingFlags({ ...base, fulfillment_type: 'delivery', shipping_address: { country: 'Italia' } }).international).toBe(false);
+  expect(orderHandlingFlags({ ...base, fulfillment_type: 'delivery', shipping_address: { country: 'BE' } }).international).toBe(true);
+  expect(orderHandlingFlags({ ...base, fulfillment_type: 'pickup', shipping_address: { country: 'BE' } }).international).toBe(false);
+});

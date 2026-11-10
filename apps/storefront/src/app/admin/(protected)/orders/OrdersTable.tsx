@@ -10,12 +10,13 @@ import {
 } from '@tabler/icons-react';
 import { ORDER_DOCUMENT_FORMATS } from '@/lib/orders/documents/formats';
 import {
-  classifyOrderOperation, formatSince, lastTrackingEventAt, PRIORITY_GROUP_LABELS, transportState,
+  classifyOrderOperation, formatSince, lastTrackingEventAt, normalizeCountryCode, PRIORITY_GROUP_LABELS, transportState,
   type OperationalThresholds, type OrderOperation, type OrderSortKey, type PriorityGroup,
 } from '@/lib/orders/adminOrderOperations';
 import {
   defaultGroupCollapsed, groupCountLabel, orderActionEmphasis, PRIORITY_GROUP_TONE, queueGroupContextKey, type QueueGroupContext,
 } from '@/lib/orders/orderQueuePresentation';
+import { countryDisplayName, flagSrc, isIsoCountry } from '@/lib/address/countries';
 import { carrierDisplayName, carrierTrackingLink, shipmentDate } from '@/lib/shipping/shipmentPresentation';
 import type { CartonSuggestion } from '@/lib/shipping/cartonSuggestion';
 import type { NormalizedShipmentStatus, OrderStatus, ShipmentTrackingEvent } from '@lepefy/types';
@@ -118,14 +119,32 @@ function rowToneOf(operation: OrderOperation): AdminTone | undefined {
   return undefined;
 }
 
+/**
+ * Foreign destination: colour flag (SVG from /flags, never an emoji, which
+ * Windows shows as two letters) and the country name in French. The words
+ * « Livraison internationale » stay for screen readers. An unreadable country
+ * falls back to the former « International » badge.
+ */
+function DestinationCountryBadge({ country }: { country: string | null | undefined }) {
+  const code = normalizeCountryCode(country);
+  if (!isIsoCountry(code)) return <Badge tone="info">International</Badge>;
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-tone-info-border bg-tone-info-bg py-0.5 pl-1 pr-2 text-xs font-semibold text-tone-info-fg">
+      {/* eslint-disable-next-line @next/next/no-img-element -- petit SVG statique de /public/flags */}
+      <img src={flagSrc(code)} alt="" aria-hidden="true" width={18} height={12} decoding="async" className="h-3 w-[18px] shrink-0 rounded-[2px] object-cover ring-1 ring-a-border-strong" />
+      <span className="sr-only">Livraison internationale : </span>{countryDisplayName(code)}
+    </span>
+  );
+}
+
 // Fresh / frozen are already counted next to the units (« 7 frais », « 9 surgelés »): no second badge.
-function HandlingBadges({ operation }: { operation: OrderOperation }) {
+function HandlingBadges({ order, operation }: { order: ListOrder; operation: OrderOperation }) {
   const { international, score } = operation.handling;
   if (!international && score !== 3) return null;
   return (
     <span className="mt-1.5 flex flex-wrap gap-1" aria-label="Attention logistique">
       {score === 3 && <Badge tone="danger">Priorité élevée</Badge>}
-      {international && <Badge tone="info">International</Badge>}
+      {international && <DestinationCountryBadge country={order.shipping_address?.country} />}
     </span>
   );
 }
@@ -402,7 +421,7 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
         </>;
       },
     },
-    { key: 'items', header: 'À préparer', hideBelow: 'lg', className: 'max-w-[220px]', cell: (order) => <>{preparationSummary(order)}<HandlingBadges operation={operationOf(order)} /></> },
+    { key: 'items', header: 'À préparer', hideBelow: 'lg', className: 'max-w-[220px]', cell: (order) => <>{preparationSummary(order)}<HandlingBadges order={order} operation={operationOf(order)} /></> },
     { key: 'fulfillment', header: 'Livraison / Retrait', hideBelow: 'lg', cell: (order) => fulfillmentCell(order) },
     {
       key: 'state', header: 'État / Action',
@@ -450,7 +469,7 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
         {operation.urgency && <p className="mt-1.5 flex items-start gap-1 text-xs font-semibold text-tone-urgent-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{operation.urgency}</p>}
         <div className="mt-2">{stateBlock(order, operation)}</div>
         <div className="mt-2 space-y-1 border-t border-a-border pt-2">
-          {preparationSummary(order, true)}<HandlingBadges operation={operation} />
+          {preparationSummary(order, true)}<HandlingBadges order={order} operation={operation} />
           {fulfillmentCell(order, true)}
         </div>
         <div className="mt-3 flex items-center gap-2">
