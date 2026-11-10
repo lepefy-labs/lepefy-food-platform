@@ -1,14 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
 import { IconChevronDown } from '@tabler/icons-react';
-import { ADMIN_NAV_GROUPS, activeNavChild, isHrefActive, visibleNavChildren, isNavItemActive, isPrimaryNavGroup, navItemsById, type AdminNavGroup, type AdminNavItem } from '@/lib/admin/navigation';
+import {
+  ADMIN_NAV_GROUPS, activeNavChild, activeNavView, isHrefActive, navViewHref, visibleNavChildren, isNavItemActive, isPrimaryNavGroup, navItemsById,
+  type AdminNavChild, type AdminNavGroup, type AdminNavItem,
+} from '@/lib/admin/navigation';
 import { cn } from '@/lib/utils/cn';
 import { CountBadge } from '../ui/Badge';
 import { PLATFORM_NAV, isGroupActive } from '../platformNavConfig';
 import type { AdminShellNav } from './shellState';
+import { useNavCounts } from './navCounts';
 
 const PLATFORM_OPEN_KEY = 'lepefy-admin-platform-nav-open';
 const GROUPS_OPEN_KEY = 'lepefy-admin-nav-groups-open';
@@ -36,13 +40,37 @@ function NavLink({ item, pathname, nav }: { item: AdminNavItem; pathname: string
   );
   const children = visibleNavChildren(item, nav.children);
   if (children.length < 2 || !active) return link;
-  // Sub-pages of the active module; hidden in the collapsed rail (admin-nav-children).
-  const current = activeNavChild(pathname, children);
   return (
     <div>
       {link}
-      <div className="admin-nav-children mb-1 ml-5 mt-0.5 space-y-0.5 border-l border-a-border pl-2">
-        {children.map((child) => {
+      {/* The search params decide the active view; without them (static fallback) no view is marked. */}
+      <Suspense fallback={<ModuleSubPages item={item} items={children} pathname={pathname} nav={nav} params={null} />}>
+        <ModuleSubPagesWithParams item={item} items={children} pathname={pathname} nav={nav} />
+      </Suspense>
+    </div>
+  );
+}
+
+function ModuleSubPagesWithParams(props: { item: AdminNavItem; items: AdminNavChild[]; pathname: string; nav: AdminShellNav }) {
+  const params = useSearchParams();
+  return <ModuleSubPages {...props} params={params} />;
+}
+
+/**
+ * Sub-pages of the active module, then its views (« Suivi opérationnel »).
+ * Exactly one entry is current: a view on the list page wins over the list
+ * sub-page. Hidden in the collapsed rail (admin-nav-children), where the
+ * page's tab strip (ModuleSubNav) takes over.
+ */
+function ModuleSubPages({ item, items, pathname, nav, params }: { item: AdminNavItem; items: AdminNavChild[]; pathname: string; nav: AdminShellNav; params: URLSearchParams | null }) {
+  const counts = useNavCounts(item.id);
+  const view = activeNavView(pathname, params, item.views);
+  const current = view ? null : activeNavChild(pathname, items);
+  const headingId = `admin-nav-views-${item.id}`;
+  return (
+    <div className="admin-nav-children">
+      <div className="mb-1 ml-5 mt-0.5 space-y-0.5 border-l border-a-border pl-2">
+        {items.map((child) => {
           const childActive = child === current;
           const childBadge = child.badge ? nav.badges[child.badge.key] : 0;
           return (
@@ -53,6 +81,25 @@ function NavLink({ item, pathname, nav }: { item: AdminNavItem; pathname: string
           );
         })}
       </div>
+      {item.views && (
+        <div role="group" aria-labelledby={headingId} className="mb-2 mt-2 space-y-0.5 border-t border-a-border pt-2">
+          <p id={headingId} className="px-2.5 pb-1 text-xs font-semibold text-a-text-3">{item.views.label}</p>
+          {item.views.items.map((entry) => {
+            const entryActive = entry === view;
+            const count = counts[entry.value] ?? 0;
+            const Icon = entry.icon;
+            return (
+              <Link key={entry.value} href={navViewHref(pathname, params, item.views!, entry)} aria-current={entryActive ? 'page' : undefined}
+                className={cn(itemClass(entryActive), 'min-h-8 py-1')}>
+                <Icon size={16} stroke={1.8} aria-hidden="true" className={cn('shrink-0', !entryActive && 'text-a-text-3')} />
+                <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                {/* Positive counts only: seven zero badges would weigh the rail down. */}
+                {entry.tone && count > 0 && <CountBadge tone={entry.tone} count={count} label={`${count} ${entry.countLabel ?? ''}`.trim()} />}
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

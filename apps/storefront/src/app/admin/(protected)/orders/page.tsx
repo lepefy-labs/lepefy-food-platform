@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { IconAlertTriangle, IconBuildingStore, IconChefHat, IconDownload, IconHourglass, IconPackage, IconPlus, IconSnowflake, IconTruckDelivery, type Icon as TablerIcon } from '@tabler/icons-react'
+import { IconDownload, IconPlus } from '@tabler/icons-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenant } from '@/lib/tenant/getTenant'
 import { getCurrentAdminAccessContext, canAdmin } from '@/lib/auth/adminRbac'
@@ -10,20 +10,17 @@ import { loadOrderOperationalContext, ORDER_LIST, parseOrderList, type OrderList
 import { pageWindow } from '@/lib/admin/listParams'
 import { formatNumber, pluralize } from '@/lib/admin/format'
 import { ORDER_STATUS_META } from '@/lib/admin/statusRegistry'
-import type { AdminTone } from '@/lib/admin/tokens'
-import { cn } from '@/lib/utils/cn'
 import { readOrderDocumentSettings } from '@/lib/orders/documents/settings'
 import { CLOSURE_REASON_LABELS, CLOSURE_REASONS, type ClosureReason } from '@/lib/orders/closure/closureRules'
 import OrdersTable, { type ListOrder } from './OrdersTable'
 import PendingPaymentsBanner, { type PendingPaymentSession } from './PendingPaymentsBanner'
 import AdminPageHeader from '../../_components/ui/AdminPageHeader'
-import AdminStatCard from '../../_components/ui/AdminStatCard'
-import { TONE_BADGE_CLASS } from '../../_components/ui/Badge'
 import { ButtonAnchor, ButtonLink } from '../../_components/ui/Button'
 import InlineAlert from '../../_components/ui/InlineAlert'
 import { Card } from '../../_components/ui/Panel'
 import { ErrorState } from '../../_components/ui/States'
-import FilterBar, { type ActiveFilterChip, type FilterView } from '../../_components/data/FilterBar'
+import FilterBar, { type ActiveFilterChip } from '../../_components/data/FilterBar'
+import { NavCountsPublisher } from '../../_components/shell/navCounts'
 import Pagination from '../../_components/data/Pagination'
 
 export const dynamic = 'force-dynamic'
@@ -33,20 +30,9 @@ const PAYMENT_LABELS: Record<string, string> = {
   stripe: 'Carte bancaire', satispay: 'Satispay', in_store: 'En magasin', external_link: 'Lien de paiement', cash: 'Espèces', manual: 'Manuel',
 }
 
-// Same counters as before (classifier flags), in the order of the daily flow, incidents last.
-// A card's tone is the tone of the matching priority group (PRIORITY_GROUP_TONE); icons tell them apart.
-const OPERATIONAL_VIEWS: { key: Exclude<OrderView, ''> & QueueKey; label: string; helper: string; tone: AdminTone; icon: TablerIcon }[] = [
-  { key: 'to_treat', label: 'À traiter', helper: 'Une action de l’équipe est attendue', tone: 'info', icon: IconHourglass },
-  { key: 'preparing', label: 'En préparation', helper: 'Préparation et emballage', tone: 'warning', icon: IconChefHat },
-  { key: 'to_ship', label: 'À expédier', helper: 'Colis prêts à partir', tone: 'warning', icon: IconPackage },
-  { key: 'in_transit', label: 'En transit', helper: 'Confirmé par le transporteur', tone: 'info', icon: IconTruckDelivery },
-  { key: 'pickup_ready', label: 'Retraits prêts', helper: 'Client attendu en boutique', tone: 'success', icon: IconBuildingStore },
-  { key: 'incidents', label: 'Incidents', helper: 'Signalés par le transporteur', tone: 'danger', icon: IconAlertTriangle },
-]
-
 const VIEW_LABELS: Partial<Record<OrderView, string>> = {
   to_treat: 'À traiter', preparing: 'En préparation', to_ship: 'À expédier', in_transit: 'En transit', incidents: 'Incidents',
-  pickup_ready: 'Retraits prêts', urgent: 'Urgents', finished: 'Terminés', payment_pending: 'Paiement à vérifier', aged: 'Plus de 24 h',
+  pickup_ready: 'Retraits prêts', urgent: 'Urgents', finished: 'Terminées', payment_pending: 'Paiement à vérifier', aged: 'Plus de 24 h',
   picking_incomplete: 'Préparation incomplète', packing_pending: 'Emballage à terminer', tracking_missing: 'Suivi manquant',
   cold_chain: 'Chaîne du froid', paper_in_progress: 'Listes imprimées, préparation à confirmer', to_prepare: 'À préparer', to_print: 'À imprimer',
   late_preparation: 'Préparations en retard', late_pickup: 'Retraits en retard', tracking_issues: 'Suivis à vérifier',
@@ -115,17 +101,23 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
   // Reset keeps the chosen sort and page size: they are preferences, not filters.
   const resetHref = ORDER_LIST.href('/admin/orders', { ...ORDER_LIST.parse({}), sort: values.sort, pageSize: values.pageSize }, {})
 
-  // Quick views: fulfillment and a few queue views; KPI cards cover the rest.
-  const views: FilterView[] = [
-    { key: 'all', label: 'Tous', active: !view && !filters.fulfillment, href: href({ view: undefined, fulfillment: undefined }) },
-    { key: 'delivery', label: 'Livraison', active: filters.fulfillment === 'delivery', href: href({ fulfillment: filters.fulfillment === 'delivery' ? undefined : 'delivery' }) },
-    { key: 'pickup', label: 'Retrait', active: filters.fulfillment === 'pickup', href: href({ fulfillment: filters.fulfillment === 'pickup' ? undefined : 'pickup' }) },
-    { key: 'urgent', label: 'Urgents', count: kpi('urgent'), countTone: 'urgent', active: view === 'urgent', href: href({ view: view === 'urgent' ? undefined : 'urgent', status: undefined }) },
-    { key: 'incidents', label: 'Incidents', count: kpi('incidents'), countTone: 'danger', active: view === 'incidents', href: href({ view: view === 'incidents' ? undefined : 'incidents', status: undefined }) },
-    { key: 'finished', label: 'Terminés', active: view === 'finished', href: href({ view: view === 'finished' ? undefined : 'finished', status: undefined }) },
+  // Views moved to the sidebar (« Suivi opérationnel », counts published below) and to the « Filtres »
+  // panel (« Vue »: urgent orders and the former « Contrôles »). Same classifier counts, no extra query.
+  const viewCount = (key: OrderView): number | null => key === 'payment_pending' ? Number(stats?.pending_payment_count ?? 0)
+    : key === 'finished' ? null : queue ? kpi(key as QueueKey) : null
+  const viewOption = (key: OrderView) => {
+    const count = viewCount(key)
+    return { value: key, label: count ? `${VIEW_LABELS[key]} (${formatNumber(count)})` : VIEW_LABELS[key] ?? key }
+  }
+  const paperMode = operational.preparationMode.picking === 'paper'
+  const PANEL_VIEWS: OrderView[] = [
+    'to_treat', 'urgent', 'preparing', 'to_ship', 'in_transit', 'pickup_ready', 'incidents', 'finished',
+    'picking_incomplete', ...(paperMode || kpi('paper_in_progress') > 0 ? ['paper_in_progress' as const] : []), 'packing_pending', 'tracking_missing', 'cold_chain', 'payment_pending',
   ]
+  // Every active filter is a removable chip, the view included (the sidebar shows it too).
   const chips: ActiveFilterChip[] = [
-    ...(view && !['urgent', 'incidents', 'finished'].includes(view) ? [{ key: 'view', label: VIEW_LABELS[view] ?? view, href: href({ view: undefined }) }] : []),
+    ...(view ? [{ key: 'view', label: `État : ${VIEW_LABELS[view] ?? view}`, href: href({ view: undefined }) }] : []),
+    ...(filters.fulfillment ? [{ key: 'fulfillment', label: `Mode : ${filters.fulfillment === 'pickup' ? 'Retrait' : 'Livraison'}`, href: href({ fulfillment: undefined }) }] : []),
     ...(filters.status ? [{ key: 'status', label: `Statut : ${ORDER_STATUS_META[filters.status]?.label ?? filters.status}`, href: href({ status: undefined }) }] : []),
     ...(values.closure ? [{ key: 'closure', label: `Clôture : ${values.closure === 'external' ? 'traitées hors plateforme' : 'annulations'}`, href: href({ closure: undefined }) }] : []),
     ...(values.reason ? [{ key: 'reason', label: `Motif : ${CLOSURE_REASON_LABELS[values.reason as ClosureReason]}`, href: href({ reason: undefined }) }] : []),
@@ -133,17 +125,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
     ...(filters.dateFrom ? [{ key: 'dateFrom', label: `Depuis le ${filters.dateFrom.split('-').reverse().join('/')}`, href: href({ dateFrom: undefined }) }] : []),
     ...(filters.dateTo ? [{ key: 'dateTo', label: `Jusqu’au ${filters.dateTo.split('-').reverse().join('/')}`, href: href({ dateTo: undefined }) }] : []),
   ]
-  // « Contrôles »: same classifier as the KPIs, aware of each order's preparation mode —
-  // a paper-mode order never counts as « Préparation incomplète » for a missing digital tick.
-  const paperMode = operational.preparationMode.picking === 'paper'
-  const controls: { view: OrderView; label: string; count: number; tone: AdminTone; icon?: boolean }[] = [
-    { view: 'picking_incomplete', label: 'Préparation incomplète', count: kpi('picking_incomplete'), tone: 'warning' },
-    ...(paperMode || kpi('paper_in_progress') > 0 ? [{ view: 'paper_in_progress' as const, label: 'Listes imprimées', count: kpi('paper_in_progress'), tone: 'info' as AdminTone }] : []),
-    { view: 'packing_pending', label: 'Emballage à terminer', count: kpi('packing_pending'), tone: 'warning' },
-    { view: 'tracking_missing', label: 'Suivi manquant', count: kpi('tracking_missing'), tone: 'warning' },
-    { view: 'cold_chain', label: 'Chaîne du froid', count: kpi('cold_chain'), tone: 'urgent', icon: true },
-    { view: 'payment_pending', label: 'Paiement à vérifier', count: Number(stats?.pending_payment_count ?? 0), tone: 'warning' },
-  ]
+  // Sidebar counts: the tenant-wide classifier KPIs this page already computed (null = unavailable, no badge).
+  const navCounts = queue && !statsError
+    ? Object.fromEntries((['to_treat', 'preparing', 'to_ship', 'in_transit', 'pickup_ready', 'incidents'] as const).map((key) => [key, kpi(key)]))
+    : null
   const exportQuery = ORDER_LIST.query({ ...values, page: 1, pageSize: ORDER_LIST.defaultPageSize })
 
   return (
@@ -160,42 +145,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
         </>}
       />
 
+      <NavCountsPublisher scope="orders" counts={navCounts} />
       <div className="space-y-3">
         {countsUnavailable && <InlineAlert tone="warning" action={<Link href="/admin/orders" className="underline">Réessayer</Link>}>Certains compteurs sont indisponibles.</InlineAlert>}
         {queue && !queue.priorityAvailable && <InlineAlert tone="info">Plus de 5 000 commandes actives : la liste est triée par date et les compteurs sont partiels.</InlineAlert>}
-
-        <section aria-labelledby="work-queue-title">
-          <h2 id="work-queue-title" className="sr-only">File de fulfillment</h2>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-            {OPERATIONAL_VIEWS.map(item => {
-              const active = view === item.key
-              return (
-                <AdminStatCard
-                  key={item.key}
-                  href={href({ view: active ? undefined : item.key, status: undefined })}
-                  title={item.label}
-                  value={formatNumber(kpi(item.key))}
-                  description={<span className="hidden sm:inline">{active ? 'Filtre appliqué · cliquer pour retirer' : item.key === 'preparing' && kpi('to_ship') > 0 ? `Dont ${formatNumber(kpi('to_ship'))} prête${kpi('to_ship') > 1 ? 's' : ''} à expédier` : item.helper}</span>}
-                  active={active}
-                  tone={item.tone}
-                  icon={item.icon}
-                  tinted
-                />
-              )
-            })}
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-a-text-3">
-            <span className="mr-0.5">Contrôles</span>
-            {controls.map(control => {
-              const className = cn('inline-flex min-h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium',
-                control.count > 0 ? TONE_BADGE_CLASS[control.tone] : 'border-a-border bg-a-surface text-a-text-3')
-              const content = <>{control.icon && <IconSnowflake size={13} aria-hidden="true" />}{control.label} <b className="font-semibold tabular-nums">{control.count}</b></>
-              return control.count > 0
-                ? <Link key={control.label} href={href({ view: view === control.view ? undefined : control.view, status: undefined })} aria-current={view === control.view ? 'true' : undefined} className={cn(className, 'hover:underline', view === control.view && 'ring-1 ring-a-brand')}>{content}</Link>
-                : <span key={control.label} className={className}>{content}</span>
-            })}
-          </div>
-        </section>
 
         {pendingPayments.length > 0 && <PendingPaymentsBanner sessions={pendingPayments} tenantCurrency={tenant.currency} />}
         {(preordersToVerifyCount ?? 0) > 0 && (
@@ -208,10 +161,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
           <h2 className="sr-only">Liste des commandes</h2>
           <Suspense fallback={<div className="h-14 border-b border-a-border" />}>
             <FilterBar
-              views={views}
-              viewsLabel="Filtres rapides"
-              search={{ label: 'Rechercher une commande', placeholder: 'Client, e-mail, n° ou UUID de commande' }}
+              search={{ label: 'Rechercher une commande', placeholder: 'Client, e-mail, n° ou UUID de commande…' }}
               filters={[
+                { type: 'select', key: 'view', label: 'Vue', allLabel: 'Toutes les commandes', options: PANEL_VIEWS.map(viewOption) },
+                { type: 'select', key: 'fulfillment', label: 'Mode', allLabel: 'Livraison et retrait', options: [{ value: 'delivery', label: 'Livraison' }, { value: 'pickup', label: 'Retrait' }] },
                 { type: 'select', key: 'status', label: 'Statut', allLabel: 'Tous les statuts', options: Object.entries(ORDER_STATUS_META).map(([key, meta]) => ({ value: key, label: statusCounts[key] ? `${meta.label} (${formatNumber(statusCounts[key]!)})` : meta.label })) },
                 { type: 'select', key: 'payment', label: 'Paiement', allLabel: 'Tous les paiements', options: Object.entries(PAYMENT_LABELS).filter(([key]) => key !== 'manual').map(([value, label]) => ({ value, label })) },
                 { type: 'select', key: 'closure', label: 'Clôture', allLabel: 'Toutes les commandes', options: [
@@ -223,7 +176,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
               ]}
               activeChips={chips}
               resetHref={resetHref}
+              // A status or closure filter is ignored by an active-queue view: changing one drops the view.
               panelClears={['view']}
+              panelClearsWhen={['status', 'closure', 'reason']}
               sort={{ value: queue?.appliedSort ?? sort, options: ORDER_SORT_OPTIONS.map(option => ({ value: option.key, label: option.label })) }}
               resultLabel={pluralize(window.total, 'résultat')}
             />

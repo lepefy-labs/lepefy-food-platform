@@ -1,15 +1,16 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, Suspense, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { IconDots, IconLayoutSidebarLeftCollapse } from '@tabler/icons-react';
-import { isNavItemActive, mobileNavItems, navItemsById, visibleNavChildren } from '@/lib/admin/navigation';
+import { activeNavView, isNavItemActive, mobileNavItems, navItemsById, navViewHref, visibleNavChildren } from '@/lib/admin/navigation';
 import { cn } from '@/lib/utils/cn';
 import { CountBadge } from '../ui/Badge';
 import Dialog from '../ui/Dialog';
 import AdminTabs from '../ui/Tabs';
 import AdminNav from './AdminNav';
+import { useNavCounts } from './navCounts';
 import CommandPalette from './CommandPalette';
 import { SIDEBAR_NO_FLASH_SCRIPT, SIDEBAR_STORAGE_KEY, type AdminShellNav } from './shellState';
 
@@ -64,19 +65,62 @@ function BottomNav({ nav, onMore }: { nav: AdminShellNav; onMore: () => void }) 
  * themselves, detail pages keep their breadcrumb.
  */
 function ModuleSubNav({ nav, pathname }: { nav: AdminShellNav; pathname: string }) {
+  return (
+    <Suspense fallback={<ModuleSubNavContent nav={nav} pathname={pathname} params={null} />}>
+      <ModuleSubNavWithParams nav={nav} pathname={pathname} />
+    </Suspense>
+  );
+}
+
+function ModuleSubNavWithParams({ nav, pathname }: { nav: AdminShellNav; pathname: string }) {
+  const params = useSearchParams();
+  return <ModuleSubNavContent nav={nav} pathname={pathname} params={params} />;
+}
+
+/**
+ * On the module's list page, its views (« Suivi opérationnel ») follow as a
+ * compact row of pills: the phone and folded-rail way to switch view without a
+ * second dashboard. Counts come from the same navCounts store as the sidebar.
+ */
+function ModuleSubNavContent({ nav, pathname, params }: { nav: AdminShellNav; pathname: string; params: URLSearchParams | null }) {
   const item = navItemsById(nav.items).find((entry) => isNavItemActive(pathname, entry) && visibleNavChildren(entry, nav.children).length > 1);
+  const counts = useNavCounts(item?.id ?? '');
   if (!item) return null;
   const children = visibleNavChildren(item, nav.children);
   if (!children.some((child) => child.href === pathname)) return null;
+  const view = activeNavView(pathname, params, item.views);
+  const views = item.views && pathname === item.views.href ? item.views : null;
   return (
-    <AdminTabs label={`Navigation ${item.label}`} className="admin-subnav mb-3 md:hidden"
-      tabs={children.map((child) => {
-        const badge = child.badge ? nav.badges[child.badge.key] : 0;
-        return {
-          href: child.href, label: child.label, active: child.href === pathname,
-          badge: child.badge && badge > 0 ? <CountBadge tone={child.badge.tone} count={badge} label={`${badge} ${child.badge.label}`} /> : undefined,
-        };
-      })} />
+    <div className="admin-subnav mb-3 md:hidden">
+      <AdminTabs label={`Navigation ${item.label}`}
+        tabs={children.map((child) => {
+          const badge = child.badge ? nav.badges[child.badge.key] : 0;
+          return {
+            href: child.href, label: child.label, active: !view && child.href === pathname,
+            badge: child.badge && badge > 0 ? <CountBadge tone={child.badge.tone} count={badge} label={`${badge} ${child.badge.label}`} /> : undefined,
+          };
+        })} />
+      {views && (
+        <nav aria-label={views.label} className="-mx-3 mt-2 overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:px-0">
+          <ul className="flex min-w-max gap-1.5">
+            {views.items.map((entry) => {
+              const active = entry === view;
+              const count = counts[entry.value] ?? 0;
+              return (
+                <li key={entry.value}>
+                  <Link href={navViewHref(pathname, params, views, entry)} aria-current={active ? 'page' : undefined}
+                    className={cn('inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus',
+                      active ? 'border-a-brand bg-a-selected font-semibold text-a-brand-fg' : 'border-a-border bg-a-surface text-a-text-2 hover:border-a-border-strong hover:text-a-text')}>
+                    {entry.label}
+                    {entry.tone && count > 0 && <CountBadge tone={entry.tone} count={count} label={`${count} ${entry.countLabel ?? ''}`.trim()} />}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
+    </div>
   );
 }
 

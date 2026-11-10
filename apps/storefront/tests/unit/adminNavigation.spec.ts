@@ -184,3 +184,37 @@ test('sub-pages are resolved per capability: a sub-page with its own capability 
   // Entries outside the workspace resolve no children.
   expect(resolveAdminNavigation(ctx({ workspace: 'events', permissions: ['*'] })).children.customers).toBeUndefined();
 });
+
+test('Commandes › Suivi opérationnel: classifier views only, active view from the URL, one current entry', async () => {
+  const { ADMIN_NAV, activeNavView, navViewHref } = await import('../../src/lib/admin/navigation');
+  const { ORDER_VIEWS } = await import('../../src/lib/orders/loadOrderWorkQueue');
+  const orders = ADMIN_NAV.find((item) => item.id === 'orders')!;
+  const views = orders.views!;
+  expect(views.items.map((item) => item.value)).toEqual(['to_treat', 'preparing', 'to_ship', 'in_transit', 'pickup_ready', 'incidents', 'finished']);
+  for (const item of views.items) expect(ORDER_VIEWS).toContain(item.value);
+  // Views belong to the list sub-page of the module.
+  expect(orders.children!.some((child) => child.href === views.href)).toBe(true);
+
+  const params = (query: string) => new URLSearchParams(query);
+  expect(activeNavView('/admin/orders', params('view=in_transit'), views)?.label).toBe('En transit');
+  expect(activeNavView('/admin/orders', params(''), views)).toBeNull();
+  // A view that is not in the sidebar (urgent, a control) leaves « Toutes les commandes » current.
+  expect(activeNavView('/admin/orders', params('view=urgent'), views)).toBeNull();
+  expect(activeNavView('/admin/orders/preparation', params('view=in_transit'), views)).toBeNull();
+});
+
+test('a view link keeps compatible filters, drops the page and contradicting filters', async () => {
+  const { ADMIN_NAV, navViewHref } = await import('../../src/lib/admin/navigation');
+  const views = ADMIN_NAV.find((item) => item.id === 'orders')!.views!;
+  const item = (value: string) => views.items.find((entry) => entry.value === value)!;
+  const current = new URLSearchParams('q=Ntjam&fulfillment=delivery&payment=cash&sort=newest&size=25&page=3&status=new&closure=cancelled&reason=duplicate&view=to_treat');
+  const transit = new URLSearchParams(navViewHref('/admin/orders', current, views, item('in_transit')).split('?')[1]);
+  expect(Object.fromEntries(transit)).toEqual({ q: 'Ntjam', fulfillment: 'delivery', payment: 'cash', sort: 'newest', size: '25', view: 'in_transit' });
+  // Finished orders keep the closure filters.
+  const finished = new URLSearchParams(navViewHref('/admin/orders', current, views, item('finished')).split('?')[1]);
+  expect(finished.get('closure')).toBe('cancelled');
+  expect(finished.get('reason')).toBe('duplicate');
+  expect(finished.get('status')).toBeNull();
+  // From another page: the view alone.
+  expect(navViewHref('/admin/orders/preparation', new URLSearchParams('ids=a,b'), views, item('preparing'))).toBe('/admin/orders?view=preparing');
+});

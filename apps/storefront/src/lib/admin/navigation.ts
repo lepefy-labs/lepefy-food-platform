@@ -1,5 +1,5 @@
 import {
-  IconBrandWhatsapp, IconBriefcase, IconClipboardList, IconHome, IconBuildingWarehouse, IconCalendarEvent, IconCash, IconChartBar, IconCreditCard,
+  IconAlertTriangle, IconBrandWhatsapp, IconBriefcase, IconBuildingStore, IconChefHat, IconCircleCheck, IconClipboardList, IconHome, IconHourglass, IconTruckDelivery as IconTruckMoving, IconBuildingWarehouse, IconCalendarEvent, IconCash, IconChartBar, IconCreditCard,
   IconFileInvoice, IconFileText, IconGift, IconHistory, IconBook2, IconLayoutDashboard, IconLifebuoy, IconMessageCircle, IconPackage, IconPackages, IconPhoto,
   IconPlus, IconQrcode, IconScan, IconSettings, IconShoppingBag, IconSparkles, IconStar, IconToolsKitchen2, IconTruck,
   IconTruckDelivery, IconTruckLoading, IconUserPlus, IconUsers, type Icon,
@@ -48,6 +48,36 @@ export interface AdminNavItem {
    * as a tab strip on small screens and in the command palette.
    */
   children?: AdminNavChild[];
+  /**
+   * Filtered views of the module's list (same page, one URL parameter), listed
+   * under the sub-pages while the module is active. Counts are published by the
+   * list page itself (navCounts store), never loaded by the shared layout.
+   */
+  views?: AdminNavViews;
+}
+
+export interface AdminNavViews {
+  /** Section heading (« Suivi opérationnel »). */
+  label: string;
+  /** List page the views filter (an entry child href). */
+  href: string;
+  /** URL parameter holding the view. */
+  param: string;
+  /** Parameters removed when a view is chosen (page, filters a view would contradict). */
+  resetParams: string[];
+  items: AdminNavViewItem[];
+}
+
+export interface AdminNavViewItem {
+  value: string;
+  label: string;
+  icon: Icon;
+  /** Tone of the count badge; no tone = no count shown. */
+  tone?: AdminTone;
+  /** Accessible noun of the count (« 4 commandes en transit »). */
+  countLabel?: string;
+  /** Parameters of resetParams this view keeps (e.g. closure filters for finished orders). */
+  keepParams?: string[];
 }
 
 export interface AdminNavChild {
@@ -93,7 +123,21 @@ export const ADMIN_NAV: AdminNavItem[] = [
       { label: 'Toutes les commandes', href: '/admin/orders' },
       { label: 'Session de préparation', href: '/admin/orders/preparation', keywords: ['liste groupée', 'imprimer'] },
       { label: 'Précommandes', href: '/admin/orders/precommandes', badge: { key: 'preordersToVerify', tone: 'warning', label: 'précommandes à vérifier' }, keywords: ['whatsapp', 'téléphone', 'assistée'] },
-    ] },
+    ],
+    // Classifier views of /admin/orders (KPI_KEYS + finished): the old KPI cards, now in the sidebar.
+    // A status or closure filter would contradict an active-queue view: dropped on selection.
+    views: {
+      label: 'Suivi opérationnel', href: '/admin/orders', param: 'view', resetParams: ['page', 'status', 'closure', 'reason'],
+      items: [
+        { value: 'to_treat', label: 'À traiter', icon: IconHourglass, tone: 'urgent', countLabel: 'commandes à traiter' },
+        { value: 'preparing', label: 'En préparation', icon: IconChefHat, tone: 'warning', countLabel: 'commandes en préparation' },
+        { value: 'to_ship', label: 'À expédier', icon: IconPackage, tone: 'warning', countLabel: 'commandes à expédier' },
+        { value: 'in_transit', label: 'En transit', icon: IconTruckMoving, tone: 'info', countLabel: 'commandes en transit' },
+        { value: 'pickup_ready', label: 'Retraits prêts', icon: IconBuildingStore, tone: 'success', countLabel: 'retraits prêts' },
+        { value: 'incidents', label: 'Incidents', icon: IconAlertTriangle, tone: 'danger', countLabel: 'incidents transporteur' },
+        { value: 'finished', label: 'Terminées', icon: IconCircleCheck, keepParams: ['closure', 'reason'] },
+      ],
+    } },
   { id: 'catalogue', label: 'Produits', href: '/admin/catalogue', icon: IconPackage, group: 'Essentiel', workspace: 'shop', anyOf: ['catalog.view'], alsoActive: [{ href: '/admin/products' }], mobile: 3, keywords: ['catalogue', 'stock', 'prix', 'catégories'],
     children: [
       { label: 'Tous les produits', href: '/admin/catalogue' },
@@ -211,6 +255,25 @@ export function isHrefActive(pathname: string, href: string, match: 'exact' | 'p
 export function isNavItemActive(pathname: string, item: Pick<AdminNavItem, 'href' | 'match' | 'alsoActive'>): boolean {
   return isHrefActive(pathname, item.href, item.match)
     || (item.alsoActive ?? []).some((extra) => isHrefActive(pathname, extra.href, extra.match));
+}
+
+/** Active view of the entry (`?view=…` on its list page), null on any other page or view. */
+export function activeNavView(pathname: string, params: URLSearchParams | null, views: AdminNavViews | undefined): AdminNavViewItem | null {
+  if (!views || pathname !== views.href) return null;
+  const value = params?.get(views.param) ?? '';
+  return views.items.find((item) => item.value === value) ?? null;
+}
+
+/**
+ * Link of a view. On the list page itself the compatible filters stay (search,
+ * delivery mode, payment, dates, sort, page size); the page and the filters the
+ * view would contradict are dropped. From another page: the view alone.
+ */
+export function navViewHref(pathname: string, params: URLSearchParams | null, views: AdminNavViews, item: AdminNavViewItem): string {
+  const next = new URLSearchParams(pathname === views.href && params ? params.toString() : '');
+  for (const key of views.resetParams) if (!(item.keepParams ?? []).includes(key)) next.delete(key);
+  next.set(views.param, item.value);
+  return `${views.href}?${next.toString()}`;
 }
 
 /** The child whose href is the longest segment prefix of the path (the product editor stays under « Tous les produits »). */

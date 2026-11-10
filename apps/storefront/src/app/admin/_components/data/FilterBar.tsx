@@ -39,6 +39,11 @@ interface FilterBarProps {
   leading?: ReactNode;
   /** URL keys removed when a panel select changes (e.g. a quick view that the new filter replaces). */
   panelClears?: string[];
+  /**
+   * Only these panel selects trigger `panelClears` (default: any select). A key of
+   * `panelClears` the user changed in the panel itself is never cleared.
+   */
+  panelClearsWhen?: string[];
 }
 
 /**
@@ -46,7 +51,7 @@ interface FilterBarProps {
  * to 1) and the Server Component re-renders with the new data; the URL is the
  * only state.
  */
-export default function FilterBar({ views, viewsLabel = 'Vues', viewsClassName, search, filters, activeChips = [], resetHref, sort, resultLabel, trailing, leading, panelClears = [] }: FilterBarProps) {
+export default function FilterBar({ views, viewsLabel = 'Vues', viewsClassName, search, filters, activeChips = [], resetHref, sort, resultLabel, trailing, leading, panelClears = [], panelClearsWhen }: FilterBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -84,10 +89,11 @@ export default function FilterBar({ views, viewsLabel = 'Vues', viewsClassName, 
     setPanelOpen(true);
   }
   function applyPanel() {
-    const selectChanged = (filters ?? []).some((def) => def.type === 'select' && (draft[def.key] ?? '') !== (searchParams.get(def.key) ?? ''));
+    const changed = (key: string) => (draft[key] ?? searchParams.get(key) ?? '') !== (searchParams.get(key) ?? '');
+    const selectChanged = (filters ?? []).some((def) => def.type === 'select' && (!panelClearsWhen || panelClearsWhen.includes(def.key)) && changed(def.key));
     replace({
       ...Object.fromEntries(filterKeys.map((key) => [key, draft[key] || null])),
-      ...(selectChanged ? Object.fromEntries(panelClears.map((key) => [key, null])) : {}),
+      ...(selectChanged ? Object.fromEntries(panelClears.filter((key) => !changed(key)).map((key) => [key, null])) : {}),
     });
     setPanelOpen(false);
   }
@@ -111,10 +117,11 @@ export default function FilterBar({ views, viewsLabel = 'Vues', viewsClassName, 
             </div>
           </nav>
         )}
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        {/* Phones: the search takes its own row, « Filtres » and the sort follow (never a squeezed field). */}
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:flex-nowrap">
           {leading}
           {search && (
-            <div className="relative min-w-0 flex-1">
+            <div className="relative min-w-0 flex-1 basis-full sm:basis-auto">
               <IconSearch size={16} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" />
               <input
                 type="search"

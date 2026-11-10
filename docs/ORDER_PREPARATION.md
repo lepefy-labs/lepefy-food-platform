@@ -8,7 +8,7 @@
 | Percorso | Ruolo |
 |---|---|
 | `/admin` | **Aujourd'hui** (workspace shop): saluto, «À régler en priorité», «Dernières mises à jour», «Que voulez-vous faire ?», «Commandes à préparer». Sul dominio événementiel `/admin` resta riscritto su `/admin/evenementiel`. |
-| `/admin/orders` | **Commandes**: il cockpit storico (KPI, Contrôles, FilterBar, DataTable `variant="queue"` a gruppi comprimibili, BulkBar, export, documenti, précommandes, pagamenti per link); presentazione della coda in `docs/SHIPPING_INTELLIGENCE.md` §3.0 « Riga e azioni ». |
+| `/admin/orders` | **Commandes**: il cockpit storico (viste operative nella sidebar « Suivi opérationnel », FilterBar con « Vue » e « Mode » nel pannello, DataTable `variant="queue"` a gruppi comprimibili, BulkBar, export, documenti, précommandes, pagamenti per link); presentazione della coda in `docs/SHIPPING_INTELLIGENCE.md` §3.0 « Riga e azioni ». |
 | `/admin/orders/preparation` | **Session de préparation** (stateless, `?ids=`): senza id elenca gli ordini da preparare; con id mostra la lista per articolo, gli ordini esclusi e i documenti. |
 | `/admin/orders/[id]` | Dettaglio: checklist digitale **oppure** pannello «Préparation sur papier» secondo la modalità dell'ordine. |
 | `/admin/parametres/preparation` | Paramètres → Commandes → **Préparation et emballage**. |
@@ -22,7 +22,7 @@ Compatibilità: `/admin?<chiave di ORDER_LIST>` (view, status, q, payment, fulfi
 - lavoro: `to_prepare` (nuovo/in preparazione, pagato, non pronto), `to_print` (modalità papier, lista non stampata), `late_preparation`, `late_pickup`, `tracking_issues`, `payment_unverified`, `stock_conflict`;
 - Contrôles, consapevoli della modalità: `picking_incomplete` (solo checklist digitale), `packing_pending`, `tracking_missing`, `cold_chain` (solo controlli che la modalità prevede in Lepefy), `paper_in_progress` (informativo, mai anomalia).
 
-I chip «Contrôles» di `/admin/orders` vengono ora dal classificatore (non più da `admin_order_dashboard_stats`, che resta per i conteggi di stato e `pending_payment_count`). `OrderOperation.step` porta l'étape: À imprimer · À préparer · Liste imprimée · Préparation en cours · Préparation terminée · Colis à indiquer · Prêt à expédier / Prête au retrait (`PREPARATION_STEP_META` in `statusRegistry`; arancione = l'équipe deve ancora fare qualcosa in Lepefy, verde = niente da fare).
+I controlli (select « Vue » del pannello « Filtres » di `/admin/orders`, già chip «Contrôles») vengono dal classificatore (non più da `admin_order_dashboard_stats`, che resta per i conteggi di stato e `pending_payment_count`). `OrderOperation.step` porta l'étape: À imprimer · À préparer · Liste imprimée · Préparation en cours · Préparation terminée · Colis à indiquer · Prêt à expédier / Prête au retrait (`PREPARATION_STEP_META` in `statusRegistry`; arancione = l'équipe deve ancora fare qualcosa in Lepefy, verde = niente da fare).
 
 «À régler en priorité» (`lib/admin/todayDashboard.ts`): conflitti di stock, incidenti, pagamenti da verificare (ordini + pagamenti per link + précommandes), preparazioni e ritiri in ritardo, suivis da verificare. Mai la contabilità del flusso papier.
 

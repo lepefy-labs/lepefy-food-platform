@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@684a7587`
-> **Ultima verifica:** 10 novembre 2026 (§3.0 « Riga e azioni »: redesign work queue Commandes)
+> **Base codice verificata:** `main@ee0931ec`
+> **Ultima verifica:** 11 novembre 2026 (§3.0: navigazione Commandes nella sidebar, KPI tolti dalla pagina; base `main@ee0931ec`)
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale) + `151_shipping_shipment_creation.sql` + `152_shipping_automation_content.sql` (brouillons d'expédition, §2.4) + `159_shipping_tariff_publish.sql` (pubblicazione atomica dei prezzi forfait, §18.6)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
@@ -191,7 +191,7 @@ Stato ordine e stato provider non vengono mai fusi. La sincronizzazione provider
 
 A parità di valori decidono `created_at` e poi `id`, quindi l'ordinamento è stabile.
 
-**KPI**
+**KPI** (conteggi delle viste: dall'11/2026 non più card sopra la lista ma badge della sidebar « Commandes › Suivi opérationnel », pubblicati dalla pagina stessa senza query aggiuntive; Urgents e i controlli nel select « Vue » del pannello « Filtres »)
 
 - `À traiter`: tutti i gruppi tranne `Expéditions en cours`, `Retraits prêts` e `Terminées`. Un ritiro in attesa normale o un transito regolare non sono azioni.
 - `Urgents`: i primi tre gruppi.
@@ -213,7 +213,7 @@ Le viste di classificazione (`to_treat`, `urgent`, `incidents`, …) filtrano lo
 
 **Compromesso documentato:** la coda attiva è tenuta in memoria lato server. Oltre `ACTIVE_ORDER_LIMIT` (5 000 ordini attivi) la lista ripiega sull'ordine per data con un avviso, e i KPI diventano parziali. Nessuna riga interroga Packlink/BRT live; il poller della pagina rilegge solo il DB.
 
-**Query string.** Parametri: `view`, `status`, `fulfillment`, `payment`, `dateFrom`, `dateTo`, `q`, `sort`, `page`. `sort` accetta `priority` (default, omesso dall'URL), `newest`, `oldest`, `amount_desc`, `amount_asc`; i vecchi `date_desc`/`date_asc`/`total_desc`/`total_asc` restano alias. Esiste un solo sistema di filtri: i filtri rapidi (`Tous`, `Livraison`, `Retrait`, `Urgents`, `Incidents`, `Terminés`) più i select `Statut` / date / `Paiement`. Ogni filtro conserva gli altri parametri.
+**Query string.** Parametri: `view`, `status`, `fulfillment`, `payment`, `dateFrom`, `dateTo`, `q`, `sort`, `page`. `sort` accetta `priority` (default, omesso dall'URL), `newest`, `oldest`, `amount_desc`, `amount_asc`; i vecchi `date_desc`/`date_asc`/`total_desc`/`total_asc` restano alias. Esiste un solo sistema di filtri: le viste della sidebar (`À traiter`, `En préparation`, `À expédier`, `En transit`, `Retraits prêts`, `Incidents`, `Terminées`) e il pannello « Filtres » (`Vue` con Urgents e controlli, `Mode` Livraison/Retrait, `Statut`, `Paiement`, `Clôture`, `Motif`, date); ogni filtro attivo è un chip removibile. Ogni filtro conserva gli altri parametri.
 
 **Riga e azioni** (redesign work queue, novembre 2026: `DataTable variant="queue"`, regole pure in `lib/orders/orderQueuePresentation.ts`)
 
