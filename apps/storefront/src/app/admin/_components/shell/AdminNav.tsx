@@ -57,7 +57,7 @@ function ModuleSubPagesWithParams(props: { item: AdminNavItem; items: AdminNavCh
 }
 
 /**
- * Sub-pages of the active module, then its views (« Suivi opérationnel »).
+ * Sub-pages and operational views of the active module share one indented tree.
  * Exactly one entry is current: a view on the list page wins over the list
  * sub-page. Hidden in the collapsed rail (admin-nav-children), where the
  * page's tab strip (ModuleSubNav) takes over.
@@ -66,40 +66,40 @@ function ModuleSubPages({ item, items, pathname, nav, params }: { item: AdminNav
   const counts = useNavCounts(item.id);
   const view = activeNavView(pathname, params, item.views);
   const current = view ? null : activeNavChild(pathname, items);
-  const headingId = `admin-nav-views-${item.id}`;
+  const renderChild = (child: AdminNavChild) => {
+    const active = child === current;
+    const badge = child.badge ? nav.badges[child.badge.key] : 0;
+    return (
+      <Link key={child.href} href={child.href} aria-current={active ? 'page' : undefined} className={itemClass(active)}>
+        <span className="min-w-0 flex-1">{child.label}</span>
+        {child.badge && badge > 0 && <CountBadge tone={child.badge.tone} count={badge} label={`${badge} ${child.badge.label}`} />}
+      </Link>
+    );
+  };
   return (
     <div className="admin-nav-children">
+      {/* A single indented tree keeps list views visually attached to Commandes. */}
       <div className="mb-1 ml-5 mt-0.5 space-y-0.5 border-l border-a-border pl-2">
-        {items.map((child) => {
-          const childActive = child === current;
-          const childBadge = child.badge ? nav.badges[child.badge.key] : 0;
-          return (
-            <Link key={child.href} href={child.href} aria-current={childActive ? 'page' : undefined} className={itemClass(childActive)}>
-              <span className="min-w-0 flex-1">{child.label}</span>
-              {child.badge && childBadge > 0 && <CountBadge tone={child.badge.tone} count={childBadge} label={`${childBadge} ${child.badge.label}`} />}
-            </Link>
-          );
-        })}
+        {item.views ? items.slice(0, 1).map(renderChild) : items.map(renderChild)}
+        {item.views && (
+          <div role="group" aria-label={item.views.label} className="space-y-0.5">
+            {item.views.items.map((entry) => {
+              const active = entry === view;
+              const count = counts[entry.value] ?? 0;
+              const Icon = entry.icon;
+              return (
+                <Link key={entry.value} href={navViewHref(pathname, params, item.views!, entry)} aria-current={active ? 'page' : undefined}
+                  className={cn(itemClass(active), 'min-h-8 py-1')}>
+                  <Icon size={16} stroke={1.8} aria-hidden="true" className={cn('shrink-0', !active && 'text-a-text-3')} />
+                  <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                  {entry.tone && count > 0 && <CountBadge tone={entry.tone} count={count} label={`${count} ${entry.countLabel ?? ''}`.trim()} />}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+        {item.views && items.slice(1).map(renderChild)}
       </div>
-      {item.views && (
-        <div role="group" aria-labelledby={headingId} className="mb-2 mt-2 space-y-0.5 border-t border-a-border pt-2">
-          <p id={headingId} className="px-2.5 pb-1 text-xs font-semibold text-a-text-3">{item.views.label}</p>
-          {item.views.items.map((entry) => {
-            const entryActive = entry === view;
-            const count = counts[entry.value] ?? 0;
-            const Icon = entry.icon;
-            return (
-              <Link key={entry.value} href={navViewHref(pathname, params, item.views!, entry)} aria-current={entryActive ? 'page' : undefined}
-                className={cn(itemClass(entryActive), 'min-h-8 py-1')}>
-                <Icon size={16} stroke={1.8} aria-hidden="true" className={cn('shrink-0', !entryActive && 'text-a-text-3')} />
-                <span className="min-w-0 flex-1 truncate">{entry.label}</span>
-                {/* Positive counts only: seven zero badges would weigh the rail down. */}
-                {entry.tone && count > 0 && <CountBadge tone={entry.tone} count={count} label={`${count} ${entry.countLabel ?? ''}`.trim()} />}
-              </Link>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

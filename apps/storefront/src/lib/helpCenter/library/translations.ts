@@ -25,7 +25,7 @@ export const LIBRARY_TRANSLATIONS: Record<string, Record<Locale, LibraryTranslat
         p('Un ordine si prepara una volta pagato. La sessione di preparazione raggruppa gli articoli di più ordini per prelevarli in una sola volta.'),
         steps(
           'Aprite **Commandes** e selezionate gli ordini da preparare. Un gruppo chiuso (per esempio **Terminées**) si apre con un clic sul suo titolo; i suoi ordini non vengono mai selezionati finché è chiuso.',
-          'Nella barra che appare, cliccate su **Préparer la sélection**.',
+          'Nella barra che appare, cliccate su **Préparer ensemble**.',
           'La sessione di preparazione mostra la lista raggruppata per prodotto, con il totale e la ripartizione per ordine. Gli ordini esclusi (non pagati, annullati, conflitto di stock) sono indicati con il motivo.',
           'Preparate gli articoli, poi confermate la preparazione secondo la modalità scelta dal vostro negozio (vedi la guida sulla modalità cartacea).',
         ),
@@ -41,7 +41,7 @@ export const LIBRARY_TRANSLATIONS: Record<string, Record<Locale, LibraryTranslat
         p('An order is prepared once it is paid. The preparation session groups the items of several orders so you can pick them in one go.'),
         steps(
           'Open **Commandes** and tick the orders to prepare. A collapsed group (for example **Terminées**) opens with a click on its title; its orders are never selected while it is collapsed.',
-          'In the bar that appears, click **Préparer la sélection**.',
+          'In the bar that appears, click **Préparer ensemble**.',
           'The preparation session shows the list grouped by product, with the total and the split per order. Excluded orders (unpaid, cancelled, stock conflict) are listed with the reason.',
           'Prepare the items, then confirm the preparation according to the mode chosen by your shop (see the guide on paper mode).',
         ),

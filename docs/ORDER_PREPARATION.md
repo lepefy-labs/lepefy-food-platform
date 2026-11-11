@@ -8,8 +8,8 @@
 | Percorso | Ruolo |
 |---|---|
 | `/admin` | **Aujourd'hui** (workspace shop): saluto, «À régler en priorité», «Dernières mises à jour», «Que voulez-vous faire ?», «Commandes à préparer». Sul dominio événementiel `/admin` resta riscritto su `/admin/evenementiel`. |
-| `/admin/orders` | **Commandes**: il cockpit storico (viste operative nella sidebar « Suivi opérationnel », FilterBar con « Vue » e « Mode » nel pannello, DataTable `variant="queue"` a gruppi comprimibili, BulkBar, export, documenti, précommandes, pagamenti per link); presentazione della coda in `docs/SHIPPING_INTELLIGENCE.md` §3.0 « Riga e azioni ». |
-| `/admin/orders/preparation` | **Session de préparation** (stateless, `?ids=`): senza id elenca gli ordini da preparare; con id mostra la lista per articolo, gli ordini esclusi e i documenti. |
+| `/admin/orders` | **Commandes**: il cockpit storico (viste operative direttamente sotto « Commandes » nella sidebar, senza intestazione separata, FilterBar con « Vue » e « Mode » nel pannello, DataTable `variant="queue"` a gruppi comprimibili, BulkBar, export, documenti, précommandes, pagamenti per link); presentazione della coda in `docs/SHIPPING_INTELLIGENCE.md` §3.0 « Riga e azioni ». |
+| `/admin/orders/preparation` | **Session de préparation** (stateless, `?ids=`): raggiungibile dalla selezione multipla « Préparer ensemble » o dalla vista « En préparation »; senza id elenca gli ordini da preparare; con id mostra la lista per articolo, gli ordini esclusi e i documenti. Non è una voce permanente della sidebar. |
 | `/admin/orders/[id]` | Dettaglio: checklist digitale **oppure** pannello «Préparation sur papier» secondo la modalità dell'ordine. |
 | `/admin/parametres/preparation` | Paramètres → Commandes → **Préparation et emballage**. |
 

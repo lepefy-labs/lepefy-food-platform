@@ -185,11 +185,13 @@ test('sub-pages are resolved per capability: a sub-page with its own capability 
   expect(resolveAdminNavigation(ctx({ workspace: 'events', permissions: ['*'] })).children.customers).toBeUndefined();
 });
 
-test('Commandes › Suivi opérationnel: classifier views only, active view from the URL, one current entry', async () => {
+test('Commandes: integrated classifier views, active view from the URL, one current entry', async () => {
   const { ADMIN_NAV, activeNavView, navViewHref } = await import('../../src/lib/admin/navigation');
   const { ORDER_VIEWS } = await import('../../src/lib/orders/loadOrderWorkQueue');
   const orders = ADMIN_NAV.find((item) => item.id === 'orders')!;
   const views = orders.views!;
+  expect(orders.children!.map((child) => child.label)).toEqual(['Toutes les commandes', 'Précommandes']);
+  expect(views.label).toBe('Vues des commandes');
   expect(views.items.map((item) => item.value)).toEqual(['to_treat', 'preparing', 'to_ship', 'in_transit', 'pickup_ready', 'incidents', 'finished']);
   for (const item of views.items) expect(ORDER_VIEWS).toContain(item.value);
   // Views belong to the list sub-page of the module.
