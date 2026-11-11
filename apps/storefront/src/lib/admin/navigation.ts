@@ -118,16 +118,15 @@ export function isPrimaryNavGroup(group: AdminNavGroup): boolean {
 export const ADMIN_NAV: AdminNavItem[] = [
   // Essentiel — the shop's daily work (Aujourd'hui, Commandes, Produits, Livraisons, Clients)
   { id: 'today', label: 'Aujourd’hui', href: '/admin', icon: IconHome, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], match: 'exact', mobile: 1, keywords: ['accueil', 'tableau de bord', 'priorités', 'dashboard'] },
-  { id: 'orders', label: 'Commandes', href: '/admin/orders', icon: IconShoppingBag, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], alsoActive: [{ href: '/admin/paiements-en-attente' }], badge: { key: 'pendingPayments', tone: 'warning', label: 'paiements à vérifier' }, mobile: 2, keywords: ['ordres', 'préparation', 'expédition', 'précommandes', 'session de préparation'],
+  { id: 'orders', label: 'Commandes', href: '/admin/orders', icon: IconShoppingBag, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], alsoActive: [{ href: '/admin/paiements-en-attente' }], badge: { key: 'pendingPayments', tone: 'warning', label: 'paiements à vérifier' }, mobile: 2, keywords: ['ordres', 'préparation', 'expédition', 'précommandes', 'préparer ensemble'],
     children: [
       { label: 'Toutes les commandes', href: '/admin/orders' },
-      { label: 'Session de préparation', href: '/admin/orders/preparation', keywords: ['liste groupée', 'imprimer'] },
       { label: 'Précommandes', href: '/admin/orders/precommandes', badge: { key: 'preordersToVerify', tone: 'warning', label: 'précommandes à vérifier' }, keywords: ['whatsapp', 'téléphone', 'assistée'] },
     ],
     // Classifier views of /admin/orders (KPI_KEYS + finished): the old KPI cards, now in the sidebar.
     // A status or closure filter would contradict an active-queue view: dropped on selection.
     views: {
-      label: 'Suivi opérationnel', href: '/admin/orders', param: 'view', resetParams: ['page', 'status', 'closure', 'reason'],
+      label: 'Vues des commandes', href: '/admin/orders', param: 'view', resetParams: ['page', 'status', 'closure', 'reason'],
       items: [
         { value: 'to_treat', label: 'À traiter', icon: IconHourglass, tone: 'urgent', countLabel: 'commandes à traiter' },
         { value: 'preparing', label: 'En préparation', icon: IconChefHat, tone: 'warning', countLabel: 'commandes en préparation' },

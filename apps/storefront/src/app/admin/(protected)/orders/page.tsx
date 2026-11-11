@@ -141,6 +141,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
           <ButtonAnchor href={`/api/admin/orders/export${exportQuery ? `?${exportQuery}` : ''}`} variant="secondary" title="Exporter la liste filtrée (CSV, 2 000 commandes max.)">
             <IconDownload size={17} aria-hidden="true" /> Exporter
           </ButtonAnchor>
+          {view === 'preparing' && <ButtonLink href="/admin/orders/preparation" variant="secondary">Préparer ensemble</ButtonLink>}
           {canManage && <ButtonLink href="/admin/orders/new" variant="primary"><IconPlus size={17} aria-hidden="true" /> Nouvelle commande</ButtonLink>}
         </>}
       />

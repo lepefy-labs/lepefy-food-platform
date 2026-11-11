@@ -506,7 +506,7 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
       />
       <BulkBar rowIds={rowIds}>
         {(ids) => <>
-          <Link href={`/admin/orders/preparation?ids=${ids.join(',')}`} className={buttonClasses({ variant: 'secondary', size: 'sm' })}><IconClipboardList size={16} aria-hidden="true" />Préparer la sélection</Link>
+          <Link href={`/admin/orders/preparation?ids=${ids.join(',')}`} className={buttonClasses({ variant: 'secondary', size: 'sm' })}><IconClipboardList size={16} aria-hidden="true" />Préparer ensemble</Link>
           <Button variant="secondary" size="sm" onClick={() => setDocumentIds(ids)}><IconPrinter size={16} aria-hidden="true" />Documents…</Button>
           <Button variant="secondary" size="sm" onClick={() => exportSelection(ids)}><IconDownload size={16} aria-hidden="true" />Exporter (CSV)</Button>
           {canManage && <Button size="sm" onClick={() => setBulkIds(ids)}><IconTruckDelivery size={16} aria-hidden="true" />Traiter la sélection</Button>}
