@@ -44,7 +44,7 @@ export interface OperationalOrder extends Omit<PreparationOrder, 'status' | 'ord
 
 export interface OperationalThresholds { prepareHours: number; pickupHours: number; trackingStaleHours: number }
 export type QueueKey = 'to_treat' | 'preparing' | 'to_ship' | 'in_transit' | 'incidents' | 'pickup_ready' | 'urgent' | 'finished'
-  // Work views of the « Aujourd'hui » dashboard (same classifier, one count per order and view).
+  // Operational work views of the orders list (same classifier, one count per order and view).
   | 'to_prepare' | 'to_print' | 'late_preparation' | 'late_pickup' | 'tracking_issues' | 'payment_unverified' | 'stock_conflict'
   // « Contrôles » chips, aware of each order's preparation mode (never a missing digital click in paper mode).
   | 'picking_incomplete' | 'packing_pending' | 'tracking_missing' | 'cold_chain' | 'paper_in_progress';

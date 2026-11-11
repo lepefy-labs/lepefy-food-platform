@@ -1,5 +1,5 @@
 import {
-  IconAlertTriangle, IconBrandWhatsapp, IconBriefcase, IconBuildingStore, IconChefHat, IconCircleCheck, IconClipboardList, IconHome, IconHourglass, IconTruckDelivery as IconTruckMoving, IconBuildingWarehouse, IconCalendarEvent, IconCash, IconChartBar, IconCreditCard,
+  IconAlertTriangle, IconBrandWhatsapp, IconBriefcase, IconBuildingStore, IconChefHat, IconCircleCheck, IconClipboardList, IconChartLine, IconHourglass, IconTruckDelivery as IconTruckMoving, IconBuildingWarehouse, IconCalendarEvent, IconCash, IconChartBar, IconCreditCard,
   IconFileInvoice, IconFileText, IconGift, IconHistory, IconBook2, IconLayoutDashboard, IconLifebuoy, IconMessageCircle, IconPackage, IconPackages, IconPhoto,
   IconPlus, IconQrcode, IconScan, IconSettings, IconShoppingBag, IconSparkles, IconStar, IconToolsKitchen2, IconTruck,
   IconTruckDelivery, IconTruckLoading, IconUserPlus, IconUsers, type Icon,
@@ -116,8 +116,8 @@ export function isPrimaryNavGroup(group: AdminNavGroup): boolean {
 }
 
 export const ADMIN_NAV: AdminNavItem[] = [
-  // Essentiel — the shop's daily work (Aujourd'hui, Commandes, Produits, Livraisons, Clients)
-  { id: 'today', label: 'Aujourd’hui', href: '/admin', icon: IconHome, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], match: 'exact', mobile: 1, keywords: ['accueil', 'tableau de bord', 'priorités', 'dashboard'] },
+  // Essentiel — the shop's daily work (Statistiques, Commandes, Produits, Livraisons, Clients)
+  { id: 'statistics', label: 'Statistiques', href: '/admin', icon: IconChartLine, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], match: 'exact', mobile: 1, keywords: ['accueil', 'tableau de bord', 'dashboard', 'ventes', 'chiffre d’affaires', 'ca', 'panier moyen', 'meilleures ventes', 'analyse'] },
   { id: 'orders', label: 'Commandes', href: '/admin/orders', icon: IconShoppingBag, group: 'Essentiel', workspace: 'shop', anyOf: ['orders.view'], alsoActive: [{ href: '/admin/paiements-en-attente' }], badge: { key: 'pendingPayments', tone: 'warning', label: 'paiements à vérifier' }, mobile: 2, keywords: ['ordres', 'préparation', 'expédition', 'précommandes', 'préparer ensemble'],
     children: [
       { label: 'Toutes les commandes', href: '/admin/orders' },

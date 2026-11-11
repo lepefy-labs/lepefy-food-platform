@@ -75,6 +75,20 @@ export const ADMIN_SURFACE_VALUES: Record<AdminThemeMode, AdminSurfaceValues> = 
   },
 };
 
+/**
+ * Data-visualisation colours (charts of /admin « Statistiques »). A fourth
+ * family, never a status: categorical slots in a fixed order (CVD-validated
+ * pairs, light and dark stepped separately), a one-hue sequential ramp for
+ * magnitude (heatmap), a muted series for comparisons and the gridline.
+ * Emitted as --admin-chart-*; text never wears these colours.
+ */
+export interface AdminChartValues { series: [string, string, string]; muted: string; grid: string; sequential: [string, string, string, string] }
+
+export const ADMIN_CHART_VALUES: Record<AdminThemeMode, AdminChartValues> = {
+  light: { series: ['#2A78D6', '#EB6834', '#1BAF7A'], muted: '#94A3B8', grid: '#EEF1F5', sequential: ['#B7D3F6', '#6DA7EC', '#2A78D6', '#1C5CAB'] },
+  dark: { series: ['#3987E5', '#D95926', '#199E70'], muted: '#64748B', grid: '#1E2737', sequential: ['#184F95', '#256ABF', '#3987E5', '#86B6EF'] },
+};
+
 export const ADMIN_DARK_BRAND: AdminBrandValues = {
   primary: '#8B7CFF', primaryHover: '#9D90FF', primarySoft: '#221E45', primaryFg: '#C9C1FF', onPrimary: '#0B0F17',
 };
@@ -83,7 +97,7 @@ export function adminLightBrand(platform: Pick<PlatformBranding, 'primary' | 'pr
   return { primary: platform.primary, primaryHover: platform.primaryHover, primarySoft: platform.primarySoft, primaryFg: platform.primaryForeground, onPrimary: '#FFFFFF' };
 }
 
-function declarations(surface: AdminSurfaceValues, brand: AdminBrandValues, tones: Record<AdminTone, AdminToneValues>): string {
+function declarations(surface: AdminSurfaceValues, brand: AdminBrandValues, tones: Record<AdminTone, AdminToneValues>, chart: AdminChartValues): string {
   const lines = [
     `--admin-primary: ${brand.primary}`,
     `--admin-primary-hover: ${brand.primaryHover}`,
@@ -111,6 +125,9 @@ function declarations(surface: AdminSurfaceValues, brand: AdminBrandValues, tone
     const value = tones[tone];
     lines.push(`--admin-tone-${tone}-bg: ${value.bg}`, `--admin-tone-${tone}-fg: ${value.fg}`, `--admin-tone-${tone}-border: ${value.border}`, `--admin-tone-${tone}-solid: ${value.solid}`);
   }
+  chart.series.forEach((value, index) => lines.push(`--admin-chart-${index + 1}: ${value}`));
+  chart.sequential.forEach((value, index) => lines.push(`--admin-chart-seq-${index + 1}: ${value}`));
+  lines.push(`--admin-chart-muted: ${chart.muted}`, `--admin-chart-grid: ${chart.grid}`);
   return lines.map((line) => `  ${line};`).join('\n');
 }
 
@@ -129,8 +146,8 @@ export function adminTokensCss(platform: PlatformColors): string {
     ...(platform.border ? { border: platform.border } : {}),
   };
   return [
-    `:root {\n${declarations(light, adminLightBrand(platform), ADMIN_TONE_VALUES.light)}\n}`,
-    `:root.dark {\n  color-scheme: dark;\n${declarations(ADMIN_SURFACE_VALUES.dark, ADMIN_DARK_BRAND, ADMIN_TONE_VALUES.dark)}\n}`,
+    `:root {\n${declarations(light, adminLightBrand(platform), ADMIN_TONE_VALUES.light, ADMIN_CHART_VALUES.light)}\n}`,
+    `:root.dark {\n  color-scheme: dark;\n${declarations(ADMIN_SURFACE_VALUES.dark, ADMIN_DARK_BRAND, ADMIN_TONE_VALUES.dark, ADMIN_CHART_VALUES.dark)}\n}`,
   ].join('\n');
 }
 

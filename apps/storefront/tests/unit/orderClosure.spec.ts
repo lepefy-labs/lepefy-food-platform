@@ -11,7 +11,6 @@ import { runOrderTransitionSideEffects } from '../../src/lib/orders/adminOrderWo
 import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
 import { orderClosureMessageEmail } from '../../src/lib/notifications/customerEmails';
 import type { TenantNotificationContext } from '../../src/lib/notifications/getTenantNotificationContext';
-import { describeRecentOrder } from '../../src/lib/admin/todayDashboard';
 
 const MIGRATION = readFileSync(resolve(__dirname, '../../../../supabase/migrations/161_order_closure.sql'), 'utf8');
 const ORDER_ID = '4a2b91c0-0000-4000-8000-000000000001';
@@ -123,7 +122,6 @@ test.describe('rules', () => {
     expect(closureOf({ status: 'cancelled', closure_type: 'handled_externally' })).toBe('handled_externally');
     expect(closureOf({ status: 'cancelled', closure_type: null })).toBe('cancelled');
     expect(closureOf({ status: 'preparing' })).toBeNull();
-    expect(describeRecentOrder({ id: ORDER_ID, created_at: 'a', updated_at: 'b', status: 'cancelled', payment_status: 'paid', fulfillment_type: 'delivery', full_name: null, total: 1, closure_type: 'handled_externally' }).label).toBe('Traitée hors plateforme');
     expect(closureIdempotencyKey('standard', ORDER_ID)).toBe(`order-cancelled:${ORDER_ID}`);
     expect(closureIdempotencyKey('none', ORDER_ID)).toBeNull();
   });

@@ -4,10 +4,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { IconAlertTriangle, IconBuildingStore, IconClipboardList, IconLeaf, IconSnowflake, IconTruck } from '@tabler/icons-react';
 import type { PreparationStep } from '@/lib/orders/preparation/preparationPolicy';
-import Badge from '../_components/ui/Badge';
-import { buttonClasses } from '../_components/ui/Button';
-import { EmptyState } from '../_components/ui/States';
-import PreparationStepBadge from '../_components/ui/PreparationStepBadge';
+import Badge from '../../../_components/ui/Badge';
+import { buttonClasses } from '../../../_components/ui/Button';
+import { EmptyState } from '../../../_components/ui/States';
+import PreparationStepBadge from '../../../_components/ui/PreparationStepBadge';
 
 export interface PrepareRow {
   id: string;
@@ -27,7 +27,7 @@ export interface PrepareRow {
 }
 
 /** Compact « to prepare » list of the dashboard; the selection opens a preparation session. */
-export default function TodayPrepareList({ rows, total }: { rows: PrepareRow[]; total: number }) {
+export default function PrepareList({ rows, total }: { rows: PrepareRow[]; total: number }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   if (rows.length === 0) {
     return <EmptyState title="Aucune commande à préparer." description="Les nouvelles commandes payées apparaîtront ici." />;

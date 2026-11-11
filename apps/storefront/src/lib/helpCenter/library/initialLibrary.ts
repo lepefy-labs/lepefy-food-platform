@@ -40,7 +40,7 @@ export const INITIAL_LIBRARY: LibraryGuide[] = [
     title: 'Préparer des commandes',
     summary: 'Ouvrir une session de préparation pour plusieurs commandes à la fois.',
     requiredPermission: 'orders.view',
-    contexts: ['/admin/orders', '/admin/orders/preparation', '/admin'],
+    contexts: ['/admin/orders', '/admin/orders/preparation'],
     watch: ['app/admin/(protected)/orders', 'lib/orders/preparation', 'docs/ORDER_PREPARATION.md'],
     blocks: [
       p('Une commande se prépare une fois payée. La session de préparation regroupe les articles de plusieurs commandes pour les prélever en une fois.'),

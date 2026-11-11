@@ -110,7 +110,7 @@ test('pathname: admin only, no query string or hash, ids masked in the route', (
 });
 
 test('page label from the navigation registry; resource only from a detail page', () => {
-  expect(pageLabelForPath('/admin')).toBe('Aujourd’hui');
+  expect(pageLabelForPath('/admin')).toBe('Statistiques');
   expect(pageLabelForPath('/admin/orders')).toBe('Commandes');
   expect(pageLabelForPath(`/admin/orders/${ID}`)).toBe('Commandes');
   expect(pageLabelForPath('/admin/orders/preparation')).toBe('Session de préparation');

@@ -20,7 +20,7 @@ import Badge from '../../../_components/ui/Badge'
 import InlineAlert from '../../../_components/ui/InlineAlert'
 import { Panel } from '../../../_components/ui/Panel'
 import { EmptyState } from '../../../_components/ui/States'
-import TodayPrepareList, { type PrepareRow } from '../../TodayPrepareList'
+import PrepareList, { type PrepareRow } from './PrepareList'
 import PreparationSessionActions from './PreparationSessionActions'
 
 export const dynamic = 'force-dynamic'
@@ -83,7 +83,7 @@ export default async function PreparationSessionPage({ searchParams }: { searchP
       <div className="mx-auto w-full max-w-5xl space-y-4 pb-10">
         <AdminPageHeader breadcrumb={breadcrumb} title="Session de préparation" description="Choisissez les commandes à préparer ensemble : Lepefy regroupe les articles et imprime les listes." />
         <Panel title={`Commandes à préparer${queue ? ` · ${formatNumber(queue.total)}` : ''}`} flush>
-          {queue ? <TodayPrepareList rows={rows} total={queue.total} /> : <EmptyState title="Liste indisponible." description="Réessayez dans un instant." />}
+          {queue ? <PrepareList rows={rows} total={queue.total} /> : <EmptyState title="Liste indisponible." description="Réessayez dans un instant." />}
         </Panel>
       </div>
     )

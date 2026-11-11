@@ -7,7 +7,7 @@
 
 | Percorso | Ruolo |
 |---|---|
-| `/admin` | **Aujourd'hui** (workspace shop): saluto, «À régler en priorité», «Dernières mises à jour», «Que voulez-vous faire ?», «Commandes à préparer». Sul dominio événementiel `/admin` resta riscritto su `/admin/evenementiel`. |
+| `/admin` | **Statistiques** (workspace shop, dall'11/2026 al posto della dashboard « Aujourd'hui », rimossa): vedi `docs/ADMIN_DESIGN_SYSTEM.md` › Statistiques. I vecchi link `/admin?<chiave ORDER_LIST>` reindirizzano ancora a `/admin/orders`. Sul dominio événementiel `/admin` resta riscritto su `/admin/evenementiel`. |
 | `/admin/orders` | **Commandes**: il cockpit storico (viste operative direttamente sotto « Commandes » nella sidebar, senza intestazione separata, FilterBar con « Vue » e « Mode » nel pannello, DataTable `variant="queue"` a gruppi comprimibili, BulkBar, export, documenti, précommandes, pagamenti per link); presentazione della coda in `docs/SHIPPING_INTELLIGENCE.md` §3.0 « Riga e azioni ». |
 | `/admin/orders/preparation` | **Session de préparation** (stateless, `?ids=`): raggiungibile dalla selezione multipla « Préparer ensemble » o dalla vista « En préparation »; senza id elenca gli ordini da preparare; con id mostra la lista per articolo, gli ordini esclusi e i documenti. Non è una voce permanente della sidebar. |
 | `/admin/orders/[id]` | Dettaglio: checklist digitale **oppure** pannello «Préparation sur papier» secondo la modalità dell'ordine. |
@@ -67,7 +67,7 @@ Tipi `orders.preparation.paper_started`, `orders.preparation.paper_completed` (a
 PDF: nuovo kind `preparation-summary` su `GET /api/admin/orders/documents/[kind]?ids=&format=` (`orders.view`, stesso Gotenberg, formato di default = quello della liste de préparation del tenant, A5/A4). Le liste individuali restano invariate e si stampano insieme («Listes individuelles»).
 
 ## 5. Navigazione
-Registry `lib/admin/navigation.ts`: gruppo **Essentiel** sempre aperto e senza titolo visibile — Aujourd'hui (`/admin`, exact), Commandes (`/admin/orders`), Produits (catalogue), Livraisons, Clients — poi gruppi pieghevoli Ventes, Croissance, Canaux, Gestion, Contenu & outils, Administration (aperti sulla voce attiva, stato ricordato nel browser, tutte le icone visibili nel rail compresso). Événementiel e Service sur place restano aperti nel loro workspace. Barra mobile: Aujourd'hui · Commandes · Produits · Plus (un cassiere conserva Scan fidélité). Azione palette «Préparer les commandes». RBAC, flag e workspace invariati.
+Registry `lib/admin/navigation.ts`: gruppo **Essentiel** sempre aperto e senza titolo visibile — Statistiques (`/admin`, exact), Commandes (`/admin/orders`), Produits (catalogue), Livraisons, Clients — poi gruppi pieghevoli Ventes, Croissance, Canaux, Gestion, Contenu & outils, Administration (aperti sulla voce attiva, stato ricordato nel browser, tutte le icone visibili nel rail compresso). Événementiel e Service sur place restano aperti nel loro workspace. Barra mobile: Statistiques · Commandes · Produits · Plus (un cassiere conserva Scan fidélité). Azione palette «Préparer les commandes». RBAC, flag e workspace invariati.
 
 ## 6. Prestazioni
 La dashboard riusa la lettura leggera degli ordini attivi di `loadOrderWorkQueue` (vista `to_prepare`, 8 righe complete), due `count head` (pagamenti per link, précommandes), un `count head` del giorno e 8 righe recenti; nessun provider, nessuno storico. La sessione legge al massimo 50 ordini, i loro articoli e i fatti catalogo dei prodotti coinvolti. Polling invariato.

@@ -1,51 +1,50 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import {
-  IconCash, IconCircleCheck, IconClipboardList, IconPlus, IconPrinter, IconTruckDelivery, type Icon,
-} from '@tabler/icons-react'
+import { IconArrowRight, IconBuildingStore } from '@tabler/icons-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenant } from '@/lib/tenant/getTenant'
-import { getCurrentAdminAccessContext, canAdmin } from '@/lib/auth/adminRbac'
-import { classifyOrderOperation, type OperationalOrder } from '@/lib/orders/adminOrderOperations'
-import { loadOrderWorkQueue, type WorkQueueResult } from '@/lib/orders/loadOrderWorkQueue'
-import { loadOrderOperationalContext, ORDER_LIST } from '@/lib/orders/orderListParams'
-import { buildPriorityItems, buildQuickActions, describeRecentOrder, type KpiCounts, type QuickAction, type RecentOrderRow } from '@/lib/admin/todayDashboard'
-import { formatDate, formatMoney, formatNumber, pluralize } from '@/lib/admin/format'
-import { PREPARATION_MODE_LABELS } from '@/lib/orders/preparation/preparationPolicy'
-import { cn } from '@/lib/utils/cn'
-import { shopDayStartIso } from '@/lib/time/shopTime'
-import { isMissingPreparationColumn, withoutPreparationColumns } from '@/lib/orders/preparation/compat'
+import { ORDER_LIST } from '@/lib/orders/orderListParams'
+import { countryDisplayName, flagSrc, isIsoCountry } from '@/lib/address/countries'
+import { formatMoney, formatNumber, pluralize } from '@/lib/admin/format'
+import {
+  bucketAxisLabel, bucketLongLabel, compareValues, fillSeries, FULFILLMENT_LABELS, HEATMAP_DAYS, HEATMAP_SLOTS, heatmapGrid, LIMITED_DATA_ORDERS,
+  metricValue, PAYMENT_METHOD_LABELS, PERIOD_LABELS, parseStatisticsQuery, plottedValues, rangeLabel, rankCategories, shares, statisticsHref,
+  type SalesStatistics, type StatisticsMetric,
+} from '@/lib/admin/salesStatistics'
+import { loadSalesStatistics } from '@/lib/admin/salesStatisticsServer'
 import AdminPageHeader from '../_components/ui/AdminPageHeader'
 import { ButtonLink } from '../_components/ui/Button'
-import { TONE_SOLID_BG_CLASS } from '../_components/ui/Badge'
 import InlineAlert from '../_components/ui/InlineAlert'
-import { Panel } from '../_components/ui/Panel'
-import { ErrorState } from '../_components/ui/States'
-import TodayPrepareList, { type PrepareRow } from './TodayPrepareList'
+import { EmptyState, ErrorState } from '../_components/ui/States'
+import StatTile, { Sparkline } from '../_components/charts/StatTile'
+import TrendChart, { type TrendPoint } from '../_components/charts/TrendChart'
+import BarList from '../_components/charts/BarList'
+import SegmentedBar from '../_components/charts/SegmentedBar'
+import Heatmap from '../_components/charts/Heatmap'
+import ChartDataTable from '../_components/charts/ChartDataTable'
+import { CHART_ACCENT, CHART_SERIES, formatChartValue } from '../_components/charts/chartTheme'
+import StatisticsControls, { SegmentedLinks } from './StatisticsControls'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
-const QUICK_ICONS: Record<QuickAction['key'], Icon> = {
-  prepare: IconClipboardList, print: IconPrinter, ship: IconTruckDelivery, new_order: IconPlus, payments: IconCash,
-}
-
 /** Orders list query keys (ORDER_LIST): an old /admin?… link is an orders link. */
 const ORDER_LIST_KEYS = [...Object.keys(ORDER_LIST.spec), 'page', 'size']
 
-function greeting(now: Date): string {
-  const hour = Number(new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hour12: false, timeZone: 'Europe/Paris' }).format(now))
-  return hour >= 18 || hour < 5 ? 'Bonsoir' : 'Bonjour'
-}
+const METRICS: Array<{ key: StatisticsMetric; label: string; title: string }> = [
+  { key: 'revenue', label: 'Chiffre d’affaires', title: 'Évolution du chiffre d’affaires' },
+  { key: 'orders', label: 'Commandes', title: 'Évolution des commandes' },
+  { key: 'average', label: 'Panier moyen', title: 'Évolution du panier moyen' },
+]
+
+const CARD = 'rounded-2xl border border-a-border bg-a-surface p-4 sm:p-5'
 
 /**
- * « Aujourd'hui » — operational home of the shop workspace. Answers what to do
- * now; the full orders cockpit lives at /admin/orders. One light read of the
- * active orders (the same work-queue classifier as Commandes), two head
- * counts for payments that are not orders yet, one 8-row recent query.
- * No provider call, no history scan.
+ * « Statistiques » — home of the shop workspace (/admin). Sales of the
+ * period from one aggregated RPC (admin_sales_statistics, migration 181),
+ * compared with the previous period of the same length. Pure rules in
+ * lib/admin/salesStatistics.ts; charts in _components/charts.
  */
-export default async function AdminTodayPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export default async function AdminStatisticsPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
   // Back-compat: /admin?status=…, ?view=…, ?q=… (notifications, bookmarks) open the orders list.
   const legacy = new URLSearchParams()
   for (const [key, value] of Object.entries(searchParams)) {
@@ -55,149 +54,215 @@ export default async function AdminTodayPage({ searchParams }: { searchParams: R
   if (legacy.toString()) redirect(`/admin/orders?${legacy.toString()}`)
 
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood')
-  const supabase = createServiceClient()
-  const now = new Date()
-  const [access, operational] = await Promise.all([getCurrentAdminAccessContext(tenant.id), loadOrderOperationalContext(supabase, tenant)])
-  const RECENT_COLUMNS = 'id, created_at, updated_at, status, payment_status, fulfillment_type, full_name, total, closure_type'
-  const readRecent = (columns: string) => supabase.from('orders').select(columns).eq('tenant_id', tenant.id).order('updated_at', { ascending: false }).limit(8)
-  // Before migration 161: same list without closure_type.
-  const readRecentOrders = async () => {
-    const first = await readRecent(RECENT_COLUMNS)
-    return isMissingPreparationColumn(first.error) ? readRecent(withoutPreparationColumns(RECENT_COLUMNS)) : first
+  const currency = tenant.currency || 'EUR'
+  const query = parseStatisticsQuery(searchParams)
+  const periodName = query.period === 'custom' ? 'la période' : PERIOD_LABELS[query.period].long
+
+  const header = (
+    <AdminPageHeader
+      title="Statistiques"
+      description={<>Ventes payées de la boutique, hors commandes test et annulations · <span className="text-a-text">{rangeLabel(query.range)}</span></>}
+      actions={<StatisticsControls query={query} />}
+    />
+  )
+
+  let data: { current: SalesStatistics; previous: SalesStatistics | null }
+  try {
+    data = await loadSalesStatistics(createServiceClient(), tenant.id, query)
+  } catch (error) {
+    console.error('[admin/statistics] load failed', tenant.id, error)
+    return (
+      <div className="mx-auto w-full max-w-7xl pb-10">
+        {header}
+        <ErrorState title="Statistiques momentanément indisponibles." description="Les commandes restent accessibles dans Commandes." action={<ButtonLink href="/admin">Réessayer</ButtonLink>} />
+      </div>
+    )
   }
-  const canManage = Boolean(access && canAdmin(access, 'orders.manage'))
 
-  const [queue, { count: pendingLinkPayments }, { count: preordersToVerify }, { data: recentRaw }, { count: todayCount }] = await Promise.all([
-    loadOrderWorkQueue(supabase, tenant.id, {
-      filters: { view: 'to_prepare', status: '', dateFrom: '', dateTo: '', fulfillment: '', payment: '', search: '' },
-      sort: 'priority', page: 1, pageSize: 8, now, thresholds: operational.thresholds,
-      managedProviderAvailable: operational.managedProviderAvailable, originCountry: tenant.country, tenantPreparationMode: operational.preparationMode,
-    }).catch((error: unknown): WorkQueueResult | null => { console.error('[admin/today] work queue unavailable', error); return null }),
-    supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id)
-      .eq('payment_method', 'external_link').eq('origin', 'storefront').in('status', ['open', 'expired', 'awaiting_verification']).is('order_id', null),
-    supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('origin', 'assisted').eq('status', 'awaiting_verification'),
-    readRecentOrders(),
-    supabase.from('orders').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).gte('created_at', shopDayStartIso(now)),
+  const { current, previous } = data
+  const totals = current.totals
+  const limited = totals.orders < LIMITED_DATA_ORDERS
+  const average = totals.orders > 0 ? totals.revenue / totals.orders : 0
+  const previousAverage = previous && previous.totals.orders > 0 ? previous.totals.revenue / previous.totals.orders : 0
+  const money = (value: number) => formatMoney(value, currency)
+  const previousWord = query.period === '12m' ? 'les 12 mois précédents' : `les ${formatNumber(query.range.days)} j précédents`
+
+  const points = fillSeries(current.series, query.range, query.bucket)
+  const previousPoints = previous ? fillSeries(previous.series, query.previous, query.bucket) : []
+  const spark = (metric: StatisticsMetric) => points.map((point) => metricValue(point, metric) ?? 0)
+
+  const metric = METRICS.find((item) => item.key === query.metric)!
+  const plotted = plottedValues(points, query.metric, query.display)
+  const plottedPrevious = previous ? plottedValues(previousPoints, query.metric, query.display) : undefined
+  const format = query.metric === 'orders' ? 'number' : 'money'
+  const trendPoints: TrendPoint[] = points.map((point, index) => ({
+    key: point.bucket,
+    axisLabel: bucketAxisLabel(point.bucket, query.bucket),
+    title: bucketLongLabel(point.bucket, query.bucket),
+    value: plotted[index] ?? null,
+    detail: query.display === 'cumulative'
+      ? `${query.bucket === 'day' ? 'ce jour' : query.bucket === 'week' ? 'cette semaine' : 'ce mois'} : ${pluralize(point.orders, 'commande', 'commandes')} · ${money(point.revenue)}`
+      : query.metric === 'revenue' ? pluralize(point.orders, 'commande', 'commandes') : undefined,
+  }))
+  const headline = query.metric === 'revenue' ? money(totals.revenue) : query.metric === 'orders' ? formatNumber(totals.orders) : money(average)
+  const headlineCaption = query.metric === 'average' ? `sur ${pluralize(totals.orders, 'commande', 'commandes')}` : `au total, ${rangeLabel(query.range)}`
+
+  const categories = rankCategories(current.categories)
+  const products = current.products.slice(0, 8)
+  const pickup = current.fulfillment.find((row) => row.key === 'pickup')
+  const destinations = [
+    ...current.countries.map((row) => ({ key: row.key ?? 'unknown', label: row.key && isIsoCountry(row.key) ? countryDisplayName(row.key) : 'Pays non renseigné', code: row.key && isIsoCountry(row.key) ? row.key : null, orders: row.orders, revenue: row.revenue })),
+    ...(pickup && pickup.orders > 0 ? [{ key: 'pickup', label: 'Retrait en boutique', code: null, orders: pickup.orders, revenue: pickup.revenue }] : []),
+  ].sort((a, b) => b.revenue - a.revenue)
+  const grid = heatmapGrid(current.heatmap)
+
+  const fulfillmentShares = shares(['delivery', 'pickup'].map((key) => ({ key, label: FULFILLMENT_LABELS[key]!, value: current.fulfillment.find((row) => row.key === key)?.orders ?? 0 })))
+  const paymentShares = shares(current.paymentMethods.map((row) => ({ key: row.key ?? 'unknown', label: PAYMENT_METHOD_LABELS[row.key ?? ''] ?? 'Autre', value: row.revenue })))
+  const customerShares = shares([
+    { key: 'new', label: '1ʳᵉ commande', value: totals.newCustomers },
+    { key: 'returning', label: 'Déjà clients', value: totals.returningCustomers },
   ])
+  const percent = (share: number) => `${formatNumber(share * 100)} %`
 
-  const kpis: KpiCounts = queue?.kpis ?? {}
-  const linkPayments = pendingLinkPayments ?? 0
-  const preorders = preordersToVerify ?? 0
-  const priorities = buildPriorityItems({ kpis, pendingLinkPayments: linkPayments, preordersToVerify: preorders })
-  const paymentsToVerify = (kpis.payment_unverified ?? 0) + linkPayments + preorders
-  const actions = buildQuickActions({ kpis, mode: operational.preparationMode, canManage, paymentsToVerify })
-  const recent = ((recentRaw ?? []) as unknown as RecentOrderRow[]).map((row) => ({ row, entry: describeRecentOrder(row) }))
-  const name = access?.nickname || access?.firstName || null
-  const dateLabel = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' }).format(now)
-
-  const prepareRows: PrepareRow[] = ((queue?.rows ?? []) as unknown as Array<Omit<OperationalOrder, 'order_items'> & {
-    id: string; full_name: string | null; email: string | null; order_items: Array<{ quantity: number; storage_type: string | null; cold_chain_checked_at?: string | null }>
-  }>).map((order) => {
-    const operation = classifyOrderOperation({ ...order, originCountry: tenant.country, managedProviderAvailable: operational.managedProviderAvailable, tenantPreparationMode: operational.preparationMode }, operational.thresholds, now)
-    return {
-      id: order.id,
-      ref: `#${order.id.slice(0, 8).toUpperCase()}`,
-      customer: order.full_name ?? order.email ?? 'Client',
-      createdAt: formatDate(order.created_at, 'datetime'),
-      units: order.order_items.reduce((sum, item) => sum + item.quantity, 0),
-      lines: order.order_items.length,
-      pickup: order.fulfillment_type === 'pickup',
-      country: order.fulfillment_type === 'delivery' ? order.shipping_address?.country ?? null : null,
-      international: operation.handling.international,
-      fresh: operation.handling.fresh,
-      frozen: operation.handling.frozen,
-      step: operation.step,
-      urgency: operation.urgency,
-      action: operation.action.label,
-    }
-  })
+  const metricLinks = METRICS.map((item) => ({ key: item.key, label: item.label, href: statisticsHref(query, { metric: item.key }), active: item.key === query.metric }))
+  const displayLinks = [
+    { key: 'cumulative', label: 'Cumulé', href: statisticsHref(query, { display: 'cumulative' }), active: query.display === 'cumulative' },
+    { key: 'daily', label: query.bucket === 'day' ? 'Par jour' : query.bucket === 'week' ? 'Par semaine' : 'Par mois', href: statisticsHref(query, { display: 'daily' }), active: query.display === 'daily' },
+  ]
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 pb-10">
-      <AdminPageHeader
-        title={`${greeting(now)}${name ? ` ${name}` : ''}`}
-        meta={<span className="capitalize">{dateLabel}</span>}
-        description={`${tenant.name} · ${todayCount ? `${pluralize(todayCount, 'nouvelle commande', 'nouvelles commandes')} aujourd’hui` : 'aucune nouvelle commande aujourd’hui'}`}
-        actions={<>
-          <ButtonLink href="/admin/orders">Toutes les commandes</ButtonLink>
-          {canManage && <ButtonLink href="/admin/orders/new" variant="primary"><IconPlus size={17} aria-hidden="true" /> Nouvelle commande</ButtonLink>}
-        </>}
-      />
+      {header}
 
-      {!queue && <InlineAlert tone="warning" action={<Link href="/admin" className="underline">Réessayer</Link>}>Certains compteurs sont indisponibles. Les commandes restent accessibles dans Commandes.</InlineAlert>}
+      {query.invalidCustom && <InlineAlert tone="warning">Les dates choisies ne sont pas valides (au plus 3 ans, la fin après le début) : affichage des 30 derniers jours.</InlineAlert>}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <Panel id="today-priorities" title="À régler en priorité" flush
-          description={priorities.length ? pluralize(priorities.reduce((sum, item) => sum + item.count, 0), 'point à traiter', 'points à traiter') : undefined}>
-          {priorities.length === 0 ? (
-            <p className="flex items-center gap-2 px-4 py-4 text-sm text-tone-success-fg">
-              <IconCircleCheck size={18} aria-hidden="true" /> Rien d’urgent : aucun paiement, stock ou incident à régler.
-            </p>
-          ) : (
-            <ul className="divide-y divide-a-border">
-              {priorities.map((item) => (
-                <li key={item.key}>
-                  <Link href={item.href} className="grid min-h-14 grid-cols-[4px_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-2.5 hover:bg-a-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus">
-                    <span aria-hidden="true" className={cn('h-full min-h-8 rounded-full', TONE_SOLID_BG_CLASS[item.tone])} />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-a-text">{item.label}</span>
-                      <span className="block text-xs text-a-text-3">{item.detail}</span>
-                    </span>
-                    <b className="text-lg font-bold tabular-nums text-a-text">{formatNumber(item.count)}</b>
-                    <span className="text-sm font-semibold text-a-brand-fg">{item.cta}<span className="sr-only"> : {item.label}</span></span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-
-        <Panel id="today-activity" title="Dernières mises à jour" flush>
-          {recent.length === 0 ? <p className="px-4 py-4 text-sm text-a-text-3">Aucune commande pour le moment.</p> : (
-            <ol className="divide-y divide-a-border">
-              {recent.map(({ row, entry }) => (
-                <li key={row.id}>
-                  <Link href={`/admin/orders/${row.id}`} className="flex min-h-11 items-center gap-3 px-4 py-2 text-sm hover:bg-a-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus">
-                    <time dateTime={entry.at} className="w-12 shrink-0 text-xs tabular-nums text-a-text-3">{formatDate(entry.at, 'time')}</time>
-                    <span aria-hidden="true" className={cn('h-2 w-2 shrink-0 rounded-full', TONE_SOLID_BG_CLASS[entry.tone])} />
-                    <span className="min-w-0 flex-1 truncate">{entry.label} <span className="font-mono text-xs text-a-text-2">#{row.id.slice(0, 8).toUpperCase()}</span><span className="text-a-text-3"> · {row.full_name ?? 'Client'}</span></span>
-                    <span className="shrink-0 text-xs font-semibold tabular-nums text-a-text-2">{formatMoney(Number(row.total ?? 0), tenant.currency || 'EUR')}</span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          )}
-        </Panel>
-      </div>
-
-      <section aria-labelledby="today-actions-title">
-        <h2 id="today-actions-title" className="mb-2 text-base font-semibold text-a-text">Que voulez-vous faire ?</h2>
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-          {actions.map((action) => {
-            const ActionIcon = QUICK_ICONS[action.key]
-            return (
-              <li key={action.key}>
-                <Link href={action.href} className={cn('flex h-full min-h-24 flex-col gap-1 rounded-[10px] border bg-a-surface p-3 hover:bg-a-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus',
-                  action.primary ? 'border-a-brand ring-1 ring-inset ring-a-brand' : 'border-a-border')}>
-                  <span className={cn('flex h-8 w-8 items-center justify-center rounded-lg', action.primary ? 'bg-a-brand text-a-on-brand' : 'bg-a-brand-soft text-a-brand-fg')}>
-                    <ActionIcon size={18} aria-hidden="true" />
-                  </span>
-                  <span className="text-sm font-semibold text-a-text">{action.label}</span>
-                  <span className="text-xs text-a-text-3">{action.detail}</span>
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
+      <section aria-label="Indicateurs clés" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Chiffre d’affaires" value={money(totals.revenue)}
+          delta={previous ? compareValues(totals.revenue, previous.totals.revenue, { limited, kind: 'amount' }) : null}
+          comparison={previous ? <span>vs {money(previous.totals.revenue)} {previousWord}</span> : undefined}
+          trend={<span className="hidden sm:block"><Sparkline values={spark('revenue')} color={CHART_ACCENT} /></span>} />
+        <StatTile label="Commandes" value={formatNumber(totals.orders)}
+          delta={previous ? compareValues(totals.orders, previous.totals.orders, { limited, kind: 'count' }) : null}
+          comparison={previous ? <span>vs {formatNumber(previous.totals.orders)}</span> : undefined}
+          trend={<span className="hidden sm:block"><Sparkline values={spark('orders')} color={CHART_SERIES[0]} /></span>} />
+        <StatTile label="Panier moyen" value={totals.orders ? money(average) : '—'}
+          delta={previous && totals.orders ? compareValues(average, previousAverage, { limited, kind: 'amount' }) : null}
+          comparison={previous && previous.totals.orders ? <span>vs {money(previousAverage)}</span> : undefined}
+          trend={<span className="hidden sm:block"><Sparkline values={spark('average')} color={CHART_SERIES[1]} /></span>} />
+        <StatTile label="Clients acheteurs" value={formatNumber(totals.customers)}
+          delta={previous ? compareValues(totals.customers, previous.totals.customers, { limited, kind: 'count' }) : null}
+          comparison={previous ? <span>vs {formatNumber(previous.totals.customers)}</span> : undefined}>
+          <p className="text-xs text-a-text-2">
+            <b className="font-semibold tabular-nums text-a-text">{formatNumber(totals.newCustomers)}</b> {totals.newCustomers > 1 ? 'nouveaux' : 'nouveau'} ·{' '}
+            <b className="font-semibold tabular-nums text-a-text">{formatNumber(totals.returningCustomers)}</b> {totals.returningCustomers > 1 ? 'fidèles' : 'fidèle'}
+          </p>
+        </StatTile>
       </section>
 
-      <Panel id="today-prepare" title={`Commandes à préparer${queue ? ` · ${formatNumber(queue.total)}` : ''}`} flush
-        description={`Préparation : ${PREPARATION_MODE_LABELS[operational.preparationMode.picking].toLowerCase()} · ordre de priorité opérationnelle`}
-        actions={<ButtonLink href="/admin/orders?view=to_prepare" size="sm">Tout voir</ButtonLink>}>
-        {!queue
-          ? <ErrorState title="Impossible de charger les commandes à préparer." action={<ButtonLink href="/admin">Réessayer</ButtonLink>} />
-          : <TodayPrepareList rows={prepareRows} total={queue.total} />}
-      </Panel>
+      {totals.orders === 0 ? (
+        <EmptyState title="Pas encore de ventes sur cette période" description={`Aucune commande payée ${periodName === 'la période' ? 'sur la période choisie' : `sur les ${periodName}`}. Essayez une période plus longue.`}
+          action={query.period !== '12m' ? <ButtonLink href={statisticsHref(query, { period: '12m' })}>Voir les 12 derniers mois</ButtonLink> : undefined} />
+      ) : (
+        <>
+          {limited && (
+            <InlineAlert tone="info">
+              Encore peu de commandes sur la période ({formatNumber(totals.orders)}) : les variations sont données en valeurs, pas en pourcentage, pour ne pas exagérer les écarts.
+            </InlineAlert>
+          )}
+
+          <section aria-labelledby="stats-trend-title" className={CARD}>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <h2 id="stats-trend-title" className="text-base font-semibold text-a-text">{metric.title}</h2>
+                <p className="mt-1 flex flex-wrap items-baseline gap-x-2.5">
+                  <span className="text-3xl font-bold tabular-nums tracking-tight text-a-text">{headline}</span>
+                  <span className="text-sm text-a-text-3">{headlineCaption}</span>
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <SegmentedLinks label="Indicateur" options={metricLinks} size="sm" />
+                <SegmentedLinks label="Affichage" options={displayLinks} size="sm" />
+              </div>
+            </div>
+            <TrendChart className="mt-4" points={trendPoints} previous={plottedPrevious}
+              mode={query.display === 'cumulative' ? 'area' : 'bars'} format={format} currency={currency}
+              currentLabel={query.display === 'cumulative' ? 'Cumulé' : metric.label}
+              previousLabel={previous ? 'Période préc.' : undefined}
+              ariaLabel={`${metric.title}, ${rangeLabel(query.range)} : ${headline}${previous ? `, contre ${query.metric === 'revenue' ? money(previous.totals.revenue) : query.metric === 'orders' ? formatNumber(previous.totals.orders) : money(previousAverage)} sur la période précédente` : ''}`} />
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-a-text-2">
+                <li className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-0.5 w-4 rounded" style={{ background: CHART_ACCENT }} />{rangeLabel(query.range)}</li>
+                {previous && <li className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="w-4 border-t-2 border-dashed border-a-text-3" />{rangeLabel(query.previous)}</li>}
+              </ul>
+              <ChartDataTable caption={metric.title}
+                columns={['Période', 'Commandes', 'Chiffre d’affaires', ...(previous ? ['Commandes (préc.)', 'CA (préc.)'] : [])]}
+                rows={points.map((point, index) => [
+                  bucketLongLabel(point.bucket, query.bucket), formatNumber(point.orders), money(point.revenue),
+                  ...(previous ? [formatNumber(previousPoints[index]?.orders ?? 0), money(previousPoints[index]?.revenue ?? 0)] : []),
+                ])} />
+            </div>
+          </section>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <section aria-labelledby="stats-categories-title" className={CARD}>
+              <div className="mb-4 flex items-baseline justify-between gap-3">
+                <h2 id="stats-categories-title" className="text-base font-semibold text-a-text">Ventes par catégorie</h2>
+                <span className="text-xs text-a-text-3">CA des articles</span>
+              </div>
+              <BarList color={CHART_SERIES[0]} empty="Aucun article vendu."
+                items={categories.map((item) => ({ key: item.key, label: item.label, value: item.value, valueLabel: money(item.value), detail: percent(item.share), other: item.other }))} />
+            </section>
+
+            <section aria-labelledby="stats-products-title" className={CARD}>
+              <div className="mb-4 flex items-baseline justify-between gap-3">
+                <h2 id="stats-products-title" className="text-base font-semibold text-a-text">Produits les plus vendus</h2>
+                <span className="text-xs text-a-text-3">par chiffre d’affaires</span>
+              </div>
+              <BarList ranked color={CHART_ACCENT} empty="Aucun article vendu."
+                items={products.map((product, index) => ({
+                  key: product.id ?? `line-${index}`, label: product.name, value: product.revenue, valueLabel: money(product.revenue),
+                  detail: `${formatNumber(product.units)} ${product.units > 1 ? 'vendus' : 'vendu'}`, href: product.id ? `/admin/catalogue/${product.id}` : undefined,
+                }))} />
+            </section>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <section aria-labelledby="stats-mix-title" className={`${CARD} flex flex-col gap-5`}>
+              <h2 id="stats-mix-title" className="text-base font-semibold text-a-text">Comment on vous achète</h2>
+              <SegmentedBar title="Mode de remise (commandes)" segments={fulfillmentShares.map((item) => ({ key: item.key, label: item.label, value: item.value, valueLabel: `${formatNumber(item.value)} · ${percent(item.share)}` }))} />
+              <SegmentedBar title="Paiement (part du CA)" segments={paymentShares.map((item) => ({ key: item.key, label: item.label, value: item.value, valueLabel: percent(item.share) }))} />
+              <SegmentedBar title="Clients" segments={customerShares.map((item) => ({ key: item.key, label: item.label, value: item.value, valueLabel: formatNumber(item.value) }))} empty="Clients non identifiés sur la période." />
+            </section>
+
+            <section aria-labelledby="stats-geo-title" className={CARD}>
+              <h2 id="stats-geo-title" className="mb-4 text-base font-semibold text-a-text">Destinations</h2>
+              <BarList layout="stacked" color={CHART_SERIES[0]} empty="Aucune livraison sur la période."
+                items={destinations.map((row) => ({
+                  key: row.key, label: row.label, value: row.revenue, valueLabel: money(row.revenue), detail: pluralize(row.orders, 'commande', 'commandes'), other: row.key === 'pickup',
+                  leading: row.code
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={flagSrc(row.code)} alt="" width={20} height={15} className="h-[15px] w-5 shrink-0 rounded-sm border border-a-border object-cover" />
+                    : row.key === 'pickup' ? <IconBuildingStore size={18} aria-hidden="true" className="shrink-0 text-a-text-3" /> : undefined,
+                }))} />
+            </section>
+
+            <section aria-labelledby="stats-heat-title" className={`${CARD} md:col-span-2 xl:col-span-1`}>
+              <h2 id="stats-heat-title" className="text-base font-semibold text-a-text">Moments forts</h2>
+              <p className="mb-3 text-xs text-a-text-3">Commandes par jour et tranche horaire (heure de la boutique)</p>
+              <Heatmap grid={grid} rows={HEATMAP_DAYS} columns={HEATMAP_SLOTS} unit={['commande', 'commandes']} />
+            </section>
+          </div>
+        </>
+      )}
+
+      <nav aria-label="Aller plus loin" className="flex flex-wrap gap-2">
+        <ButtonLink href="/admin/orders" size="sm">Commandes <IconArrowRight size={16} aria-hidden="true" /></ButtonLink>
+        <ButtonLink href="/admin/checkout-funnel" size="sm">Funnel checkout <IconArrowRight size={16} aria-hidden="true" /></ButtonLink>
+        <ButtonLink href="/admin/paiements-carte" size="sm">Paiements carte <IconArrowRight size={16} aria-hidden="true" /></ButtonLink>
+      </nav>
+      <p className="text-xs text-a-text-3">
+        Une commande compte si elle est payée, n’est pas une commande test et n’a pas été annulée (y compris « traitée hors plateforme »). Montants TTC, livraison incluse ; catégories et produits : montant des articles. {formatChartValue(totals.units, 'number')} {totals.units > 1 ? 'articles vendus' : 'article vendu'} sur la période.
+      </p>
     </div>
   )
 }

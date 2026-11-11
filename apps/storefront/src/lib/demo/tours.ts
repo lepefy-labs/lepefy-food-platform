@@ -51,9 +51,9 @@ export const DEMO_PATHS: readonly DemoPath[] = [
     ],
   },
   {
-    key: 'orders', title: 'Gérer les commandes', summary: 'Aujourd’hui, préparation, retraits', minutes: 4, admin: true,
+    key: 'orders', title: 'Gérer les commandes', summary: 'Statistiques, préparation, retraits', minutes: 4, admin: true,
     steps: [
-      { href: '/admin', title: 'Aujourd’hui', body: 'Ce qui est à préparer, à remettre et à relancer aujourd’hui, en un écran.' },
+      { href: '/admin', title: 'Statistiques', body: 'Chiffre d’affaires, commandes, panier moyen et meilleures ventes, comparés à la période précédente.' },
       { href: '/admin/orders', title: 'Les commandes', body: 'Filtres par état, mode de réception et paiement. Chaque commande a sa fiche et ses documents à imprimer.' },
       { href: '/admin/evenementiel/devis', title: 'Les demandes de devis', body: 'Mariage, anniversaire, repas d’entreprise : chaque demande suit ses étapes jusqu’à l’acceptation.', gap: 'Pas encore de calendrier des prestations ni de devis chiffré.' },
       { href: '/admin/clients', title: 'Les clients', body: 'Historique d’achats, fidélité et coordonnées réunis sur une fiche.' },

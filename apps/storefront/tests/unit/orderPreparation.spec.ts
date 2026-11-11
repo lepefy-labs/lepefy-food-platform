@@ -14,7 +14,6 @@ import { buildPreparationSummary } from '../../src/lib/orders/preparation/prepar
 import { OrderWorkflowError, PreparationIncompleteError, updateWorkflowOrder, type OrderService } from '../../src/lib/orders/orderTransitionService';
 import { classifyOrderOperation, transportState, type OperationalOrder } from '../../src/lib/orders/adminOrderOperations';
 import { PREPARATION_STEP_META } from '../../src/lib/admin/statusRegistry';
-import { buildPriorityItems, buildQuickActions, describeRecentOrder } from '../../src/lib/admin/todayDashboard';
 import { ORDER_LIST } from '../../src/lib/orders/orderListParams';
 import { ORDER_VIEWS } from '../../src/lib/orders/loadOrderWorkQueue';
 import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
@@ -495,32 +494,7 @@ test.describe('preparation session', () => {
 
 // ─── Dashboard and URLs ─────────────────────────────────────────────────────
 
-test.describe('dashboard « Aujourd’hui »', () => {
-  test('priorities: only real actions, most severe first; a positive empty state otherwise', () => {
-    expect(buildPriorityItems({ kpis: {}, pendingLinkPayments: 0, preordersToVerify: 0 })).toEqual([]);
-    const items = buildPriorityItems({ kpis: { incidents: 1, late_preparation: 2, payment_unverified: 1, stock_conflict: 0 }, pendingLinkPayments: 1, preordersToVerify: 0 });
-    expect(items.map((item) => item.key)).toEqual(['incidents', 'payment_unverified', 'link_payments', 'late_preparation']);
-    expect(items.every((item) => item.href.startsWith('/admin/orders'))).toBe(true);
-    // Paper-mode bookkeeping is never a priority.
-    expect(buildPriorityItems({ kpis: { paper_in_progress: 4, picking_incomplete: 0 }, pendingLinkPayments: 0, preordersToVerify: 0 })).toEqual([]);
-  });
-
-  test('quick actions follow permissions and the mode', () => {
-    const viewer = buildQuickActions({ kpis: { to_prepare: 3, to_print: 2 }, mode: PAPER, canManage: false, paymentsToVerify: 0 });
-    expect(viewer.map((action) => action.key)).toEqual(['prepare', 'print', 'ship', 'payments']);
-    expect(viewer.find((action) => action.key === 'print')?.href).toBe('/admin/orders?view=to_print');
-    const manager = buildQuickActions({ kpis: {}, mode: DIGITAL_PREPARATION, canManage: true, paymentsToVerify: 0 });
-    expect(manager.map((action) => action.key)).toContain('new_order');
-    expect(manager.find((action) => action.key === 'print')?.href).toBe('/admin/orders/preparation');
-  });
-
-  test('recent activity wording comes from the current state only', () => {
-    const row = { id: ORDER_ID, created_at: '2026-10-20T09:00:00Z', updated_at: '2026-10-20T09:00:30Z', status: 'new', payment_status: 'paid', fulfillment_type: 'pickup' as const, full_name: 'A', total: 10 };
-    expect(describeRecentOrder(row).label).toBe('Nouvelle commande');
-    expect(describeRecentOrder({ ...row, status: 'delivered', updated_at: '2026-10-20T12:00:00Z' }).label).toBe('Retrait terminé');
-    expect(describeRecentOrder({ ...row, status: 'stock_conflict' }).tone).toBe('danger');
-  });
-
+test.describe('/admin URLs', () => {
   test('old /admin?… order links keep working: every list key is redirected, new views are valid', () => {
     expect(Object.keys(ORDER_LIST.spec)).toEqual(expect.arrayContaining(['view', 'status', 'q', 'payment', 'fulfillment', 'dateFrom', 'dateTo', 'sort']));
     expect(ORDER_LIST.parse({ view: 'to_print' }).view).toBe('to_print');
