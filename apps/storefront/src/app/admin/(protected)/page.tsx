@@ -82,6 +82,8 @@ export default async function AdminStatisticsPage({ searchParams }: { searchPara
   const { current, previous } = data
   const totals = current.totals
   const limited = totals.orders < LIMITED_DATA_ORDERS
+  // Counts compared with a small previous period read as raw differences (« +17 », not « +567 % »).
+  const countsLimited = limited || (previous !== null && previous.totals.orders < LIMITED_DATA_ORDERS)
   const average = totals.orders > 0 ? totals.revenue / totals.orders : 0
   const previousAverage = previous && previous.totals.orders > 0 ? previous.totals.revenue / previous.totals.orders : 0
   const money = (value: number) => formatMoney(value, currency)
@@ -142,7 +144,7 @@ export default async function AdminStatisticsPage({ searchParams }: { searchPara
           comparison={previous ? <span>vs {money(previous.totals.revenue)} {previousWord}</span> : undefined}
           trend={<span className="hidden sm:block"><Sparkline values={spark('revenue')} color={CHART_ACCENT} /></span>} />
         <StatTile label="Commandes" value={formatNumber(totals.orders)}
-          delta={previous ? compareValues(totals.orders, previous.totals.orders, { limited, kind: 'count' }) : null}
+          delta={previous ? compareValues(totals.orders, previous.totals.orders, { limited: countsLimited, kind: 'count' }) : null}
           comparison={previous ? <span>vs {formatNumber(previous.totals.orders)}</span> : undefined}
           trend={<span className="hidden sm:block"><Sparkline values={spark('orders')} color={CHART_SERIES[0]} /></span>} />
         <StatTile label="Panier moyen" value={totals.orders ? money(average) : '—'}
@@ -150,7 +152,7 @@ export default async function AdminStatisticsPage({ searchParams }: { searchPara
           comparison={previous && previous.totals.orders ? <span>vs {money(previousAverage)}</span> : undefined}
           trend={<span className="hidden sm:block"><Sparkline values={spark('average')} color={CHART_SERIES[1]} /></span>} />
         <StatTile label="Clients acheteurs" value={formatNumber(totals.customers)}
-          delta={previous ? compareValues(totals.customers, previous.totals.customers, { limited, kind: 'count' }) : null}
+          delta={previous ? compareValues(totals.customers, previous.totals.customers, { limited: countsLimited, kind: 'count' }) : null}
           comparison={previous ? <span>vs {formatNumber(previous.totals.customers)}</span> : undefined}>
           <p className="text-xs text-a-text-2">
             <b className="font-semibold tabular-nums text-a-text">{formatNumber(totals.newCustomers)}</b> {totals.newCustomers > 1 ? 'nouveaux' : 'nouveau'} ·{' '}
