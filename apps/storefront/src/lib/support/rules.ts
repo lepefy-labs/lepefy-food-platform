@@ -115,6 +115,8 @@ export function routePattern(pathname: string): string {
 export function pageLabelForPath(pathname: string): string {
   if (pathname === '/admin' || pathname === '/admin/') return 'Aujourd’hui';
   if (pathname.startsWith('/admin/assistance')) return 'Assistance';
+  // The bulk-preparation route retains its page label even though it is no longer a sidebar child.
+  if (pathname === '/admin/orders/preparation' || pathname.startsWith('/admin/orders/preparation/')) return 'Session de préparation';
   if (pathname.startsWith('/admin/platform')) return 'Console Lepefy';
   let best: { label: string; length: number } | null = null;
   for (const item of ADMIN_NAV) {
