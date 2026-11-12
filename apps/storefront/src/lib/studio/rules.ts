@@ -96,6 +96,7 @@ export function studioErrorCode(error: unknown): string | null {
 export const STUDIO_JOB_ERROR_MESSAGES: Record<string, string> = {
   provider_timeout: 'Le service d’images n’a pas répondu à temps.',
   rate_limit: 'Le service d’images est très sollicité en ce moment.',
+  provider_billing: 'Le service d’images est momentanément indisponible. Lepefy a été prévenu ; réessayez plus tard.',
   safety_blocked: 'Le service d’images a refusé cette demande. Reformulez-la (sans personne réelle, marque ou contenu sensible).',
   no_image: 'Le service d’images n’a pas renvoyé d’image pour cette demande. Reformulez-la plus simplement.',
   invalid_output: 'L’image reçue était illisible.',

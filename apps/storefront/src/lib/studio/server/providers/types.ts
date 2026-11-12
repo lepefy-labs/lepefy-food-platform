@@ -45,14 +45,15 @@ export interface ImageStudioProvider {
 export class StudioProviderError extends Error {
   /** Provider HTTP status and a short message, for the server log only (never shown, never a secret). */
   detail: string | null = null;
-  constructor(public code: 'provider_timeout' | 'rate_limit' | 'safety_blocked' | 'no_image' | 'provider_error' | 'model_unavailable' | 'missing_credential' | 'invalid_output' | 'no_enabled_model') {
+  constructor(public code: 'provider_timeout' | 'rate_limit' | 'provider_billing' | 'safety_blocked' | 'no_image' | 'provider_error' | 'model_unavailable' | 'missing_credential' | 'invalid_output' | 'no_enabled_model') {
     super(code);
     this.name = 'StudioProviderError';
   }
 }
 
 export function httpStatusError(status: number | undefined, message?: unknown): StudioProviderError {
-  const error = status === 429 ? new StudioProviderError('rate_limit')
+  const error = status === 402 ? new StudioProviderError('provider_billing')
+    : status === 429 ? new StudioProviderError('rate_limit')
     : status === 404 ? new StudioProviderError('model_unavailable')
       : status === 401 || status === 403 ? new StudioProviderError('missing_credential')
         : new StudioProviderError('provider_error');

@@ -102,7 +102,7 @@ Campione: 10 prodotti reali (uno per categoria; 2 avevano solo il segnaposto « 
 
 « Approvabile » = l'immagine iniziale sarebbe approvata senza correzione (fedeltà per le foto, soggetto corretto e niente confezioni/testi per le idee). Nessuna immagine da idea mostra confezioni, loghi o testo. Valutazione fatta dall'agente sulle immagini a piena risoluzione dopo la lettura dei numeri: **non cieca** per il valutatore (il foglio `contact-sheet.html` dell'artifact resta cieco per una seconda valutazione umana). Verifica reale su Chloe Food lo stesso giorno coerente: 2.5 Flash ha di nuovo prodotto banane dolci per « bananes plantain ».
 
-Lettura: 3.1 Flash Image ha il miglior costo per immagine approvabile su entrambi i compiti, alla stessa latenza di 2.5 Flash; 3 Pro costa il doppio, è più lento e non è più fedele sulle foto. Il routing di produzione resta quello della migration (2.5 Flash, poi 3.1 Flash) finché il cambio non è approvato: per applicarlo, policy `studio/photo_edit` e `studio/prompt_generate` → priorità 1 a `gemini-3-1-flash-image`.
+Lettura: 3.1 Flash Image ha il miglior costo per immagine approvabile su entrambi i compiti, alla stessa latenza di 2.5 Flash; 3 Pro costa il doppio, è più lento e non è più fedele sulle foto. **Routing di produzione aggiornato il 13/11/2026** (approvato): policy `studio/photo_edit` e `studio/prompt_generate` → priorità 1 `gemini-3-1-flash-image`, priorità 2 `gemini-2-5-flash-image` (fallback). Modifica dati in `ai_routing_policy_models`, non in una migration: un ambiente nuovo parte dal default della 183.
 
 ## 9. Operatività
 
@@ -117,6 +117,7 @@ Lettura: 3.1 Flash Image ha il miglior costo per immagine approvabile su entramb
 |---|---|
 | « Le Studio images n'est pas encore installé » | migration 183 assente sul database del deployment |
 | Job fermo « En cours » | `/run` interrotto e tick n8n non attivo: verificare il workflow e `STUDIO_WORKER_TOKEN` |
+| « Le service d'images est momentanément indisponible » (`provider_billing`) | il provider risponde 402: credito prepagato esaurito (Google AI Studio → Billing); nessun ritentativo automatico, poi « Réessayer » |
 | « Le service d'images n'est pas configuré » | `credential_ref` della policy senza env sul deployment, o policy vuota/spenta |
 | « L'emplacement vient d'être modifié » | modifica concorrente dello slot: compare-and-set rifiutato, nulla sostituito |
 | Upload rifiutato dal bucket | formato HEIC: iOS converte in JPEG con `accept` limitato; altrimenti esportare in JPEG |

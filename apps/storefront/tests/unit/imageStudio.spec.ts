@@ -95,6 +95,9 @@ test.describe('Studio images · requests and errors', () => {
     expect(jobErrorMessage('something_new')).toBe(STUDIO_JOB_ERROR_MESSAGES.provider_error);
     expect(isRetryableJobError('provider_timeout')).toBe(true);
     expect(isRetryableJobError('safety_blocked')).toBe(false);
+    // Provider credit exhausted (HTTP 402): retrying only spends attempts.
+    expect(isRetryableJobError('provider_billing')).toBe(false);
+    expect(jobErrorMessage('provider_billing')).toMatch(/Lepefy a été prévenu/);
     for (const message of [...Object.values(STUDIO_ERRORS).map((e) => e.message), ...Object.values(STUDIO_JOB_ERROR_MESSAGES)]) {
       expect(message).not.toMatch(/gemini|openai|google|api key/i);
     }
