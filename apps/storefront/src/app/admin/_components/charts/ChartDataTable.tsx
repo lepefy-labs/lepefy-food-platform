@@ -4,7 +4,7 @@ import { IconTable } from '@tabler/icons-react';
 export default function ChartDataTable({ caption, columns, rows }: { caption: string; columns: string[]; rows: string[][] }) {
   if (rows.length === 0) return null;
   return (
-    <details className="group text-sm">
+    <details className="group min-w-0 max-w-full text-sm">
       <summary className="inline-flex min-h-9 cursor-pointer list-none items-center gap-1.5 rounded-lg px-1 font-semibold text-a-brand-fg hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus [&::-webkit-details-marker]:hidden">
         <IconTable size={16} aria-hidden="true" />
         <span className="group-open:hidden">Voir les données</span>
