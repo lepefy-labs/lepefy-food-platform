@@ -132,6 +132,7 @@ export default function TrendChart({ points, previous, currentLabel, previousLab
         onPointerMove={onPointer}
         onPointerDown={onPointer}
         onPointerLeave={() => setActive(null)}
+        onPointerCancel={() => setActive(null)}
         onKeyDown={onKey}
         onBlur={() => setActive(null)}
         className="touch-pan-y select-none rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-a-focus"
@@ -204,7 +205,7 @@ export default function TrendChart({ points, previous, currentLabel, previousLab
 
       {activePoint && (
         <div aria-hidden="true" style={{ left: tooltipLeft }}
-          className="pointer-events-none absolute top-0 z-10 min-w-44 -translate-x-1/2 rounded-xl bg-a-inverse px-3 py-2 text-xs text-a-on-inverse shadow-lg">
+          className="pointer-events-none absolute top-0 z-10 min-w-44 max-w-[calc(100%-8px)] -translate-x-1/2 rounded-xl bg-a-inverse px-3 py-2 text-xs text-a-on-inverse shadow-lg">
           <p className="font-semibold">{activePoint.title}</p>
           <p className="mt-1 flex items-center justify-between gap-4">
             <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-3 rounded" style={{ background: CHART_ACCENT }} />{currentLabel}</span>

@@ -46,7 +46,7 @@ export default function StatTile({ label, value, delta, upIsGood = true, compari
       <h3 className="truncate text-sm font-semibold text-a-text-2">{label}</h3>
       <div className="flex items-end justify-between gap-2">
         {/* The value always wins the space: the trend shrinks and clips first, never the number. */}
-        <p className="shrink-0 whitespace-nowrap text-2xl font-bold tabular-nums tracking-tight text-a-text sm:text-[28px] sm:leading-9">{value}</p>
+        <p className="shrink-0 whitespace-nowrap text-xl font-bold tabular-nums tracking-tight text-a-text min-[400px]:text-2xl sm:text-[28px] sm:leading-9">{value}</p>
         {trend && <div className="flex min-w-0 justify-end overflow-hidden">{trend}</div>}
       </div>
       {children}

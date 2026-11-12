@@ -36,7 +36,9 @@ const METRICS: Array<{ key: StatisticsMetric; label: string; title: string }> = 
   { key: 'average', label: 'Panier moyen', title: 'Évolution du panier moyen' },
 ]
 
-const CARD = 'rounded-2xl border border-a-border bg-a-surface p-4 sm:p-5'
+// min-w-0: a grid item's min width defaults to its min-content, and the hidden data table
+// of a card (« Voir les données ») would widen the whole page on a phone.
+const CARD = 'min-w-0 rounded-2xl border border-a-border bg-a-surface p-4 sm:p-5'
 
 /**
  * « Statistiques » — home of the shop workspace (/admin). Sales of the
