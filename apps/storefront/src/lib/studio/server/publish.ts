@@ -81,10 +81,13 @@ export async function publishStudioImage(
   const target = await impl.target(db, tenant, input.targetId);
   if (!target) fail('studio_target_missing');
 
-  const { data: begun, error: beginError } = await db.rpc('studio_begin_usage', {
+  const begin = () => db.rpc('studio_begin_usage', {
     p_tenant_id: tenant.id, p_asset_id: input.assetId, p_destination_key: destination.key, p_target_id: input.targetId,
     p_target_label: target!.label, p_crop: input.crop, p_admin_id: access.userId, p_request_key: input.requestKey,
   });
+  let { data: begun, error: beginError } = await begin();
+  // Two identical requests raced past the replay check: the loser replays.
+  if (beginError?.code === '23505') ({ data: begun, error: beginError } = await begin());
   if (beginError) throw beginError;
   const usage = ((begun ?? []) as Array<{ out_usage_id: string; out_revision_id: string; out_status: string; out_created: boolean }>)[0];
   if (!usage) fail('studio_publish_failed');
@@ -92,6 +95,8 @@ export async function publishStudioImage(
     const { data: done } = await db.from('studio_usages').select('public_url').eq('id', usage!.out_usage_id).maybeSingle();
     return { usageId: usage!.out_usage_id, publicUrl: done?.public_url ?? '', replay: true };
   }
+  // The same request is still publishing elsewhere (double click): never copy twice.
+  if (usage!.out_status === 'publishing' && !usage!.out_created) fail('studio_busy');
   if (usage!.out_status !== 'publishing') fail('studio_publish_failed');
 
   const { data: revision } = await db.from('studio_revisions').select('storage_path')

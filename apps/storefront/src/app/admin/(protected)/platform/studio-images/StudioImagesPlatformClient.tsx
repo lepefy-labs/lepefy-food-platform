@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Button from '../../../_components/ui/Button';
 import Badge from '../../../_components/ui/Badge';
 import Dialog from '../../../_components/ui/Dialog';
@@ -25,6 +26,7 @@ async function patch(body: Record<string, unknown>): Promise<{ tenant?: Platform
 /** One row per shop: flag switch (with confirmation), quotas dialog, month usage. */
 export default function StudioImagesPlatformClient({ initialTenants }: { initialTenants: PlatformStudioTenant[] }) {
   const toast = useAdminToast();
+  const router = useRouter();
   const [tenants, setTenants] = useState(initialTenants);
   const [toggle, setToggle] = useState<PlatformStudioTenant | null>(null);
   const [editing, setEditing] = useState<PlatformStudioTenant | null>(null);
@@ -41,6 +43,7 @@ export default function StudioImagesPlatformClient({ initialTenants }: { initial
     setPending(false);
     if (result.error) { setError(result.error); return; }
     replace(result.tenant);
+    router.refresh();
     toast.success(`${toggle.name} : Studio images ${toggle.enabled ? 'désactivé' : 'activé'}`, { description: 'Visible sur sa boutique d’ici 30 secondes.' });
     setToggle(null);
   }

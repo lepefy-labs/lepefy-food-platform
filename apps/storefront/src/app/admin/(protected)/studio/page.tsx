@@ -131,6 +131,7 @@ export default async function StudioPage({ searchParams = {} }: { searchParams?:
     );
   } catch (error) {
     const missing = (error as { code?: string })?.code;
+    console.error('[studio] page load failed', tenant.id, missing ?? (error instanceof Error ? error.message.slice(0, 160) : 'unknown'));
     content = <ErrorState title="Impossible de charger le Studio." description={missing === '42P01' || missing === 'PGRST205' ? 'Le Studio images n’est pas encore installé (migration 183).' : 'Réessayez dans un instant.'} />;
   }
 

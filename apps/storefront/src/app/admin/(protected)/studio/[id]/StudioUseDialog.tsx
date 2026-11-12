@@ -176,7 +176,7 @@ export default function StudioUseDialog({ open, onClose, assetId, ambianceOnly, 
           {!destination.singleton && (
             <>
               <label htmlFor="studio-target-search" className="sr-only">Rechercher</label>
-              <Input id="studio-target-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Rechercher un ${destination.targetNoun}`} autoComplete="off" />
+              <Input id="studio-target-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Rechercher un ${destination.targetNoun}`} autoComplete="off" autoFocus />
               <ul className="max-h-72 space-y-1 overflow-y-auto" aria-busy={loadingTargets}>
                 {targets.map((item) => (
                   <li key={item.id}>

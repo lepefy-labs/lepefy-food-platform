@@ -44,18 +44,28 @@ export async function createStudioAsset(
   let source: Awaited<ReturnType<typeof adoptUpload>> | null = null;
 
   // Replay of the same request: the upload was already adopted, nothing to redo.
-  const { data: existing } = await db.from('studio_assets').select('id').eq('tenant_id', tenantId).eq('request_key', input.requestKey).maybeSingle();
+  const findExisting = async () => (await db.from('studio_assets').select('id').eq('tenant_id', tenantId).eq('request_key', input.requestKey).maybeSingle()).data;
+  let existing = await findExisting();
   if (!existing && input.origin === 'photo') {
     if (!input.uploadPath) throw new Error('studio_invalid_request');
-    source = await adoptUpload(db, { tenantId, adminId: access.userId, uploadPath: input.uploadPath, key: input.requestKey });
+    try {
+      source = await adoptUpload(db, { tenantId, adminId: access.userId, uploadPath: input.uploadPath, key: input.requestKey });
+    } catch (error) {
+      // A concurrent identical request adopted the upload first: answer as its replay.
+      existing = await findExisting();
+      if (!existing) throw error;
+    }
   }
 
-  const { data, error } = await db.rpc('studio_create_asset', {
+  const call = () => db.rpc('studio_create_asset', {
     p_tenant_id: tenantId, p_origin: input.origin, p_title: input.title, p_request_text: input.request,
     p_source_path: source?.path ?? (existing ? `tenants/${tenantId}/assets/${input.requestKey}/source.jpg` : null),
     p_source_mime: source ? 'image/jpeg' : null, p_source_width: source?.width ?? null, p_source_height: source?.height ?? null,
     p_source_bytes: source?.bytes.byteLength ?? null, p_style_version_id: style.id, p_admin_id: access.userId, p_request_key: input.requestKey,
   });
+  let { data, error } = await call();
+  // Two identical requests raced past the replay check: the loser hits the unique key, then replays.
+  if (error?.code === '23505') ({ data, error } = await call());
   if (error) throw error;
   const row = ((data ?? []) as Array<{ out_asset_id: string; out_job_id: string; out_created: boolean }>)[0];
   if (!row) throw new Error('studio_invalid_request');
@@ -73,10 +83,12 @@ export async function requestCorrection(
   input: { assetId: string; baseRevisionId: string; request: string; requestKey: string },
 ): Promise<{ jobId: string }> {
   const style = await ensureActiveStyle(db, tenantId, access.userId);
-  const { data, error } = await db.rpc('studio_request_correction', {
+  const call = () => db.rpc('studio_request_correction', {
     p_tenant_id: tenantId, p_asset_id: input.assetId, p_base_revision_id: input.baseRevisionId, p_request_text: input.request,
     p_style_version_id: style.id, p_admin_id: access.userId, p_request_key: input.requestKey,
   });
+  let { data, error } = await call();
+  if (error?.code === '23505') ({ data, error } = await call());
   if (error) throw error;
   const row = ((data ?? []) as Array<{ out_job_id: string }>)[0];
   if (!row) throw new Error('studio_invalid_request');

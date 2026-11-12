@@ -102,7 +102,7 @@ export default function StudioCreatePanel({ styleSummary, styleVersion, remainin
       )}
 
       <div role="group" aria-label="Point de départ" className="mt-4 grid grid-cols-2 gap-1 rounded-[10px] border border-a-border bg-a-surface-2 p-1">
-        {([['photo', 'À partir d’une photo', IconPhoto], ['prompt', 'Créer avec une idée', IconSparkles]] as const).map(([value, label, Icon]) => (
+        {([['photo', 'À partir d’une photo', 'Photo', IconPhoto], ['prompt', 'Créer avec une idée', 'Idée', IconSparkles]] as const).map(([value, label, short, Icon]) => (
           <button
             key={value}
             type="button"
@@ -114,7 +114,8 @@ export default function StudioCreatePanel({ styleSummary, styleVersion, remainin
             )}
           >
             <Icon size={18} aria-hidden="true" />
-            <span className="truncate">{label}</span>
+            <span className="truncate sm:hidden">{short}</span>
+            <span className="hidden truncate sm:inline">{label}</span>
           </button>
         ))}
       </div>

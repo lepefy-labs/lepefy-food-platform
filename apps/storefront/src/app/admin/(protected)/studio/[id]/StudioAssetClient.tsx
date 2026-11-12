@@ -140,6 +140,7 @@ export default function StudioAssetClient({ initialAsset, destinations, pour }: 
   const statusMeta = STUDIO_ASSET_STATUS_META[asset.status] ?? { label: asset.status, tone: 'neutral' as const };
   const activeUsages = asset.usages.filter((usage) => usage.status === 'active');
   const latestFailed = latest?.status === 'failed' ? latest : null;
+  // The Original/Proposition switch exists on phones only (desktop shows both side by side).
   const shownUrl = showOriginal ? asset.sourceUrl : selected?.imageUrl ?? null;
   const canCorrect = !asset.busy && selected?.status === 'succeeded' && (asset.status === 'review' || asset.status === 'approved');
   const isApprovedSelected = asset.status === 'approved' && asset.approvedRevisionId === selected?.id;
@@ -154,7 +155,7 @@ export default function StudioAssetClient({ initialAsset, destinations, pour }: 
         </div>
 
         {asset.sourceUrl && selected?.imageUrl && (
-          <div role="group" aria-label="Image affichée" className="grid grid-cols-2 gap-1 rounded-[10px] border border-a-border bg-a-surface-2 p-1 sm:max-w-xs">
+          <div role="group" aria-label="Image affichée" className="grid grid-cols-2 gap-1 rounded-[10px] border border-a-border bg-a-surface-2 p-1 sm:max-w-xs md:hidden">
             {([false, true] as const).map((original) => (
               <button
                 key={String(original)}

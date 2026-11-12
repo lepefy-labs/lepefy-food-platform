@@ -90,9 +90,19 @@ Script `apps/storefront/scripts/studio-benchmark.ts` (`pnpm studio:benchmark`), 
 
 Risultati: vedi §8.1 (aggiornato dopo ogni run; nessun vincitore dichiarato senza risultati misurati). Il routing iniziale della migration è prudente (2.5 Flash Image, poi 3.1 Flash Image) finché il confronto non è eseguito.
 
-### 8.1 Risultati misurati
+### 8.1 Risultati misurati (run GitHub Actions `43317896748`, 12/11/2026, tenant `chloefood`)
 
-Da completare con il run del workflow (artifact `studio-benchmark`).
+Campione: 10 prodotti reali (uno per categoria; 2 avevano solo il segnaposto « Produit disponible », esclusi dalla fedeltà) + 10 idee di piatti africani, ognuno con 1 correzione: 40 chiamate per modello, **120/120 riuscite** su Gemini. OpenAI `gpt-image-1.5` **non misurato** (nessuna `OPENAI_API_KEY` nei secret). Costo totale del run: 9,65 USD.
+
+| Modello (`ai_pricing`) | Latenza p50 / p90 | Costo per immagine | Foto: fedeltà al prodotto (8 reali) | Idea: soggetto credibile (10) | Correzioni seguite senza derive | Costo per immagine **approvabile** foto / idea |
+|---|---|---|---|---|---|---|
+| Gemini 2.5 Flash Image | 8,1 s / 9,2 s | 0,039 $ | 7/8 (« Kilichi » rimpicciolito in un riquadro) | 5/10 (banane dolci invece di plantain, ndolé, foglie di manioca, safou, poulet DG senza plantain) | 16/18 (sfondo cambiato su « Attiéké ») | 0,045 $ / 0,078 $ |
+| Gemini 3.1 Flash Image | 8,1 s / 9,3 s | 0,067 $ | 8/8 (richiesta « fond plus clair » poco applicata su « 4 côté ») | 10/10 | 17/18 (sfondo cambiato su « Karité ») | 0,067 $ / 0,067 $ |
+| Gemini 3 Pro Image | 13,8 s / 16,9 s | 0,135 $ | 7/8 (**prodotto sostituito** su « 4 côté ») | 10/10 | 18/18 | 0,154 $ / 0,135 $ |
+
+« Approvabile » = l'immagine iniziale sarebbe approvata senza correzione (fedeltà per le foto, soggetto corretto e niente confezioni/testi per le idee). Nessuna immagine da idea mostra confezioni, loghi o testo. Valutazione fatta dall'agente sulle immagini a piena risoluzione dopo la lettura dei numeri: **non cieca** per il valutatore (il foglio `contact-sheet.html` dell'artifact resta cieco per una seconda valutazione umana). Verifica reale su Chloe Food lo stesso giorno coerente: 2.5 Flash ha di nuovo prodotto banane dolci per « bananes plantain ».
+
+Lettura: 3.1 Flash Image ha il miglior costo per immagine approvabile su entrambi i compiti, alla stessa latenza di 2.5 Flash; 3 Pro costa il doppio, è più lento e non è più fedele sulle foto. Il routing di produzione resta quello della migration (2.5 Flash, poi 3.1 Flash) finché il cambio non è approvato: per applicarlo, policy `studio/photo_edit` e `studio/prompt_generate` → priorità 1 a `gemini-3-1-flash-image`.
 
 ## 9. Operatività
 
