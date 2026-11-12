@@ -27,7 +27,7 @@ export const geminiImageProvider: ImageStudioProvider = {
     } catch (error) {
       if (request.signal.aborted) throw new StudioProviderError('provider_timeout');
       const status = (error as { status?: number })?.status;
-      throw httpStatusError(status);
+      throw httpStatusError(status, error);
     }
 
     const candidate = response.candidates?.[0];

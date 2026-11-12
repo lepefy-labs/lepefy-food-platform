@@ -92,6 +92,8 @@ export async function runStudioImage(
       return { ...result, model: candidate, latencyMs: Date.now() - start, attempts };
     } catch (error) {
       const failure = error instanceof StudioProviderError ? error : new StudioProviderError(controller.signal.aborted ? 'provider_timeout' : 'provider_error');
+      if (!(error instanceof StudioProviderError)) failure.detail = (error instanceof Error ? error.message : String(error)).slice(0, 200);
+      console.warn('[studio] provider attempt failed', { model: candidate.key, code: failure.code, detail: failure.detail, ms: Date.now() - start });
       attempts.push({ model: candidate.key, code: failure.code });
       lastError = failure;
       if (failure.code === 'provider_timeout' || failure.code === 'safety_blocked') break;

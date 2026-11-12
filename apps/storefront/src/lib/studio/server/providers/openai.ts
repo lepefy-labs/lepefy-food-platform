@@ -54,7 +54,7 @@ export const openaiImageProvider: ImageStudioProvider = {
     if (!response.ok) {
       const code = body?.error?.code ?? '';
       if (/moderation|safety|content_policy/.test(code)) throw new StudioProviderError('safety_blocked');
-      throw httpStatusError(response.status);
+      throw httpStatusError(response.status, body?.error?.code ?? '');
     }
     const data = body?.data?.[0]?.b64_json;
     if (!data) throw new StudioProviderError('no_image');

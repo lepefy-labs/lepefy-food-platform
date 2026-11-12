@@ -43,15 +43,21 @@ export interface ImageStudioProvider {
 
 /** Normalised failure: the code is stored and mapped to a French message. */
 export class StudioProviderError extends Error {
+  /** Provider HTTP status and a short message, for the server log only (never shown, never a secret). */
+  detail: string | null = null;
   constructor(public code: 'provider_timeout' | 'rate_limit' | 'safety_blocked' | 'no_image' | 'provider_error' | 'model_unavailable' | 'missing_credential' | 'invalid_output' | 'no_enabled_model') {
     super(code);
     this.name = 'StudioProviderError';
   }
 }
 
-export function httpStatusError(status: number | undefined): StudioProviderError {
-  if (status === 429) return new StudioProviderError('rate_limit');
-  if (status === 404) return new StudioProviderError('model_unavailable');
-  if (status === 401 || status === 403) return new StudioProviderError('missing_credential');
-  return new StudioProviderError('provider_error');
+export function httpStatusError(status: number | undefined, message?: unknown): StudioProviderError {
+  const error = status === 429 ? new StudioProviderError('rate_limit')
+    : status === 404 ? new StudioProviderError('model_unavailable')
+      : status === 401 || status === 403 ? new StudioProviderError('missing_credential')
+        : new StudioProviderError('provider_error');
+  const text = typeof message === 'string' ? message : message instanceof Error ? message.message : '';
+  // Keys are never in provider messages; still strip anything that looks like one.
+  error.detail = `${status ?? 'no-status'} ${text.replace(/AIza[0-9A-Za-z_-]{20,}|sk-[0-9A-Za-z_-]{20,}/g, '[key]').slice(0, 200)}`;
+  return error;
 }
