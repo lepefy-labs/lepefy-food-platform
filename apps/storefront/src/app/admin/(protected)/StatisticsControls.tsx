@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { IconCalendar, IconCheck } from '@tabler/icons-react';
-import { PERIOD_LABELS, statisticsHref, type StatisticsQuery } from '@/lib/admin/salesStatistics';
+import { CHANNEL_PARAM, PERIOD_LABELS, statisticsHref, type StatisticsQuery } from '@/lib/admin/salesStatistics';
 import { cn } from '@/lib/utils/cn';
 import { controlClasses, labelClasses } from '../_components/ui/Form';
 import { buttonClasses } from '../_components/ui/Button';
@@ -41,6 +41,8 @@ export default function StatisticsControls({ query }: { query: StatisticsQuery }
           {query.metric !== 'revenue' && <input type="hidden" name="indicateur" value={query.metric === 'orders' ? 'commandes' : 'panier'} />}
           {query.display === 'daily' && <input type="hidden" name="vue" value="jour" />}
           {!query.compare && <input type="hidden" name="comparer" value="0" />}
+          {query.channel !== 'all' && <input type="hidden" name="canal" value={CHANNEL_PARAM[query.channel]} />}
+          {query.heatChannel !== 'all' && <input type="hidden" name="moments" value={CHANNEL_PARAM[query.heatChannel]} />}
           <label className="flex flex-col gap-1">
             <span className={labelClasses}>Du</span>
             <input type="date" name="du" required defaultValue={query.range.fromDay} className={controlClasses} />

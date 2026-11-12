@@ -613,6 +613,19 @@ jobs:
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/181_admin_sales_statistics.sql
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/181_admin_sales_statistics.test.sql
 
+      - name: Sales statistics — in-store channel from /card payments (182)
+        if: ${{ !cancelled() }}
+        env:
+          PGPASSWORD: test
+        run: |
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/181_admin_sales_statistics.fixture.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/182_admin_sales_statistics_in_store.fixture.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/181_admin_sales_statistics.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/182_admin_sales_statistics_in_store.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/182_admin_sales_statistics_in_store.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/181_admin_sales_statistics.test.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/182_admin_sales_statistics_in_store.test.sql
+
       - name: Demo Experience — visitor role, demo-only RPCs, presentation lease, single reset (167)
         if: ${{ !cancelled() }}
         env:

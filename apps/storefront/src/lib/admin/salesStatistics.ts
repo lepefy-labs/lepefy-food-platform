@@ -2,7 +2,12 @@
  * Pure rules of the « Statistiques » page (/admin): period from the URL,
  * previous period, bucket size, zero-filled series, comparisons and the
  * small read-models the charts receive. The aggregation itself runs in SQL
- * (RPC admin_sales_statistics, migration 181); this file never reads data.
+ * (RPC admin_sales_statistics, migrations 181 + 182); this file never reads data.
+ *
+ * Two sales channels: online orders (orders, the only source of order
+ * counts, basket, categories and products) and in-store /card payments
+ * (tenant_card_payments, free amount, no line items). Revenue and the
+ * « moments » heatmap can show either channel or both; nothing else mixes them.
  *
  * Every date is a shop-local calendar day (Europe/Paris, SHOP_TIME_ZONE):
  * a period is [from 00:00, to + 1 day 00:00) in shop time.
@@ -17,6 +22,13 @@ export type StatisticsPeriod = (typeof STATISTICS_PERIODS)[number];
 export type StatisticsBucket = 'day' | 'week' | 'month';
 export type StatisticsMetric = 'revenue' | 'orders' | 'average';
 export type StatisticsDisplay = 'cumulative' | 'daily';
+/** all = online orders + in-store /card payments. */
+export type StatisticsChannel = 'all' | 'online' | 'in_store';
+
+export const CHANNEL_PARAM: Record<StatisticsChannel, string> = { all: 'tous', online: 'en-ligne', in_store: 'boutique' };
+function parseChannel(value: string): StatisticsChannel {
+  return value === 'en-ligne' ? 'online' : value === 'boutique' ? 'in_store' : 'all';
+}
 
 export const PERIOD_LABELS: Record<Exclude<StatisticsPeriod, 'custom'>, { short: string; long: string }> = {
   '7j': { short: '7 j', long: '7 derniers jours' },
@@ -49,6 +61,10 @@ export interface StatisticsQuery {
   compare: boolean;
   metric: StatisticsMetric;
   display: StatisticsDisplay;
+  /** Channel of the revenue trend (?canal=). */
+  channel: StatisticsChannel;
+  /** Channel of the « Moments forts » heatmap (?moments=). */
+  heatChannel: StatisticsChannel;
   /** The custom dates were invalid and the default period was used. */
   invalidCustom: boolean;
 }
@@ -132,11 +148,14 @@ export function parseStatisticsQuery(params: Params, now: Date = new Date()): St
   const compare = first(params.comparer) !== '0';
   const bucket: StatisticsBucket = period === '12m' ? 'month' : bucketForDays(range.days);
 
-  return { period, range, previous: previousRange(range), bucket, compare, metric, display, invalidCustom };
+  const channel = parseChannel(first(params.canal));
+  const heatChannel = parseChannel(first(params.moments));
+
+  return { period, range, previous: previousRange(range), bucket, compare, metric, display, channel, heatChannel, invalidCustom };
 }
 
 /** URL of the page with some parameters changed; defaults are left out. */
-export function statisticsHref(query: StatisticsQuery, patch: Partial<{ period: StatisticsPeriod; du: string; au: string; compare: boolean; metric: StatisticsMetric; display: StatisticsDisplay }>): string {
+export function statisticsHref(query: StatisticsQuery, patch: Partial<{ period: StatisticsPeriod; du: string; au: string; compare: boolean; metric: StatisticsMetric; display: StatisticsDisplay; channel: StatisticsChannel; heatChannel: StatisticsChannel }>): string {
   const period = patch.period ?? query.period;
   const params = new URLSearchParams();
   if (period !== '30j') params.set('periode', period);
@@ -148,6 +167,10 @@ export function statisticsHref(query: StatisticsQuery, patch: Partial<{ period: 
   if (metric !== 'revenue') params.set('indicateur', metric === 'orders' ? 'commandes' : 'panier');
   if ((patch.display ?? query.display) === 'daily') params.set('vue', 'jour');
   if (!(patch.compare ?? query.compare)) params.set('comparer', '0');
+  const channel = patch.channel ?? query.channel;
+  if (channel !== 'all') params.set('canal', CHANNEL_PARAM[channel]);
+  const heatChannel = patch.heatChannel ?? query.heatChannel;
+  if (heatChannel !== 'all') params.set('moments', CHANNEL_PARAM[heatChannel]);
   const search = params.toString();
   return search ? `/admin?${search}` : '/admin';
 }
@@ -161,8 +184,17 @@ export interface CategoryRow { id: string | null; name: string | null; revenue: 
 export interface ProductRow { id: string | null; name: string; revenue: number; units: number }
 export interface HeatmapRow { weekday: number; slot: number; orders: number }
 
+/** In-store /card payments of the period (migration 182; zeros before it). */
+export interface InStoreStatistics {
+  payments: number;
+  revenue: number;
+  series: Array<{ bucket: string; payments: number; revenue: number }>;
+  heatmap: Array<{ weekday: number; slot: number; payments: number }>;
+}
+
 export interface SalesStatistics {
   totals: SalesTotals;
+  inStore: InStoreStatistics;
   series: SeriesRow[];
   categories: CategoryRow[];
   products: ProductRow[];
@@ -184,6 +216,7 @@ const rows = (value: unknown): Json[] => (Array.isArray(value) ? value.filter((r
 export function normalizeSalesStatistics(raw: unknown): SalesStatistics {
   const data = (raw && typeof raw === 'object' ? raw : {}) as Json;
   const totals = (data.totals && typeof data.totals === 'object' ? data.totals : {}) as Json;
+  const inStore = (data.in_store && typeof data.in_store === 'object' ? data.in_store : {}) as Json;
   const breakdown = (value: unknown): BreakdownRow[] => rows(value).map((row) => ({ key: str(row.key), orders: num(row.orders), revenue: num(row.revenue) }));
   return {
     totals: {
@@ -193,6 +226,12 @@ export function normalizeSalesStatistics(raw: unknown): SalesStatistics {
       newCustomers: num(totals.new_customers),
       returningCustomers: num(totals.returning_customers),
       units: num(totals.units),
+    },
+    inStore: {
+      payments: num(inStore.payments),
+      revenue: num(inStore.revenue),
+      series: rows(inStore.series).map((row) => ({ bucket: String(row.bucket ?? ''), payments: num(row.payments), revenue: num(row.revenue) })).filter((row) => DAY_RE.test(row.bucket)),
+      heatmap: rows(inStore.heatmap).map((row) => ({ weekday: num(row.weekday), slot: num(row.slot), payments: num(row.payments) })),
     },
     series: rows(data.series).map((row) => ({ bucket: String(row.bucket ?? ''), orders: num(row.orders), revenue: num(row.revenue) })).filter((row) => DAY_RE.test(row.bucket)),
     categories: rows(data.categories).map((row) => ({ id: str(row.id), name: str(row.name), revenue: num(row.revenue), units: num(row.units) })),
@@ -232,6 +271,47 @@ export function fillSeries(series: SeriesRow[], range: StatisticsRange, bucket: 
     if (points.length > 400) break;
   }
   return points;
+}
+
+export interface ChannelPoint { bucket: string; orders: number; payments: number; revenue: number }
+
+/**
+ * One point per bucket for a channel: orders and payments are kept apart
+ * (they never add up to a count), revenue is the channel's revenue.
+ */
+export function channelSeries(stats: SalesStatistics, range: StatisticsRange, bucket: StatisticsBucket, channel: StatisticsChannel): ChannelPoint[] {
+  const online = fillSeries(stats.series, range, bucket);
+  const inStore = fillSeries(stats.inStore.series.map((row) => ({ bucket: row.bucket, orders: row.payments, revenue: row.revenue })), range, bucket);
+  return online.map((point, index) => {
+    const store = inStore[index]!;
+    const orders = channel === 'in_store' ? 0 : point.orders;
+    const payments = channel === 'online' ? 0 : store.orders;
+    const revenue = (channel === 'in_store' ? 0 : point.revenue) + (channel === 'online' ? 0 : store.revenue);
+    return { bucket: point.bucket, orders, payments, revenue };
+  });
+}
+
+/** Revenue of a channel over the period. */
+export function channelRevenue(stats: SalesStatistics, channel: StatisticsChannel): number {
+  return (channel === 'in_store' ? 0 : stats.totals.revenue) + (channel === 'online' ? 0 : stats.inStore.revenue);
+}
+
+/** Heatmap rows of a channel (count = orders, payments or both). */
+export function channelHeatmap(stats: SalesStatistics, channel: StatisticsChannel): HeatmapRow[] {
+  return [
+    ...(channel === 'in_store' ? [] : stats.heatmap),
+    ...(channel === 'online' ? [] : stats.inStore.heatmap.map((row) => ({ weekday: row.weekday, slot: row.slot, orders: row.payments }))),
+  ];
+}
+
+/** The tenant takes /card payments on this page's periods: channel views are worth showing. */
+export function hasInStoreChannel(current: SalesStatistics, previous: SalesStatistics | null): boolean {
+  return current.inStore.payments > 0 || (previous?.inStore.payments ?? 0) > 0;
+}
+
+/** Admin → Paiements carte, paid payments of the same shop-local days. */
+export function cardPaymentsHref(range: StatisticsRange): string {
+  return `/admin/paiements-carte?${new URLSearchParams({ period: 'custom', from: range.fromDay, to: range.toDay, status: 'paid' }).toString()}`;
 }
 
 export function metricValue(point: { orders: number; revenue: number }, metric: StatisticsMetric): number | null {
@@ -290,6 +370,9 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   satispay: 'Satispay',
   manual: 'Saisie manuelle',
 };
+
+/** Channel names in the UI: the register is « Paiements carte » in the sidebar. */
+export const CHANNEL_LABELS: Record<StatisticsChannel, string> = { all: 'Tout', online: 'Commandes', in_store: 'Paiements carte' };
 
 export const FULFILLMENT_LABELS: Record<string, string> = { delivery: 'Livraison', pickup: 'Retrait' };
 

@@ -2,12 +2,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import {
-  bucketAxisLabel, bucketForDays, bucketLongLabel, bucketStart, compareValues, fillSeries, heatmapGrid, heatmapLevel, niceTicks,
+  bucketAxisLabel, bucketForDays, cardPaymentsHref, channelHeatmap, channelRevenue, channelSeries, hasInStoreChannel, bucketLongLabel, bucketStart, compareValues, fillSeries, heatmapGrid, heatmapLevel, niceTicks,
   normalizeSalesStatistics, parseStatisticsQuery, plottedValues, rangeLabel, rangeOf, rankCategories, shares, statisticsHref,
 } from '../../src/lib/admin/salesStatistics';
 import { permissionForAdminPath } from '../../src/lib/auth/adminRoutePermissions';
 
 const MIGRATION = readFileSync(resolve(__dirname, '../../../../supabase/migrations/181_admin_sales_statistics.sql'), 'utf8');
+const MIGRATION_182 = readFileSync(resolve(__dirname, '../../../../supabase/migrations/182_admin_sales_statistics_in_store.sql'), 'utf8');
 // 11 November 2026, 10:00 in Paris.
 const now = new Date('2026-11-11T09:00:00Z');
 
@@ -160,4 +161,64 @@ test('SQL counts the same orders as the documented rule and stays service-role o
   expect(MIGRATION).toContain("o.status <> 'cancelled'");
   expect(MIGRATION).toMatch(/revoke all on function public\.admin_sales_statistics\([^)]*\) from public, anon, authenticated;/);
   expect(MIGRATION).toMatch(/grant execute on function public\.admin_sales_statistics\([^)]*\) to service_role;/);
+});
+
+test.describe('in-store channel (/card payments)', () => {
+  const stats = normalizeSalesStatistics({
+    totals: { orders: 2, revenue: 100 },
+    series: [{ bucket: '2026-11-09', orders: 2, revenue: 100 }],
+    heatmap: [{ weekday: 1, slot: 3, orders: 2 }],
+    in_store: {
+      payments: '3', revenue: '45.5',
+      series: [{ bucket: '2026-11-09', payments: 1, revenue: 20 }, { bucket: '2026-11-10', payments: 2, revenue: '25.5' }],
+      heatmap: [{ weekday: 1, slot: 3, payments: 1 }, { weekday: 2, slot: 2, payments: 2 }],
+    },
+  });
+  const range = rangeOf('2026-11-09', '2026-11-11');
+
+  test('channel parameters round-trip and default to both channels', () => {
+    const query = parseStatisticsQuery({ canal: 'boutique', moments: 'en-ligne' }, now);
+    expect(query).toMatchObject({ channel: 'in_store', heatChannel: 'online' });
+    expect(parseStatisticsQuery({ canal: 'nimporte' }, now).channel).toBe('all');
+    expect(statisticsHref(query, {})).toBe('/admin?canal=boutique&moments=en-ligne');
+    expect(statisticsHref(query, { channel: 'all', heatChannel: 'all' })).toBe('/admin');
+  });
+
+  test('payload before migration 182: zeros, no channel to show', () => {
+    const before = normalizeSalesStatistics({ totals: { orders: 1, revenue: 10 } });
+    expect(before.inStore).toEqual({ payments: 0, revenue: 0, series: [], heatmap: [] });
+    expect(hasInStoreChannel(before, null)).toBe(false);
+    expect(hasInStoreChannel(before, stats)).toBe(true);
+  });
+
+  test('revenue adds up, orders and payments never do', () => {
+    expect(channelRevenue(stats, 'all')).toBe(145.5);
+    expect(channelRevenue(stats, 'online')).toBe(100);
+    expect(channelRevenue(stats, 'in_store')).toBe(45.5);
+    expect(channelSeries(stats, range, 'day', 'all')).toEqual([
+      { bucket: '2026-11-09', orders: 2, payments: 1, revenue: 120 },
+      { bucket: '2026-11-10', orders: 0, payments: 2, revenue: 25.5 },
+      { bucket: '2026-11-11', orders: 0, payments: 0, revenue: 0 },
+    ]);
+    expect(channelSeries(stats, range, 'day', 'in_store')[0]).toEqual({ bucket: '2026-11-09', orders: 0, payments: 1, revenue: 20 });
+    expect(channelSeries(stats, range, 'day', 'online')[1]).toEqual({ bucket: '2026-11-10', orders: 0, payments: 0, revenue: 0 });
+  });
+
+  test('heatmap per channel', () => {
+    expect(heatmapGrid(channelHeatmap(stats, 'all')).cells[0]![3]).toBe(3);
+    expect(heatmapGrid(channelHeatmap(stats, 'in_store')).peak).toBe('mardi 8h–12h');
+    expect(heatmapGrid(channelHeatmap(stats, 'online')).cells[1]![2]).toBe(0);
+  });
+
+  test('link to the payments register for the same days, paid only', () => {
+    expect(cardPaymentsHref(range)).toBe('/admin/paiements-carte?period=custom&from=2026-11-09&to=2026-11-11&status=paid');
+  });
+
+  test('SQL: paid /card payments of the tenant only, orders rule and privileges kept', () => {
+    expect(MIGRATION_182).toContain("cp.status = 'paid'");
+    expect(MIGRATION_182).toContain('cp.tenant_id = p_tenant_id');
+    expect(MIGRATION_182).toContain("o.is_test = false");
+    expect(MIGRATION_182).toMatch(/revoke all on function public\.admin_sales_statistics\([^)]*\) from public, anon, authenticated;/);
+    expect(MIGRATION_182).toMatch(/grant execute on function public\.admin_sales_statistics\([^)]*\) to service_role;/);
+  });
 });
