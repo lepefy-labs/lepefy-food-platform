@@ -152,6 +152,7 @@ I moduli esistenti passano ai token con un codemod a regole fisse (una unità pe
 | — | Journal d'activité (`/admin/activite`, `AuditChanges`, `ResourceActivity`, `JournalLink`), nato sul kit | ✅ |
 | — | Commandes work queue: `DataTable variant="queue"`, `MenuLink newTab` | ✅ 10/11/2026 |
 | — | Statistiques su `/admin` (sostituisce Aujourd'hui), kit grafici `_components/charts`, token `--admin-chart-*` | ✅ 11/11/2026 |
+| — | Studio images (`/admin/studio`): libreria server via URL, creazione mobile-first, confronto e « Utiliser l’image » in `Dialog`; toni da `STUDIO_ASSET_STATUS_META` / `STUDIO_REVISION_STATUS_META` (`docs/IMAGE_STUDIO.md`) | ✅ 12/11/2026 |
 | — | Navigazione Commandes: viste di modulo `views` (« Suivi opérationnel ») con conteggi pubblicati dalla pagina, KPI e Contrôles tolti dalla pagina, `FilterBar` `panelClearsWhen` e ricerca a tutta riga sul telefono | ✅ 11/11/2026 |
 
 Nota PWA: `AdminInstallPrompt` e `AdminWorkspaceMemory` (`app/admin/_components/`) seguono queste regole (kit `InlineAlert`/`Button`, token a-*); l'app installabile è descritta in `docs/ADMIN_PWA.md`.

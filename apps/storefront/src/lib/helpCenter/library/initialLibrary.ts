@@ -1,7 +1,7 @@
 import type { HelpBlock } from '../domain';
 
 /**
- * Initial French library of the Help Center: 18 short guides written ONLY from
+ * Initial French library of the Help Center: 19 short guides written ONLY from
  * features and labels that exist in the repository (verified against the admin
  * screens and docs on 30/10/2026). They are imported as DRAFTS by the platform
  * owner (POST /api/admin/platform/knowledge/import-library) and published only
@@ -206,6 +206,28 @@ export const INITIAL_LIBRARY: LibraryGuide[] = [
         'Cliquez sur **Enregistrer**.',
       ),
       info('Conseil : des produits secs, légers et à petit prix, qui se gardent longtemps.'),
+    ],
+  },
+
+  {
+    slug: 'studio-images',
+    module: 'catalogue',
+    title: 'Créer une image avec le Studio images',
+    summary: 'Partir d’une photo (même reçue sur WhatsApp) ou d’une idée, vérifier la proposition, puis l’utiliser sur un produit ou une page.',
+    requiredPermission: 'studio.use',
+    requiredFlag: 'image_studio',
+    contexts: ['/admin/studio', '/admin/studio/[id]', '/admin/catalogue/[id]'],
+    watch: ['app/admin/(protected)/studio', 'lib/studio', 'app/admin/(protected)/catalogue/[id]/ProductMediaManager.tsx', 'docs/IMAGE_STUDIO.md'],
+    blocks: [
+      steps(
+        'Ouvrez **Studio images** (section Contenu & outils), ou **Créer avec le Studio images** dans les médias d’un produit.',
+        'Choisissez **À partir d’une photo** (galerie, appareil photo ou photo reçue sur WhatsApp), avec une demande facultative, ou **Créer avec une idée** et décrivez l’image.',
+        'Cliquez sur **Créer une proposition**. Vous pouvez quitter la page : l’image vous attend dans la **Bibliothèque**.',
+        'Comparez **Original** et **Proposition**. Si besoin, écrivez ce qu’il faut changer et cliquez sur **Demander une correction**.',
+        'Cliquez sur **Approuver cette version**, puis **Utiliser l’image** : choisissez l’emplacement, l’élément, vérifiez l’**Aperçu** et cliquez sur **Confirmer et publier**.',
+      ),
+      info('Le style de votre boutique est appliqué automatiquement. Rien n’est visible sur la boutique avant **Confirmer et publier** ; chaque emplacement reçoit sa propre copie, et **Retirer d’ici** ne touche pas les autres.'),
+      warn('Une image créée avec une idée est une illustration : elle ne montre ni emballage, ni logo, ni texte. Pour montrer un produit réel, partez d’une photo du produit.'),
     ],
   },
 

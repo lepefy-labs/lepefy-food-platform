@@ -17,7 +17,7 @@ import {
   moveProductImage,
   normalizeProductImages,
 } from '@/lib/catalog/productImages';
-import Button from '../../../_components/ui/Button';
+import Button, { ButtonLink } from '../../../_components/ui/Button';
 import ConfirmDialog from '../../../_components/ui/ConfirmDialog';
 
 const MAX_UPLOAD_FILE_BYTES = 4 * 1024 * 1024;
@@ -64,6 +64,8 @@ interface ProductMediaManagerProps {
   initialImageUrl: string | null;
   initialImages: ProductImage[];
   aiEnabled: boolean;
+  /** Studio images: create/review there, then publish to this product. */
+  studioEnabled?: boolean;
   isNew: boolean;
   /** Création par duplication : aperçu de la galerie d'origine, reprise (ou non) à la création. */
   inherited?: { sourceName: string; keep: boolean; onKeepChange: (keep: boolean) => void };
@@ -80,6 +82,7 @@ export default function ProductMediaManager({
   initialImageUrl,
   initialImages,
   aiEnabled,
+  studioEnabled = false,
   isNew,
   inherited,
   onChange,
@@ -437,7 +440,19 @@ export default function ProductMediaManager({
           }}
         />
 
-        {aiEnabled && remaining > 0 && (
+        {studioEnabled && remaining > 0 && (
+          <>
+            <ButtonLink href={'/admin/studio?pour=product:' + productId + '#creer'} variant="primary" className="mt-3 w-full">
+              <IconSparkles size={16} aria-hidden="true" />
+              Créer avec le Studio images
+            </ButtonLink>
+            <p className="mt-2 text-center text-xs text-a-text-3">
+              À partir d’une photo ou d’une idée ; vous vérifiez l’image avant qu’elle soit ajoutée à la galerie.
+            </p>
+          </>
+        )}
+
+        {!studioEnabled && aiEnabled && remaining > 0 && (
           <>
             <Button
               type="button"

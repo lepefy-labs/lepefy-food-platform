@@ -1,4 +1,5 @@
 import { cookies, headers } from 'next/headers';
+import { isStudioEnabled } from '@/lib/studio/server/access';
 import { redirect } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -117,7 +118,9 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   const platformSupportAwaiting = access.isPlatformOwner ? await platformAwaitingCount() : 0;
   // Centre d'aide: commercial level (entitlement, suspension, kill-switch) + help.view. Independent from Assistance.
   const helpEnabled = canAdmin(access, 'help.view') && !limitedBySuspension ? (await getHelpLevel(tenant.id)) !== 'disabled' : false;
-  const navContext = { workspace, permissions: navPermissions, isPlatformOwner: access.isPlatformOwner, flags: { gestion: gestionEnabled, whatsapp: whatsappEnabled, activity: activityEnabled, support: supportEnabled, help: helpEnabled } };
+  // Studio images (flag image_studio, platform-managed): read only if the admin could use it.
+  const studioEnabled = canAdmin(access, 'studio.use') && !limitedBySuspension ? await isStudioEnabled(tenant.id) : false;
+  const navContext = { workspace, permissions: navPermissions, isPlatformOwner: access.isPlatformOwner, flags: { gestion: gestionEnabled, whatsapp: whatsappEnabled, activity: activityEnabled, support: supportEnabled, help: helpEnabled, studio: studioEnabled } };
   const resolvedNav = resolveAdminNavigation(navContext);
   const searchScopes: AdminSearchScope[] = workspace === 'events'
     ? (canSee(navContext, ['events.view']) ? ['events'] : [])

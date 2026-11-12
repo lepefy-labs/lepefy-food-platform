@@ -3,6 +3,7 @@ export type AiProductFeatureKey =
   | 'smart_search'
   | 'product_descriptions'
   | 'product_images'
+  | 'studio_images'
   | 'catalog_indexing'
   | 'knowledge_base'
   | 'other';
@@ -64,6 +65,15 @@ export const AI_PRODUCT_FEATURES: Record<AiProductFeatureKey, AiProductFeatureDe
     creditWeight: 1,
     sortOrder: 40,
   },
+  studio_images: {
+    key: 'studio_images',
+    label: 'Studio images',
+    description: 'Créations et corrections d’images du Studio images.',
+    unitLabelSingular: 'création',
+    unitLabelPlural: 'créations',
+    creditWeight: 1,
+    sortOrder: 45,
+  },
   catalog_indexing: {
     key: 'catalog_indexing',
     label: 'Indexation catalogue',
@@ -98,6 +108,7 @@ const ENDPOINT_FEATURE_MAP: Record<string, AiProductFeatureKey> = {
   'search-semantic': 'smart_search',
   'generate-product-description': 'product_descriptions',
   'generate-product-image': 'product_images',
+  'studio-image': 'studio_images',
   'embed-sync': 'catalog_indexing',
   'knowledge-base': 'knowledge_base',
   'knowledge-base-sync': 'knowledge_base',

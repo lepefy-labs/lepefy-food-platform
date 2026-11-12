@@ -245,6 +245,10 @@ The client may resize images to a maximum 1600 px edge and convert them to high-
 
 The server also creates an immutable seven-file set in Supabase Storage: a master plus 160/320/480/640/960/1600 px WebP variants (quality 75). It preserves aspect ratio, transparency and gallery order. For a tenant enabled through the server-side `PRODUCT_IMAGE_VARIANTS_TENANTS` configuration, the browser reads the prepared variants directly from Storage/CDN. Historical images remain visible through the legacy path until backfilled. See `docs/IMAGE_DELIVERY_ARCHITECTURE.md` for backfill, verification and rollback; never run a mass production backfill without explicit approval.
 
+## Studio images (admin)
+
+When the `image_studio` flag is enabled for the tenant, the shop can produce the same images itself from **Admin → Studio images** (`docs/IMAGE_STUDIO.md`). The Studio's default style is derived from this runbook (square, warm off-white seamless background, soft diffused light, grounded shadow, 10–12 % safe margin, no invented label facts, no people, props or watermark) and is applied to every creation. A photo-based proposal must keep the real package, label and text; an idea-based image is an atmosphere image only (no packaging, logo or text) and needs explicit confirmation before it is used on a product. The visual QA checklist above still applies at the « Approuver cette version » step. Published images are copied through the same v3 product pipeline described in the upload procedure.
+
 ## Delivery report
 
 When delivering assets, report:

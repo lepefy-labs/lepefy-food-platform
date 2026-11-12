@@ -40,6 +40,12 @@ export interface LogAiUsageParams {
   latencyMs?: number;
   fallbackUsed?: boolean;
   fallbackReason?: string | null;
+  /**
+   * Cost already computed by the caller from the same ai_pricing row (Studio
+   * images: flat price per image, output tokens not charged twice). When set,
+   * it is stored as is instead of the token estimate below.
+   */
+  estimatedCostUsd?: number;
   status: 'success' | 'error' | 'rate_limited';
 }
 
@@ -85,7 +91,9 @@ export async function logAiUsage(params: LogAiUsageParams): Promise<void> {
       ? imagesGenerated * pricing.image_price_flat
       : 0;
 
-    const estimatedCostUsd = inputCost + outputCost + imageCost;
+    const estimatedCostUsd = typeof params.estimatedCostUsd === 'number' && Number.isFinite(params.estimatedCostUsd)
+      ? params.estimatedCostUsd
+      : inputCost + outputCost + imageCost;
 
     const { error: insertError } = await supabase.from('ai_usage_log').insert({
       ...(params.consumer ? { consumer: params.consumer, capability: params.capability,

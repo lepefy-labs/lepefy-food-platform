@@ -39,6 +39,7 @@ export const PLATFORM_NAV: PlatformNavGroup[] = [
     id: 'ai', label: 'Intelligence artificielle', icon: IconSparkles, children: [
       { label: 'Routage', href: '/admin/platform/ai-routing' },
       { label: 'Coûts', href: '/admin/platform/ai-usage' },
+      { label: 'Studio images', href: '/admin/platform/studio-images' },
     ],
   },
   {

@@ -106,6 +106,8 @@ interface ProductEditProps {
   tenantId: string;
   tenantCurrency: string;
   aiEnabled: boolean;
+  /** Studio images available: the AI button opens the Studio (review before publication). */
+  studioEnabled?: boolean;
   tenantLocales: string[];
   aiDescriptionsEnabled: boolean;
   isNew?: boolean;
@@ -332,6 +334,7 @@ export default function ProductEditClient({
   producers,
   importers,
   aiEnabled,
+  studioEnabled = false,
   tenantLocales,
   aiDescriptionsEnabled,
   tenantCurrency,
@@ -865,6 +868,7 @@ export default function ProductEditClient({
               initialImageUrl={formData.image_url}
               initialImages={formData.images}
               aiEnabled={aiEnabled}
+              studioEnabled={studioEnabled && !isNew}
               isNew={isNew}
               inherited={isNew && duplicateFrom ? {
                 sourceName: duplicateFrom.name,

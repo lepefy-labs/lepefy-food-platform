@@ -1,0 +1,80 @@
+{
+  "name": "Lepefy · Studio images worker (multi-tenant)",
+  "nodes": [
+    {
+      "id": "0c8d1a2b-3e4f-4a5b-9c6d-7e8f9a0b1c21",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [180, 200],
+      "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 5 }] } }
+    },
+    {
+      "id": "1d9e2b3c-4f5a-4b6c-8d7e-8f9a0b1c2d32",
+      "name": "Daily cleanup 03:40",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [180, 420],
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "40 3 * * *" }] } }
+    },
+    {
+      "id": "2e0f3c4d-5a6b-4c7d-9e8f-9a0b1c2d3e43",
+      "name": "Resume due jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "https://shop.chloefood.com/api/internal/studio-worker",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": { "timeout": 125000, "response": { "response": { "responseFormat": "json" } } }
+      }
+    },
+    {
+      "id": "3f1a4d5e-6b7c-4d8e-8f9a-0b1c2d3e4f54",
+      "name": "Resume jobs and purge drafts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://shop.chloefood.com/api/internal/studio-worker",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{ \"cleanup\": true }",
+        "options": { "timeout": 125000, "response": { "response": { "responseFormat": "json" } } }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 30000
+    },
+    {
+      "id": "4a2b5e6f-7c8d-4e9f-9a0b-1c2d3e4f5a65",
+      "name": "Check worker outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [770, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const result = $input.first()?.json ?? {};\nconst processed = Number(result.processed ?? 0);\nif (result.ok !== true || !Number.isSafeInteger(processed) || processed < 0) {\n  // Throw without echoing upstream responses, HTTP headers, or credentials.\n  throw new Error(\"studio_worker_tick_failed\");\n}\nreturn [{ json: { ok: true, processed, purged: Number(result.cleanup?.purged ?? 0) } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 minutes": { "main": [[{ "node": "Resume due jobs", "type": "main", "index": 0 }]] },
+    "Daily cleanup 03:40": { "main": [[{ "node": "Resume jobs and purge drafts", "type": "main", "index": 0 }]] },
+    "Resume due jobs": { "main": [[{ "node": "Check worker outcome", "type": "main", "index": 0 }]] },
+    "Resume jobs and purge drafts": { "main": [[{ "node": "Check worker outcome", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "timezone": "Europe/Paris" },
+  "active": false,
+  "tags": [],
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}

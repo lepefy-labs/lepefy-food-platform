@@ -13,6 +13,7 @@
     "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts",
     "test:e2e:report": "playwright show-report ../../playwright-report",
     "catalog:whatsapp:test": "node --env-file-if-exists=.env.local --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/catalog-whatsapp-test.ts",
+    "studio:benchmark": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/studio-benchmark.ts",
     "engineering:index": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/engineering-index.ts",
     "engineering:sync": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/engineering-sync.ts",
     "engineering:docs-check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/engineering-docs-check.ts",

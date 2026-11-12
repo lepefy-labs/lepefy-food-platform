@@ -1,0 +1,62 @@
+name: Studio images benchmark
+
+# Manual only. Compares image models for the Studio (photo edit and idea,
+# each with one correction) on a real sample of the tenant's products, with
+# the production prompt builder. Read-only on the database; outputs are a
+# workflow artifact (images, results.json, blind contact sheet). Costs money:
+# about 4 calls per sample and per model. docs/IMAGE_STUDIO.md §8.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tenant:
+        description: Tenant slug used for the real product sample
+        required: true
+        default: chloefood
+      sample:
+        description: Photos and ideas each (1-12)
+        required: true
+        default: '10'
+      models:
+        description: provider:model list
+        required: true
+        default: gemini:gemini-2.5-flash-image,gemini:gemini-3.1-flash-image-preview,gemini:gemini-3-pro-image-preview,openai:gpt-image-1.5
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run benchmark
+        working-directory: apps/storefront
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          STUDIO_BENCH_TENANT: ${{ inputs.tenant }}
+          STUDIO_BENCH_SAMPLE: ${{ inputs.sample }}
+          STUDIO_BENCH_MODELS: ${{ inputs.models }}
+        run: pnpm studio:benchmark
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-benchmark
+          path: apps/storefront/artifacts/studio-benchmark
+          retention-days: 14

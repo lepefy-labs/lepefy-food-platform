@@ -259,6 +259,38 @@ export const LIBRARY_TRANSLATIONS: Record<string, Record<Locale, LibraryTranslat
       ],
     },
   },
+  'studio-images': {
+    it: {
+      title: 'Creare un’immagine con lo Studio images',
+      summary: 'Partire da una foto (anche ricevuta su WhatsApp) o da un’idea, verificare la proposta, poi usarla su un prodotto o una pagina.',
+      blocks: [
+        steps(
+          'Aprite **Studio images** (sezione Contenu & outils), oppure **Créer avec le Studio images** nei media di un prodotto.',
+          'Scegliete **À partir d’une photo** (galleria, fotocamera o foto ricevuta su WhatsApp), con una richiesta facoltativa, oppure **Créer avec une idée** e descrivete l’immagine.',
+          'Cliccate su **Créer une proposition**. Potete lasciare la pagina: l’immagine vi aspetta nella **Bibliothèque**.',
+          'Confrontate **Original** e **Proposition**. Se serve, scrivete cosa cambiare e cliccate su **Demander une correction**.',
+          'Cliccate su **Approuver cette version**, poi **Utiliser l’image**: scegliete la posizione, l’elemento, controllate l’**Aperçu** e cliccate su **Confirmer et publier**.',
+        ),
+        info('Lo stile del vostro negozio viene applicato automaticamente. Nulla è visibile sul negozio prima di **Confirmer et publier**; ogni posizione riceve la propria copia e **Retirer d’ici** non tocca le altre.'),
+        warn('Un’immagine creata da un’idea è un’illustrazione: non mostra confezioni, loghi né testo. Per mostrare un prodotto reale, partite da una foto del prodotto.'),
+      ],
+    },
+    en: {
+      title: 'Create an image with the Studio images',
+      summary: 'Start from a photo (even one received on WhatsApp) or an idea, check the proposal, then use it on a product or a page.',
+      blocks: [
+        steps(
+          'Open **Studio images** (Contenu & outils section), or **Créer avec le Studio images** in a product’s media.',
+          'Choose **À partir d’une photo** (gallery, camera or a photo received on WhatsApp), with an optional request, or **Créer avec une idée** and describe the image.',
+          'Click **Créer une proposition**. You can leave the page: the image waits for you in the **Bibliothèque**.',
+          'Compare **Original** and **Proposition**. If needed, write what to change and click **Demander une correction**.',
+          'Click **Approuver cette version**, then **Utiliser l’image**: choose the place and the item, check the **Aperçu** and click **Confirmer et publier**.',
+        ),
+        info('Your shop’s style is applied automatically. Nothing appears on the shop before **Confirmer et publier**; each place gets its own copy, and **Retirer d’ici** does not affect the others.'),
+        warn('An image created from an idea is an illustration: it shows no packaging, logo or text. To show a real product, start from a photo of the product.'),
+      ],
+    },
+  },
   'petits-plus': {
     it: {
       title: 'Scegliere i « petits plus » proposti nel carrello',

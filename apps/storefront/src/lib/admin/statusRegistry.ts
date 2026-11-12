@@ -176,3 +176,21 @@ export const HELP_STATUS_META: Record<string, AdminStatusMeta> = {
   published: { label: 'Publié', tone: 'success' },
   archived: { label: 'Archivé', tone: 'neutral' },
 };
+
+/** Studio images (migration 183, docs/IMAGE_STUDIO.md): one image of the library. */
+export const STUDIO_ASSET_STATUS_META: Record<string, AdminStatusMeta> = {
+  processing: { label: 'En cours', tone: 'info' },
+  review: { label: 'À valider', tone: 'warning' },
+  approved: { label: 'Prête', tone: 'success' },
+  failed: { label: 'Échec', tone: 'danger' },
+  discarded: { label: 'Écartée', tone: 'neutral' },
+  archived: { label: 'Archivée', tone: 'neutral' },
+};
+
+/** Studio images: one proposed version. */
+export const STUDIO_REVISION_STATUS_META: Record<string, AdminStatusMeta> = {
+  pending: { label: 'En cours', tone: 'info' },
+  succeeded: { label: 'Proposée', tone: 'warning' },
+  failed: { label: 'Échec', tone: 'danger' },
+  discarded: { label: 'Écartée', tone: 'neutral' },
+};

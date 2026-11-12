@@ -5,6 +5,7 @@ import ResourceActivity from '../../../_components/data/ResourceActivity';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getAiCapabilities } from '@/lib/ai/aiSettings';
+import { isStudioEnabled } from '@/lib/studio/server/access';
 import ProductEditClient from './ProductEditClient';
 import ProductEditWorkspace from './ProductEditWorkspace';
 import { ProductCostPanel } from '../../gestion/_components/ProductCostPanel';
@@ -27,6 +28,8 @@ export default async function AdminProductEditPage({
   const tenant   = await getTenant(slug);
   const supabase = createServiceClient();
   const [ai, access] = await Promise.all([getAiCapabilities(supabase, tenant.id, tenant), getCurrentAdminAccessContext(tenant.id)]);
+  // Studio images (flag image_studio): « Générer avec l’IA » opens the Studio, reviewed before publication.
+  const studioEnabled = Boolean(access && canAdmin(access, 'studio.use')) && await isStudioEnabled(tenant.id);
   // UI hint only: PATCH /api/admin/catalogue/[id] re-checks catalog.manage.
   const canManage = Boolean(access && canAdmin(access, 'catalog.manage'));
 
@@ -122,6 +125,7 @@ export default async function AdminProductEditPage({
           tenantId={tenant.id}
           tenantCurrency={tenant.currency}
           aiEnabled={ai.imageGeneration}
+          studioEnabled={studioEnabled}
           tenantLocales={tenant.locales ?? ['fr']}
           aiDescriptionsEnabled={ai.descriptionGeneration}
           fromCategory={searchParams.from_category}

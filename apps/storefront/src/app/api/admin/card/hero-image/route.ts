@@ -6,8 +6,7 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 import { updateModuleConfig } from '@/lib/tenantConfig/moduleConfig';
 import { digitalCardModule } from '@/lib/card/digitalCardSettings';
-import { HERO_UPLOAD_WIDTHS } from '@/lib/card/cardHero';
-import { CARD_HERO_BUCKET, cardHeroFolder, removeHeroVersion, removeOldHeroVariants } from '@/lib/card/cardHeroStorage';
+import { removeHeroVersion, removeOldHeroVariants, storeHeroVariants } from '@/lib/card/cardHeroStorage';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -46,33 +45,15 @@ async function handlePOST(req: NextRequest) {
   }
   if (width < MIN_WIDTH) return NextResponse.json({ error: `Photo trop petite : ${MIN_WIDTH} px de large minimum.` }, { status: 400 });
 
-  const widths: number[] = HERO_UPLOAD_WIDTHS.filter((w) => w <= width);
-  if (widths.length === 0 || (widths[widths.length - 1]! < width && widths.length < HERO_UPLOAD_WIDTHS.length)) widths.push(width);
-  const version = `v${Date.now()}`;
-  const folder = cardHeroFolder(tenant.id);
   const db = createServiceClient();
-
+  let stored: Awaited<ReturnType<typeof storeHeroVariants>>;
   try {
-    for (const w of widths) {
-      const resized = source.clone().resize({ width: w, withoutEnlargement: true });
-      const [webp, avif] = await Promise.all([
-        resized.clone().webp({ quality: 80 }).toBuffer(),
-        resized.clone().avif({ quality: 55 }).toBuffer(),
-      ]);
-      for (const [ext, body, contentType] of [['webp', webp, 'image/webp'], ['avif', avif, 'image/avif']] as const) {
-        const { error } = await db.storage.from(CARD_HERO_BUCKET).upload(`${folder}/${version}-${w}.${ext}`, body, {
-          contentType, upsert: true, cacheControl: '31536000',
-        });
-        if (error) throw new Error(error.message);
-      }
-    }
+    stored = await storeHeroVariants(db, tenant.id, source, width);
   } catch (error) {
     console.error('[card hero] upload failed', tenant.id, error instanceof Error ? error.message : error);
-    await removeHeroVersion(db, tenant.id, version);
     return NextResponse.json({ error: 'Téléversement impossible. Réessayez.' }, { status: 500 });
   }
-
-  const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${CARD_HERO_BUCKET}/${folder}/${version}`;
+  const { base, widths, version } = stored;
   try {
     const state = await updateModuleConfig(db, digitalCardModule, tenant.id, {
       config: { hero_image_base: base, hero_image_widths: widths, hero_image_url: null },

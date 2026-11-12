@@ -37,6 +37,7 @@ const LEGACY_TENANT_ADMIN_PERMISSIONS = [
   'audit.view','audit.export','audit.security.view',
   'support.use',
   'help.view',
+  'studio.use',
 ];
 const LEGACY_CASHIER_PERMISSIONS = ['loyalty.scan','scan.access','scan.search','scan.redeem','scan.metrics','scan.undo_own'];
 

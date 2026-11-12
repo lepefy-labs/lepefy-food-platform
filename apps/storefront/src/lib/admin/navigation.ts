@@ -1,6 +1,6 @@
 import {
   IconAlertTriangle, IconBrandWhatsapp, IconBriefcase, IconBuildingStore, IconChefHat, IconCircleCheck, IconClipboardList, IconChartLine, IconHourglass, IconTruckDelivery as IconTruckMoving, IconBuildingWarehouse, IconCalendarEvent, IconCash, IconChartBar, IconCreditCard,
-  IconFileInvoice, IconFileText, IconGift, IconHistory, IconBook2, IconLayoutDashboard, IconLifebuoy, IconMessageCircle, IconPackage, IconPackages, IconPhoto,
+  IconFileInvoice, IconFileText, IconGift, IconHistory, IconBook2, IconLayoutDashboard, IconLifebuoy, IconMessageCircle, IconPackage, IconPackages, IconPhoto, IconWand,
   IconPlus, IconQrcode, IconScan, IconSettings, IconShoppingBag, IconSparkles, IconStar, IconToolsKitchen2, IconTruck,
   IconTruckDelivery, IconTruckLoading, IconUserPlus, IconUsers, type Icon,
 } from '@tabler/icons-react';
@@ -21,7 +21,7 @@ import type { AdminTone } from './tokens';
 export type AdminNavGroup =
   | 'Essentiel' | 'Ventes' | 'Croissance' | 'Canaux' | 'Gestion' | 'Contenu & outils' | 'Administration'
   | 'Événementiel' | 'Service sur place';
-export type AdminNavFlag = 'gestion' | 'whatsapp' | 'activity' | 'support' | 'help';
+export type AdminNavFlag = 'gestion' | 'whatsapp' | 'activity' | 'support' | 'help' | 'studio';
 export type AdminNavBadgeKey = 'pendingPayments' | 'pendingEventRequests' | 'newInquiries' | 'pendingRentalRequests' | 'preordersToVerify' | 'supportUnread' | 'platformSupportAwaiting';
 
 export interface AdminNavItem {
@@ -190,6 +190,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { id: 'event-scan', label: 'Service repas / Scan', href: '/admin/evenementiel/scan', icon: IconScan, group: 'Service sur place', workspace: 'events', anyOf: ['scan.access'], match: 'exact', mobile: 3, keywords: ['billets', 'repas'] },
   // Contenu & outils
   { id: 'home-slides', label: 'Slides d’accueil', href: '/admin/accueil-slides', icon: IconPhoto, group: 'Contenu & outils', workspace: 'shop', anyOf: ['catalog.manage'], match: 'exact', keywords: ['bannière', 'hero'] },
+  { id: 'image-studio', label: 'Studio images', href: '/admin/studio', icon: IconWand, group: 'Contenu & outils', workspace: 'all', anyOf: ['studio.use'], flag: 'studio', keywords: ['photo', 'image', 'ia', 'générer', 'retoucher', 'galerie', 'whatsapp'] },
   { id: 'public-content', label: 'Contenu public', href: '/admin/contenu', icon: IconFileText, group: 'Contenu & outils', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['notre origine', 'histoire'] },
   { id: 'tools', label: 'Outils & QR', href: '/admin/outils', icon: IconQrcode, group: 'Contenu & outils', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['affiche', 'qr code'] },
   // Administration
@@ -205,6 +206,7 @@ export const ADMIN_QUICK_ACTIONS: AdminQuickAction[] = [
   { id: 'new-order', label: 'Nouvelle commande', href: '/admin/orders/new', icon: IconPlus, workspace: 'shop', anyOf: ['orders.manage'], keywords: ['précommande', 'whatsapp', 'téléphone'] },
   { id: 'prepare-orders', label: 'Préparer les commandes', href: '/admin/orders/preparation', icon: IconClipboardList, workspace: 'shop', anyOf: ['orders.view'], keywords: ['session de préparation', 'liste groupée', 'imprimer', 'picking'] },
   { id: 'new-product', label: 'Nouveau produit', href: '/admin/catalogue/nouveau', icon: IconPlus, workspace: 'shop', anyOf: ['catalog.manage'] },
+  { id: 'new-studio-image', label: 'Créer une image', href: '/admin/studio', icon: IconWand, workspace: 'all', anyOf: ['studio.use'], flag: 'studio', keywords: ['photo', 'image', 'ia', 'studio'] },
   { id: 'new-catalog-campaign', label: 'Nouvelle campagne catalogue', href: '/admin/catalogue/campagnes/nouvelle', icon: IconPlus, workspace: 'shop', anyOf: ['catalog.manage'], keywords: ['promotion', 'nouveauté'] },
   { id: 'support-request', label: 'Contacter l’assistance Lepefy', href: '/admin/assistance?nouvelle=1', icon: IconLifebuoy, workspace: 'all', anyOf: ['support.use'], flag: 'support', keywords: ['aide', 'problème', 'signaler', 'suggestion', 'question'] },
   { id: 'new-customer', label: 'Ajouter un client', href: '/admin/clients?new=1', icon: IconUserPlus, workspace: 'shop', anyOf: ['customers.manage'] },

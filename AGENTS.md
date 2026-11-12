@@ -78,6 +78,22 @@ Non-negotiable invariants:
 4. inference, source data and confirmed decisions stay separate; the WhatsApp price is the total for the minimum quantity: the unit price is computed only by `computeUnitPrice` (lot ÷ minimum × (1 − discount), shown rounding gap), never applied without explicit confirmation;
 5. CLI outputs stay under `artifacts/whatsapp-catalog/` (git-ignored); never enable the flag on a real tenant (e.g. Chloe Food) without explicit approval; the document is a mandatory co-change.
 
+### Studio images documentation contract
+
+For **any task that touches the Studio images** (`apps/storefront/src/lib/studio/**`, `app/admin/(protected)/studio/**`, `app/api/admin/studio/**`, `app/api/internal/studio-worker/**`, `scripts/studio-benchmark.ts`, migration `183_image_studio.sql` or later Studio migrations, `ops/n8n/studio-worker.json`), read and follow:
+
+```text
+docs/IMAGE_STUDIO.md
+```
+
+Non-negotiable invariants:
+
+1. nothing is public before « Confirmer et publier »: proposals live only in the private bucket `studio-private`; publication copies the approved version per destination (copy → verify → compare-and-set of the slot reference → cleanup on failure) and never reprocesses an already published image;
+2. the tenant comes from the server (`getTenant()`), every write goes through a `studio_*` RPC, and publishing needs the destination's own permission on top of `studio.use`;
+3. prompts are built only by `buildStudioPrompt` (runbook rules): a photo keeps the real product, label and text; an idea never shows packaging, brands, logos or text; an atmosphere image needs explicit confirmation on product slots;
+4. never enable the `image_studio` flag, change a tenant's quota/budget or the `studio/*` routing policy on a real tenant (e.g. Chloe Food) without the requester's explicit approval; never declare a provider winner without measured results (§8);
+5. the document is a mandatory co-change, together with the Help Center guide `studio-images` when an admin label changes.
+
 ### Help Center documentation contract
 
 For **any task that touches the Help Center** (`apps/storefront/src/lib/helpCenter/**`, `app/admin/_components/help/**`, `app/admin/(protected)/aide/**`, `platform/knowledge/**`, `app/api/admin/help/**`, `app/api/admin/platform/knowledge/**`, migration `174_help_center.sql` or later Help Center migrations), read and follow:

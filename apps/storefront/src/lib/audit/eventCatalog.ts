@@ -58,6 +58,13 @@ export const AUDIT_EVENT_TYPES = {
   'support.ticket.assigned': { label: 'Demande d’assistance assignée', module: 'support', category: 'activity', severity: 'info', retention: 'business' },
   'support.ticket.merged': { label: 'Demandes d’assistance fusionnées', module: 'support', category: 'activity', severity: 'notice', retention: 'business' },
   'support.ticket.linked': { label: 'Lien GitHub ajouté à une demande d’assistance', module: 'support', category: 'activity', severity: 'info', retention: 'business' },
+  'studio.asset.created': { label: 'Image créée dans le Studio', module: 'studio', category: 'activity', severity: 'info', retention: 'business' },
+  'studio.asset.approved': { label: 'Image du Studio approuvée', module: 'studio', category: 'activity', severity: 'info', retention: 'business' },
+  'studio.asset.discarded': { label: 'Image du Studio écartée', module: 'studio', category: 'activity', severity: 'info', retention: 'business' },
+  'studio.usage.published': { label: 'Image du Studio publiée sur la boutique', module: 'studio', category: 'activity', severity: 'notice', retention: 'business' },
+  'studio.usage.removed': { label: 'Image du Studio retirée de la boutique', module: 'studio', category: 'activity', severity: 'notice', retention: 'business' },
+  'studio.settings.updated': { label: 'Quotas du Studio images modifiés', module: 'studio', category: 'activity', severity: 'notice', retention: 'business' },
+  'studio.style.published': { label: 'Nouveau style d’images de la boutique', module: 'studio', category: 'activity', severity: 'notice', retention: 'business' },
   'catalog.campaign.created': { label: 'Campagne créée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'catalog.campaign.updated': { label: 'Campagne modifiée', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
   'catalog.campaign.products_changed': { label: 'Produits de campagne modifiés', module: 'catalog', category: 'activity', severity: 'info', retention: 'business' },
@@ -120,6 +127,7 @@ export const AUDIT_MODULES = {
   external_catalog: { label: 'Import de catalogues', anyOf: [], platformOnly: true },
   // Assistance: platform-only (internal notes, priorities and assignments never reach the shop).
   support: { label: 'Assistance', anyOf: [], platformOnly: true },
+  studio: { label: 'Studio images', anyOf: ['studio.use'] },
 } as const satisfies Record<string, AuditModuleDefinition>;
 
 export type AuditModule = keyof typeof AUDIT_MODULES;

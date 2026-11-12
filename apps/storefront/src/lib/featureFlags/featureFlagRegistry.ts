@@ -79,6 +79,13 @@ export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
     description: 'Donne à l’équipe de la boutique le bouton « Assistance » : demandes avec captures et page concernée, conversation avec Lepefy, suivi des réponses. Activation réservée à Lepefy.',
     platformOnly: true,
   },
+  {
+    // Studio images (migration 183, docs/IMAGE_STUDIO.md) : génération payante, activée par Lepefy.
+    key: 'image_studio',
+    label: 'Studio images',
+    description: 'Donne à l’équipe le Studio images : créer une image depuis une photo ou une idée, la réviser, puis l’utiliser sur un produit, une slide ou un module. Activation réservée à Lepefy (quota et budget mensuels).',
+    platformOnly: true,
+  },
 ];
 
 export function featureFlagDefinition(key: string): FeatureFlagDefinition | undefined {

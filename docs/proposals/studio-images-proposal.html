@@ -1,0 +1,365 @@
+<title>Studio images Lepefy</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bricolage+Grotesque:wght@600;700&display=swap">
+<style>
+/* Layout: documento di proposta a colonna unica; i mockup sono "schermi" disegnati in HTML con i token admin Lepefy */
+:root{
+  --bg:#f4f5f9; --surface:#ffffff; --surface-2:#f7f7fb; --border:#dfe2ea; --field:#8d93a5;
+  --text:#1e2333; --text-2:#475066; --text-3:#646c80;
+  --brand:#5b4bc4; --brand-soft:#efecfb; --brand-fg:#4a3bb0; --on-brand:#ffffff;
+  --info-bg:#e8f1fd; --info-fg:#1d5aa8; --ok-bg:#e6f5ec; --ok-fg:#1c6b3d;
+  --warn-bg:#fdf3dc; --warn-fg:#8a5a00; --danger-bg:#fdeaea; --danger-fg:#a12828;
+  --neutral-bg:#eef0f4; --neutral-fg:#4b5263; --photo:#dfe8d4; --photo-2:#c7d8b5;
+  --display:"Bricolage Grotesque", "Inter", system-ui, sans-serif;
+  --body:"Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11131a; --surface:#1a1d27; --surface-2:#20242f; --border:#2e3342; --field:#7d849a;
+  --text:#eceef4; --text-2:#b8bdcc; --text-3:#9aa0b2;
+  --brand:#8f82ef; --brand-soft:#28244a; --brand-fg:#b9b0ff; --on-brand:#14121f;
+  --info-bg:#16283f; --info-fg:#8cc0ff; --ok-bg:#14301f; --ok-fg:#86d9a6;
+  --warn-bg:#352a10; --warn-fg:#f3c96a; --danger-bg:#3a1a1a; --danger-fg:#ff9b9b;
+  --neutral-bg:#262a35; --neutral-fg:#c0c5d3; --photo:#2c3a26; --photo-2:#3d5233; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11131a; --surface:#1a1d27; --surface-2:#20242f; --border:#2e3342; --field:#7d849a;
+  --text:#eceef4; --text-2:#b8bdcc; --text-3:#9aa0b2;
+  --brand:#8f82ef; --brand-soft:#28244a; --brand-fg:#b9b0ff; --on-brand:#14121f;
+  --info-bg:#16283f; --info-fg:#8cc0ff; --ok-bg:#14301f; --ok-fg:#86d9a6;
+  --warn-bg:#352a10; --warn-fg:#f3c96a; --danger-bg:#3a1a1a; --danger-fg:#ff9b9b;
+  --neutral-bg:#262a35; --neutral-fg:#c0c5d3; --photo:#2c3a26; --photo-2:#3d5233; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+main{max-width:1120px;margin:0 auto;display:grid;gap:44px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,4vw,40px);line-height:1.1}
+h2{font-size:24px;margin-bottom:6px}
+h3{font-size:16px;font-family:var(--body);font-weight:700}
+p{margin:0;max-width:72ch}
+.lede{color:var(--text-2);font-size:17px;margin-top:10px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--brand-fg)}
+section{display:grid;gap:16px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--neutral-bg);color:var(--neutral-fg)}
+.chip.info{background:var(--info-bg);color:var(--info-fg)} .chip.ok{background:var(--ok-bg);color:var(--ok-fg)}
+.chip.warn{background:var(--warn-bg);color:var(--warn-fg)} .chip.danger{background:var(--danger-bg);color:var(--danger-fg)}
+.chip.brand{background:var(--brand-soft);color:var(--brand-fg)}
+.tbl{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:720px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-size:12px;font-weight:700;color:var(--text-2)}
+tr:last-child td{border-bottom:0}
+code{font-size:12.5px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:0 4px;word-break:break-word}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.note{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:grid;gap:6px;min-width:0}
+.note ul{margin:0;padding-left:18px;color:var(--text-2);font-size:14px}
+.finding{border-left:4px solid var(--warn-fg)} .finding.danger{border-left-color:var(--danger-fg)} .finding.info{border-left-color:var(--info-fg)}
+.lbl{font-size:12px;font-weight:700;color:var(--text-3);letter-spacing:.06em;text-transform:uppercase}
+
+/* ---- schermi mockup ---- */
+.stage{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+.screen{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;min-width:0}
+.desk{flex:1 1 640px;display:grid;grid-template-columns:170px 1fr}
+.side{background:var(--surface-2);border-right:1px solid var(--border);padding:14px 10px;display:grid;gap:4px;align-content:start;font-size:13px}
+.side .it{padding:6px 10px;border-radius:7px;color:var(--text-2)} .side .it.on{background:var(--brand-soft);color:var(--brand-fg);font-weight:700}
+.side .grp{font-size:12px;color:var(--text-3);margin:8px 10px 2px;font-weight:600}
+.pane{padding:18px;display:grid;gap:14px;min-width:0}
+.phone{flex:0 0 270px;width:270px;max-width:100%;border-radius:26px;padding:16px 14px 18px;display:grid;gap:11px;align-content:start;position:relative}
+.cap{font-size:12px;font-weight:700;color:var(--text-3);margin-bottom:6px;letter-spacing:.04em}
+.col{display:grid;gap:6px}
+.ttl{font-family:var(--display);font-weight:700;font-size:19px}
+.sub{font-size:12.5px;color:var(--text-3)}
+.seg{display:flex;gap:4px;padding:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px}
+.seg span{flex:1;text-align:center;font-size:13px;padding:7px 6px;border-radius:7px;color:var(--text-2)}
+.seg span.on{background:var(--surface);color:var(--text);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.btn{display:inline-flex;justify-content:center;align-items:center;gap:6px;font-size:13.5px;font-weight:600;padding:9px 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text)}
+.btn.p{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+.btn.full{width:100%} .btn.sm{font-size:12.5px;padding:6px 10px}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--brand-fg)}
+.field{border:1px solid var(--field);border-radius:8px;padding:9px 11px;font-size:13px;color:var(--text-3);background:var(--surface)}
+.field.tall{min-height:72px}
+.drop{border:1.5px dashed var(--field);border-radius:10px;padding:16px;display:grid;gap:8px;justify-items:center;text-align:center;background:var(--surface-2);font-size:13px;color:var(--text-2)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.photo{border-radius:9px;background:linear-gradient(160deg,var(--photo),var(--photo-2));position:relative;overflow:hidden}
+.photo::after{content:"";position:absolute;left:18%;right:18%;bottom:16%;height:46%;border-radius:50% 50% 12px 12px;background:rgba(0,0,0,.12)}
+.photo.orig{filter:saturate(.55) brightness(.95)}
+.sq{aspect-ratio:1/1;max-width:100%} .wide{aspect-ratio:4/3;max-width:100%}
+.photo .tag{position:absolute;left:8px;top:8px;z-index:1}
+.lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px}
+.thumb{display:grid;gap:4px;font-size:12px;color:var(--text-2)}
+.progress{height:6px;border-radius:9px;background:var(--neutral-bg);overflow:hidden}
+.progress i{display:block;height:100%;width:62%;background:var(--brand)}
+.alert{border-radius:9px;padding:10px 12px;font-size:13px;display:grid;gap:4px}
+.alert.info{background:var(--info-bg);color:var(--info-fg)} .alert.danger{background:var(--danger-bg);color:var(--danger-fg)} .alert.warn{background:var(--warn-bg);color:var(--warn-fg)}
+.alert b{font-weight:700}
+.dest{display:grid;gap:6px}
+.opt{display:flex;gap:10px;align-items:center;border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:13px}
+.opt.on{border-color:var(--brand);background:var(--brand-soft)}
+.opt .box{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--field);flex:none}
+.opt.on .box{background:var(--brand);border-color:var(--brand)}
+.opt small{color:var(--text-3);font-size:12px;display:block}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.crop{position:relative}
+.crop .frame{position:absolute;inset:12% 0 12% 0;border:2px solid var(--brand);border-radius:6px;box-shadow:0 0 0 999px rgba(0,0,0,.35);z-index:2}
+.crop{overflow:hidden;border-radius:9px}
+.pre-old{opacity:.95}
+.strike{color:var(--danger-fg);font-weight:700}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.flow .arrow{color:var(--text-3)}
+.ask{background:var(--brand-soft);border:1px solid var(--brand);border-radius:12px;padding:20px;text-align:center}
+.ask strong{font-family:var(--display);font-size:22px;color:var(--brand-fg)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
+.kv dt{color:var(--text-3)} .kv dd{margin:0}
+@media (max-width:720px){.desk{grid-template-columns:1fr}.side{display:none}.phone{flex-basis:100%;width:100%}}
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">Proposta AGENTS.md · DISCOVER → PRE → AUDIT → POST</div>
+  <h1>Studio images</h1>
+  <p class="lede">Una libreria privata di immagini per tenant: si crea prima l’immagine (da foto o da un’idea), la si rivede, e solo dopo la si usa su un prodotto o su uno slot di un modulo. Base letta: <code>main</code> @ <code>2b78c243</code>, 12/11/2026.</p>
+  <div class="meta"><span class="chip brand">Admin · mobile first</span><span class="chip info">Migrazione 183 additiva</span><span class="chip warn">Benchmark provider a pagamento: richiede ok</span><span class="chip">Etichette UI in francese</span></div>
+</header>
+
+<!-- ============ DISCOVER ============ -->
+<section>
+  <div class="eyebrow">1 · Discover</div>
+  <h2>Cosa esiste oggi</h2>
+  <p>Ogni modulo carica la propria immagine con una propria route, un proprio formato e una propria cartella nel bucket pubblico <code>assets</code>. L’unica generazione IA è nel prodotto ed è sincrona e senza revisione.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Slot immagine (storefront)</th><th>Colonna</th><th>Upload attuale</th><th>Permesso</th><th>Formato visibile</th></tr></thead>
+    <tbody>
+      <tr><td>Galleria prodotto (cover = 1ª)</td><td><code>products.images</code>, <code>image_url</code></td><td><code>upload-product-image</code> → set v3 immutabile (master + 6 WebP)</td><td><code>catalog.manage</code></td><td>1:1, max 8</td></tr>
+      <tr><td>Slide d’accueil</td><td><code>tenant_hero_slides.image_url</code></td><td><code>hero-slides/upload-image</code> (kind <code>hero-slide</code>)</td><td><code>catalog.manage</code></td><td>1:1 (HeroCarousel)</td></tr>
+      <tr><td>Photo « Notre origine »</td><td><code>tenants.story_image_url</code></td><td><code>upload-story-photo</code></td><td><code>tenant_settings.manage</code></td><td>4:3</td></tr>
+      <tr><td>Hero de la carte /card</td><td><code>tenant_feature_settings</code> card (<code>hero_image_base</code>)</td><td><code>card/hero-image</code> → WebP+AVIF multi-larghezza</td><td><code>tenant_settings.manage</code></td><td>4:3</td></tr>
+      <tr><td>Événement: bannière, cover service, matériel, galerie, tarifs</td><td><code>events.banner_image_url</code>, <code>…cover_image_url</code>, <code>rental_items.image_url</code>, <code>event_gallery_photos</code></td><td><code>evenementiel/upload-image</code> (kind)</td><td><code>event_content.manage</code></td><td>libero, ridotto a 1600 px</td></tr>
+      <tr><td>Image de catégorie</td><td><code>categories.image_url</code></td><td>nessun upload dedicato trovato</td><td><code>catalog.manage</code></td><td>4:5 (CategoryBlock)</td></tr>
+      <tr><td>Logo, icône app, fond d’étiquette</td><td><code>tenants.logo_url</code>, <code>app_icon_url</code>, <code>label_background_image_url</code></td><td>route dedicate</td><td>vari</td><td><b>esclusi</b>: identità/stampa, non contenuto generabile</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid3">
+    <div class="note"><h3>Generazione IA attuale</h3><ul><li><code>generate-product-image</code>: Gemini chiamato direttamente (non via AI Core), prompt dedotto dal <em>nome</em> prodotto.</li><li>Sincrona, <code>maxDuration 60</code>: chiudere la pagina perde il lavoro.</li><li>Il risultato entra subito nella galleria pubblica, senza confronto né approvazione.</li></ul></div>
+    <div class="note"><h3>Infrastruttura riusabile</h3><ul><li>Pipeline v3 <code>uploadProductImageSet</code> (sharp, immutabile, rollback).</li><li>Code DB + tick interno n8n con claim compare-and-set (modello <code>shipping-sync</code>).</li><li>AI Core: gateway, routing policy, adapter Gemini e OpenAI-compatible, <code>ai_usage_log</code>, <code>checkRateLimit</code>.</li><li>Journal d’activité (<code>record_audit_event</code>), <code>useAdminMutation</code>.</li></ul></div>
+    <div class="note"><h3>Mancanti</h3><ul><li>Nessuno “stile/pattern” del tenant salvato e versionato.</li><li>Nessuno storage privato per bozze: tutto va nel bucket pubblico.</li><li>Nessun registro di destinazioni; nessuna libreria riusabile.</li><li>Nessuna chiave IA in locale; in prod solo <code>GEMINI_API_KEY</code> (OpenAI da verificare).</li></ul></div>
+  </div>
+</section>
+
+<!-- ============ PRE ============ -->
+<section>
+  <div class="eyebrow">2 · Pre mockup</div>
+  <h2>Oggi: l’immagine nasce dentro il prodotto</h2>
+  <div class="stage">
+    <div class="screen desk pre-old">
+      <nav class="side"><div class="it">Statistiques</div><div class="it">Commandes</div><div class="it on">Produits</div><div class="grp">Contenu &amp; outils</div><div class="it">Slides d’accueil</div><div class="it">Contenu public</div></nav>
+      <div class="pane">
+        <div class="sub">Produits › Poivre de Penja</div>
+        <div class="ttl">Poivre de Penja</div>
+        <div class="note" style="gap:10px">
+          <h3>Médias</h3>
+          <div class="lib" style="grid-template-columns:repeat(4,1fr)"><div class="photo sq"></div><div class="photo sq orig"></div><div class="drop" style="padding:8px">Aucune image</div><div></div></div>
+          <div class="row"><span class="opt" style="padding:6px 10px"><span class="box"></span>Supprimer le fond automatiquement (IA)</span></div>
+          <div class="row"><span class="btn sm">Ajouter des images</span><span class="btn sm p">Générer avec l’IA</span></div>
+          <div class="alert warn"><b>Comportement attuale</b>Clic → attesa 5–15 s in pagina → l’immagine è subito pubblica nella galleria. Nessuna foto sorgente, nessuna correzione, nessun confronto.</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">MOBILE · SLIDE / ÉVÉNEMENT</div>
+      <div class="screen phone pre-old">
+        <div class="sub">Slides d’accueil</div>
+        <div class="ttl">Modifier la slide</div>
+        <div class="photo sq"></div>
+        <span class="btn full">Changer l’image</span>
+        <div class="sub">Il file va subito in <code>assets/events/&lt;tenant&gt;/hero-slide/…</code> (pubblico) anche se poi non si salva.</div>
+        <div class="sub">Nessun modo di riusare una foto già caricata altrove.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AUDIT ============ -->
+<section>
+  <div class="eyebrow">3 · UX audit</div>
+  <h2>Problemi principali</h2>
+  <div class="grid2">
+    <div class="note finding danger"><h3>Pubblicazione senza revisione</h3><p class="sub">La generazione IA scrive direttamente nella galleria pubblica. Un’immagine da solo nome può inventare confezione, logo o testo attribuiti a un prodotto reale.</p></div>
+    <div class="note finding danger"><h3>File pubblici prima della conferma</h3><p class="sub">Gli upload di slide/eventi finiscono nel bucket pubblico anche se l’utente annulla; restano orfani.</p></div>
+    <div class="note finding"><h3>Lavoro perso chiudendo la pagina</h3><p class="sub">La chiamata sincrona su telefono (rete mobile, schermo che si spegne) fallisce senza possibilità di ripresa.</p></div>
+    <div class="note finding"><h3>Foto ricevute su WhatsApp</h3><p class="sub">Partono dalla galleria del telefono, ma oggi si possono usare solo aprendo prima un prodotto o uno slot specifico.</p></div>
+    <div class="note finding"><h3>Sei route di upload, sei formati</h3><p class="sub">Ogni modulo ridimensiona a modo suo; nessuna anteprima del ritaglio dove il formato visibile cambia (1:1, 4:3, 4:5).</p></div>
+    <div class="note finding info"><h3>Stile incoerente fra tenant e nel tempo</h3><p class="sub">Il prompt è fisso e uguale per tutti i tenant; non c’è versione del pattern da registrare né da riapplicare.</p></div>
+  </div>
+</section>
+
+<!-- ============ POST ============ -->
+<section>
+  <div class="eyebrow">4 · Post mockup</div>
+  <h2>Studio images: creare, rivedere, poi usare</h2>
+  <p>Nuova voce di navigazione <b>Studio images</b> (gruppo Contenu &amp; outils, palette comandi « Créer une image »). Il pulsante « Générer avec l’IA » del prodotto apre lo Studio con la destinazione già proposta, invece di pubblicare.</p>
+  <div class="flow"><span class="chip info">En cours</span><span class="arrow">→</span><span class="chip warn">À valider</span><span class="arrow">→</span><span class="chip ok">Approuvée</span><span class="arrow">→</span><span class="chip brand">Utilisée (n)</span><span class="arrow">·</span><span class="chip danger">Échec · Réessayer</span><span class="chip">Écartée</span></div>
+
+  <div class="cap">A · DESKTOP: CREAZIONE + LIBRERIA</div>
+  <div class="stage">
+    <div class="screen desk">
+      <nav class="side"><div class="it">Statistiques</div><div class="it">Commandes</div><div class="it">Produits</div><div class="grp">Contenu &amp; outils</div><div class="it">Contenu public</div><div class="it on">Studio images</div></nav>
+      <div class="pane">
+        <div class="row" style="justify-content:space-between"><div class="col"><div class="ttl">Studio images</div><div class="sub">Créez une image, vérifiez-la, puis choisissez où l’utiliser.</div></div><span class="btn sm">Style de la boutique · v3</span></div>
+        <div class="grid2" style="gap:14px">
+          <div class="note" style="gap:10px">
+            <div class="seg"><span class="on">À partir d’une photo</span><span>Créer avec une idée</span></div>
+            <div class="drop"><b style="color:var(--text)">Choisir une photo</b>Galerie, appareil photo ou photo reçue sur WhatsApp<br><span class="sub">JPG, PNG, WebP, HEIC · 12 Mo max</span></div>
+            <label class="col"><span style="font-size:13px;font-weight:600">Votre demande <span class="sub">(facultatif)</span></span><span class="field">Ex. enlever le piment rouge, garder le plat identique</span></label>
+            <div class="alert info"><b>Le style de votre boutique est appliqué</b>Fond, lumière et cadrage définis par Lepefy pour votre boutique.</div>
+            <div class="row" style="justify-content:space-between"><span class="sub">Il reste 38 créations ce mois-ci</span><span class="btn p">Créer une proposition</span></div>
+          </div>
+          <div class="col" style="gap:10px">
+            <div class="row" style="justify-content:space-between"><h3>Bibliothèque</h3><span class="sub">24 images</span></div>
+            <div class="seg"><span class="on">À valider 2</span><span>Prêtes 6</span><span>Utilisées 14</span><span>Toutes</span></div>
+            <div class="lib">
+              <div class="thumb"><div class="photo sq"><span class="tag chip info">En cours</span></div>Bananes vertes</div>
+              <div class="thumb"><div class="photo sq"><span class="tag chip warn">À valider</span></div>Ndolé</div>
+              <div class="thumb"><div class="photo sq"><span class="tag chip ok">Prête</span></div>Poivre Penja</div>
+              <div class="thumb"><div class="photo sq"><span class="tag chip brand">2 usages</span></div>Plantain frit</div>
+              <div class="thumb"><div class="photo sq"><span class="tag chip danger">Échec</span></div>Bobolo</div>
+              <div class="thumb"><div class="photo sq orig"><span class="tag chip">Écartée</span></div>Safou</div>
+            </div>
+            <div class="sub">Liste serveur via URL (<code>?statut=</code>, recherche, pagination). Les brouillons non utilisés sont supprimés après 30 jours, avec rappel 7 jours avant.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cap">B · MOBILE: I SEI STATI DEL FLUSSO</div>
+  <div class="stage">
+    <div>
+      <div class="cap">1 · CRÉER AVEC UNE IDÉE</div>
+      <div class="screen phone">
+        <div class="sub">STUDIO IMAGES</div><div class="ttl">Créer une image</div>
+        <div class="seg"><span>Photo</span><span class="on">Idée</span></div>
+        <label class="col"><span style="font-size:13px;font-weight:600">Décrivez votre image</span><span class="field tall">Des bananes plantain vertes sur un plan de travail clair, lumière du matin</span></label>
+        <div class="alert warn"><b>Image d’ambiance uniquement</b>Sans emballage, logo, texte ni marque. Pour un produit réel, partez d’une photo.</div>
+        <span class="btn p full">Créer l’image</span>
+        <div class="sub">Vous pouvez quitter la page : l’image vous attendra dans la bibliothèque.</div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">2 · EN COURS (RIPRESA)</div>
+      <div class="screen phone">
+        <div class="sub">BIBLIOTHÈQUE</div><div class="ttl">Bananes vertes</div>
+        <div class="photo sq orig" style="opacity:.6"></div>
+        <div class="progress"><i></i></div>
+        <div class="sub" aria-live="polite">Création en cours… environ 20 secondes</div>
+        <div class="sub">L’état se met à jour tout seul (sondage léger toutes les 4 s, arrêté quand la page est masquée).</div>
+        <span class="btn full">Retour à la bibliothèque</span>
+      </div>
+    </div>
+    <div>
+      <div class="cap">3 · ÉCHEC</div>
+      <div class="screen phone">
+        <div class="sub">BIBLIOTHÈQUE</div><div class="ttl">Bobolo</div>
+        <div class="alert danger" role="alert"><b>La création n’a pas abouti</b>Le service d’images n’a pas répondu à temps. Votre photo est conservée. Aucune création n’a été décomptée.</div>
+        <span class="btn p full">Réessayer</span>
+        <span class="btn full">Modifier la demande</span>
+        <span class="btn ghost full">Écarter</span>
+      </div>
+    </div>
+    <div>
+      <div class="cap">4 · À VALIDER: COMPARER + CORRIGER</div>
+      <div class="screen phone">
+        <div class="sub">PROPOSITION PRÊTE · VERSION 2</div><div class="ttl">Ndolé</div>
+        <div class="cmp"><div class="photo sq orig"><span class="tag chip">Original</span></div><div class="photo sq"><span class="tag chip warn">Proposition</span></div></div>
+        <div class="row"><span class="chip">V1</span><span class="chip brand">V2</span><span class="sub">Glisser pour comparer</span></div>
+        <span class="field">Ex. moins de sauce, assiette blanche</span>
+        <span class="btn full">Demander une correction</span>
+        <span class="btn p full">Approuver cette version</span>
+        <span class="btn ghost full">Écarter</span>
+      </div>
+    </div>
+    <div>
+      <div class="cap">5 · UTILISER: DESTINATION</div>
+      <div class="screen phone">
+        <div class="sub">IMAGE APPROUVÉE</div><div class="ttl">Où l’utiliser ?</div>
+        <div class="dest">
+          <div class="opt on"><span class="box"></span><span>Produit<small>Ndolé · ajoutée à la galerie</small></span></div>
+          <div class="opt on"><span class="box"></span><span>Slide d’accueil<small>« Saveurs du pays »</small></span></div>
+          <div class="opt"><span class="box"></span><span>Photo Notre origine<small>Format 4:3</small></span></div>
+          <div class="opt" style="opacity:.55"><span class="box"></span><span>Bannière d’événement<small>Réservé à l’équipe Événementiel</small></span></div>
+        </div>
+        <span class="btn p full">Continuer</span>
+      </div>
+    </div>
+    <div>
+      <div class="cap">6 · APERÇU DU FORMAT + CONFIRMER</div>
+      <div class="screen phone">
+        <div class="sub">PRODUIT · NDOLÉ</div><div class="ttl">Aperçu</div>
+        <div class="row"><span class="chip">Carré 1:1</span><span class="opt" style="padding:5px 9px"><span class="box"></span>Image principale</span></div>
+        <div class="crop"><div class="photo sq"></div><div class="frame"></div></div>
+        <div class="sub">Recadrage automatique centré · faites glisser pour ajuster.</div>
+        <div class="alert info"><b>Visible sur la boutique après confirmation</b>Une copie dédiée est créée pour ce produit.</div>
+        <span class="btn p full">Confirmer et publier</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note"><h3>Riuso e rimozione</h3><ul><li>La scheda di un’immagine elenca i suoi « Utilisations » (prodotto, slide…) con link e « Retirer d’ici ».</li><li>Ogni destinazione riceve <b>la propria copia</b>: rimuoverla da un prodotto non tocca la slide.</li><li>Un’immagine « Utilisée » non si cancella; si archivia.</li></ul></div>
+    <div class="note"><h3>Dal prodotto</h3><ul><li>« Générer avec l’IA » → apre lo Studio con <code>?pour=product:&lt;id&gt;</code>: prompt e foto vuoti, destinazione pre-spuntata.</li><li>Nuovo pulsante « Choisir dans le Studio » accanto a « Ajouter des images ».</li><li>Nessuna scrittura sulla galleria prima di « Confirmer et publier ».</li></ul></div>
+  </div>
+</section>
+
+<!-- ============ ARCHITETTURA ============ -->
+<section>
+  <div class="eyebrow">Architettura</div>
+  <h2>Libreria, job, provider, destinazioni</h2>
+  <div class="grid2">
+    <div class="note"><h3>Database · migrazione 183 (additiva)</h3><dl class="kv">
+      <dt><code>studio_style_versions</code></dt><dd>pattern del tenant, immutabile, <code>version</code> crescente, istruzioni + riferimenti; uno <code>active</code></dd>
+      <dt><code>studio_assets</code></dt><dd>tenant, origine (<code>photo</code>|<code>prompt</code>), titolo, stato, versione approvata, autore, <code>last_used_at</code></dd>
+      <dt><code>studio_revisions</code></dt><dd>n° versione, richiesta, prompt finale, stile v, provider/modello, costo, durata, oggetto privato</dd>
+      <dt><code>studio_jobs</code></dt><dd>coda: <code>queued→running→succeeded|failed</code>, tentativi, <code>locked_until</code>, chiave idempotente unica</dd>
+      <dt><code>studio_usages</code></dt><dd>asset × destinazione (registry key + id) × copia pubblica, <code>removed_at</code></dd>
+    </dl><p class="sub">RLS forzata senza policy (solo service role), FK composite <code>(tenant_id, id)</code>, scritture via RPC con <code>request_key</code>, audit con <code>record_audit_event</code>.</p></div>
+    <div class="note"><h3>Storage</h3><ul><li>Nuovo bucket <b>privato</b> <code>studio-private</code>: <code>tenants/&lt;t&gt;/studio/&lt;asset&gt;/source|rev-n.webp</code>.</li><li>Upload diretto dal telefono con <b>signed upload URL</b> (nessun body nella Vercel Function), tipo verificato dai byte, 12 Mo, HEIC → JPEG lato server.</li><li>Anteprime admin via URL firmati 60 s.</li><li>Promozione: <b>copia</b> nel percorso pubblico della destinazione (prodotto = pipeline v3 esistente, slot = <code>tenants/&lt;t&gt;/&lt;modulo&gt;/&lt;id&gt;/&lt;uuid&gt;</code>) → <b>verifica</b> (HEAD + hash) → <b>aggiornamento riferimento</b> con confronto sul valore precedente → pulizia staging intermedio.</li><li>Immagini già pubblicate mai rielaborate.</li></ul></div>
+    <div class="note"><h3>Esecuzione durevole</h3><ul><li><code>POST /api/admin/studio/assets</code> crea asset + job (idempotente) e avvia il lavoro in background nella stessa funzione (<code>waitUntil</code>, 60 s).</li><li>Tick <code>POST /api/internal/studio-worker</code> (n8n ogni minuto, bearer dedicato) riprende job scaduti: claim compare-and-set, max 3 tentativi con backoff, poi <code>failed</code> con messaggio francese.</li><li>Pulizia: bozze non usate &gt; 30 g e revisioni scartate rimosse dal tick giornaliero.</li></ul></div>
+    <div class="note"><h3>Provider intercambiabile</h3><ul><li>Interfaccia <code>ImageStudioProvider</code>: <code>editPhoto</code>, <code>generateFromPrompt</code>, <code>capabilities</code>, <code>estimateCost</code>.</li><li>Adapter registrati in AI Core (credenziali solo per nome env); scelta via routing policy <code>studio/photo_edit</code> e <code>studio/prompt_generate</code>: cambiare provider = cambiare policy, il flusso admin non cambia.</li><li>Quote: creazioni/mese per piano + tetto di costo mensile per tenant; rifiuto prima di chiamare il provider.</li></ul></div>
+    <div class="note"><h3>Registro destinazioni</h3><ul><li><code>lib/studio/destinations.ts</code>: <code>key</code>, etichetta, permesso, formato (1:1, 4:3, 4:5), dimensioni min, <code>listTargets</code>, <code>preview</code>, <code>attach</code>, <code>detach</code>, scope di invalidazione cache.</li><li>V1: prodotto, slide d’accueil, Notre origine, hero /card, bannière/cover/matériel/galerie événement. Esclusi: logo, icona, étiquette.</li><li>Aggiungere uno slot = una voce, test di parità con le colonne.</li></ul></div>
+    <div class="note"><h3>Sicurezza e tenant</h3><ul><li>Capability nuova <code>studio.use</code> (creare/rivedere) + permesso <b>della destinazione</b> per pubblicare.</li><li>Tenant sempre da <code>getTenant()</code> server, mai dal client; id destinazione riletti con <code>tenant_id</code>.</li><li>Rilascio dietro flag <code>image_studio</code> (off di default, nessun tenant attivato senza ok).</li><li>Le immagini da prompt portano il marcatore « Ambiance » e richiedono una casella di conferma prima di essere usate su un prodotto.</li></ul></div>
+  </div>
+</section>
+
+<!-- ============ BENCHMARK ============ -->
+<section>
+  <div class="eyebrow">Confronto provider</div>
+  <h2>Protocollo, nessun vincitore dichiarato in anticipo</h2>
+  <p>Campione reale: 12 foto prodotto ChloeFood (6 confezioni, 6 piatti) + 12 prompt d’ambiance, ciascuno con 1 correzione. Valutazione cieca 1–5 su fedeltà del soggetto, qualità, aderenza alla correzione; tempo misurato; costo reale dal provider; metrica finale <b>costo per immagine approvata</b>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Fascia</th><th>Modifica foto (candidati)</th><th>Generazione da prompt (candidati)</th><th>Chiave necessaria</th></tr></thead>
+    <tbody>
+      <tr><td>Economica</td><td>Gemini 2.5 Flash Image</td><td>Gemini 2.5 Flash Image</td><td><code>GEMINI_API_KEY</code> (presente su Vercel)</td></tr>
+      <tr><td>Equilibrata</td><td>Gemini 3.1 Flash Image</td><td>Imagen 4 (Gemini API)</td><td>stessa</td></tr>
+      <tr><td>Precisione</td><td>OpenAI gpt-image-1 (edit, input fidelity alta)</td><td>OpenAI gpt-image-1</td><td><code>OPENAI_API_KEY</code>: da fornire</td></tr>
+    </tbody>
+  </table></div>
+  <p class="sub">I modelli esatti vengono verificati sulla documentazione dei provider al momento del run; il costo stimato del benchmark è nell’ordine di qualche decina di euro (72 generazioni × 3 fasce). Script in <code>scripts/studio-benchmark</code>, output in <code>artifacts/</code> (git-ignored), report in <code>docs/IMAGE_STUDIO.md</code>. Il default di produzione si sceglie dopo i numeri, con il tuo ok.</p>
+</section>
+
+<!-- ============ DELIVERY ============ -->
+<section>
+  <div class="eyebrow">Consegna</div>
+  <h2>Ambito e punti che chiedono il tuo ok</h2>
+  <div class="grid3">
+    <div class="note"><h3>Frontend</h3><ul><li>Pagine <code>/admin/studio</code>, <code>/admin/studio/[id]</code> sul kit V2, voce di navigazione, palette.</li><li>Prodotto: « Générer avec l’IA » → Studio, « Choisir dans le Studio ».</li><li>Guide Help Center « Studio images » (seed, non pubblicata).</li></ul></div>
+    <div class="note"><h3>API / backend</h3><ul><li><code>/api/admin/studio/**</code> (upload firmato, asset, correzioni, approvazione, destinazioni, utilizzi).</li><li><code>/api/internal/studio-worker</code> + workflow n8n.</li><li>Adapter provider + benchmark script; <code>generate-product-image</code> dismesso.</li></ul></div>
+    <div class="note"><h3>Database</h3><ul><li>Migrazione 183: 5 tabelle, bucket privato, RPC, tipi audit, capability <code>studio.use</code>, flag <code>image_studio</code>.</li><li>Nessuna modifica a <code>products</code> o alle tabelle degli slot.</li></ul></div>
+  </div>
+  <div class="note finding"><h3>Da approvare esplicitamente (eccezioni AGENTS.md)</h3><ul>
+    <li><b>Migrazione 183 in produzione</b>: additiva e reversibile, ma introduce bucket privato, RLS e una capability RBAC nuova.</li>
+    <li><b>Spesa del benchmark</b> e una <code>OPENAI_API_KEY</code> sul progetto Vercel (o in locale) per la fascia precisione; senza, il confronto copre solo Gemini e lo dico nel report.</li>
+    <li><b>Attivazione</b> del flag <code>image_studio</code> e della quota per ChloeFood.</li>
+  </ul></div>
+  <div class="ask"><strong>Proceed with this solution?</strong></div>
+</section>
+</main>

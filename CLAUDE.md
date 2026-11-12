@@ -247,6 +247,14 @@ The shipping logic is the most complex part of the codebase:
 
 - Supabase Send Email Hook → Edge Function `auth-mailer` → Resend; Supabase keeps OTP/sessions. Tenant ONLY from the signed `lctx` context in `redirect_to` (`lib/authMailer/core/contextToken.ts`), never from the email/user_metadata; invalid context = fail closed. Edit the core in `src/lib/authMailer/core`, then run `node apps/storefront/scripts/syncAuthMailer.mjs` (a unit test fails when `supabase/functions/_shared/authMailer` is stale). Sender address is fixed to `@auth.lepefy.com`. The hook is activated manually in Supabase (cutover needs explicit approval); `AUTH_MAILER_CONTEXT_ENABLED` keeps the storefront inert until then. Never log codes, tokens or links.
 
+### Studio images (admin, migration 183) — `docs/IMAGE_STUDIO.md`
+
+- `/admin/studio` (capability `studio.use`, platform-only release flag `image_studio`, guards `studioApi()` / `requireStudioPage()` in `lib/studio/server/access.ts`): a private per-tenant image library independent from products. Create from a photo (signed upload straight to the private bucket `studio-private`) or from an idea (always an atmosphere image: no packaging, logo or text), versioned shop style (`studio_style_versions`, immutable rows) applied automatically, async jobs, review/correction/approval, then « Utiliser l’image ».
+- Tables `studio_*` are RLS-forced with no policy and read-only for the service role: every write goes through a `studio_*` RPC (state machine, monthly quota/budget under an advisory lock, idempotent `request_key`, job claim by compare-and-set with `claim_token`). Never write them directly.
+- Nothing is public before « Confirmer et publier »: `lib/studio/server/publish.ts` copies the approved version into the destination's public folder (one copy per usage), verifies it, then updates the slot reference with compare-and-set on the previous value; any failure removes the copy. Destinations = registry `lib/studio/destinations.ts` + `server/destinations.ts` (parity test), each with its module's permission; product copies use the v3 pipeline and are only detached on removal.
+- Providers behind `ImageStudioProvider` (Gemini, OpenAI Images), chosen by the AI Core policies `studio/photo_edit` and `studio/prompt_generate` (image models never have `chat`). Worker: `/api/admin/studio/jobs/[id]/run` (keepalive) + n8n tick `POST /api/internal/studio-worker` (bearer `STUDIO_WORKER_TOKEN`, `ops/n8n/studio-worker.json`). Prompts only through `buildStudioPrompt` (`lib/studio/style.ts`, runbook rules).
+- Platform console `/admin/platform/studio-images` (platform owner, `platformStudioApi`): per-tenant flag switch and quotas through RPC `studio_set_tenant_settings` (migration 184). Costs: `studio_revisions.cost_usd` and the same amount in `ai_usage_log` (`endpoint = studio-image`, feature « Studio images » in `lib/ai/productUsage.ts`).
+
 ### Help Center (contextual admin guides) — `docs/HELP_CENTER.md`
 
 - Autonomous module `lib/helpCenter/`: entitlements `help_center` (standard, included in Base once the plan row is granted) / `help_center_advanced` (reserved, inactive), resolved only by `rules.resolveHelpLevel` (suspension > flag `help_center_disabled` > advanced > standard); capability `help.view`; never Assistance-dependent (no import from `lib/support`). Tenant reads go through the `help_tenant_*` projection RPCs (published revisions only); console and its APIs are platform-owner only (`helpPlatformApi`). Content is structured blocks (`blocks.ts`), never HTML.
@@ -372,6 +380,9 @@ DEMO_INTERNAL_TOKEN=                 # bearer of POST /api/internal/demo/revalid
 
 # Assistance (migration 163, optional)
 SUPPORT_NOTIFY_EMAILS=               # Lepefy addresses notified of new requests / shop messages, comma-separated
+
+# Studio images (docs/IMAGE_STUDIO.md §9)
+STUDIO_WORKER_TOKEN=                 # bearer of POST /api/internal/studio-worker (n8n tick, >= 32 chars). Unset = tick refused
 
 # Engineering Hub (docs/engineering/RUNBOOK.md)
 ENGINEERING_INGEST_TOKEN=            # bearer of POST /api/internal/engineering/ingest (>= 32 chars; also a GitHub Actions secret). Unset = ingest disabled

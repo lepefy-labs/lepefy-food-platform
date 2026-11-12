@@ -322,7 +322,7 @@ test('initial library: no placeholder, no unfinished text, every guide has steps
 });
 
 test('navigation: the Centre d’aide entry needs the entitlement flag and help.view; Assistance is unrelated', () => {
-  const ctx = (permissions: string[], help: boolean, support = false) => ({ workspace: 'shop' as const, permissions, isPlatformOwner: false, flags: { gestion: false, whatsapp: false, activity: false, support, help } });
+  const ctx = (permissions: string[], help: boolean, support = false) => ({ workspace: 'shop' as const, permissions, isPlatformOwner: false, flags: { gestion: false, whatsapp: false, activity: false, support, help, studio: false } });
   expect(ADMIN_NAV.some((item) => item.id === 'help')).toBe(true);
   expect(resolveAdminNavigation(ctx(['help.view'], false)).items).not.toContain('help');
   expect(resolveAdminNavigation(ctx(['orders.view'], true)).items).not.toContain('help');
