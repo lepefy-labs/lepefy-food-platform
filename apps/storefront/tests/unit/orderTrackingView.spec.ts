@@ -34,7 +34,7 @@ test('normal shipment: carrier headline, estimated day, last move, Poste link wi
   });
   expect(view.steps.map((s) => [s.label, s.state])).toEqual([['Confirmée', 'done'], ['Préparée', 'done'], ['Expédiée', 'current'], ['Livrée', 'todo']]);
   expect(view.steps[3]!.date).toBeNull();
-  expect(view.events?.[0]).toMatchObject({ label: 'In transito', latest: true });
+  expect(view.events?.[0]).toMatchObject({ label: 'En transit', latest: true });
 });
 
 test('delay: shown only when the carrier date is past or the carrier reports an incident', () => {

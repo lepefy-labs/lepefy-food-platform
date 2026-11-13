@@ -304,3 +304,34 @@ test('parcel in transit before preparation is recorded: snapshot kept, flagged, 
   expect(db.order().status).toBe('shipped');
   expect(db.order().shipping_sync_error).toBeNull();
 });
+
+test('Packlink placeholder event « Unknown » is dropped and never replaces the shipment state (IT2026PRO0007475485)', () => {
+  const reference = 'IT2026PRO0007475485';
+  const snapshot = parsePacklinkShipment(reference, {
+    reference, state: 'IN_TRANSIT', carrier: 'Poste Italiane', trackings: ['1UW1YZT088236'],
+  }, [
+    { timestamp: 1794313080, description: "LA SPEDIZIONE E' STATA RITIRATA PRESSO IL MITTENTE", status_code: 'READY_FOR_COLLECTION' },
+    { timestamp: 1794322980, description: 'IN TRANSITO', status_code: 'IN_TRANSIT' },
+    { timestamp: 1794362040, description: "LA SPEDIZIONE E' PARTITA", status_code: 'IN_TRANSIT' },
+    { timestamp: 1794485340, description: 'Unknown', status_code: 'UNKNOWN' },
+  ]);
+  expect(snapshot.normalizedStatus).toBe('in_transit');
+  expect(snapshot.events.map(event => event.description)).not.toContain('Unknown');
+  expect(snapshot.events).toHaveLength(3);
+
+  // An unrecognised code with a real description stays visible but does not become the status.
+  const odd = parsePacklinkShipment(reference, { reference, state: 'IN_TRANSIT' }, [
+    { timestamp: 1794322980, description: 'IN TRANSITO', status_code: 'IN_TRANSIT' },
+    { timestamp: 1794485340, description: 'In giacenza presso il centro', status_code: 'HELD' },
+  ]);
+  expect(odd.normalizedStatus).toBe('in_transit');
+  expect(odd.events).toHaveLength(2);
+
+  // Already stored placeholders are hidden at read time; Poste phrases are translated.
+  const stored = shipmentEventsNewestFirst([
+    { occurredAt: '2026-11-11T01:54:00.000Z', description: "LA SPEDIZIONE E' PARTITA", providerStatus: 'IN_TRANSIT', status: 'in_transit' },
+    { occurredAt: '2026-11-12T12:09:00.000Z', description: 'Unknown', providerStatus: 'UNKNOWN', status: 'unknown' },
+  ]);
+  expect(stored).toHaveLength(1);
+  expect(shipmentEventLabel(stored[0]!)).toBe('Parti');
+});

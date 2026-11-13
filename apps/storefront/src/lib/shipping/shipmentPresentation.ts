@@ -15,6 +15,10 @@ export function shipmentEventLabel(event: ShipmentTrackingEvent): string {
     RITIRATA: 'Pris en charge', 'DATI SPEDIZ. TRASMESSI A BRT': 'Données transmises au transporteur',
     PARTITA: 'Parti', 'IN CONSEGNA': 'En livraison', 'DA RITIRARE AL PARCEL SHOP': 'À retirer au Parcel Shop',
     CONSEGNATA: 'Livré',
+    // Poste Italiane (via Packlink).
+    "LA SPEDIZIONE E' STATA RITIRATA PRESSO IL MITTENTE": 'Pris en charge chez l’expéditeur',
+    'IN TRANSITO': 'En transit', "LA SPEDIZIONE E' PARTITA": 'Parti',
+    "LA SPEDIZIONE E' IN CONSEGNA": 'En livraison', "LA SPEDIZIONE E' STATA CONSEGNATA": 'Livré',
   };
   return known[event.description.trim().toUpperCase()] ?? event.description;
 }
@@ -28,11 +32,20 @@ export function safeShipmentTrackingUrl(value: string | null | undefined): strin
     return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : null;
   } catch { return null; }
 }
+/**
+ * Packlink sometimes appends an empty carrier event (`{"description":"Unknown",
+ * "status_code":"UNKNOWN"}`, observed on IT2026PRO0007475485 / Poste Italiane):
+ * it says nothing, so it is never shown nor treated as the latest update.
+ */
+export function isPlaceholderShipmentEvent(event: { description: string; status: string }): boolean {
+  return event.status === 'unknown' && /^(unknown|inconnu|sconosciuto|n\/?a|null|undefined|-+)?$/i.test(event.description.trim());
+}
 export function shipmentEventsNewestFirst(value: unknown): ShipmentTrackingEvent[] {
   if (!Array.isArray(value)) return [];
   return value.filter((event): event is ShipmentTrackingEvent => event && typeof event === 'object'
     && typeof event.occurredAt === 'string' && Number.isFinite(Date.parse(event.occurredAt))
-    && typeof event.description === 'string' && typeof event.status === 'string')
+    && typeof event.description === 'string' && typeof event.status === 'string'
+    && !isPlaceholderShipmentEvent(event))
     .slice(-100).sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
 }
 

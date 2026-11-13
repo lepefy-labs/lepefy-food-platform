@@ -1,5 +1,6 @@
 import { resolvePacklinkApiKey } from '@/lib/shipping/packlinkApiKey';
 import { checkPacklinkDestination } from './packlinkDestination';
+import { isPlaceholderShipmentEvent } from '@/lib/shipping/shipmentPresentation';
 import {
   ShipmentDraftError, ShippingProviderError,
   type NormalizedShipmentStatus, type ProviderShipmentDraftInput, type ProviderShipmentSnapshot, type ShippingProviderAdapter,
@@ -78,11 +79,15 @@ export function parsePacklinkShipment(reference: string, payload: unknown, timel
       && event.timestamp > 0 && event.timestamp < 253402300800
       ? new Date(event.timestamp * 1000).toISOString() : date(event.timestamp);
     if (!occurredAt || !description) return [];
-    return [{ occurredAt, description, providerStatus, status: normalizePacklinkStatus(providerStatus) }];
+    const status = normalizePacklinkStatus(providerStatus);
+    if (isPlaceholderShipmentEvent({ description, status })) return [];
+    return [{ occurredAt, description, providerStatus, status }];
   }).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt)).slice(-100);
   // Carriers emit late administrative events (BRT "DATI SPEDIZ. TRASMESSI" -> READY_FOR_COLLECTION
   // after "PARTITA"): a forward-progress event never moves the shipment back behind one already reached.
-  const latest = events.reduce<(typeof events)[number] | undefined>((current, event) => {
+  // An event whose code we do not recognise never replaces a known status: the
+  // shipment `state` (e.g. IN_TRANSIT) stays the fallback.
+  const latest = events.filter(event => event.status !== 'unknown').reduce<(typeof events)[number] | undefined>((current, event) => {
     const rank = PROGRESS_RANK[event.status], best = current ? PROGRESS_RANK[current.status] : undefined;
     return rank !== undefined && best !== undefined && rank < best ? current : event;
   }, undefined);
