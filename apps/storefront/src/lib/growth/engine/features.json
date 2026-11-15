@@ -1,0 +1,57 @@
+{
+  "_nota": "Solo funzioni verificate nella documentazione della repo (colonna fonte). Un messaggio può citare unicamente queste. Aggiornare quando il prodotto cambia.",
+  "verificatoIl": "2026-11-14",
+  "features": {
+    "catalogo_checkout": {
+      "label": "Boutique online con catalogo, carrello e pagamento con carta",
+      "fonte": "CLAUDE.md § Data Flow: Checkout",
+      "demo": "Il cliente apre il catalogo dal telefono, compone il carrello e paga; al negozio arriva un ordine completo."
+    },
+    "ordini_assistiti": {
+      "label": "Ordini ricevuti via WhatsApp, telefono o Instagram registrati dal negozio, con link di pagamento da condividere",
+      "fonte": "docs/ASSISTED_ORDERS.md",
+      "demo": "Il negozio registra l'ordine arrivato in chat, genera il link di pagamento e lo incolla nella conversazione; pagamenti esterni (contanti, bonifico, Satispay, Postepay) restano registrabili."
+    },
+    "contatto_whatsapp": {
+      "label": "Pulsante WhatsApp del negozio nella boutique: il cliente continua a scrivere al negozio",
+      "fonte": "apps/storefront/src/components/layout/Header.tsx (link wa.me dal numero del tenant)",
+      "demo": "Dal catalogo il cliente apre la chat WhatsApp del negozio per una domanda, poi conclude l'ordine dal carrello."
+    },
+    "spedizione": {
+      "label": "Costo di spedizione calcolato al checkout (preventivo corriere o forfait per paese)",
+      "fonte": "CLAUDE.md § Shipping Calculation, § Flat-rate shipping tariffs",
+      "demo": "Il cliente inserisce l'indirizzo e vede il costo di spedizione prima di pagare."
+    },
+    "ritiro_in_negozio": {
+      "label": "Ritiro in negozio (click & collect), anche imposto per singolo prodotto",
+      "fonte": "CLAUDE.md § Product fulfillment policy",
+      "demo": "Il cliente ordina online e sceglie il ritiro; i prodotti solo-ritiro lo impongono."
+    },
+    "regole_quantita": {
+      "label": "Quantità minima e multipli per prodotto o per gruppo di prodotti (cartoni, lotti)",
+      "fonte": "CLAUDE.md § Purchase Quantity Rules",
+      "demo": "Un prodotto venduto a cartoni da 12 si può ordinare solo a multipli validi."
+    },
+    "import_catalogo_whatsapp": {
+      "label": "Import assistito di un catalogo WhatsApp esistente (fatto da Lepefy, con consenso del venditore)",
+      "fonte": "docs/WHATSAPP_EXTERNAL_CATALOG_IMPORT.md",
+      "demo": "Il catalogo WhatsApp del negozio diventa la base del catalogo online, voce per voce, dopo revisione."
+    },
+    "preparazione_ordini": {
+      "label": "Lista di preparazione e bolla per ogni ordine",
+      "fonte": "CLAUDE.md § Order documents & QR portal",
+      "demo": "Per ogni ordine il negozio stampa la lista di preparazione."
+    },
+    "evenementiel": {
+      "label": "Modulo eventi e catering (segmento distinto)",
+      "fonte": "CLAUDE.md § Lepefy Admin PWA (workspace /admin/evenementiel), docs/EVENT_SCAN_OPERATIONS.md",
+      "demo": "Richiesta di prestazione catering dal sito e gestione delle prenotazioni di un evento."
+    }
+  },
+  "limitiNoti": [
+    "Le stringhe della boutique sono in francese (CLAUDE.md § Conventions): per clientela italofona o anglofona serve una verifica prima di proporre la demo.",
+    "Il canale WhatsApp Business (risposte automatiche) è dietro flag di rilascio: non va promesso.",
+    "Nessuna acquisizione automatica delle conversazioni WhatsApp (docs/ASSISTED_ORDERS.md).",
+    "Nessuna consegna locale per zona né fasce orarie di ritiro o consegna (LEPEFY_PROJECT_CONTEXT.md, limiti dichiarati): la spedizione è via corriere. Non proporla a chi consegna in giornata in città."
+  ]
+}

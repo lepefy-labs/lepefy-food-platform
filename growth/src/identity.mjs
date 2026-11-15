@@ -60,6 +60,8 @@ export function phoneKey(phone) {
   let digits = String(phone ?? '').replace(/\D/g, '');
   digits = digits.replace(/^00/, '');
   if (digits.length > 10 && digits.startsWith('39')) digits = digits.slice(2);
+  // +33 6 12 34 56 78 e 06 12 34 56 78 sono lo stesso numero francese.
+  else if (digits.length === 11 && digits.startsWith('33')) digits = `0${digits.slice(2)}`;
   return digits.length >= 8 ? `tel:${digits}` : null;
 }
 

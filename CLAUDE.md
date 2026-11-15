@@ -136,6 +136,12 @@ The shipping logic is the most complex part of the codebase:
 - Separate bounded context `src/lib/engineering/` (pure indexer + `server/` guard and active-run reader), tables `engineering_*` (migration 175: RLS forced, no policy, service role only, no tenant column), routes only under `/admin/platform/engineering` and `/api/admin/platform/engineering/**` with `requireEngineeringApi` (= `requirePlatformOwner`); absent from `adminApiPermissions.ts`. Never use `canAdmin()` for `engineering.*`.
 - `pnpm engineering:index` builds a deterministic snapshot of committed files (TypeScript Compiler API, conservative SQL and Markdown extraction, only demonstrated relations); secrets/personal data/binaries exclude the whole file. Runs are written only while `running`, verified against a manifest, activated atomically (`engineering_activate_run`), rolled back with `engineering_rollback`; the Hub reads only the `active` run. UI (overview/architecture/modules/code/search), search and the AI assistant exist (migration 176: AI off by default — needs BOTH `engineering_settings.ai_enabled` and the `engineering/structured_chat` routing policy; the gateway runs tenant-less only for consumer `engineering` with a usage sink; citations are verified server-side; machine API `/api/engineering/v1/*` with hashed bearer tokens; `docs/engineering/AI_RETRIEVAL.md`). Snapshot upload: `pnpm engineering:sync` / workflow `engineering-sync.yml` → `POST /api/internal/engineering/ingest` (bearer `ENGINEERING_INGEST_TOKEN`, never the service-role key); `pnpm engineering:docs-check` (CI job) fails on invalid or drifted module cards; Metriche page; `docs/engineering/RUNBOOK.md` and `CONTRIBUTING.md`. Engineering scripts run under Node type stripping (no `@/`, enums or constructor parameter properties in the indexer/ingest files).
 
+### Growth prospecting (platform owner, migration 185) — `docs/GROWTH_PROSPECTING.md`
+
+- Research runs outside the app (Claude Code + `growth/` CLI); the engine lives only in `growth/src` and is copied to `src/lib/growth/engine/` by `node growth/scripts/sync-engine.mjs` (unit test fails when stale, never edit the copy). `growth/data/` holds names and phone numbers and is git-ignored: the repository is public.
+- `node growth/cli.mjs push` → `POST /api/internal/growth/ingest` (bearer `GROWTH_INGEST_TOKEN`, never the service-role key): the server re-evaluates every dossier and never writes sales fields. Tables `growth_*` are RLS-forced, service role only; touches are append-only.
+- `/admin/platform/prospection` (platform owner, absent from `adminApiPermissions.ts`): Lepefy never sends; WhatsApp/e-mail open the owner's app prefilled and a contact is recorded only after « envoyé ». Rules in `lib/growth/contactPolicy.ts`: opt-out sentence on written channels, cold WhatsApp in France only, blocked after refusal / « ne plus contacter » (which suppresses the shop's strong identity keys for future research).
+
 ### Statistiques (admin home, migrations 181–182)
 
 - `/admin` (shop workspace, `orders.view`, nav entry `statistics`, first of Essentiel and of the mobile bar) is « Statistiques »; the former « Aujourd'hui » dashboard was removed (11/2026). URL state `?periode=7j|30j|90j|12m|custom&du=&au=&indicateur=commandes|panier&vue=jour&comparer=0`; pure rules in `lib/admin/salesStatistics.ts` (shop-local days, previous period of the same length, bucket day ≤ 31 d / week ≤ 120 d / month, zero-filled series, honest deltas: raw differences under 10 orders, none against 0).
@@ -383,6 +389,9 @@ SUPPORT_NOTIFY_EMAILS=               # Lepefy addresses notified of new requests
 
 # Studio images (docs/IMAGE_STUDIO.md §9)
 STUDIO_WORKER_TOKEN=                 # bearer of POST /api/internal/studio-worker (n8n tick, >= 32 chars). Unset = tick refused
+
+# Growth prospecting (docs/GROWTH_PROSPECTING.md)
+GROWTH_INGEST_TOKEN=                 # bearer of POST /api/internal/growth/ingest (>= 32 chars; also set for the growth CLI). Unset = import disabled
 
 # Engineering Hub (docs/engineering/RUNBOOK.md)
 ENGINEERING_INGEST_TOKEN=            # bearer of POST /api/internal/engineering/ingest (>= 32 chars; also a GitHub Actions secret). Unset = ingest disabled

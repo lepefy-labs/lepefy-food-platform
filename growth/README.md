@@ -50,6 +50,20 @@ node growth/cli.mjs export:all            # tutte le schede di tutti i giri → 
 
 Una seconda esecuzione aggiorna le schede esistenti (fonti, stato, storico) senza duplicarle.
 
+## Pagina admin e dati
+
+`growth/data/` contiene nomi, indirizzi e telefoni: è esclusa da git (il repository è pubblico).
+Le schede si lavorano in `/admin/platform/prospection`; per mandarle lì:
+
+```bash
+GROWTH_INGEST_URL=https://<host admin>/api/internal/growth/ingest GROWTH_INGEST_TOKEN=… node growth/cli.mjs push
+```
+
+Il server rivaluta ogni scheda con lo stesso motore e restituisce le identità da non ricontattare,
+salvate in `data/suppressions.json`: `ingest` rifiuta quelle aziende e `brief` le elenca.
+Dopo ogni modifica a `src/qualify.mjs`, `src/identity.mjs` o `config/features.json` lanciare
+`node growth/scripts/sync-engine.mjs` (copia il motore nello storefront). Vedi docs/GROWTH_PROSPECTING.md.
+
 ## Regole applicate dal controllo
 
 - Un risultato di ricerca o una fonte non accessibile non conferma nulla. Una fonte primaria aperta
@@ -71,6 +85,9 @@ Una seconda esecuzione aggiorna le schede esistenti (fonti, stato, storico) senz
 e i limiti noti. Va aggiornato quando il prodotto cambia.
 
 ## Esiti commerciali
+
+Con la pagina admin gli esiti si registrano lì (storico, relance, «ne plus contacter»); i comandi
+sotto restano per l'uso locale.
 
 ```bash
 node growth/cli.mjs outcome biskolak-international--castiglione-delle-stiviere --type demo --note "in negozio"

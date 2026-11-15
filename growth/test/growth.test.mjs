@@ -232,6 +232,17 @@ test('CLI end-to-end: run, budget, ingest, seconda esecuzione, export', () => {
   const md = readFileSync(join(data, 'exports', 't1', 'shortlist.md'), 'utf8');
   assert.match(md, /Da contattare per primi/);
   assert.match(md, /solo ristorante/);
+  // A shop that asked not to be contacted (list downloaded by «push») is never filed again.
+  writeFileSync(join(data, 'suppressions.json'), JSON.stringify({ keys: ['tel:3331112223'] }));
+  assert.equal(cli('run:new', '--id', 't3').status, 0);
+  mkdirSync(join(data, 'runs', 't3'), { recursive: true });
+  writeFileSync(join(data, 'runs', 't3', 'dossiers.json'), JSON.stringify([dossier({ name: 'Koko Shop', links: {} })]));
+  writeFileSync(join(data, 'runs', 't3', 'discovery.json'), JSON.stringify({ searchLog: [{ q: 'a' }], pagesOpened: 1, found: [] }));
+  const third = cli('ingest', '--run', 't3');
+  assert.match(third.stdout, /esclusa\s+Koko Shop/);
+  assert.match(third.stdout, /non essere ricontattata/);
+  assert.match(cli('brief', '--run', 't3').stdout, /tel:3331112223/);
+  assert.match(cli('push').stderr, /GROWTH_INGEST_URL/);
   const all = cli('export:all');
   assert.equal(all.status, 0, all.stderr);
   const allMd = readFileSync(join(data, 'exports', 'tutte', 'shortlist.md'), 'utf8');

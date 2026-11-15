@@ -8,12 +8,16 @@ import { fileURLToPath } from 'node:url';
 import { evaluate } from './src/qualify.mjs';
 import { loadStore, saveStore, upsertProspect, recordOutcome, loadOutcomes, summarizeOutcomes, OUTCOME_TYPES } from './src/store.mjs';
 import { toMarkdown, toCsv, funnel, rank } from './src/exporter.mjs';
-import { compareIdentity } from './src/identity.mjs';
+import { compareIdentity, identityKeys } from './src/identity.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.GROWTH_DATA_DIR ? resolve(process.env.GROWTH_DATA_DIR) : join(ROOT, 'data');
 const STORE = join(DATA, 'store.json');
 const OUTCOMES = join(DATA, 'outcomes.jsonl');
+// Identità che hanno chiesto di non essere ricontattate (scaricate dalla piattaforma con «push»).
+const SUPPRESSIONS = join(DATA, 'suppressions.json');
+const suppressionKeys = () => new Set(existsSync(SUPPRESSIONS) ? readJson(SUPPRESSIONS).keys ?? [] : []);
+const suppressedKey = (d, keys) => identityKeys(d).strong.find((k) => keys.has(k)) ?? null;
 const today = () => process.env.GROWTH_TODAY ?? new Date().toISOString().slice(0, 10);
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const writeJson = (p, v) => { mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, `${JSON.stringify(v, null, 2)}\n`); };
@@ -58,6 +62,7 @@ const commands = {
       run: run.id, ...run.config,
       istruzioni: 'growth/AGENT.md',
       scrivere: [`${join(runDir(run.id), 'discovery.json')}`, `${join(runDir(run.id), 'dossiers.json')}`],
+      nonRicontattare: [...suppressionKeys()],
       giaNote: store.prospects.map((p) => ({ id: p.id, nome: p.dossier.name, citta: p.dossier.city, stato: p.evaluation.status, ultimoControllo: p.lastSeen })),
     }, null, 2));
   },
@@ -86,7 +91,10 @@ const commands = {
     const store = loadStore(STORE);
     const ctx = { features: features(), today: today(), targetSegment: run.config.segment };
     const report = [];
+    const suppressed = suppressionKeys();
     for (const d of dossiers) {
+      const key = suppressedKey(d, suppressed);
+      if (key) { report.push({ name: d.name, action: 'esclusa', errors: [`Ha chiesto di non essere ricontattata (${key}).`] }); continue; }
       const ev = evaluate(d, ctx);
       if (ev.status === 'respinta') { report.push({ name: d.name, action: 'respinta', errors: ev.errors }); continue; }
       const res = upsertProspect(store, d, ev, { runId: run.id, today: today() });
@@ -164,6 +172,32 @@ const commands = {
     writeJson(join(outDir, 'shortlist.json'), rank(store.prospects));
     console.log(JSON.stringify(funnel(store.prospects, discovery)));
     console.log(`Esportate ${store.prospects.length} schede da ${runIds.length} giri in ${outDir}`);
+  },
+
+  /**
+   * Invia l'archivio alla pagina admin /admin/platform/prospection e scarica le identità da non ricontattare.
+   * Ambiente: GROWTH_INGEST_URL (…/api/internal/growth/ingest) e GROWTH_INGEST_TOKEN. Il server rivaluta ogni scheda.
+   */
+  async push(a) {
+    const url = a.url ?? process.env.GROWTH_INGEST_URL;
+    const token = process.env.GROWTH_INGEST_TOKEN;
+    if (!url || !/^https?:\/\//.test(url)) throw new Error('GROWTH_INGEST_URL assente: indirizzo di …/api/internal/growth/ingest.');
+    if (!token || token.length < 32) throw new Error('GROWTH_INGEST_TOKEN assente o troppo corto.');
+    const defaults = readJson(join(ROOT, 'config', 'default.json'));
+    const store = loadStore(STORE);
+    const prospects = store.prospects.map((p) => ({ id: p.id, dossier: p.dossier, runs: p.runs, firstSeen: p.firstSeen, lastSeen: p.lastSeen }));
+    if (a['dry-run']) { console.log(`${prospects.length} schede pronte per l'invio a ${new URL(url).host} (nessun invio).`); return; }
+    const res = await fetch(url, {
+      method: 'POST', signal: AbortSignal.timeout(60000),
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1, targetSegment: a.segment ?? defaults.segment, prospects }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(`Invio rifiutato: HTTP ${res.status} ${body.error ?? ''}`);
+    writeJson(SUPPRESSIONS, { updatedAt: today(), keys: body.suppressionKeys ?? [] });
+    console.log(`Importate ${body.imported} schede; rifiutate ${body.rejected?.length ?? 0}; escluse per richiesta di non contatto ${body.suppressed?.length ?? 0}.`);
+    for (const r of body.rejected ?? []) console.log(`  rifiutata ${r.id}: ${(r.errors ?? []).join(' ')}`);
+    console.log(`Identità da non ricontattare: ${(body.suppressionKeys ?? []).length} (salvate in ${SUPPRESSIONS}).`);
   },
 
   /** Registra un esito commerciale: growth outcome <id> --type demo [--reason ..] [--note ..] */

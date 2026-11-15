@@ -3,7 +3,8 @@
 Obiettivo: conversazioni con i titolari, demo e tenant paganti. Il numero di schede non conta.
 Non contattare nessuno, non compilare moduli, non inviare messaggi. Non usare dati o clienti di
 Chloe Food come bacino. Leggi la consegna con `node growth/cli.mjs brief --run <id>`: contiene area,
-segmento, lingue, budget e le aziende già note (da riproporre solo con fatti nuovi).
+segmento, lingue, budget, le aziende già note (da riproporre solo con fatti nuovi) e `nonRicontattare`:
+le identità che hanno chiesto di non essere ricontattate, da non schedare mai.
 
 ## 1. Scoperta
 
