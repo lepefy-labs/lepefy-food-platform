@@ -38,6 +38,7 @@ function card(p, n) {
   lines.push('');
   lines.push(`- **Stato:** ${STATUS_LABEL[ev.status]} · **Priorità ${d.priority.level}** · confidenza ${ev.confidence} · fit ${ev.fit.score}/100`);
   lines.push(`- **Segmento:** ${d.segment}${d.address ? ` · ${d.address}` : ''}`);
+  if (d.phones?.length) lines.push(`- **Telefoni pubblici dell'attività:** ${d.phones.join(' · ')} (contatto, non via d'ingresso)`);
   lines.push(`- **Fatto verificato:** ${d.verifiedFact.text} (${d.verifiedFact.evidence.map((id) => `[${id}]`).join(' ')})`);
   lines.push(`- **Ipotesi di problema:** ${d.hypothesis.problem}`);
   lines.push(`- **Domanda per confermarla:** ${d.hypothesis.question}`);
@@ -122,11 +123,11 @@ export function toMarkdown({ prospects, discovery, run, outcomes }) {
 const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
 
 export function toCsv(prospects) {
-  const head = ['id', 'nome', 'citta', 'regione', 'segmento', 'stato', 'priorita', 'fit', 'confidenza', 'via_ingresso', 'via_verificata',
+  const head = ['id', 'nome', 'citta', 'regione', 'segmento', 'telefoni', 'stato', 'priorita', 'fit', 'confidenza', 'via_ingresso', 'via_verificata',
     'fatto_verificato', 'ipotesi', 'domanda', 'funzioni_lepefy', 'demo', 'prossima_azione', 'canale_messaggio', 'messaggio', 'da_verificare', 'fonti', 'ultimo_controllo'];
   const rows = rank(prospects).map((p) => {
     const d = p.dossier; const ev = p.evaluation;
-    return [p.id, d.name, d.city, d.region, d.segment, ev.status, d.priority?.level, ev.fit.score, ev.confidence, ev.entry.kind, ev.entry.verified ? 'si' : 'no',
+    return [p.id, d.name, d.city, d.region, d.segment, (d.phones ?? []).join(' | '), ev.status, d.priority?.level, ev.fit.score, ev.confidence, ev.entry.kind, ev.entry.verified ? 'si' : 'no',
       d.verifiedFact?.text, d.hypothesis?.problem, d.hypothesis?.question, (d.lepefy?.featureIds ?? []).join(' + '), d.lepefy?.demoFlow, d.entry?.nextAction,
       d.message?.channel, d.message?.text, (d.toVerify ?? []).join(' | '), (d.evidence ?? []).map((e) => e.url).join(' | '), p.lastSeen].map(csvCell).join(';');
   });

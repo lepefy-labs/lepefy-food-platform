@@ -182,6 +182,9 @@ test('segmento diverso: riportato a parte, fuori dalla classifica principale', (
   const md = toMarkdown({ prospects: store.prospects, discovery: { found: [] }, run: { id: 'r', config: { area: 'x', segment: 'y' }, exportedAt: '2026-11-14' }, outcomes: [] });
   assert.ok(md.indexOf('Segmenti separati') > md.indexOf('Mama Koko Market'));
   assert.ok(toCsv(store.prospects).split('\n').length >= 3);
+  assert.ok(md.includes('+39 333 1112223'), 'telefono pubblico nella scheda Markdown');
+  const csv = toCsv(store.prospects);
+  assert.ok(csv.split('\n')[0].includes('telefoni') && csv.includes('+39 333 1112223'), 'colonna telefoni nel CSV');
 });
 
 test('esiti commerciali: registrazione, motivo obbligatorio per il rifiuto, riepilogo', () => {
