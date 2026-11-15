@@ -34,7 +34,7 @@ export function fitScore(d, signals) {
     const got = signals[key] === 'confirmed' ? points : signals[key] === 'indicated' ? Math.floor(points / 2) : 0;
     if (got) breakdown.push({ signal: key, state: signals[key], points: got });
   }
-  let score = breakdown.reduce((s, b) => s + b.points, 0);
+  let score = Math.min(100, breakdown.reduce((s, b) => s + b.points, 0));
   const notes = [];
   const need = d.ecommerceNeed;
   const needBacked = need && filled(need.text) && openedIds(d).some((id) => (need.evidence ?? []).includes(id));

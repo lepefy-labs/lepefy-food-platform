@@ -51,6 +51,7 @@
   "limitiNoti": [
     "Le stringhe della boutique sono in francese (CLAUDE.md § Conventions): per clientela italofona o anglofona serve una verifica prima di proporre la demo.",
     "Il canale WhatsApp Business (risposte automatiche) è dietro flag di rilascio: non va promesso.",
-    "Nessuna acquisizione automatica delle conversazioni WhatsApp (docs/ASSISTED_ORDERS.md)."
+    "Nessuna acquisizione automatica delle conversazioni WhatsApp (docs/ASSISTED_ORDERS.md).",
+    "Nessuna consegna locale per zona né fasce orarie di ritiro o consegna (LEPEFY_PROJECT_CONTEXT.md, limiti dichiarati): la spedizione è via corriere. Non proporla a chi consegna in giornata in città."
   ]
 }
