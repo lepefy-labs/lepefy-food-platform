@@ -154,3 +154,6 @@ artifacts/
 
 # Report locali degli agenti AI (docs/agents/README.md)
 agent-reports/
+
+# Growth prospecting data: names and phone numbers of businesses, never in git (public repo)
+growth/data/
