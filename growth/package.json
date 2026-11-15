@@ -1,0 +1,12 @@
+{
+  "name": "lepefy-growth",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Ricerca e qualificazione di nuovi tenant. Indipendente dallo storefront: nessuna dipendenza, nessun accesso ai dati dei tenant.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test test/growth.test.mjs",
+    "growth": "node cli.mjs"
+  }
+}

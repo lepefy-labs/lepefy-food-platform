@@ -1,0 +1,7 @@
+{
+  "area": "Emilia-Romagna e regioni limitrofe (Lombardia, Veneto, Liguria, Toscana, Marche, Piemonte)",
+  "segment": "boutique-alimentare-africana",
+  "languages": ["it", "fr", "en"],
+  "budget": { "searches": 40, "pages": 40 },
+  "targetQualified": 10
+}
