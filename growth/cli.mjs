@@ -2,7 +2,7 @@
 // Lepefy Growth — CLI indipendente dallo storefront e dall'admin.
 // L'agente di ricerca produce i file di un'esecuzione; questa CLI li controlla,
 // deduplica, qualifica, archivia ed esporta. Non invia nulla a nessuno.
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { evaluate } from './src/qualify.mjs';
@@ -142,6 +142,28 @@ const commands = {
     writeJson(join(outDir, 'shortlist.json'), rank(prospects));
     console.log(JSON.stringify(funnel(prospects, discovery)));
     console.log(`Esportato in ${outDir}`);
+  },
+
+  /** Un unico file con tutte le schede dell'archivio, di tutti i giri: data/exports/tutte/. */
+  'export:all'() {
+    const store = loadStore(STORE);
+    const runsDir = join(DATA, 'runs');
+    const runIds = existsSync(runsDir) ? readdirSync(runsDir).filter((id) => existsSync(join(runsDir, id, 'run.json'))).sort() : [];
+    const found = [];
+    for (const id of runIds) {
+      const p = join(runsDir, id, 'discovery.json');
+      if (existsSync(p)) for (const c of readJson(p).found ?? []) found.push({ ...c, run: id });
+    }
+    const discovery = { found };
+    const outcomes = loadOutcomes(OUTCOMES);
+    const outDir = join(DATA, 'exports', 'tutte');
+    mkdirSync(outDir, { recursive: true });
+    const run = { id: 'tutte le schede', config: { area: `tutti i giri (${runIds.join(', ')})`, segment: 'come da ogni giro' }, exportedAt: today() };
+    writeFileSync(join(outDir, 'shortlist.md'), toMarkdown({ prospects: store.prospects, discovery, run, outcomes }));
+    writeFileSync(join(outDir, 'shortlist.csv'), toCsv(store.prospects));
+    writeJson(join(outDir, 'shortlist.json'), rank(store.prospects));
+    console.log(JSON.stringify(funnel(store.prospects, discovery)));
+    console.log(`Esportate ${store.prospects.length} schede da ${runIds.length} giri in ${outDir}`);
   },
 
   /** Registra un esito commerciale: growth outcome <id> --type demo [--reason ..] [--note ..] */

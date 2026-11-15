@@ -232,4 +232,11 @@ test('CLI end-to-end: run, budget, ingest, seconda esecuzione, export', () => {
   const md = readFileSync(join(data, 'exports', 't1', 'shortlist.md'), 'utf8');
   assert.match(md, /Da contattare per primi/);
   assert.match(md, /solo ristorante/);
+  const all = cli('export:all');
+  assert.equal(all.status, 0, all.stderr);
+  const allMd = readFileSync(join(data, 'exports', 'tutte', 'shortlist.md'), 'utf8');
+  assert.match(allMd, /giri: t1, t2/, 'una sola scheda, con entrambi i giri');
+  assert.match(allMd, /\| Altro \| Parma \| t1 \| esclusa \| solo ristorante \|/);
+  const allCsv = readFileSync(join(data, 'exports', 'tutte', 'shortlist.csv'), 'utf8').trim().split('\n');
+  assert.equal(allCsv.length, 2, 'intestazione + una riga: nessun doppione tra i giri');
 });

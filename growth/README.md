@@ -38,6 +38,7 @@ node growth/cli.mjs check-sources --run <id>
 
 ```bash
 node growth/cli.mjs export --run <id>
+node growth/cli.mjs export:all            # tutte le schede di tutti i giri → data/exports/tutte/
 ```
 
 - `ingest` rifiuta il lotto se supera il budget, se manca il registro delle ricerche o se la stessa
