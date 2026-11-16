@@ -78,14 +78,8 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      // DEBUG TEMPORAIRE — voir note de retrait en fin de réponse.
       console.error('[payment-methods][POST] supabase error:', error);
-      return NextResponse.json({
-        error: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-      }, { status: 500 });
+      return NextResponse.json({ error: 'Le moyen de paiement n’a pas pu être ajouté.' }, { status: 500 });
     }
 
     // /card a revalidate = 300 : sans ceci, la modification resterait
@@ -93,9 +87,7 @@ export async function POST(req: NextRequest) {
     revalidatePath('/card');
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
-    // DEBUG TEMPORAIRE — voir note de retrait en fin de réponse.
     console.error('[payment-methods][POST] error:', err);
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message, raw: err }, { status: 500 });
+    return NextResponse.json({ error: 'Le moyen de paiement n’a pas pu être ajouté.' }, { status: 500 });
   }
 }

@@ -6,7 +6,9 @@ import { IconAlertOctagon, IconCircleCheck, IconInfoCircle, IconX } from '@table
 import { cn } from '@/lib/utils/cn';
 
 type ToastTone = 'success' | 'danger' | 'info';
-interface ToastInput { title: string; description?: string; action?: { label: string; href: string } }
+/** A link to follow, or a button (e.g. « Annuler » to undo the action just done). */
+type ToastAction = { label: string; href: string } | { label: string; onClick: () => void };
+interface ToastInput { title: string; description?: string; action?: ToastAction }
 interface ToastItem extends ToastInput { id: number; tone: ToastTone }
 
 interface ToastApi {
@@ -44,7 +46,16 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: (id: number) =
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-a-text">{item.title}</p>
         {item.description && <p className="mt-0.5 text-a-text-2">{item.description}</p>}
-        {item.action && <Link href={item.action.href} onClick={() => onDismiss(item.id)} className="mt-1 inline-block font-semibold text-a-brand-fg hover:underline">{item.action.label}</Link>}
+        {item.action && 'href' in item.action && <Link href={item.action.href} onClick={() => onDismiss(item.id)} className="mt-1 inline-block font-semibold text-a-brand-fg hover:underline">{item.action.label}</Link>}
+        {item.action && 'onClick' in item.action && (
+          <button
+            type="button"
+            onClick={() => { const { onClick } = item.action as { onClick: () => void }; onDismiss(item.id); onClick(); }}
+            className="mt-1 inline-block font-semibold text-a-brand-fg hover:underline"
+          >
+            {item.action.label}
+          </button>
+        )}
       </div>
       <button type="button" onClick={() => onDismiss(item.id)} aria-label="Fermer la notification" className="-m-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-a-text-3 hover:bg-a-hover hover:text-a-text">
         <IconX size={16} aria-hidden="true" />

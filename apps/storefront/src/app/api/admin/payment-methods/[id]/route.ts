@@ -81,14 +81,8 @@ export async function PATCH(
       .eq('tenant_id', tenant.id);
 
     if (error) {
-      // DEBUG TEMPORAIRE — voir note de retrait en fin de réponse.
       console.error('[payment-methods][PATCH] supabase error:', error);
-      return NextResponse.json({
-        error: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-      }, { status: 500 });
+      return NextResponse.json({ error: 'La modification n’a pas pu être enregistrée.' }, { status: 500 });
     }
 
     // /card a revalidate = 300 : sans ceci, la modification resterait
@@ -96,10 +90,8 @@ export async function PATCH(
     revalidatePath('/card');
     return NextResponse.json({ success: true });
   } catch (err) {
-    // DEBUG TEMPORAIRE — voir note de retrait en fin de réponse.
     console.error('[payment-methods][PATCH] error:', err);
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message, raw: err }, { status: 500 });
+    return NextResponse.json({ error: 'La modification n’a pas pu être enregistrée.' }, { status: 500 });
   }
 }
 
@@ -122,7 +114,8 @@ export async function DELETE(
     .eq('tenant_id', tenant.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('[payment-methods][DELETE] supabase error:', error);
+    return NextResponse.json({ error: 'Le moyen de paiement n’a pas pu être supprimé.' }, { status: 500 });
   }
 
   revalidatePath('/card');
