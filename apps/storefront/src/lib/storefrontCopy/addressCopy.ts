@@ -64,6 +64,8 @@ export const ADDRESS_COPY = {
 
   required: 'Complétez ce champ pour continuer.',
   houseNumberRequired: 'Écrivez le numéro de votre maison, ou cochez « Pas de numéro ».',
+  houseNumberInvalid: 'Le numéro doit contenir un chiffre (exemple : 25). Sinon, cochez « Pas de numéro ».',
+  streetHasName: 'Écrivez seulement le nom de la rue, sans votre nom.',
   tooLong: 'Ce texte est trop long. Raccourcissez-le.',
   countryUnsupported: 'Choisissez un pays de la liste.',
 

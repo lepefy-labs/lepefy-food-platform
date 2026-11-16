@@ -47,6 +47,8 @@ export interface CustomerAddressFormProps {
   autofillSection?: 'shipping';
   /** Aide sous le pays, ex. « Livraison possible en Italie. » */
   countryHint?: string;
+  /** Nom du destinataire saisi ailleurs (checkout) : il ne doit pas se retrouver dans la rue. */
+  recipientName?: string;
 }
 
 /**
@@ -67,6 +69,7 @@ export function CustomerAddressForm({
   showLine2 = true,
   showCompany = true,
   countryHint,
+  recipientName,
 }: CustomerAddressFormProps) {
   const [touched, setTouched] = useState<Set<AddressField>>(() => new Set());
   const valueRef = useRef(value);
@@ -78,7 +81,7 @@ export function CustomerAddressForm({
 
   const options = countryOptions(countries);
   const allowedCountries = countries ? options.map((option) => option.code) : undefined;
-  const computed = validateAddressDraft(value, { requireFullName: showFullName, allowedCountries });
+  const computed = validateAddressDraft(value, { requireFullName: showFullName, allowedCountries, recipientName });
   const errorFor = (field: AddressField): string | undefined =>
     serverErrors?.[field] ?? (showAllErrors || touched.has(field) ? computed[field] : undefined);
 

@@ -119,6 +119,25 @@ test.describe('contrôle serveur de l\'adresse (checkout, compte)', () => {
     expect(normalizeShippingAddress({ ...valid, line1: 'Via Roma' })).toMatchObject({ ok: true });
   });
 
+  test('numéro sans chiffre et nom du destinataire dans la rue refusés', () => {
+    // Cas réel : nom saisi dans la rue, dernier mot du nom dans le champ numéro.
+    const draft = { ...filled, street: 'Via felice mendelsohnn Alexandra rosah', houseNumber: 'Assen' };
+    const errors = validateAddressDraft(draft, { recipientName: 'Rosah alexandra Assen' });
+    expect(errors.street).toBe(ADDRESS_COPY.streetHasName);
+    expect(errors.houseNumber).toBe(ADDRESS_COPY.houseNumberInvalid);
+    expect(validateAddressDraft({ ...filled, houseNumber: 'bis' }).houseNumber).toBe(ADDRESS_COPY.houseNumberInvalid);
+    expect(validateAddressDraft({ ...filled, houseNumber: '12/B' })).toEqual({});
+    // Une rue qui porte le nom du client, ou un seul mot commun, reste valide.
+    expect(validateAddressDraft({ ...filled, street: 'Via Giuseppe Verdi' }, { recipientName: 'Giuseppe Verdi' })).toEqual({});
+    expect(validateAddressDraft({ ...filled, street: 'Via Roma' }, { recipientName: 'Marie Roma' })).toEqual({});
+    expect(validateAddressDraft({ ...filled, street: 'Marie Kamga', fullName: 'Marie Kamga' }, { requireFullName: true }).street)
+      .toBe(ADDRESS_COPY.streetHasName);
+    // Serveur : même règle pour le nom ; une adresse sans numéro reste acceptée.
+    expect(normalizeShippingAddress({ ...valid, full_name: 'Rosah alexandra Assen', line1: 'Via felice mendelsohnn Alexandra rosah Assen' }))
+      .toEqual({ ok: false, field: 'line1', error: ADDRESS_COPY.streetHasName });
+    expect(normalizeShippingAddress({ ...valid, full_name: 'Giuseppe Verdi', line1: 'Via Giuseppe Verdi 3' })).toMatchObject({ ok: true });
+  });
+
   test('code postal identique à celui du devis (jeton lié au CAP)', () => {
     const result = normalizeShippingAddress({ ...valid, postal_code: ' 42121 ' });
     expect(result.ok && result.address.postal_code).toBe('42121');

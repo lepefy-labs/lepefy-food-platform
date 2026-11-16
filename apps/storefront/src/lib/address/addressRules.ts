@@ -159,6 +159,28 @@ export function isNoHouseNumber(value: string): boolean {
   return /^s\.?\s?n\.?$/i.test(value.trim());
 }
 
+/** Un numéro de maison contient au moins un chiffre (« 25 », « 12/B »), ou c'est « s.n. ». */
+export function isPlausibleHouseNumber(value: string): boolean {
+  return /\d/.test(value) || isNoHouseNumber(value);
+}
+
+const nameWords = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  .split(/[^a-z0-9]+/).filter((word) => word.length >= 3);
+
+/**
+ * Le destinataire a écrit son nom dans la rue (« Via Verdi Marie Kamga ») : au
+ * moins deux mots du nom s'y trouvent. Une rue qui porte exactement ce nom
+ * (« Via Giuseppe Verdi » pour Giuseppe Verdi : un seul autre mot) reste valide.
+ */
+export function streetContainsRecipientName(street: string, fullName: string): boolean {
+  const name = new Set(nameWords(fullName));
+  if (name.size < 2) return false;
+  const words = nameWords(street);
+  const matched = new Set(words.filter((word) => name.has(word)));
+  if (matched.size < 2) return false;
+  return words.filter((word) => !name.has(word)).length !== 1;
+}
+
 /** Adresse saisie dans le formulaire client (une valeur par champ). */
 export interface AddressDraft {
   country: string;
@@ -200,7 +222,12 @@ export type AddressErrors = Partial<Record<AddressField, string>>;
 /** Erreurs champ par champ ; objet vide = adresse complète (pas « livrable »). */
 export function validateAddressDraft(
   draft: AddressDraft,
-  options: { requireFullName?: boolean; allowedCountries?: ReadonlyArray<string> } = {},
+  options: {
+    requireFullName?: boolean;
+    allowedCountries?: ReadonlyArray<string>;
+    /** Nom du destinataire quand il est saisi hors du formulaire (checkout). */
+    recipientName?: string;
+  } = {},
 ): AddressErrors {
   const errors: AddressErrors = {};
   if (options.requireFullName) {
@@ -213,7 +240,11 @@ export function validateAddressDraft(
     : isDeliveryCountry(draft.country);
   if (!countryAllowed) errors.country = ADDRESS_COPY.countryUnsupported;
   if (!collapse(draft.street)) errors.street = ADDRESS_COPY.required;
+  else if (streetContainsRecipientName(composeLine1(draft.street, draft.houseNumber), options.recipientName ?? draft.fullName ?? '')) {
+    errors.street = ADDRESS_COPY.streetHasName;
+  }
   if (!collapse(draft.houseNumber)) errors.houseNumber = ADDRESS_COPY.houseNumberRequired;
+  else if (!isPlausibleHouseNumber(draft.houseNumber)) errors.houseNumber = ADDRESS_COPY.houseNumberInvalid;
   if (!errors.street && !errors.houseNumber && composeLine1(draft.street, draft.houseNumber).length > ADDRESS_LIMITS.line1) {
     errors.street = ADDRESS_COPY.tooLong;
   }
@@ -334,6 +365,8 @@ export function normalizeShippingAddress(value: unknown): NormalizeShippingAddre
   if (city.length > ADDRESS_LIMITS.city) return tooLong('city', ADDRESS_COPY.city);
   if (companyName.length > ADDRESS_LIMITS.company) return tooLong('company_name', ADDRESS_COPY.companyName);
   if (!isValidPostalCode(country, postalCode)) return { ok: false, field: 'postal_code', error: postalCodeError(country) };
+  // Une ancienne adresse sans numéro reste acceptée ; le nom dans la rue, jamais.
+  if (streetContainsRecipientName(line1, fullName)) return { ok: false, field: 'line1', error: ADDRESS_COPY.streetHasName };
 
   return {
     ok: true,

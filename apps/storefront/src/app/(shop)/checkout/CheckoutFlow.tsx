@@ -328,7 +328,8 @@ export default function CheckoutFlow({
     ? SUMMARY_COPY.shippingAfterAddress
     : effectiveShippingTotal === 0 ? SUMMARY_COPY.shippingFree : formatPrice(effectiveShippingTotal, tenant.currency);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-  const addressErrors = validateAddressDraft(address);
+  const recipientName = `${firstName ?? ''} ${lastName ?? ''}`.trim();
+  const addressErrors = validateAddressDraft(address, { recipientName });
   const hasCompleteAddress = Object.keys(addressErrors).length === 0;
   const quotePostalCode = normalizePostalCode(country, postalCode);
   const recipientComplete = Boolean(firstName?.trim() && lastName?.trim());
@@ -857,6 +858,7 @@ export default function CheckoutFlow({
                           searchMode={editingSaved ? 'collapsed' : 'open'}
                           autofillSection="shipping"
                           countries={deliveryCountries}
+                          recipientName={recipientName}
                         />
                       </>
                     )}

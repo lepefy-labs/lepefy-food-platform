@@ -255,7 +255,7 @@ export function CheckoutSessionEditor({
       return;
     }
     if (editFulfillmentType === 'delivery') {
-      const addressErrors = validateAddressDraft(editAddress);
+      const addressErrors = validateAddressDraft(editAddress, { recipientName: data?.shippingAddress?.full_name || data?.fullName || '' });
       const missing = Object.keys(addressErrors).length;
       if (missing > 0) {
         setAddressSubmitted(true);
@@ -551,6 +551,7 @@ export function CheckoutSessionEditor({
                   showAllErrors={addressSubmitted}
                   searchMode="collapsed"
                   autofillSection="shipping"
+                  recipientName={data?.shippingAddress?.full_name || data?.fullName || ''}
                 />
                 <div aria-live="polite">
                   {requoting ? (
