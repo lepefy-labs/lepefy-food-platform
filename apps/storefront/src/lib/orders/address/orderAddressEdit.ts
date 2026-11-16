@@ -14,7 +14,6 @@ import {
   splitLine1,
   type NormalizedShippingAddress,
 } from '../../address/addressRules';
-import { ADDRESS_COPY } from '../../storefrontCopy/addressCopy';
 import { normalizePhoneForStorage, hasUsableDigits } from '../../phone/internationalPhone';
 
 /** Faits de la commande nécessaires à la décision. */
@@ -26,6 +25,9 @@ export interface AddressEditOrderFacts {
   shipping_creation_status?: string | null;
   shipping_address?: Partial<NormalizedShippingAddress> | null;
 }
+
+/** Admin : pas de case « Pas de numéro », l'équipe écrit « s.n. ». */
+export const ADMIN_HOUSE_NUMBER_MESSAGE = 'Écrivez le numéro de la maison (avec un chiffre), ou « s.n. » s’il n’y en a pas.';
 
 export type AddressEditBlocker = 'not_delivery' | 'closed' | 'shipped' | 'label_purchased' | 'draft_in_progress' | 'no_address';
 
@@ -91,7 +93,7 @@ export function buildEditedShippingAddress(current: Partial<NormalizedShippingAd
     return { ok: false, field: 'country', error: 'Le pays ne peut pas changer : le prix de livraison payé en dépend.' };
   }
   // splitLine1 ne reconnaît un numéro que s'il contient un chiffre (ou « s.n. »).
-  if (!splitLine1(address.line1).houseNumber) return { ok: false, field: 'line1', error: ADDRESS_COPY.houseNumberRequired };
+  if (!splitLine1(address.line1).houseNumber) return { ok: false, field: 'line1', error: ADMIN_HOUSE_NUMBER_MESSAGE };
 
   const rawPhone = typeof input.phone === 'string' ? input.phone.trim() : '';
   if (rawPhone) {

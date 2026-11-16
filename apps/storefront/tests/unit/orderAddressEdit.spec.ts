@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
+  ADMIN_HOUSE_NUMBER_MESSAGE,
   addressEditBlocker,
   buildEditedShippingAddress,
   providerDraftKeepsOldAddress,
@@ -69,9 +70,9 @@ test.describe('correction de l’adresse d’une commande (admin)', () => {
   test('refus : nom dans la rue, numéro absent ou sans chiffre, autre pays', () => {
     expect(buildEditedShippingAddress(current, { ...current })).toEqual({ ok: false, field: 'line1', error: ADDRESS_COPY.streetHasName });
     expect(buildEditedShippingAddress(current, { ...corrected, line1: 'Via Felice Mendelssohn' }))
-      .toEqual({ ok: false, field: 'line1', error: ADDRESS_COPY.houseNumberRequired });
+      .toEqual({ ok: false, field: 'line1', error: ADMIN_HOUSE_NUMBER_MESSAGE });
     expect(buildEditedShippingAddress(current, { ...corrected, line1: 'Via Felice Mendelssohn bis' }))
-      .toEqual({ ok: false, field: 'line1', error: ADDRESS_COPY.houseNumberRequired });
+      .toEqual({ ok: false, field: 'line1', error: ADMIN_HOUSE_NUMBER_MESSAGE });
     expect(buildEditedShippingAddress(current, { ...corrected, line1: 'Via Felice Mendelssohn s.n.' })).toMatchObject({ ok: true });
     expect(buildEditedShippingAddress(current, { ...corrected, country: 'FR', postal_code: '75011' })).toMatchObject({ ok: false, field: 'country' });
     expect(buildEditedShippingAddress(current, { ...corrected, postal_code: '3513' })).toMatchObject({ ok: false, field: 'postal_code' });

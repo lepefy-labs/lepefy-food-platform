@@ -12,6 +12,7 @@ import {
   type AddressErrors,
   type AddressField,
 } from '@/lib/address/addressRules';
+import { ADMIN_HOUSE_NUMBER_MESSAGE } from '@/lib/orders/address/orderAddressEdit';
 import type { ShippingAddress } from '@lepefy/types';
 import Button from '../../_components/ui/Button';
 import Dialog from '../../_components/ui/Dialog';
@@ -58,7 +59,10 @@ export default function OrderAddressEditor({ orderId, updatedAt, address, provid
     { ...draft, deliverToCompany: Boolean(draft.companyName?.trim()) },
     { requireFullName: true, allowedCountries: [address.country.toUpperCase()] },
   );
-  const errorFor = (field: EditableField) => (submitted ? clientErrors[field] : undefined);
+  // Storefront copy mentions the « Pas de numéro » checkbox, absent here.
+  const errorFor = (field: EditableField) => (submitted && clientErrors[field]
+    ? (field === 'houseNumber' ? ADMIN_HOUSE_NUMBER_MESSAGE : clientErrors[field])
+    : undefined);
 
   function openDialog() {
     setDraft(initialDraft(address));
