@@ -7,6 +7,7 @@ import Link from 'next/link'
 import {
   IconAlertTriangle,
   IconArrowLeft,
+  IconBrandWhatsapp,
   IconBuildingStore,
   IconCheck,
   IconExternalLink,
@@ -46,6 +47,9 @@ import OrderClosureLauncher from '../../../orders/[id]/OrderClosureLauncher'
 import OrderAddressEditor from '../../../orders/[id]/OrderAddressEditor'
 import { addressEditBlocker } from '@/lib/orders/address/orderAddressEdit'
 import { orderDataIssues, orderDataIssueSteps } from '@/lib/orders/dataQuality/orderDataIssues'
+import { whatsappContactLink, whatsappContactMessage, whatsappNumber } from '@/lib/orders/customerWhatsapp'
+import { orderContactPhone } from '@/lib/shipping/shipmentDraft/buildDraftInput'
+import { buttonClasses } from '../../../_components/ui/Button'
 import {
   classifyOrderOperation, formatSince, orderDetailTransition, PRIORITY_GROUP_LABELS, transportState,
   type OperationalOrder, type OrderActionSection, type OrderAnomalyCode,
@@ -303,6 +307,14 @@ export default async function AdminOrderPage({ params }: PageProps) {
   const reference = `#${order.id.slice(0, 8).toUpperCase()}`
   // Same rules as the hourly data check e-mail (« Commande à vérifier »).
   const dataIssues = operation.anomaly?.code === 'address_to_check' ? orderDataIssues(order) : []
+  // « Contacter sur WhatsApp »: the team's own WhatsApp, first message prefilled (asks what the data check found missing).
+  const customerPhone = orderContactPhone(order.notes, order.shipping_address) ?? assistedSession?.phone ?? null
+  const whatsappLink = canManage
+    ? whatsappContactLink(
+      whatsappNumber(customerPhone, address?.country ?? tenant.country),
+      whatsappContactMessage({ customerName: order.full_name, tenantName: tenant.name, orderReference: reference, issues: orderDataIssues(order) }),
+    )
+    : null
   const dataIssueSteps = dataIssues.length > 0
     ? orderDataIssueSteps(dataIssues, order.shipping_provider_reference ? managedProvider?.displayName ?? null : null)
     : []
@@ -529,7 +541,18 @@ export default async function AdminOrderPage({ params }: PageProps) {
                   <p className="text-sm font-semibold text-a-text">{order.full_name ?? '—'}</p>
                   {order.email
                     ? <a href={`mailto:${order.email}`} className="mt-1 block break-all text-sm text-a-brand-fg hover:underline">{order.email}</a>
-                    : <p className="mt-1 text-sm text-a-text-3">Pas d’e-mail{assistedSession?.phone ? ` · ${assistedSession.phone}` : ''}</p>}
+                    : <p className="mt-1 text-sm text-a-text-3">Pas d’e-mail</p>}
+                  {customerPhone && <a href={`tel:${customerPhone.replace(/[^\d+]/g, '')}`} className="mt-1 block text-sm text-a-brand-fg hover:underline">{customerPhone}</a>}
+                  {whatsappLink && (
+                    <a
+                      href={whatsappLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={buttonClasses({ variant: 'secondary', size: 'sm', className: 'mt-3 w-full sm:w-auto' })}
+                    >
+                      <IconBrandWhatsapp size={16} aria-hidden="true" className="text-tone-success-fg" /> Contacter sur WhatsApp<span className="sr-only"> (nouvel onglet)</span>
+                    </a>
+                  )}
                 </div>
                 <div className="rounded-xl bg-a-surface-2 p-3">
                   <div className="flex items-start gap-2">

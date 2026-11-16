@@ -246,9 +246,16 @@ export function marketingCampaignEmail(context: TenantNotificationContext, input
 export function staffAlertEmail(context: TenantNotificationContext, alert: StaffAlert, test = false): RenderedEmail {
   const priority = PRIORITY_LABEL[alert.priority];
   const indicators = [...(priority ? [priority] : []), ...alert.indicators];
+  // Plain text link near the top as well as the button below: some clients hide
+  // or strip coloured buttons, and the button sits after the steps.
+  const linkUrl = alert.link ? staffAlertUrl(context.storefrontUrl, alert.link.path) : null;
+  const directLink = linkUrl && alert.link
+    ? `<a href="${escapeHtml(linkUrl)}" style="color:#175cd3;font-weight:700;text-decoration:underline">${escapeHtml(alert.link.label)} →</a>`
+    : '';
   const intro = [
     test ? '<strong>[TEST] Message de test — aucune action requise.</strong>' : '',
     indicators.map((line) => escapeHtml(line)).join('<br>'),
+    directLink,
   ].filter(Boolean).join('<br><br>') || escapeHtml(alert.title);
   return {
     subject: staffEmailSubject(alert, context.tenantName, test),
