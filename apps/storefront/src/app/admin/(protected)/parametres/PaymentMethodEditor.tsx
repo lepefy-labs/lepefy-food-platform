@@ -7,7 +7,8 @@ import Button from '../../_components/ui/Button';
 import { Drawer } from '../../_components/ui/Dialog';
 import { useConfirm, useUnsavedChangesGuard } from '../../_components/ui/ConfirmDialog';
 import { FormField, Input } from '../../_components/ui/Form';
-import { ErrorText } from '../../_components/ui/InlineAlert';
+import InlineAlert, { ErrorText } from '../../_components/ui/InlineAlert';
+import { paymentMethodAvailability } from '@/lib/payments/paymentMethodAvailability';
 import { cn } from '@/lib/utils/cn';
 import {
   PAYMENT_METHOD_TYPES,
@@ -16,6 +17,7 @@ import {
   PAYMENT_TYPE_FIELDS,
   SINGLE_INSTANCE_TYPES,
   draftFromMethod,
+  draftToBody,
   draftsEqual,
   emptyDraft,
   paymentMethodName,
@@ -65,6 +67,15 @@ export function PaymentMethodEditor({ target, existingTypes, onClose, onSave }: 
   const guardDialog = useUnsavedChangesGuard(dirty, 'Les modifications de ce moyen de paiement seront perdues.');
   const errors = useMemo(() => (draft ? validateDraft(draft) : {}), [draft]);
   const isEdit = target?.mode === 'edit';
+  // The draft as the customer paths would read it once saved.
+  const draftAsMethod = useMemo(() => {
+    if (!draft) return null;
+    const body = draftToBody(draft);
+    return { method: body.method, value: body.value, extra: body.extra };
+  }, [draft]);
+  const effectiveCount = draft && draftAsMethod
+    ? draft.enabled_modules.filter((m) => paymentMethodAvailability(draftAsMethod, m).ok).length
+    : 0;
 
   async function requestClose() {
     if (saving) return;
@@ -213,21 +224,25 @@ export function PaymentMethodEditor({ target, existingTypes, onClose, onSave }: 
               <legend className="mb-3 text-xs font-semibold uppercase tracking-wide text-a-text-3">Où le proposer</legend>
               <div className="grid gap-2">
                 {PAYMENT_MODULES.map((module) => {
-                  const checked = draft.enabled_modules.includes(module.value);
+                  const availability = paymentMethodAvailability(draftAsMethod ?? { method: draft.method, value: null, extra: null }, module.value);
+                  const checked = availability.ok && draft.enabled_modules.includes(module.value);
                   const id = `pm-module-${module.value}`;
                   return (
                     <label
                       key={module.value}
                       htmlFor={id}
                       className={cn(
-                        'grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 rounded-xl border px-3 py-2.5 transition',
-                        checked ? 'border-transparent bg-a-brand-soft' : 'border-a-border bg-a-surface hover:bg-a-surface-2',
+                        'grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 rounded-xl border px-3 py-2.5 transition',
+                        !availability.ok && 'cursor-not-allowed border-dashed border-a-border-strong bg-a-surface-2',
+                        availability.ok && (checked ? 'cursor-pointer border-transparent bg-a-brand-soft' : 'cursor-pointer border-a-border bg-a-surface hover:bg-a-surface-2'),
                       )}
                     >
                       <input
                         id={id}
                         type="checkbox"
                         checked={checked}
+                        disabled={!availability.ok}
+                        aria-describedby={`${id}-detail`}
                         onChange={() => {
                           update({
                             enabled_modules: checked
@@ -238,12 +253,19 @@ export function PaymentMethodEditor({ target, existingTypes, onClose, onSave }: 
                         }}
                         className="mt-0.5 h-4 w-4 accent-[var(--admin-primary)]"
                       />
-                      <span className={cn('text-sm font-semibold', checked ? 'text-a-brand-fg' : 'text-a-text')}>{module.label}</span>
-                      <span className="col-start-2 text-xs leading-4 text-a-text-3">{module.detail}</span>
+                      <span className={cn('text-sm font-semibold', checked ? 'text-a-brand-fg' : availability.ok ? 'text-a-text' : 'text-a-text-3')}>
+                        {module.label}{!availability.ok && <span className="font-normal"> · sans effet</span>}
+                      </span>
+                      <span id={`${id}-detail`} className="col-start-2 text-xs leading-4 text-a-text-3">{availability.detail}</span>
                     </label>
                   );
                 })}
               </div>
+              {draft.active && effectiveCount === 0 && (
+                <InlineAlert tone="warning" className="mt-3">
+                  Avec ces réglages, ce moyen ne sera visible par aucun client.
+                </InlineAlert>
+              )}
               <ErrorText message={fieldError('enabled_modules')} className="mt-2" />
             </fieldset>
 

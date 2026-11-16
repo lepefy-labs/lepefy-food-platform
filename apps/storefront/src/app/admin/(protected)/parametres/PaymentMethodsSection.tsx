@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import {
+  IconAlertTriangle,
   IconArrowDown,
   IconArrowUp,
   IconCopy,
@@ -29,7 +30,10 @@ import {
   paymentTypeLabel,
   type PaymentMethodDraft,
 } from '@/lib/payments/paymentMethodForm';
+import { effectiveModules, isVisibleNowhere, paymentMethodAvailability } from '@/lib/payments/paymentMethodAvailability';
 import { ApplePayDomainStatus } from './ApplePayDomainStatus';
+import { PaymentMethodsMatrix } from './PaymentMethodsMatrix';
+import { PaymentMethodsPreview } from './PaymentMethodsPreview';
 import { SettingsIconTile } from './_components/SettingsUi';
 import { PaymentMethodEditor, type PaymentMethodEditorTarget } from './PaymentMethodEditor';
 import { PaymentMethodIcon } from './PaymentMethodIcon';
@@ -61,6 +65,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
   const [methods, setMethods] = useState<TenantPaymentMethod[]>(initialMethods);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editor, setEditor] = useState<PaymentMethodEditorTarget | null>(null);
+  const [view, setView] = useState<'list' | 'matrix'>('list');
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; after: boolean } | null>(null);
   const gripPressed = useRef(false);
@@ -168,6 +173,44 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
       : undefined);
   }
 
+  // ---------- Services (matrix) ----------
+  async function setModules(id: string, modules: PaymentModule[], changed: PaymentModule, undoable = true) {
+    const method = methodsRef.current.find((m) => m.id === id);
+    if (!method) return;
+    const previous = method.enabled_modules;
+    const added = modules.includes(changed);
+    const serviceLabel = PAYMENT_MODULES.find((m) => m.value === changed)?.label ?? changed;
+    setBusyId(id);
+    setMethods((list) => list.map((m) => (m.id === id ? { ...m, enabled_modules: modules } : m)));
+    const res = await fetch(`/api/admin/payment-methods/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled_modules: modules }),
+    }).catch(() => null);
+    setBusyId(null);
+    if (!res?.ok) {
+      setMethods((list) => list.map((m) => (m.id === id ? { ...m, enabled_modules: previous } : m)));
+      toast.error(`${paymentMethodName(method)} n’a pas été modifié`, { description: res ? await readError(res, 'Réessayez.') : 'Connexion impossible. Réessayez.' });
+      return;
+    }
+    toast.success(`${paymentMethodName(method)} ${added ? 'ajouté à' : 'retiré de'} ${serviceLabel}`, undoable
+      ? { action: { label: 'Annuler', onClick: () => { void setModules(id, previous, changed, false); } } }
+      : undefined);
+  }
+
+  function toggleModule(method: TenantPaymentMethod, module: PaymentModule) {
+    const on = method.enabled_modules.includes(module);
+    const next = on
+      ? method.enabled_modules.filter((m) => m !== module)
+      : PAYMENT_MODULES.map((m) => m.value).filter((m) => m === module || method.enabled_modules.includes(m));
+    // DB constraint: never an empty list. Removing the last service = deactivating.
+    if (next.length === 0) {
+      toast.error('Au moins un service est nécessaire', { description: `Pour ne plus proposer ${paymentMethodName(method)}, désactivez-le dans la liste.` });
+      return;
+    }
+    void setModules(method.id, next, module);
+  }
+
   // ---------- Create / edit / duplicate / delete ----------
   async function saveDraft(draft: PaymentMethodDraft): Promise<string | null> {
     const body = draftToBody(draft);
@@ -243,6 +286,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
   }
 
   const activeCount = methods.filter((m) => m.active).length;
+  const nowhereCount = methods.filter(isVisibleNowhere).length;
 
   return (
     <section id="moyens-de-paiement" aria-labelledby="moyens-de-paiement-title" className="scroll-mt-24 overflow-hidden rounded-2xl border border-a-border bg-a-surface">
@@ -262,6 +306,33 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
         </Button>
       </header>
 
+      {methods.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 border-b border-a-border px-4 py-2.5 sm:px-6">
+          <div role="group" aria-label="Affichage" className="inline-flex rounded-xl border border-a-border bg-a-hover p-0.5">
+            {([['list', 'Moyens de paiement'], ['matrix', 'Où ils apparaissent']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={view === key}
+                onClick={() => setView(key)}
+                className={cn(
+                  'min-h-9 rounded-[10px] px-3 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus',
+                  view === key ? 'bg-a-surface font-semibold text-a-text shadow-sm' : 'text-a-text-2 hover:text-a-text',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {nowhereCount > 0 && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-tone-warning-fg">
+              <IconAlertTriangle size={14} aria-hidden="true" />
+              {nowhereCount === 1 ? '1 moyen actif n’est visible nulle part' : `${nowhereCount} moyens actifs ne sont visibles nulle part`}
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="p-2 sm:p-3">
         {methods.some((m) => m.method === 'apple_pay' && m.active) && <div className="p-2"><ApplePayDomainStatus /></div>}
 
@@ -273,6 +344,8 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
               <IconPlus size={16} stroke={1.8} aria-hidden="true" /> Ajouter un moyen
             </Button>
           </div>
+        ) : view === 'matrix' ? (
+          <PaymentMethodsMatrix methods={methods} busyId={busyId} onToggle={toggleModule} />
         ) : (
           <ul className="grid gap-1" aria-label="Moyens de paiement, dans l’ordre affiché aux clients">
             {methods.map((method, index) => {
@@ -324,11 +397,18 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
                     </span>
                     <span className="break-all text-xs tabular-nums text-a-text-2">{paymentMethodSummary(method)}</span>
                     <span className="flex flex-wrap gap-1">
-                      {method.active
-                        ? PAYMENT_MODULES.filter((mod) => method.enabled_modules.includes(mod.value)).map((mod) => (
-                          <span key={mod.value} className="inline-flex h-5 items-center rounded-full bg-a-brand-soft px-2 text-[11px] font-semibold text-a-brand-fg">{MODULE_SHORT[mod.value]}</span>
-                        ))
-                        : <span className="inline-flex h-5 items-center rounded-full border border-a-border px-2 text-[11px] font-semibold text-a-text-3">Désactivé</span>}
+                      {!method.active && <span className="inline-flex h-5 items-center rounded-full border border-a-border px-2 text-[11px] font-semibold text-a-text-3">Désactivé</span>}
+                      {method.active && isVisibleNowhere(method) && (
+                        <span
+                          title={paymentMethodAvailability(method, method.enabled_modules[0] ?? 'shop').detail}
+                          className="inline-flex h-5 items-center gap-1 rounded-full border border-tone-warning-border bg-tone-warning-bg px-2 text-[11px] font-semibold text-tone-warning-fg"
+                        >
+                          <IconAlertTriangle size={12} aria-hidden="true" /> Visible nulle part
+                        </span>
+                      )}
+                      {method.active && effectiveModules(method).map((mod) => (
+                        <span key={mod} className="inline-flex h-5 items-center rounded-full bg-a-brand-soft px-2 text-[11px] font-semibold text-a-brand-fg">{MODULE_SHORT[mod]}</span>
+                      ))}
                     </span>
                   </button>
 
@@ -370,7 +450,9 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
         )}
       </div>
 
-      {methods.length > 1 && (
+      {methods.length > 0 && <PaymentMethodsPreview methods={methods} />}
+
+      {methods.length > 1 && view === 'list' && (
         <p className="border-t border-a-border px-4 py-3 text-xs leading-5 text-a-text-3 sm:px-6">
           Glissez une ligne par sa poignée, ou utilisez les flèches haut et bas sur la poignée, pour changer l’ordre. Tout est enregistré immédiatement.
         </p>
