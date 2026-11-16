@@ -156,6 +156,12 @@ The shipping logic is the most complex part of the codebase:
 - « Imprimer et démarrer » is `POST /api/admin/orders/preparation/start` (idempotent) followed by the PDF GET — document GETs never mutate. Session de préparation `/admin/orders/preparation?ids=` is stateless; the grouped list is PDF kind `preparation-summary`.
 - Reads selecting the 160 columns go through `lib/orders/preparation/compat.ts` fallbacks until the migration is applied.
 
+### Order data checks (customer-typed address, no migration)
+
+- One pure rule set `lib/orders/dataQuality/orderDataIssues.ts` (`house_number_missing`, `name_in_street`, `recipient_name_incomplete`), only on open (`new`/`preparing`) delivery orders without a tracking code — the orders whose address « Modifier l'adresse » can still correct. `s.n.` is a valid answer, not an anomaly. No network lookup.
+- Admin, at read time: `orderAnomaly` returns `address_to_check` (« Adresse à vérifier », group Action requise, next action « Corriger l'adresse » → `#order-customer`); the order detail lists the issues and `orderDataIssueSteps` (contact the customer, correct the address, redo the carrier draft when one exists, buy the label).
+- E-mail, hourly: n8n `ops/n8n/order-data-checks.json` → `POST /api/internal/order-data-checks` (bearer `ORDER_DATA_CHECKS_TOKEN`, else `CATALOG_SCHEDULE_SCHEDULER_TOKEN`: n8n credential « Lepefy · Catalogue schedule scheduler bearer ») → `runOrderDataChecks` (paid, non-test, last 30 days, all tenants) → `notifyOrderDataIssue` → dispatcher, type `order_attention_required`, e-mail only. `orderDataIssueOccurrence` (issue codes + hash of street/recipient) makes the alert unique per faulty address version: the hourly run never re-sends; the message never contains the address.
+
 ### Order closure (cancel / handled outside the platform) — `docs/ORDER_CLOSURE.md`
 
 - The only way to cancel an order is `POST /api/admin/orders/[id]/close` → `lib/orders/closure/orderClosureService.ts` (`PATCH status: 'cancelled'` is refused). Status stays `cancelled`; `orders.closure_type` (`cancelled | handled_externally`, migration 161) says whether it is a lost sale. Rules (reasons, allowed communication, carrier guard) live in `closureRules.ts`, shared with the dialog.
@@ -377,6 +383,9 @@ WHATSAPP_TEST_RECIPIENTS=            # test tenants only: allowed recipients, di
 
 # Scheduled promotions and novelties (migration 156)
 CATALOG_SCHEDULE_SCHEDULER_TOKEN=    # bearer of the n8n tick POST /api/internal/catalog-schedule
+
+# Hourly order data checks (ops/n8n/order-data-checks.json)
+ORDER_DATA_CHECKS_TOKEN=             # optional bearer of POST /api/internal/order-data-checks; unset = CATALOG_SCHEDULE_SCHEDULER_TOKEN (same n8n credential)
 
 # Demo Experience (demo deployment only, docs/DEMO_EXPERIENCE.md §9)
 LEPEFY_DEPLOYMENT_KIND=              # "demo" on the demo Vercel project only; never set in production

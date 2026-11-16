@@ -155,6 +155,23 @@ export function orderAttentionAlert(order: OrderFacts, issue: string): StaffAler
   };
 }
 
+/**
+ * Data check (orderDataIssues): what is wrong with the address typed by the
+ * customer and the steps to fix it. Never the address itself: the team reads
+ * it in the order.
+ */
+export function orderDataIssueAlert(order: OrderFacts, issues: ReadonlyArray<string>, steps: ReadonlyArray<string>): StaffAlert {
+  return {
+    kind: 'order_attention_required', priority: 'high',
+    title: `Adresse à vérifier · ${order.orderNumber}`,
+    indicators: ['Le contrôle automatique a relevé une anomalie sur une commande.', ...issues.map((issue) => `⚠️ ${issue.charAt(0).toUpperCase()}${issue.slice(1)}`)],
+    details: orderDetails(order),
+    action: 'Ne préparez pas l’expédition avant d’avoir corrigé l’adresse.',
+    link: { label: 'Voir la commande', path: orderPath(order.orderId) },
+    note: ['Que faire :', ...steps.map((step, index) => `${index + 1}. ${step}`)].join('\n'),
+  };
+}
+
 export type ShipmentAlertKind = 'shipment_creation_failed' | 'shipment_action_required' | 'shipment_delayed';
 
 export function shipmentAlert(kind: ShipmentAlertKind, order: OrderFacts, issue: string): StaffAlert {

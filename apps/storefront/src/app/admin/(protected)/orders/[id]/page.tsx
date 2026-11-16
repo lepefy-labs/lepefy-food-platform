@@ -45,6 +45,7 @@ import { CLOSURE_NOTIFICATION_LABELS, CLOSURE_REASON_LABELS, closureIdempotencyK
 import OrderClosureLauncher from '../../../orders/[id]/OrderClosureLauncher'
 import OrderAddressEditor from '../../../orders/[id]/OrderAddressEditor'
 import { addressEditBlocker } from '@/lib/orders/address/orderAddressEdit'
+import { orderDataIssues, orderDataIssueSteps } from '@/lib/orders/dataQuality/orderDataIssues'
 import {
   classifyOrderOperation, formatSince, orderDetailTransition, PRIORITY_GROUP_LABELS, transportState,
   type OperationalOrder, type OrderActionSection, type OrderAnomalyCode,
@@ -113,6 +114,7 @@ const ANOMALY_HINTS: Record<OrderAnomalyCode, string> = {
   shipment_cancelled: 'L’expédition a été annulée côté transporteur : vérifiez-la dans le panneau d’expédition.',
   sync_error: 'Les dernières données connues sont conservées : relancez la synchronisation.',
   payment_unverified: 'Vérifiez le moyen de paiement avant le traitement final.',
+  address_to_check: 'L’adresse saisie par le client est incomplète :',
   shipped_without_tracking: 'Renseignez le code de suivi pour que le client puisse suivre son colis.',
   tracking_stale: 'Aucun mouvement récent : vérifiez auprès du transporteur.',
   eta_overdue: 'La date de livraison estimée est dépassée : vérifiez auprès du transporteur.',
@@ -124,6 +126,7 @@ const SECTION_HINTS: Partial<Record<OrderActionSection, string>> = {
   shipment: 'Associez ou synchronisez l’expédition dans le panneau transporteur.',
   tracking: 'Consultez le suivi transporteur, puis contactez le client si nécessaire.',
   payment: 'Vérifiez l’encaissement avant de poursuivre.',
+  address: 'Contactez le client, puis corrigez l’adresse avec « Modifier l’adresse ».',
 }
 
 const TRANSPORT_TONES = {
@@ -282,6 +285,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
     shipment: showShipmentPanel ? '#order-shipment' : showTracking ? '#order-tracking' : null,
     tracking: showTracking ? '#order-tracking' : showShipmentPanel ? '#order-shipment' : null,
     payment: inStorePending ? '#order-payment' : showPaymentAudit ? '#order-origin' : null,
+    address: '#order-customer',
     none: null,
   }
   const ctaHref = terminal ? null : sectionHref[operation.action.section]
@@ -297,6 +301,11 @@ export default async function AdminOrderPage({ params }: PageProps) {
     ? [address.line1, address.postal_code, address.city, address.country].filter(Boolean).join(', ')
     : ''
   const reference = `#${order.id.slice(0, 8).toUpperCase()}`
+  // Same rules as the hourly data check e-mail (« Commande à vérifier »).
+  const dataIssues = operation.anomaly?.code === 'address_to_check' ? orderDataIssues(order) : []
+  const dataIssueSteps = dataIssues.length > 0
+    ? orderDataIssueSteps(dataIssues, order.shipping_provider_reference ? managedProvider?.displayName ?? null : null)
+    : []
 
   return (
     <div className="mx-auto w-full max-w-7xl pb-10">
@@ -369,6 +378,17 @@ export default async function AdminOrderPage({ params }: PageProps) {
               <IconAlertTriangle size={15} aria-hidden="true" className="mt-px shrink-0" />
               <span><strong>{PRIORITY_GROUP_LABELS.action_required} · {operation.anomaly.label}.</strong> {ANOMALY_HINTS[operation.anomaly.code]}</span>
             </p>
+          )}
+          {dataIssues.length > 0 && (
+            <div className="rounded-xl border border-tone-warning-border bg-tone-warning-bg px-3 py-2.5 text-xs leading-5 text-tone-warning-fg">
+              <ul className="list-disc pl-5">
+                {dataIssues.map(issue => <li key={issue.code}>{issue.description}</li>)}
+              </ul>
+              <p className="mt-2 font-semibold">Que faire :</p>
+              <ol className="mt-1 list-decimal space-y-1 pl-5">
+                {dataIssueSteps.map(step => <li key={step}>{step}</li>)}
+              </ol>
+            </div>
           )}
           {operation.urgency && (
             <p className="flex items-start gap-2 rounded-xl border border-tone-warning-border bg-tone-warning-bg px-3 py-2.5 text-xs text-tone-warning-fg">
@@ -494,7 +514,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
           </div>
 
           <AdminBlockAccent tone="info">
-            <section aria-labelledby="order-customer-title" className="rounded-2xl border border-a-border bg-a-surface shadow-sm">
+            <section id="order-customer" aria-labelledby="order-customer-title" className="scroll-mt-24 rounded-2xl border border-a-border bg-a-surface shadow-sm">
               <header className="flex items-center gap-3 border-b border-a-border px-4 py-3.5">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-tone-info-bg text-tone-info-fg">
                   <IconMail size={18} aria-hidden="true" />

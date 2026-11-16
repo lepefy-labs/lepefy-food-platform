@@ -8,7 +8,7 @@ import {
   coldChainKinds, countryCode, customerShortName, isInternationalDestination, itemCount, newOrderPriority, type StaffPriority,
 } from './orderSignals';
 import {
-  orderAttentionAlert, orderCreatedAlert, orderStockConflictAlert, shipmentAlert,
+  orderAttentionAlert, orderCreatedAlert, orderDataIssueAlert, orderStockConflictAlert, shipmentAlert,
   type OrderFacts, type RefundState, type ShipmentAlertKind, type ShipmentFacts,
 } from './staffMessages';
 
@@ -174,6 +174,25 @@ export async function notifyOrderAttention(tenantId: string, orderId: string, is
     return dispatchTenantNotification({
       tenantId, eventType: 'order_attention_required', entityType: 'order', entityId: orderId, occurrenceId,
       alert: orderAttentionAlert(loaded.facts, issue),
+    }, d);
+  });
+}
+
+/**
+ * Hourly data check (orderDataIssues): « Commande à vérifier » by e-mail only
+ * (the admin shows the same anomaly at read time). The occurrence id changes
+ * with the address, so the dispatcher sends one alert per faulty version.
+ */
+export async function notifyOrderDataIssue(
+  tenantId: string, orderId: string, issues: ReadonlyArray<string>, steps: ReadonlyArray<string>, occurrenceId: string, deps?: DispatchDeps,
+): Promise<DispatchResult | null> {
+  return safely('order_data_issue', async () => {
+    const d = deps ?? defaultDispatchDeps();
+    const loaded = await loadOrderForNotification(d.db, tenantId, orderId);
+    if (!loaded || loaded.isTest) return null;
+    return dispatchTenantNotification({
+      tenantId, eventType: 'order_attention_required', entityType: 'order', entityId: orderId, occurrenceId: occurrenceId.slice(0, 120),
+      alert: orderDataIssueAlert(loaded.facts, issues, steps), channels: ['email'], facts: { check: 'order_data' },
     }, d);
   });
 }

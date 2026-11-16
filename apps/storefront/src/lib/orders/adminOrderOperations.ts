@@ -5,6 +5,7 @@ import {
   DIGITAL_PREPARATION, preparationState, preparationStep,
   type OrderPreparationMode, type PreparationOrder, type PreparationStep,
 } from './preparation/preparationPolicy';
+import { orderDataIssues } from './dataQuality/orderDataIssues';
 
 // Single operational classifier of the Admin → Commandes work queue. KPIs,
 // views, the "Priorité opérationnelle" sort and every row read it: no queue
@@ -20,7 +21,7 @@ export interface OperationalOrder extends Omit<PreparationOrder, 'status' | 'ord
   created_at: string;
   updated_at: string;
   total?: number | null;
-  shipping_address?: { country?: string | null } | null;
+  shipping_address?: { country?: string | null; full_name?: string | null; line1?: string | null } | null;
   order_items?: Array<{ storage_type?: string | null; picked_at?: string | null; cold_chain_checked_at?: string | null }> | null;
   originCountry?: string | null;
   /** Tenant's current preparation mode: decides the step of an order not started yet. */
@@ -160,7 +161,7 @@ function preparationStartedAt(order: OperationalOrder): string {
 
 export type OrderAnomalyCode =
   | 'stock_conflict' | 'carrier_incident' | 'parcel_returned' | 'shipment_cancelled' | 'sync_error'
-  | 'payment_unverified' | 'shipped_without_tracking' | 'tracking_stale' | 'eta_overdue';
+  | 'payment_unverified' | 'address_to_check' | 'shipped_without_tracking' | 'tracking_stale' | 'eta_overdue';
 
 export interface OrderAnomaly { code: OrderAnomalyCode; label: string }
 
@@ -175,6 +176,8 @@ export function orderAnomaly(order: OperationalOrder, thresholds: OperationalThr
     return { code: 'sync_error', label: 'Synchronisation transporteur en erreur' };
   }
   if (order.payment_status !== 'paid') return { code: 'payment_unverified', label: 'Paiement à vérifier' };
+  // Data typed by the customer (orderDataIssues): only while the address can still be corrected.
+  if (orderDataIssues(order).length > 0) return { code: 'address_to_check', label: 'Adresse à vérifier' };
   if (order.status === 'shipped' && order.fulfillment_type === 'delivery' && !order.tracking_code && !order.shipping_provider_reference)
     return { code: 'shipped_without_tracking', label: 'Expédiée sans suivi' };
   if (isTrackingStale(order, thresholds, now)) {
@@ -186,7 +189,7 @@ export function orderAnomaly(order: OperationalOrder, thresholds: OperationalThr
 }
 
 /** Panel of the order detail page where the next action is carried out. */
-export type OrderActionSection = 'actions' | 'preparation' | 'packing' | 'shipment' | 'tracking' | 'payment' | 'none';
+export type OrderActionSection = 'actions' | 'preparation' | 'packing' | 'shipment' | 'tracking' | 'payment' | 'address' | 'none';
 
 export interface NextOrderAction { label: string; primary: boolean; intent: 'detail' | 'tracking' | 'incident'; section: OrderActionSection }
 
@@ -198,6 +201,7 @@ export function nextOrderAction(order: OperationalOrder, anomaly: OrderAnomaly |
   if (order.status === 'stock_conflict') return action('Vérifier le conflit');
   if (hasLogisticsIncident(order)) return action('Résoudre l’incident', 'incident', true, 'tracking');
   if (order.payment_status !== 'paid') return action('Vérifier le paiement', 'detail', true, 'payment');
+  if (anomaly?.code === 'address_to_check') return action('Corriger l’adresse', 'detail', true, 'address');
   if (order.status === 'new' && (order.tenantPreparationMode ?? DIGITAL_PREPARATION).picking === 'paper') return action('Imprimer et démarrer');
   if (order.status === 'new') return action('Préparer');
   if (order.status === 'preparing') {
