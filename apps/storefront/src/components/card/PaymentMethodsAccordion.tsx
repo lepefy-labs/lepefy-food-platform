@@ -55,8 +55,32 @@ function description(pm: TenantPaymentMethod, t: Copy) {
   }
 }
 
-function CopyValue({ value, color, label, copiedLabel }: { value: string; color: string; label: string; copiedLabel: string }) {
+/**
+ * Font size that keeps a monospace value on one line of its container
+ * (≈ 0.6 em per character), capped at 14 px. Needs `container-type: inline-size`
+ * on the parent; without container units the value wraps between its groups.
+ */
+export function oneLineMonoFontSize(value: string): string {
+  return `min(0.875rem, calc(100cqi / ${(Math.max(value.length, 1) * 0.62).toFixed(2)}))`;
+}
+
+function CopyValue({ value, color, label, copiedLabel, oneLine = false }: { value: string; color: string; label: string; copiedLabel: string; /** IBAN: full width on one line, copy action below. */ oneLine?: boolean }) {
   const [copied, setCopied] = useState(false);
+  if (oneLine) {
+    return (
+      <button
+        type="button"
+        onClick={() => { navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+        className="flex min-h-12 w-full flex-col items-stretch gap-1.5 rounded-xl border bg-white px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2"
+        style={{ borderColor: hexToRgba(color, 0.35), '--tw-ring-color': color } as React.CSSProperties}
+      >
+        <span className="block min-w-0" style={{ containerType: 'inline-size' }}>
+          <span className="block break-normal font-mono font-semibold leading-6 text-gray-900" style={{ fontSize: oneLineMonoFontSize(value) }}>{value}</span>
+        </span>
+        <span className="flex items-center justify-end gap-1 text-sm font-bold text-gray-900" aria-live="polite">{copied ? <IconCheck size={16} aria-hidden="true" /> : <IconCopy size={16} aria-hidden="true" />} {copied ? copiedLabel : label}</span>
+      </button>
+    );
+  }
   return (
     <button
       type="button"
@@ -170,7 +194,7 @@ export function PaymentMethodsAccordion({ paymentMethods, initialMethodId = null
           {bank ? (
             <div className="space-y-5">
               {detail.extra?.beneficiary && <div>{label(t.beneficiary)}<CopyValue value={detail.extra.beneficiary} color={color} label={t.copy} copiedLabel={t.copied} /></div>}
-              {detail.value && <div>{label('IBAN')}<CopyValue value={detail.value} color={color} label={t.copy} copiedLabel={t.copied} /></div>}
+              {detail.value && <div>{label('IBAN')}<CopyValue oneLine value={detail.value} color={color} label={t.copy} copiedLabel={t.copied} /></div>}
               {detail.extra?.bic && <div>{label('BIC')}<CopyValue value={detail.extra.bic} color={color} label={t.copy} copiedLabel={t.copied} /></div>}
               {detail.extra?.link && openButton(detail.extra.link)}
             </div>
