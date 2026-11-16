@@ -43,6 +43,8 @@ import PaperPreparationPanel from '../../../orders/[id]/PaperPreparationPanel'
 import PreparationStepBadge from '../../../_components/ui/PreparationStepBadge'
 import { CLOSURE_NOTIFICATION_LABELS, CLOSURE_REASON_LABELS, closureIdempotencyKey, isClosableStatus, type ClosureNotification } from '@/lib/orders/closure/closureRules'
 import OrderClosureLauncher from '../../../orders/[id]/OrderClosureLauncher'
+import OrderAddressEditor from '../../../orders/[id]/OrderAddressEditor'
+import { addressEditBlocker } from '@/lib/orders/address/orderAddressEdit'
 import {
   classifyOrderOperation, formatSince, orderDetailTransition, PRIORITY_GROUP_LABELS, transportState,
   type OperationalOrder, type OrderActionSection, type OrderAnomalyCode,
@@ -222,11 +224,16 @@ export default async function AdminOrderPage({ params }: PageProps) {
   const steps = isPickup ? PICKUP_STEPS : DELIVERY_STEPS
   const currentStep = steps.findIndex(step => step.key === order.status)
   const address = order.shipping_address as {
+    full_name?: string
+    company_name?: string
     line1?: string
+    line2?: string
     postal_code?: string
     city?: string
     country?: string
   } | null
+  // Correction by the team: same rule as POST /api/admin/orders/[id]/address.
+  const canEditAddress = canManage && addressEditBlocker(order) === null
 
   const frozenQty = items.filter(item => item.storage_type === 'frozen').reduce((sum, item) => sum + item.quantity, 0)
   const freshQty = items.filter(item => item.storage_type === 'fresh').reduce((sum, item) => sum + item.quantity, 0)
@@ -511,7 +518,10 @@ export default async function AdminOrderPage({ params }: PageProps) {
                       <p className="font-medium text-a-text">{isPickup ? 'Retrait magasin' : 'Livraison'}</p>
                       {!isPickup && address && (
                         <>
+                          {address.full_name && address.full_name.trim() !== (order.full_name ?? '').trim() && <p className="mt-1">{address.full_name}</p>}
+                          {address.company_name && <p className="mt-1">{address.company_name}</p>}
                           {address.line1 && <p className="mt-1">{address.line1}</p>}
+                          {address.line2 && <p>{address.line2}</p>}
                           <p>{[address.postal_code, address.city].filter(Boolean).join(' ')}{address.country ? `, ${address.country}` : ''}</p>
                           {mapQuery && (
                             <a
@@ -522,6 +532,16 @@ export default async function AdminOrderPage({ params }: PageProps) {
                             >
                               Ouvrir dans Maps <IconExternalLink size={12} aria-hidden="true" /><span className="sr-only"> (nouvel onglet)</span>
                             </a>
+                          )}
+                          {canEditAddress && order.shipping_address && (
+                            <div>
+                              <OrderAddressEditor
+                                orderId={order.id}
+                                updatedAt={order.updated_at}
+                                address={order.shipping_address}
+                                providerName={managedProvider?.displayName ?? null}
+                              />
+                            </div>
                           )}
                         </>
                       )}
