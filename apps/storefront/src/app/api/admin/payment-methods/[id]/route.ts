@@ -3,37 +3,12 @@ import { revalidatePath } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
-import type { PaymentMethodType, PaymentModule } from '@lepefy/types';
+import { parseUpdate } from '@/lib/payments/paymentMethodWrite';
+import type { PaymentMethodType } from '@lepefy/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
-
-const VALID_METHODS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card', 'apple_pay'];
-const VALID_MODULES: PaymentModule[] = ['shop', 'card', 'event', 'rental'];
-
-// Même vérification que le constraint DB
-// (enabled_modules <@ {...} and array_length(...) > 0) — non vide, valeurs
-// toutes dans l'ensemble autorisé.
-function isValidEnabledModules(value: unknown): value is PaymentModule[] {
-  return Array.isArray(value) && value.length > 0
-    && value.every((m) => VALID_MODULES.includes(m as PaymentModule));
-}
-
-// 'card' est un simple on/off (montant saisi par le client à chaque paiement,
-// cf. api/card/quick-pay) — jamais de value/extra à renseigner, même
-// traitement que 'cash'. 'apple_pay' idem (tuile Apple Pay de /card).
-function hasNoValueFields(method: PaymentMethodType): boolean {
-  return method === 'cash' || method === 'card' || method === 'apple_pay';
-}
-
-function cleanExtra(raw: unknown): Record<string, string> | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const entries = Object.entries(raw as Record<string, unknown>)
-    .filter(([, v]) => typeof v === 'string' && v.trim() !== '')
-    .map(([k, v]) => [k, String(v).trim()] as const);
-  return entries.length ? Object.fromEntries(entries) : null;
-}
 
 export async function PATCH(
   req: NextRequest,
@@ -46,37 +21,26 @@ export async function PATCH(
   if (denied) return denied;
 
   try {
-    const body   = await req.json() as Record<string, unknown>;
-
-    // Présent mais invalide → 400, même contrainte que le constraint DB.
-    // Absent → on ne touche pas à la valeur existante (retro-compatibilité
-    // avec d'éventuels appelants externes non mis à jour).
-    if ('enabled_modules' in body && !isValidEnabledModules(body.enabled_modules)) {
-      return NextResponse.json(
-        { error: 'enabled_modules doit être un tableau non vide parmi shop, card, event, rental.' },
-        { status: 400 },
-      );
-    }
+    const body = await req.json() as Record<string, unknown>;
+    if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 });
 
     const supabase = createServiceClient();
+    // The stored type decides which fields exist (the body may omit `method`).
+    const { data: existing } = await supabase
+      .from('tenant_payment_methods')
+      .select('method')
+      .eq('id', params.id)
+      .eq('tenant_id', tenant.id)
+      .maybeSingle();
+    if (!existing) return NextResponse.json({ error: 'Moyen de paiement introuvable.' }, { status: 404 });
 
-    const updatePayload: Record<string, unknown> = {};
-
-    const method = 'method' in body && VALID_METHODS.includes(body.method as PaymentMethodType)
-      ? (body.method as PaymentMethodType)
-      : undefined;
-
-    if (method !== undefined) updatePayload.method = method;
-    if ('label'      in body) updatePayload.label      = body.label ? String(body.label).trim() : null;
-    if ('value'      in body) updatePayload.value      = hasNoValueFields((method ?? body.method) as PaymentMethodType) ? null : (body.value ? String(body.value).trim() : null);
-    if ('extra'      in body) updatePayload.extra      = hasNoValueFields((method ?? body.method) as PaymentMethodType) ? null : cleanExtra(body.extra);
-    if ('sort_order' in body) updatePayload.sort_order = parseInt(String(body.sort_order), 10) || 0;
-    if ('active'     in body) updatePayload.active     = Boolean(body.active);
-    if ('enabled_modules' in body) updatePayload.enabled_modules = body.enabled_modules;
+    const parsed = parseUpdate(body, existing as { method: PaymentMethodType });
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+    if (Object.keys(parsed.values).length === 0) return NextResponse.json({ success: true });
 
     const { error } = await supabase
       .from('tenant_payment_methods')
-      .update(updatePayload)
+      .update(parsed.values)
       .eq('id', params.id)
       .eq('tenant_id', tenant.id);
 

@@ -11,7 +11,8 @@ import { resolveCheckoutShippingDetails } from '@/lib/shipping/tariff/shadowTari
 import { revalidateSessionShipping, verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
-import { buildExternalPaymentLink, isLinkPaymentMethod, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
+import { buildExternalPaymentLink, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
+import { isOfferedIn } from '@/lib/payments/paymentChannels';
 import type { ShippingAddress, TenantPaymentMethod } from '@lepefy/types';
 import { normalizeShippingAddress } from '@/lib/address/addressRules';
 import { normalizePhoneForStorage } from '@/lib/phone/internationalPhone';
@@ -402,7 +403,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             .eq('active', true)
             .maybeSingle();
           const method = methodRow as TenantPaymentMethod | null;
-          if (!method || !isLinkPaymentMethod(method)) {
+          if (!method || !isOfferedIn(method, 'shop_checkout')) {
             return NextResponse.json({ error: ERROR_COPY.invalidPaymentMethod }, { status: 400 });
           }
           const currency = (tenant.currency ?? 'EUR').toUpperCase();

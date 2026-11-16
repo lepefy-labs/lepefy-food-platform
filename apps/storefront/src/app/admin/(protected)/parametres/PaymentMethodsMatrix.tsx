@@ -7,6 +7,7 @@ import { PAYMENT_MODULES, paymentMethodName, paymentTypeLabel } from '@/lib/paym
 import { paymentMethodAvailability } from '@/lib/payments/paymentMethodAvailability';
 import { useAdminToast } from '../../_components/ui/Toaster';
 import { PaymentMethodIcon } from './PaymentMethodIcon';
+import { paymentModuleIcon } from './PaymentModuleChip';
 
 interface PaymentMethodsMatrixProps {
   methods: TenantPaymentMethod[];
@@ -25,12 +26,16 @@ export function PaymentMethodsMatrix({ methods, busyId, onToggle }: PaymentMetho
         <thead>
           <tr className="bg-a-surface-2">
             <th scope="col" className="px-3 py-2.5 text-left text-xs font-semibold text-a-text-2">Moyen</th>
-            {PAYMENT_MODULES.map((module) => (
+            {PAYMENT_MODULES.map((module) => {
+              const Glyph = paymentModuleIcon(module.value);
+              return (
               <th key={module.value} scope="col" className="px-3 py-2.5 text-center align-bottom text-xs font-semibold text-a-text-2">
+                <Glyph size={16} stroke={1.8} aria-hidden="true" className="mx-auto mb-1 text-a-brand-fg" />
                 {module.label}
                 <span className="mt-0.5 block text-[11px] font-normal leading-4 text-a-text-3">{module.detail}</span>
               </th>
-            ))}
+              );
+            })}
           </tr>
         </thead>
         <tbody>

@@ -7,7 +7,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { checkoutExpiryFromNow } from '@/lib/checkout/activeCheckoutSession';
 import { isValidCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessionAccessToken';
 import { CheckoutRecoveryClient } from './CheckoutRecoveryClient';
-import { isLinkPaymentMethod } from '@/lib/payments/externalPaymentLink';
+import { methodsOfferedIn } from '@/lib/payments/paymentChannels';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -99,10 +99,7 @@ export default async function CheckoutRecoveryPage({
   }
 
   const allMethods = await getTenantPaymentMethods(tenant.id);
-  const externalPaymentMethods = allMethods.filter(
-    (m) => isLinkPaymentMethod(m)
-      && m.enabled_modules.includes('shop'),
-  );
+  const externalPaymentMethods = methodsOfferedIn(allMethods, 'shop_checkout');
 
   return (
     <CheckoutRecoveryClient

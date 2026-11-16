@@ -5,7 +5,7 @@ import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import { countryOptions } from '@/lib/address/addressRules';
 import RentalReservationsClient from './RentalReservationsClient';
 import type { RentalReservationRequest, RentalFulfillmentType, RentalDeliveryFeeStatus } from '@lepefy/types';
-import { isLinkPaymentMethod } from '@/lib/payments/externalPaymentLink';
+import { methodsOfferedIn } from '@/lib/payments/paymentChannels';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -85,10 +85,7 @@ export default async function AdminRentalReservationsPage() {
   const rentalItemNameById = new Map(((pendingRentalItems ?? []) as { id: string; name: string }[]).map((r) => [r.id, r.name]));
 
   const allPaymentMethods = await getTenantPaymentMethods(tenant.id);
-  const externalPaymentMethods = allPaymentMethods.filter(
-    (m) => isLinkPaymentMethod(m)
-      && m.enabled_modules.includes('rental'),
-  );
+  const externalPaymentMethods = methodsOfferedIn(allPaymentMethods, 'rental');
 
   // Conversion retrait → livraison : pays de livraison du tenant, sinon les pays standard.
   const deliveryCountries = countryOptions(

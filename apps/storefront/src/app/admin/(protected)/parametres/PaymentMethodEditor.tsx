@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { IconArrowLeft } from '@tabler/icons-react';
-import type { PaymentMethodType, TenantPaymentMethod } from '@lepefy/types';
+import type { PaymentMethodType, PaymentModule, TenantPaymentMethod } from '@lepefy/types';
 import Button from '../../_components/ui/Button';
 import { Drawer } from '../../_components/ui/Dialog';
 import { useConfirm, useUnsavedChangesGuard } from '../../_components/ui/ConfirmDialog';
@@ -28,6 +28,7 @@ import {
   type PaymentMethodField,
 } from '@/lib/payments/paymentMethodForm';
 import { PaymentMethodIcon } from './PaymentMethodIcon';
+import { paymentModuleIcon } from './PaymentModuleChip';
 
 export type PaymentMethodEditorTarget = { mode: 'create' } | { mode: 'edit'; method: TenantPaymentMethod };
 
@@ -41,6 +42,11 @@ interface PaymentMethodEditorProps {
 }
 
 const FIELD_ORDER: PaymentMethodField[] = ['link', 'value', 'beneficiary', 'bic'];
+
+function ModuleGlyph({ module }: { module: PaymentModule }) {
+  const Glyph = paymentModuleIcon(module);
+  return <Glyph size={15} stroke={1.8} aria-hidden="true" />;
+}
 
 export function PaymentMethodEditor({ target, existingTypes, onClose, onSave }: PaymentMethodEditorProps) {
   const [draft, setDraft] = useState<PaymentMethodDraft | null>(null);
@@ -253,7 +259,8 @@ export function PaymentMethodEditor({ target, existingTypes, onClose, onSave }: 
                         }}
                         className="mt-0.5 h-4 w-4 accent-[var(--admin-primary)]"
                       />
-                      <span className={cn('text-sm font-semibold', checked ? 'text-a-brand-fg' : availability.ok ? 'text-a-text' : 'text-a-text-3')}>
+                      <span className={cn('inline-flex items-center gap-1.5 text-sm font-semibold', checked ? 'text-a-brand-fg' : availability.ok ? 'text-a-text' : 'text-a-text-3')}>
+                        <ModuleGlyph module={module.value} />
                         {module.label}{!availability.ok && <span className="font-normal"> · sans effet</span>}
                       </span>
                       <span id={`${id}-detail`} className="col-start-2 text-xs leading-4 text-a-text-3">{availability.detail}</span>

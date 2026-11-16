@@ -16,7 +16,8 @@ import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
 import { normalizePhoneForStorage } from '@/lib/phone/internationalPhone';
 import { normalizeShippingAddress, type NormalizedShippingAddress } from '@/lib/address/addressRules';
-import { buildExternalPaymentLink, isLinkPaymentMethod, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
+import { buildExternalPaymentLink, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
+import { isOfferedIn } from '@/lib/payments/paymentChannels';
 import type { TenantPaymentMethod } from '@lepefy/types';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     const method = methodRow as TenantPaymentMethod | null;
-    if (!method || !isLinkPaymentMethod(method)) {
+    if (!method || !isOfferedIn(method, 'shop_checkout')) {
       return NextResponse.json({ error: ERROR_COPY.invalidPaymentMethod }, { status: 400 });
     }
 

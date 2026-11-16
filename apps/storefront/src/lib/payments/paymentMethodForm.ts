@@ -1,4 +1,11 @@
-import { PAYMENT_METHOD_REGISTRY, type PaymentMethodType, type PaymentModule, type TenantPaymentMethod } from '@lepefy/types';
+import {
+  PAYMENT_METHOD_REGISTRY,
+  PAYMENT_METHOD_TYPE_KEYS,
+  PAYMENT_MODULE_KEYS,
+  type PaymentMethodType,
+  type PaymentModule,
+  type TenantPaymentMethod,
+} from '@lepefy/types';
 
 /**
  * Admin editor of `tenant_payment_methods` (Paramètres › Paiements): which
@@ -13,10 +20,10 @@ export const PAYMENT_MODULES: ReadonlyArray<{ value: PaymentModule; label: strin
   { value: 'rental', label: 'Location', detail: 'Réservation de matériel' },
 ];
 
-export const ALL_PAYMENT_MODULES: PaymentModule[] = PAYMENT_MODULES.map((m) => m.value);
+export const ALL_PAYMENT_MODULES: PaymentModule[] = [...PAYMENT_MODULE_KEYS];
 
 /** Order of the type picker. */
-export const PAYMENT_METHOD_TYPES: PaymentMethodType[] = ['card', 'apple_pay', 'paypal', 'satispay', 'bank_transfer', 'cash', 'other'];
+export const PAYMENT_METHOD_TYPES: PaymentMethodType[] = [...PAYMENT_METHOD_TYPE_KEYS];
 
 export const PAYMENT_TYPE_DESCRIPTIONS: Record<PaymentMethodType, string> = {
   card: 'Visa, Mastercard : montant saisi par le client sur /card.',
@@ -29,7 +36,9 @@ export const PAYMENT_TYPE_DESCRIPTIONS: Record<PaymentMethodType, string> = {
 };
 
 /** One row per shop: a second one would only duplicate the same /card button. */
-export const SINGLE_INSTANCE_TYPES: ReadonlySet<PaymentMethodType> = new Set(['card', 'apple_pay']);
+export const SINGLE_INSTANCE_TYPES: ReadonlySet<PaymentMethodType> = new Set(
+  PAYMENT_METHOD_TYPE_KEYS.filter((t) => PAYMENT_METHOD_REGISTRY[t].singleInstance),
+);
 
 export type PaymentMethodField = 'link' | 'value' | 'beneficiary' | 'bic';
 
@@ -89,8 +98,7 @@ export function emptyDraft(method: PaymentMethodType): PaymentMethodDraft {
     beneficiary: '',
     bic: '',
     active: true,
-    // Apple Pay n'existe que dans /card.
-    enabled_modules: method === 'apple_pay' ? ['card'] : [...ALL_PAYMENT_MODULES],
+    enabled_modules: [...PAYMENT_METHOD_REGISTRY[method].defaultModules],
   };
 }
 

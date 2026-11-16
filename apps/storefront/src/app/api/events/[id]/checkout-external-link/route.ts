@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { notifyEventExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyEventExternalPaymentAwaitingVerification';
-import { buildExternalPaymentLink, isLinkPaymentMethod, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
+import { buildExternalPaymentLink, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
+import { isOfferedIn } from '@/lib/payments/paymentChannels';
 import type { EventCheckoutItemInput, TenantPaymentMethod } from '@lepefy/types';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const method = methodRow as TenantPaymentMethod | null;
 
-    if (!method || !isLinkPaymentMethod(method)) {
+    if (!method || !isOfferedIn(method, 'event')) {
       return NextResponse.json({ error: 'Moyen de paiement invalide.' }, { status: 400 });
     }
 

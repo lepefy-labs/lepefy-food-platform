@@ -6,7 +6,7 @@ import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentS
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import CheckoutFlow from './CheckoutFlow';
 import styles from './checkoutSticky.module.css';
-import { isLinkPaymentMethod } from '@/lib/payments/externalPaymentLink';
+import { methodsOfferedIn } from '@/lib/payments/paymentChannels';
 import { createServiceClient } from '@/lib/supabase/server';
 import { loadConfiguredCountries, loadGeoPolicy } from '@/lib/shipping/geo/geoPolicyServer';
 import { destinationCountryList } from '@/lib/shipping/geo/geoPolicy';
@@ -20,10 +20,7 @@ export default async function CheckoutPage() {
     getTenantPaymentMethods(tenant.id),
     getSessionCustomer(tenant.id),
   ]);
-  const externalPaymentMethods = allMethods.filter(
-    (method) => isLinkPaymentMethod(method)
-      && method.enabled_modules.includes('shop'),
-  );
+  const externalPaymentMethods = methodsOfferedIn(allMethods, 'shop_checkout');
   const consentState = await resolveCheckoutConsentState(tenant.id, sessionCustomer?.id ?? null);
 
   // Pays proposés = politique du tenant (la livraison réelle reste décidée par le devis serveur).

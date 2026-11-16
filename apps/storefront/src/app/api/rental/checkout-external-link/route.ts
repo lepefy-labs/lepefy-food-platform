@@ -3,7 +3,8 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { isCountryAllowedForDelivery, matchDeliveryZone } from '@/lib/rental/matchDeliveryZone';
 import { normalizeAddressParts, type NormalizedAddressParts } from '@/lib/address/addressRules';
-import { buildExternalPaymentLink, isLinkPaymentMethod, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
+import { buildExternalPaymentLink, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
+import { isOfferedIn } from '@/lib/payments/paymentChannels';
 import type { RentalCheckoutItemInput, RentalDeliveryZone, TenantPaymentMethod } from '@lepefy/types';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
 
     const method = methodRow as TenantPaymentMethod | null;
 
-    if (!method || !isLinkPaymentMethod(method)) {
+    if (!method || !isOfferedIn(method, 'rental')) {
       return NextResponse.json({ error: 'Moyen de paiement invalide.' }, { status: 400 });
     }
 

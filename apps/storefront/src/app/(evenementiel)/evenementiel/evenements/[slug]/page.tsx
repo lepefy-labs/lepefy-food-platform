@@ -13,7 +13,7 @@ import EventBookingDeadlineGate from './EventBookingDeadlineGate';
 import EventCheckoutClient from './EventCheckoutClient';
 import EventOnSitePriceList from './EventOnSitePriceList';
 import type { EventGalleryPhoto, EventRow, EventTicketType } from '@lepefy/types';
-import { isLinkPaymentMethod } from '@/lib/payments/externalPaymentLink';
+import { methodsOfferedIn } from '@/lib/payments/paymentChannels';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -120,10 +120,7 @@ export default async function EventDetailPage({ params }: PageProps) {
   const minPrice = ticketTypes.length > 0 ? Math.min(...ticketTypes.map((ticket) => ticket.price)) : null;
   const soldOut = eventRow.capacity_remaining <= 0;
 
-  const externalPaymentMethods = allPaymentMethods.filter(
-    (m) => isLinkPaymentMethod(m)
-      && m.enabled_modules.includes('event'),
-  );
+  const externalPaymentMethods = methodsOfferedIn(allPaymentMethods, 'event');
 
   const eventPhotos = (eventPhotosRaw ?? []) as EventGalleryPhoto[];
   const eventImages = eventPhotos.length > 0

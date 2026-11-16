@@ -7,6 +7,7 @@ import { hashPayLinkToken, isWellFormedPayLinkToken } from './payLinkToken';
 import { buildOrderTrackingLink } from '@/lib/orders/convertCheckoutSessionToOrder';
 import { shopBaseUrl } from './assistedOrderServer';
 import { applyLinkAmount } from '@/lib/payments/externalPaymentLink';
+import { methodsOfferedIn } from '@/lib/payments/paymentChannels';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -51,9 +52,7 @@ export interface PublicPaymentMethod {
  * passent par Stripe ; les espèces n'ont pas de sens pour un paiement à distance.
  */
 export function publicExternalMethods(methods: TenantPaymentMethod[]): PublicPaymentMethod[] {
-  return methods
-    .filter((method) => method.active && method.enabled_modules.includes('shop'))
-    .filter((method) => !['card', 'apple_pay', 'cash'].includes(method.method))
+  return methodsOfferedIn(methods, 'shop_pay_link')
     .map((method): PublicPaymentMethod | null => {
       const label = method.label?.trim() || PAYMENT_METHOD_REGISTRY[method.method]?.label || method.method;
       if (method.method === 'bank_transfer') {

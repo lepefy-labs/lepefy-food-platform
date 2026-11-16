@@ -8,7 +8,7 @@ import { selectCateringHeroMedia } from '@/lib/events/selectHeroMedia';
 import CateringLanding from './CateringLanding';
 import RentalCheckoutClient from './RentalCheckoutClient';
 import type { ServiceOffering, RentalItem } from '@lepefy/types';
-import { isLinkPaymentMethod } from '@/lib/payments/externalPaymentLink';
+import { methodsOfferedIn } from '@/lib/payments/paymentChannels';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -62,10 +62,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
   }
 
   const allPaymentMethods = await getTenantPaymentMethods(tenant.id);
-  const externalPaymentMethods = allPaymentMethods.filter(
-    (m) => isLinkPaymentMethod(m)
-      && m.enabled_modules.includes('rental'),
-  );
+  const externalPaymentMethods = methodsOfferedIn(allPaymentMethods, 'rental');
 
   if (serviceOffering.cta_type === 'devis') {
     const cateringPhotos = await loadHeroGallery(supabase, tenant.id, ['traiteur']);

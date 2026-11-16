@@ -34,6 +34,7 @@ import { effectiveModules, isVisibleNowhere, paymentMethodAvailability } from '@
 import { ApplePayDomainStatus } from './ApplePayDomainStatus';
 import { PaymentMethodsMatrix } from './PaymentMethodsMatrix';
 import { PaymentMethodsPreview } from './PaymentMethodsPreview';
+import { PaymentModuleChip } from './PaymentModuleChip';
 import { SettingsIconTile } from './_components/SettingsUi';
 import { PaymentMethodEditor, type PaymentMethodEditorTarget } from './PaymentMethodEditor';
 import { PaymentMethodIcon } from './PaymentMethodIcon';
@@ -396,19 +397,17 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
                       )}
                     </span>
                     <span className="break-all text-xs tabular-nums text-a-text-2">{paymentMethodSummary(method)}</span>
-                    <span className="flex flex-wrap gap-1">
-                      {!method.active && <span className="inline-flex h-5 items-center rounded-full border border-a-border px-2 text-[11px] font-semibold text-a-text-3">Désactivé</span>}
+                    <span className="mt-0.5 flex flex-wrap gap-1.5" aria-label="Services où ce moyen est proposé">
+                      {!method.active && <span className="inline-flex h-6 items-center rounded-md border border-a-border px-2 text-[11px] font-semibold text-a-text-3">Désactivé</span>}
                       {method.active && isVisibleNowhere(method) && (
                         <span
                           title={paymentMethodAvailability(method, method.enabled_modules[0] ?? 'shop').detail}
-                          className="inline-flex h-5 items-center gap-1 rounded-full border border-tone-warning-border bg-tone-warning-bg px-2 text-[11px] font-semibold text-tone-warning-fg"
+                          className="inline-flex h-6 items-center gap-1 rounded-md border border-tone-warning-border bg-tone-warning-bg px-2 text-[11px] font-semibold text-tone-warning-fg"
                         >
                           <IconAlertTriangle size={12} aria-hidden="true" /> Visible nulle part
                         </span>
                       )}
-                      {method.active && effectiveModules(method).map((mod) => (
-                        <span key={mod} className="inline-flex h-5 items-center rounded-full bg-a-brand-soft px-2 text-[11px] font-semibold text-a-brand-fg">{MODULE_SHORT[mod]}</span>
-                      ))}
+                      {method.active && effectiveModules(method).map((mod) => <PaymentModuleChip key={mod} module={mod} />)}
                     </span>
                   </button>
 
