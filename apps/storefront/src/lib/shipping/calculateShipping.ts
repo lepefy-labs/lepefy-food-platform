@@ -91,12 +91,19 @@ export type ShippingResult =
     }
   | {
       available: false;
-      reason:  'packlink_error' | 'no_service' | 'timeout' | 'missing_weight' | 'vat_unknown';
+      reason:  'packlink_error' | 'no_service' | 'timeout' | 'missing_weight' | 'vat_unknown' | 'postal_code_rejected';
       message: string;
     };
 
-/** Esito del tentativo di lettura servizi: distingue errore API e timeout da «nessun servizio». */
-export interface PacklinkFetchFailure { kind?: 'api_error' | 'timeout' }
+/**
+ * Esito del tentativo di lettura servizi: distingue errore API e timeout da «nessun servizio».
+ * `rejected_destination` = HTTP 400: Packlink rifiuta l'indirizzo (in pratica un codice
+ * postale che non conosce, es. PT 4000-001) — riprovare non serve, va corretto il CAP.
+ */
+export interface PacklinkFetchFailure { kind?: 'api_error' | 'timeout' | 'rejected_destination' }
+
+export const POSTAL_CODE_REJECTED_MESSAGE =
+  "Nous ne reconnaissons pas ce code postal. Vérifiez-le dans l'adresse de livraison.";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -197,7 +204,7 @@ export async function fetchAllPacklinkServices(
   }
 
   if (!res.ok) {
-    if (opts?.failure) opts.failure.kind = 'api_error';
+    if (opts?.failure) opts.failure.kind = res.status === 400 ? 'rejected_destination' : 'api_error';
     let body = '';
     try { body = await res.text(); } catch { /* ignore */ }
     console.error('[calculateShipping] Packlink API error — status:', res.status, '— body:', body.slice(0, 500));
@@ -342,7 +349,7 @@ export async function calculateShipping(
         height: boxDimensions.height,
         length: boxDimensions.length,
       })),
-      input.strict ? { timeoutMs: input.strict.timeoutMs ?? 8000, failure } : undefined,
+      input.strict ? { timeoutMs: input.strict.timeoutMs ?? 8000, failure } : { failure },
     );
   } catch (err) {
     console.error('[calculateShipping] fetchPacklinkCost threw unexpectedly:', err);
@@ -353,7 +360,12 @@ export async function calculateShipping(
     };
   }
 
-  if (!packlinkResult && failure.kind) {
+  if (!packlinkResult && failure.kind === 'rejected_destination') {
+    return { available: false, reason: 'postal_code_rejected', message: POSTAL_CODE_REJECTED_MESSAGE };
+  }
+
+  // Hors mode strict, une erreur API reste «aucun service» (comportement historique).
+  if (!packlinkResult && failure.kind && input.strict) {
     return {
       available: false,
       reason: failure.kind === 'timeout' ? 'timeout' : 'packlink_error',

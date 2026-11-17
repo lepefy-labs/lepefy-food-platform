@@ -44,6 +44,7 @@ import {
   type CommercialRulesResult, type TariffPriceResult, type TariffSnapshot,
 } from './priceFromTariff';
 import { parseTariffVersion } from './tariffVersion';
+import { POSTAL_CODE_REJECTED_MESSAGE } from '@/lib/shipping/calculateShipping';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 type PricedResult = Extract<TariffPriceResult, { available: true }>;
@@ -111,6 +112,9 @@ export const MISSING_WEIGHT_MESSAGE = (clickCollectEnabled: boolean) =>
   `Nous ne pouvons pas encore calculer la livraison de certains articles. ${alternative(clickCollectEnabled)}`;
 export const NO_TARIFF_MESSAGE = (clickCollectEnabled: boolean) =>
   `La livraison en ligne n'est pas disponible vers ce pays. ${alternative(clickCollectEnabled)}`;
+/** Le transporteur ne reconnaît pas le code postal : corriger l'adresse, pas réessayer plus tard. */
+export const POSTAL_CODE_REJECTED_CUSTOMER_MESSAGE = (clickCollectEnabled: boolean) =>
+  `${POSTAL_CODE_REJECTED_MESSAGE} S'il est correct, ${clickCollectEnabled ? 'choisissez le retrait en boutique ou contactez-nous.' : 'contactez-nous pour trouver une solution.'}`;
 export const ZONE_NOT_COVERED_MESSAGE = (clickCollectEnabled: boolean) =>
   `La livraison en ligne n'est pas disponible vers ce code postal. ${alternative(clickCollectEnabled)}`;
 

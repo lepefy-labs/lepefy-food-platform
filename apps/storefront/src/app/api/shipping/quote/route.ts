@@ -42,7 +42,7 @@ import { postalCodeRequired } from '@/lib/address/addressRules';
 import { checkDeliveryGeo } from '@/lib/shipping/geo/geoPolicyServer';
 import { LEGACY_DELIVERY_COUNTRIES, geoPolicyStamp, type GeoPolicy } from '@/lib/shipping/geo/geoPolicy';
 import {
-  MISSING_WEIGHT_MESSAGE, NO_TARIFF_MESSAGE, ZONE_NOT_COVERED_MESSAGE, type TariffUnavailableCode,
+  MISSING_WEIGHT_MESSAGE, NO_TARIFF_MESSAGE, POSTAL_CODE_REJECTED_CUSTOMER_MESSAGE, ZONE_NOT_COVERED_MESSAGE, type TariffUnavailableCode,
   buildTariffShippingDetails, checkTariffAvailability, computeTariffQuote, quantitiesFromItems, tariffUnavailableMessage,
 } from '@/lib/shipping/tariff/tariffQuote';
 
@@ -91,7 +91,7 @@ type ProviderQuote =
   | { available: true; shippingTotal: number; shippingDetails: Record<string, unknown> | null; freeShipping: FreeShippingInfo }
   | { available: false; message: string; status?: number; reason?: ProviderFailureReason };
 
-type ProviderFailureReason = 'no_service' | 'api_error' | 'timeout' | 'missing_weight' | 'vat_unknown';
+type ProviderFailureReason = 'no_service' | 'api_error' | 'timeout' | 'missing_weight' | 'vat_unknown' | 'postal_code_rejected';
 
 /** Destination hors des pays historiques: devis rigoureux (poids serveur, TVA explicite, timeout). */
 function isInternationalQuote(country: string): boolean {
@@ -114,6 +114,7 @@ async function serverWeightedItems(
 
 /** Motif de non-disponibilité provider → message client (sans détail technique). */
 function providerFailureMessage(reason: ProviderFailureReason | undefined, clickCollect: boolean, fallback: string): string {
+  if (reason === 'postal_code_rejected') return POSTAL_CODE_REJECTED_CUSTOMER_MESSAGE(clickCollect);
   if (reason === 'no_service') return tariffUnavailableMessage('no_service', clickCollect);
   if (reason === 'api_error' || reason === 'timeout') return tariffUnavailableMessage('provider_unavailable', clickCollect);
   if (reason === 'missing_weight') return MISSING_WEIGHT_MESSAGE(clickCollect);
@@ -283,7 +284,9 @@ async function quoteProviderCost(
         const reason: ProviderFailureReason = result.reason === 'packlink_error' ? 'api_error' : result.reason;
         return {
           available: false,
-          message: strict ? providerFailureMessage(reason, Boolean(tenant.click_collect_enabled), message) : message,
+          message: strict || reason === 'postal_code_rejected'
+            ? providerFailureMessage(reason, Boolean(tenant.click_collect_enabled), message)
+            : message,
           reason,
         };
       }

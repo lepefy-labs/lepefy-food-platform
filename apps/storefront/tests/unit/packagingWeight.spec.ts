@@ -6,8 +6,8 @@ import {
   bandsFromRows, bandsToRows, distributeAddedWeight, grossParcelWeights, packagingWeightForOrder, parsePackagingWeightBandsInput,
   type PackagingWeightBand,
 } from '../../src/lib/shipping/packagingWeight';
-import { calculateShipping } from '../../src/lib/shipping/calculateShipping';
-import { planTariffParcels } from '../../src/lib/shipping/tariff/tariffQuote';
+import { POSTAL_CODE_REJECTED_MESSAGE, calculateShipping } from '../../src/lib/shipping/calculateShipping';
+import { POSTAL_CODE_REJECTED_CUSTOMER_MESSAGE, planTariffParcels } from '../../src/lib/shipping/tariff/tariffQuote';
 import { buildShipmentDraftInput } from '../../src/lib/shipping/shipmentDraft/buildDraftInput';
 import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
 import { computeCartonSuggestion, declaredWeightFor } from '../../src/lib/shipping/loadCartonSuggestion';
@@ -97,6 +97,38 @@ test.describe('calculateShipping', () => {
     if (!result.available) throw new Error('expected a quote');
     expect(result._internal).not.toHaveProperty('packagingWeightG');
     expect(result._internal).not.toHaveProperty('grossWeightG');
+  });
+
+  test.describe('Packlink refuse la destination', () => {
+    const respondWith = (status: number) => {
+      globalThis.fetch = (async () => new Response('{"messages":[{"message":"Bad Request"}]}', { status })) as typeof fetch;
+    };
+    const quoteTo = (strict: boolean) => calculateShipping({
+      cartItems: [{ weight_grams: 1000, quantity: 1 }], from: { country: 'IT', zip_code: '42122' }, to: { country: 'PT', zip_code: '4000-001' },
+      packagingSurcharge: PACKAGING, vatRates: [], ...(strict ? { strict: {} } : {}),
+    }, 'key');
+
+    test('400 = code postal non reconnu, en mode strict comme historique', async () => {
+      respondWith(400);
+      for (const strict of [true, false]) {
+        expect(await quoteTo(strict)).toEqual({ available: false, reason: 'postal_code_rejected', message: POSTAL_CODE_REJECTED_MESSAGE });
+      }
+    });
+
+    test('5xx reste une panne (strict) ou « aucun service » (historique)', async () => {
+      respondWith(502);
+      expect(await quoteTo(true)).toMatchObject({ available: false, reason: 'packlink_error' });
+      expect(await quoteTo(false)).toMatchObject({ available: false, reason: 'no_service' });
+    });
+
+    test('message client : corriger le code postal, jamais « réessayez »', () => {
+      for (const clickCollect of [true, false]) {
+        const message = POSTAL_CODE_REJECTED_CUSTOMER_MESSAGE(clickCollect);
+        expect(message).toContain('code postal');
+        expect(message).not.toMatch(/réessayez/i);
+      }
+      expect(POSTAL_CODE_REJECTED_CUSTOMER_MESSAGE(true)).toContain('retrait en boutique');
+    });
   });
 });
 
