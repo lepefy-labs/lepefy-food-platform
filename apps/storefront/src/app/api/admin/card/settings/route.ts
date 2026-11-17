@@ -7,7 +7,7 @@ import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidati
 import { ModuleConfigValidationError, updateModuleConfig } from '@/lib/tenantConfig/moduleConfig';
 import { digitalCardModule, readDigitalCardSettings } from '@/lib/card/digitalCardSettings';
 import { normalizeHeroPosition, type DigitalCardConfig } from '@/lib/card/cardHero';
-import { openingHoursSchema } from '@/lib/card/openingHours';
+import { openingHoursSchema, openingHoursText } from '@/lib/card/openingHours';
 import { removeOldHeroVariants } from '@/lib/card/cardHeroStorage';
 
 export const runtime = 'nodejs';
@@ -60,7 +60,21 @@ async function handlePATCH(req: NextRequest) {
   try {
     const state = await updateModuleConfig(db, digitalCardModule, tenantId, { config: patch });
     if (parsed.data.reset_hero) await removeOldHeroVariants(db, tenantId, null);
-    return NextResponse.json({ config: state.config });
+    // The text hours read by pickup e-mails, Nala, WhatsApp and the poster are
+    // generated from the grid, so they can never contradict the card.
+    let hoursText: { fr: string; it: string } | null = null;
+    if (parsed.data.opening_hours) {
+      hoursText = { fr: openingHoursText(parsed.data.opening_hours, 'fr'), it: openingHoursText(parsed.data.opening_hours, 'it') };
+      const { error } = await db
+        .from('tenants')
+        .update({ click_collect_hours: hoursText.fr, click_collect_hours_it: hoursText.it })
+        .eq('id', tenantId);
+      if (error) {
+        console.error('[card settings] hours text update failed', tenantId, error.message);
+        return NextResponse.json({ error: 'Les horaires de la carte sont enregistrés, mais pas leur version texte (e-mails, Nala). Réessayez.' }, { status: 500 });
+      }
+    }
+    return NextResponse.json({ config: state.config, hours_text: hoursText });
   } catch (error) {
     if (error instanceof ModuleConfigValidationError) {
       return NextResponse.json({ error: 'Réglages invalides.', issues: error.issues }, { status: 400 });

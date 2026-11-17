@@ -85,7 +85,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         key: 'retrait',
         title: 'Retrait & horaires',
         navLabel: 'Retrait & horaires',
-        description: 'Points de retrait, adresse, accès et horaires.',
+        description: 'Point de retrait, horaires et fermetures exceptionnelles.',
         href: `${BASE}/retrait`,
         icon: IconMapPin,
         accent: 'emerald',
@@ -93,7 +93,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         entries: [
           { title: 'Adresse de retrait', description: 'Adresse du point de retrait click & collect.', href: `${BASE}/retrait#point-principal`, keywords: ['adresse', 'click & collect'] },
           { title: 'Lien Google Maps', description: 'Itinéraire vers le point de retrait.', href: `${BASE}/retrait#point-principal`, keywords: ['google', 'maps', 'itinéraire', 'plan', 'accès'] },
-          { title: 'Horaires de retrait', description: 'Horaires affichés en français et en italien.', href: `${BASE}/retrait#point-principal`, keywords: ['horaires', 'heures', 'ouverture', 'orari'] },
+          { title: 'Horaires d’ouverture', description: 'Une saisie pour la carte digitale, les e-mails de retrait et Nala.', href: `${BASE}/retrait#horaires-ouverture`, keywords: ['horaires', 'heures', 'ouverture', 'orari', 'ouvert', 'fermé', 'pause'] },
+          { title: 'Fermetures exceptionnelles', description: 'Jours fériés, congés : « Fermé exceptionnellement » sur la carte.', href: `${BASE}/retrait#fermetures`, keywords: ['fermeture', 'férié', 'congés', 'vacances', 'noël', 'août', 'chiusura'] },
         ],
       },
       {

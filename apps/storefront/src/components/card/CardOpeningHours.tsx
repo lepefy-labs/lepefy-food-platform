@@ -3,15 +3,15 @@
 import { useEffect, useState } from 'react';
 import { IconClock } from '@tabler/icons-react';
 import {
-  DAY_LABELS, formatTime, localNow, openingStatus, statusLabel, weekRows,
-  type DayKey, type OpeningHours, type OpeningStatus,
+  DAY_LABELS, addDays, formatShortDate, formatTime, localDate, localNow, openingStatus, statusLabel, upcomingClosures, weekRows,
+  type Closure, type DayKey, type OpeningHours, type OpeningStatus,
 } from '@/lib/card/openingHours';
 
 type Lang = 'fr' | 'it';
 
 const COPY = {
-  fr: { title: 'Horaires', closed: 'Fermé' },
-  it: { title: 'Orari', closed: 'Chiuso' },
+  fr: { title: 'Horaires', closed: 'Fermé', closures: 'Fermetures à venir' },
+  it: { title: 'Orari', closed: 'Chiuso', closures: 'Chiusure in arrivo' },
 } as const;
 
 /**
@@ -23,12 +23,16 @@ export function CardOpeningHours({ hours, lang, primaryColor }: { hours: Opening
   const t = COPY[lang];
   const [status, setStatus] = useState<OpeningStatus | null>(null);
   const [today, setToday] = useState<DayKey | null>(null);
+  const [soon, setSoon] = useState<Closure[]>([]);
 
   useEffect(() => {
     const update = () => {
       const now = new Date();
       setStatus(openingStatus(hours, now));
       setToday(localNow(now, hours.timezone).day);
+      // Closures starting within 30 days (today's one is in the status pill).
+      const date = localDate(now, hours.timezone);
+      setSoon(upcomingClosures(hours, date).filter((c) => c.from > date && c.from <= addDays(date, 30)));
     };
     update();
     const timer = window.setInterval(update, 60_000);
@@ -65,6 +69,12 @@ export function CardOpeningHours({ hours, lang, primaryColor }: { hours: Opening
             );
           })}
         </dl>
+        {soon.length > 0 && (
+          <p className="mt-2 text-xs leading-5 text-gray-700">
+            <span className="font-bold">{t.closures} :</span>{' '}
+            {soon.map((c) => `${c.from === c.to ? formatShortDate(c.from, lang) : `${formatShortDate(c.from, lang)} – ${formatShortDate(c.to, lang)}`}${c.label ? ` (${c.label})` : ''}`).join(' · ')}
+          </p>
+        )}
       </div>
     </div>
   );
