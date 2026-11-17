@@ -18,6 +18,10 @@ const FILES = [
   ['config/features.json', 'features.json', (s) => s],
 ];
 
+// Line endings are not content: a Windows checkout (core.autocrlf) turns the
+// sources and the copy into CRLF, but the header added here ends with LF.
+const sameContent = (a, b) => a !== null && a.replace(/\r\n/g, '\n') === b.replace(/\r\n/g, '\n');
+
 const check = process.argv.includes('--check');
 let stale = 0;
 mkdirSync(DEST, { recursive: true });
@@ -25,7 +29,7 @@ for (const [from, to, transform] of FILES) {
   const out = transform(readFileSync(join(ROOT, from), 'utf8'));
   const target = join(DEST, to);
   const current = existsSync(target) ? readFileSync(target, 'utf8') : null;
-  if (current === out) continue;
+  if (sameContent(current, out)) continue;
   if (check) { console.error(`stale: ${to}`); stale++; } else writeFileSync(target, out);
 }
 if (check && stale) process.exit(1);
