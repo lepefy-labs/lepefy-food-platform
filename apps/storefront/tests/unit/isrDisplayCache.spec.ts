@@ -18,6 +18,7 @@ const appFile = (file: string) => readFileSync(path.join(__dirname, '../../src/a
 const ISR_PAGES = [
   '(shop)/products/[slug]/page.tsx',
   '(shop)/accueil/page.tsx',
+  '(shop)/app/page.tsx',
   'card/page.tsx',
   '(shop)/avis/page.tsx',
   '(shop)/politique-confidentialite/page.tsx',

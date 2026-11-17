@@ -3,6 +3,7 @@ import { ShopMain } from '@/components/layout/ShopMain';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { PWABanner } from '@/components/PWABanner';
+import { AppUsageTracker } from '@/components/pwa/AppUsageTracker';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { PromoTickerGate } from '@/components/layout/PromoTickerGate';
 import { ShopSearchBar } from '@/components/search/ShopSearchBar';
@@ -34,6 +35,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
     <div className="min-h-screen flex flex-col">
       <CartSyncProvider>
       <PWABanner />
+      <AppUsageTracker />
       <Suspense fallback={<div className="h-24" />}><Header socialLinks={socialLinks} storyEnabled={storyEnabled} reviewsAvailable={reviewsAvailable} /></Suspense>
 
       {/* Recherche juste sous l'header (mobile/tablette ; dans l'header en desktop),

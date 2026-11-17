@@ -324,6 +324,12 @@ Two separate clients exist — use the right one:
 - One controller (`lib/pwa/lifecycle.ts`, pure, injected deps) mounted by `components/pwa/PwaLifecycle.tsx` in the root layout (replaces `PWARegister`): on return to foreground it updates the service worker, compares `NEXT_PUBLIC_APP_VERSION` (build SHA) with `GET /api/app-version` (no DB, throttled 5 min, failures silent), refreshes server data with `router.refresh()` after ≥ 30 min away and revalidates the customer session after ≥ 6 h. No polling.
 - A full reload happens only when safe: work that a reload would destroy holds a lock (`useBusyLock(active, reason)` / `acquireBusy` in `lib/pwa/busyRegistry.ts`; `useUnsavedChangesGuard`, `CheckoutFlow` and the Stripe steps already do), `activityTracker` covers touched form fields and in-flight writes, critical routes and unsynced cart mutations also block, and `sessionStorage` `lepefy:pwa-reload` allows one automatic reload per target per 30 min. Otherwise a banner offers the update. New payment/editing UI must take a lock; never reload from elsewhere.
 
+### Storefront app install (page /app, migration 186)
+
+- `/app` (`app/(shop)/app/`, ISR) explains how to install the storefront PWA for the visitor's device: pure rule `detectInstallContext` in `lib/pwa/appInstall.ts` (`installed` / `in_app_browser` — Gmail, Instagram, WebView: nothing installs there, ask to open Safari/Chrome — / `ios` / `android` native prompt else ⋮ menu / `desktop`). `PWABanner` is hidden on `/app`.
+- Customer emails link to it with `appInstallUrl(storefrontUrl, source)`: dominant block in `orderCompletedEmail` (« Voir ma commande » becomes a link), discreet tip in `orderConfirmedEmail`; never in cancellation, payment, cart-comeback emails.
+- Measurement: aggregated counters only (`storefront_app_counts`, day × event × source, no visitor data, service role read-only, written by RPC `record_storefront_app_event` via `POST /api/app/event`, always 204, fail-open without the migration). Events/sources are mirrored in `APP_EVENTS`/`APP_SOURCES` (parity test); `AppUsageTracker` in the shop layout counts `standalone_launch` once per session and `app_installed`.
+
 ### Lepefy Admin PWA (installable admin) — `docs/ADMIN_PWA.md`
 
 - Manifest `/admin/manifest.webmanifest` (id/scope `/admin`), metadata override in `app/admin/layout.tsx`; the storefront manifest is the route `app/manifest.webmanifest/route.ts` (a `manifest.ts` file convention would beat the admin override). `public/sw.js` stays network-only.

@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useTenant } from '@/providers/TenantProvider';
+import { APP_INSTALL_PATH } from '@/lib/pwa/appInstall';
+import { recordAppEvent, rememberAppSource } from '@/lib/pwa/recordAppEvent';
 
 const DISMISS_KEY = 'pwa-banner-dismissed';
 const SEVEN_DAYS  = 7 * 24 * 60 * 60 * 1000;
@@ -13,6 +16,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 export function PWABanner() {
   const tenant = useTenant();
+  const pathname = usePathname();
   const [show,           setShow]           = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
@@ -37,9 +41,14 @@ export function PWABanner() {
 
   async function handleInstall() {
     if (!deferredPrompt) return;
+    rememberAppSource('banner');
+    recordAppEvent('install_prompt', 'banner');
     await deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') setShow(false);
+    if (outcome === 'accepted') {
+      recordAppEvent('install_accepted', 'banner');
+      setShow(false);
+    }
   }
 
   function handleDismiss() {
@@ -47,7 +56,8 @@ export function PWABanner() {
     setShow(false);
   }
 
-  if (!show) return null;
+  // La page /app porte déjà son propre bouton d'installation.
+  if (!show || pathname === APP_INSTALL_PATH) return null;
 
   return (
     <>

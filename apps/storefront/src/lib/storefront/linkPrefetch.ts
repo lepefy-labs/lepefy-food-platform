@@ -11,6 +11,7 @@
 /** Shop pages rendered from the ISR/static cache: prefetching them costs no function. */
 const CACHED_PATHS = new Set([
   '/accueil',
+  '/app',
   '/avis',
   '/card',
   '/evenementiel',

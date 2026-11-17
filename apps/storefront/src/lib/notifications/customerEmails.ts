@@ -4,6 +4,7 @@ import { cardPaymentReference } from '@/lib/card/cardPaymentOutcome';
 import { orderLineDetail, resolveSellingFormat, type SellingFormatSource } from '@/lib/storefrontCopy/sellingFormat';
 import { SUMMARY_COPY } from '@/lib/storefrontCopy/copy';
 import { distinctAddressLine2 } from '@/lib/address/addressRules';
+import { appInstallUrl } from '@/lib/pwa/appInstall';
 
 export { cardPaymentReference };
 
@@ -90,6 +91,11 @@ body{font-family:Arial,Helvetica,sans-serif;background:#f5f6f8;margin:0;padding:
 .cta{display:inline-block;background:${primary};color:#ffffff !important;text-decoration:none;padding:15px 24px;border-radius:8px;font-weight:700;font-size:15px}
 .secondary-wrap{text-align:center;margin:-6px 0 18px}
 .secondary-link{color:${primary} !important;font-weight:600;font-size:14px}
+.app-box{background:#f8fafc;border:2px solid ${primary};border-radius:10px;padding:22px 20px 6px;margin:26px 0;text-align:center}
+.app-box h2{font-size:17px;margin:0 0 8px;color:#252525}
+.app-box p{font-size:14px !important;margin:0 0 4px !important}
+.app-box .cta-wrap{margin:18px 0}
+.app-tip{background:#f8fafc;border-radius:8px;padding:14px 16px;margin:4px 0 22px;font-size:14px;line-height:1.6;color:#444444;text-align:center}
 .note{font-size:13px !important;color:#666666 !important;text-align:center;margin-top:4px !important}
 .support-box{background:#f8fafc;border-radius:8px;padding:18px;margin:28px 0 22px}
 .support-box p{margin:0 0 12px}
@@ -134,6 +140,21 @@ function infoBox(rows: Array<[string, string | null | undefined, { raw?: boolean
 function cta(url: string | null | undefined, label: string) {
   const href = safeUrl(url);
   return href ? `<div class="cta-wrap"><a class="cta" href="${href}">${esc(label)}</a></div>` : '';
+}
+
+/**
+ * Invitation à installer l'application (page /app, mesurée par `?src=`, migration 186).
+ * `primary` = bloc dominant avec bouton ; `tip` = astuce discrète sous l'action principale.
+ * Rien si l'URL boutique n'est pas http(s).
+ */
+function appInstallBlock(context: TenantNotificationContext, source: 'email_confirmed' | 'email_completed', variant: 'primary' | 'tip') {
+  const href = safeUrl(appInstallUrl(context.storefrontUrl, source));
+  if (!href) return '';
+  const name = esc(context.tenantName);
+  if (variant === 'tip') {
+    return `<div class="app-tip">📲 <strong>Astuce :</strong> ajoutez ${name} à l’écran d’accueil de votre téléphone.<br><a class="secondary-link" href="${href}">Installer l’application</a></div>`;
+  }
+  return `<div class="app-box"><h2>📲 Votre prochaine commande en un geste</h2><p>Ajoutez <strong>${name}</strong> à l’écran d’accueil de votre téléphone. Gratuit, sans passer par un store.</p><div class="cta-wrap"><a class="cta" href="${href}">Installer l’application</a></div></div>`;
 }
 
 function supportBox(context: TenantNotificationContext, heading: string, isIt = false) {
@@ -222,6 +243,7 @@ ${orderLinesBox(context, { items: input.items ?? [], delivery, shippingTotal: in
     ? '🚚 Nous vous préviendrons dès que votre commande sera expédiée. Vous recevrez alors les informations nécessaires pour suivre votre colis.'
     : '🏪 Nous vous préviendrons dès que votre commande sera prête à être retirée.'}</p>
 ${cta(input.orderTrackingLink, '👀 Voir ma commande')}
+${appInstallBlock(context, 'email_confirmed', 'tip')}
 ${supportBox(context, '💬 Une question concernant votre commande ?')}
 ${signature(context, `🙏 Merci de faire confiance à <strong>${esc(context.tenantName)}</strong>.`)}`,
     }),
@@ -302,6 +324,12 @@ export function orderCompletedEmail(context: TenantNotificationContext, input: O
 }): RenderedEmail {
   const pickedUp = input.completionType === 'picked_up';
   const tenant = `<strong>${esc(context.tenantName)}</strong>`;
+  // Commande terminée : l'installation devient l'action dominante, « Voir ma commande » passe en lien.
+  const appBox = appInstallBlock(context, 'email_completed', 'primary');
+  const tracking = safeUrl(input.orderTrackingLink);
+  const orderLink = appBox
+    ? (tracking ? `<div class="secondary-wrap"><a class="secondary-link" href="${tracking}">Voir ma commande</a></div>` : '')
+    : cta(input.orderTrackingLink, 'Voir ma commande');
   return {
     subject: subject(input.testMode, pickedUp
       ? `✅ Votre commande ${input.orderNumber} a bien été retirée`
@@ -321,7 +349,8 @@ ${infoBox([
 <p>${pickedUp
     ? 'Votre commande est maintenant terminée. Vous pouvez toujours consulter son détail depuis votre espace commande.'
     : '<strong>Vous n’avez pas reçu votre colis ou quelque chose ne va pas ?</strong><br>Contactez-nous afin que notre équipe puisse vous aider.'}</p>
-${cta(input.orderTrackingLink, 'Voir ma commande')}
+${appBox}
+${orderLink}
 ${supportBox(context, pickedUp ? '💬 Une question concernant votre commande ?' : '💬 Un problème avec votre livraison ?')}
 ${signature(context, pickedUp ? `À bientôt chez ${tenant} !` : `Merci d’avoir choisi ${tenant}.`)}`,
     }),
