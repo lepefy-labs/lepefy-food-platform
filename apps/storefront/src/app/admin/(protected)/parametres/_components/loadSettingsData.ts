@@ -63,7 +63,7 @@ export async function loadSettingsStatuses(tenant: Tenant): Promise<SettingsStat
     readOrderPreparationSettings(db, tenant.id),
   ]);
 
-  const profileComplete = Boolean(tenant.storefront_url && tenant.whatsapp_number);
+  const profileComplete = Boolean(tenant.storefront_url);
   const pickupConfigured = Boolean(tenant.click_collect_address);
   const activeSocial = socialLinks.filter((link) => link.active).length;
   const activeRecipients = recipients.filter((recipient) => recipient.active).length;
@@ -72,7 +72,7 @@ export async function loadSettingsStatuses(tenant: Tenant): Promise<SettingsStat
   const integrations = loadIntegrationStatuses(tenant).filter((item) => item.state === 'connected' || item.state === 'configured').length;
   const legalComplete = Boolean(tenant.legal_name && tenant.legal_address && tenant.legal_email);
 
-  const presenceParts = [activeSocial > 0 ? plural(activeSocial, 'réseau', 'réseaux') : null, tenant.google_review_url ? 'avis Google' : null].filter(Boolean);
+  const presenceParts = [activeSocial > 0 ? plural(activeSocial, 'réseau', 'réseaux') : null, tenant.whatsapp_number ? 'WhatsApp' : null, tenant.google_review_url ? 'avis Google' : null].filter(Boolean);
 
   return {
     boutique: profileComplete ? { label: 'Configuré', tone: 'ok' } : { label: 'À compléter', tone: 'warning' },

@@ -1,3 +1,4 @@
+import { normalizeWhatsappNumber } from '@/lib/social/whatsappNumber';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -116,6 +117,13 @@ async function handlePATCH(req: NextRequest) {
     }
     return acc;
   }, {});
+
+  // wa.me needs digits only: store the normalised international number.
+  if ('whatsapp_number' in body) {
+    const whatsapp = normalizeWhatsappNumber(body.whatsapp_number);
+    if (!whatsapp.ok) return NextResponse.json({ error: whatsapp.error }, { status: 400 });
+    updatePayload.whatsapp_number = whatsapp.digits;
+  }
 
   const supabase = createServiceClient();
 
