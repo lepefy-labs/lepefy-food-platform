@@ -59,10 +59,11 @@ export function buildNalaStoreFactsText(input: NalaStoreFactsInput): string {
     ? `- Retrait en boutique (Click & Collect) : possible${input.pickupAddress ? `, à l'adresse ${input.pickupAddress}` : ''}.`
     : '- Retrait en boutique : non proposé en ligne.');
   if (input.deliveryCountries && input.deliveryCountries.length > 0) {
-    const list = input.deliveryCountries.length <= LIST_COUNTRIES_MAX
-      ? countryNames(input.deliveryCountries)
-      : `${input.deliveryCountries.length} pays`;
-    lines.push(`- Pays de livraison acceptés au paiement : ${list}. Pour tout autre pays, dis que la livraison en ligne n'y est pas proposée. Le prix exact et la confirmation viennent du calcul fait au paiement avec l'adresse complète ; si le code postal n'est pas reconnu, le client doit le vérifier.`);
+    const coverage = input.deliveryCountries.length <= LIST_COUNTRIES_MAX
+      ? `- Pays de livraison acceptés au paiement : ${countryNames(input.deliveryCountries)}. Pour tout autre pays, dis que la livraison en ligne n'y est pas proposée.`
+      // Liste trop longue pour être citée : jamais un nombre de pays, qui sonne faux au client.
+      : '- Pays de livraison : tous les pays desservis par notre transporteur. Ne cite jamais un nombre de pays ; dis simplement que la boutique livre dans ce pays et que le transporteur confirme la destination au paiement.';
+    lines.push(`${coverage} Le prix exact et la confirmation viennent du calcul fait au paiement avec l'adresse complète ; si le code postal n'est pas reconnu, le client doit le vérifier.`);
   }
   if (input.appInstallUrl) {
     lines.push(`- Application : la boutique s'installe gratuitement sur le téléphone, sans passer par un store (icône sur l'écran d'accueil). Les étapes sont sur ${input.appInstallUrl}. Ne dis jamais qu'il n'y a rien à installer.`);

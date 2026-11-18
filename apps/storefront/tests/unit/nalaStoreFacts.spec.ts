@@ -34,9 +34,12 @@ test.describe('faits du magasin pour Nala', () => {
     expect(text).not.toContain('Application');
   });
 
-  test('une longue liste de pays est résumée', () => {
-    const many = Array.from({ length: 40 }, (_, i) => `A${String.fromCharCode(65 + (i % 26))}`);
-    expect(buildNalaStoreFactsText({ ...FACTS, deliveryCountries: many })).toContain('Pays de livraison acceptés au paiement : 40 pays.');
+  test('une longue liste de pays devient « tous les pays desservis », jamais un nombre', () => {
+    const many = Array.from({ length: 245 }, (_, i) => `A${String.fromCharCode(65 + (i % 26))}`);
+    const text = buildNalaStoreFactsText({ ...FACTS, deliveryCountries: many });
+    expect(text).toContain('tous les pays desservis par notre transporteur');
+    expect(text).toContain('Ne cite jamais un nombre de pays');
+    expect(text).not.toMatch(/\b245\b/);
   });
 
   test('la révision change dès qu’un fait change (cache des réponses invalidé)', () => {
