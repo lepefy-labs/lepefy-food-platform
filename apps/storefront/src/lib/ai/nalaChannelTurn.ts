@@ -13,6 +13,7 @@ import { getNalaExtraContext } from '@/lib/ai/aiSettings';
 import { persistNalaResponseMemory, resolveNalaResponseMemory } from '@/lib/ai/nalaResponseMemory';
 import { canUseNala } from '@/lib/entitlements/tenantEntitlements';
 import { createServiceClient } from '@/lib/supabase/server';
+import { loadNalaStoreFacts } from '@/lib/ai/nalaStoreFacts';
 
 /**
  * Nala sur un canal de messagerie (WhatsApp aujourd'hui, Instagram/Messenger
@@ -91,7 +92,8 @@ export async function runNalaChannelTurn(params: {
       return { status: 'answered', reply: smallTalk, intent: 'small_talk', confidence: 1, conversationId: conversation.id, provider: 'lepefy', model: 'small_talk' };
     }
 
-    const memory = hadPendingAction ? null : await resolveNalaResponseMemory({ supabase, tenant, locale, message });
+    const storeFacts = await loadNalaStoreFacts({ supabase, tenant, locale });
+    const memory = hadPendingAction ? null : await resolveNalaResponseMemory({ supabase, tenant, locale, message, factsRevision: storeFacts.revision });
     if (memory) {
       await logAiUsage({ tenantId: tenant.id, endpoint, provider: 'lepefy', model: 'response_memory_v1', consumer: 'nala', capability: 'deterministic', status: 'success' });
       await finishConversation(conversation, {
@@ -129,6 +131,7 @@ export async function runNalaChannelTurn(params: {
       // Le client écrit déjà sur WhatsApp : pas de renvoi vers un autre numéro.
       whatsappNumber: null,
       extraContext: extraContext?.slice(0, 4000) ?? null,
+      storeFacts: storeFacts.text,
       matchedProducts,
       knowledgeSnippets,
     });
@@ -151,7 +154,7 @@ export async function runNalaChannelTurn(params: {
       confidence: decision.confidence, commerceMode: decision.commerceMode,
     });
     await persistNalaResponseMemory({
-      supabase, tenant, locale, message, reply, decision, cartPlan, hadPendingAction,
+      supabase, tenant, factsRevision: storeFacts.revision, locale, message, reply, decision, cartPlan, hadPendingAction,
       matchedProductIds: productRows.length ? productRows.map((row) => row.id) : null,
       matchedKbIds: knowledgeRows.length ? knowledgeRows.map((row) => row.id) : null,
       interactionId: null, sourceProvider: response.provider, sourceModel: response.model,

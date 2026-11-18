@@ -166,7 +166,7 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
 
     clientSessionIdRef.current ??= createClientSessionId();
     setTurns((prev) => [...prev, { role: 'user', text: message }]);
-    const requestMessage = guidedStart ? `Aide-moi à composer mon panier avec : ${message}` : message;
+    const guided = guidedStart;
     setGuidedStart(false);
     setInput('');
     setLoading(true);
@@ -177,7 +177,8 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: requestMessage,
+          message,
+          ...(guided ? { guided: 'cart' } : {}),
           conversationId: conversationIdRef.current,
           clientSessionId: clientSessionIdRef.current,
           sourcePath: window.location.pathname,

@@ -107,7 +107,8 @@ export function createProcessingDeps(db: Db): ProcessDeps {
         locale: lang,
         tenant: { ...ctx.tenant, chatbox_extra_context: await extraContext(ctx.tenant) },
       });
-      if (!resolution || resolution.subject === 'whatsapp') return null;
+      // Seuls lieu et horaires ont une règle WhatsApp ; le reste suit le chemin normal.
+      if (!resolution || (resolution.subject !== 'address' && resolution.subject !== 'opening_hours')) return null;
       return { subject: resolution.subject === 'address' ? 'location' : 'opening_hours', reply: resolution.reply };
     },
 

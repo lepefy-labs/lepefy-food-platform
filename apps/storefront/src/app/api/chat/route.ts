@@ -32,6 +32,7 @@ import {
 import { resolveCartPlanIngredients } from '@/lib/ai/nalaCartPlanResolver';
 import { getRelatedProducts } from '@/lib/catalog/productRelationships';
 import { resolveNalaFastStoreInformation } from '@/lib/ai/nalaFastResolver';
+import { closuresSentence, loadNalaStoreFacts } from '@/lib/ai/nalaStoreFacts';
 import { getNalaExtraContext } from '@/lib/ai/aiSettings';
 import {
   extractNalaAvailabilityProductQuery,
@@ -83,6 +84,9 @@ export async function POST(req: NextRequest) {
   if (message.length < 2) {
     return NextResponse.json({ error: 'message_too_short' }, { status: 400 });
   }
+  // « Aidez-moi à composer mon panier » : un indice pour le prompt, jamais un
+  // préfixe dans le message (il faussait la recherche, la mémoire et les réponses directes).
+  const guidedCartStart = body?.guided === 'cart';
 
   const analyticsContext: NalaAnalyticsContext | null = await prepareNalaAnalytics({
     request: req,
@@ -145,10 +149,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ reply: smallTalkReply, conversationId: conversation.id,
         interactionId, matchedProductIds: null, actionProductIds: null, actions: [], cartPlan: null });
     }
+    // Faits actuels (horaires de la grille, fermetures, pays du checkout, page /app) :
+    // réponses directes, source de vérité du prompt et révision de la Response Memory.
+    const storeFacts = await loadNalaStoreFacts({ supabase: createServiceClient(), tenant, locale });
     const fastResolution = hadPendingAction ? null : resolveNalaFastStoreInformation({
       message,
       locale,
       tenant: { ...tenant, chatbox_extra_context: extraContext },
+      extras: {
+        tenantName: tenant.name,
+        closuresText: closuresSentence(storeFacts.closures, locale.toLowerCase().startsWith('it') ? 'it' : 'fr'),
+        appInstallUrl: storeFacts.appInstallUrl,
+      },
     });
     if (fastResolution) {
       const fastDecision = {
@@ -276,6 +288,7 @@ export async function POST(req: NextRequest) {
       tenant,
       locale,
       message,
+      factsRevision: storeFacts.revision,
     });
     if (memoryResolution) {
       await logAiUsage({
@@ -358,6 +371,8 @@ export async function POST(req: NextRequest) {
       locales: tenant.locales ?? ['fr'],
       whatsappNumber: tenant.whatsapp_number ?? null,
       extraContext: extraContext?.slice(0, 4000) ?? null,
+      storeFacts: storeFacts.text,
+      guidedCartStart,
       matchedProducts,
       knowledgeSnippets,
     });
@@ -468,6 +483,7 @@ export async function POST(req: NextRequest) {
     await persistNalaResponseMemory({
       supabase,
       tenant,
+      factsRevision: storeFacts.revision,
       locale,
       message,
       reply: mainResponse.reply,

@@ -58,6 +58,8 @@ interface CurrentContextSnapshot {
 interface PersistNalaResponseMemoryParams {
   supabase: SupabaseClient;
   tenant: Tenant;
+  /** Révision des faits du magasin (nalaStoreFactsRevision). */
+  factsRevision?: string | null;
   locale: string;
   message: string;
   reply: string;
@@ -314,7 +316,16 @@ function memorySchemaUnavailable(error: unknown): boolean {
     || code === 'PGRST204' || code === 'PGRST205';
 }
 
-async function loadKnowledgeRevision(supabase: SupabaseClient, tenantId: string): Promise<string> {
+/**
+ * Révision des connaissances + des faits du magasin (lib/ai/nalaStoreFacts.ts) :
+ * des horaires, fermetures ou pays de livraison modifiés invalident les réponses mémorisées.
+ */
+async function loadKnowledgeRevision(supabase: SupabaseClient, tenantId: string, factsRevision?: string | null): Promise<string> {
+  const base = await loadKnowledgeBaseRevision(supabase, tenantId);
+  return factsRevision ? `${base}|facts:${factsRevision}` : base;
+}
+
+async function loadKnowledgeBaseRevision(supabase: SupabaseClient, tenantId: string): Promise<string> {
   const { data, error, count } = await supabase
     .from('tenant_knowledge_base')
     .select('updated_at', { count: 'exact' })
@@ -331,6 +342,7 @@ async function loadContextSnapshot(params: {
   supabase: SupabaseClient;
   tenant: Tenant;
   candidates: NalaResponseMemoryRow[];
+  factsRevision?: string | null;
 }): Promise<CurrentContextSnapshot> {
   const productIds = uniqueBounded(
     params.candidates.flatMap((candidate) => Object.keys(asStringRecord(candidate.context_product_versions))),
@@ -349,7 +361,7 @@ async function loadContextSnapshot(params: {
       ? params.supabase.from('tenant_knowledge_base').select('id, updated_at, active')
         .eq('tenant_id', params.tenant.id).in('id', kbIds)
       : Promise.resolve({ data: [], error: null }),
-    loadKnowledgeRevision(params.supabase, params.tenant.id),
+    loadKnowledgeRevision(params.supabase, params.tenant.id, params.factsRevision),
   ]);
 
   if (productsResult.error) throw productsResult.error;
@@ -408,6 +420,8 @@ export async function resolveNalaResponseMemory(params: {
   tenant: Tenant;
   locale: string;
   message: string;
+  /** Révision des faits du magasin (nalaStoreFactsRevision). */
+  factsRevision?: string | null;
 }): Promise<NalaResponseMemoryResolution | null> {
   const signature = buildNalaResponseMemorySignature(params.message);
   if (!signature.normalizedQuery || signature.terms.length < 2 || signature.lookupTerms.length === 0) return null;
@@ -440,6 +454,7 @@ export async function resolveNalaResponseMemory(params: {
       supabase: params.supabase,
       tenant: params.tenant,
       candidates: scored.slice(0, 8).map(({ row }) => row),
+      factsRevision: params.factsRevision,
     });
 
     const staleIds: string[] = [];
@@ -547,7 +562,7 @@ export async function persistNalaResponseMemory(params: PersistNalaResponseMemor
         productIds: params.matchedProductIds ?? [],
         kbIds: params.matchedKbIds ?? [],
       }),
-      loadKnowledgeRevision(params.supabase, params.tenant.id),
+      loadKnowledgeRevision(params.supabase, params.tenant.id, params.factsRevision),
     ]);
     const fingerprint = contextFingerprint({
       tenantVersion: params.tenant.updated_at,

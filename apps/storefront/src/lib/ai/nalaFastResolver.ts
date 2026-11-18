@@ -1,6 +1,6 @@
 import type { Tenant } from '@lepefy/types';
 
-export type NalaFastStoreSubject = 'opening_hours' | 'address' | 'whatsapp';
+export type NalaFastStoreSubject = 'opening_hours' | 'address' | 'whatsapp' | 'app_install';
 
 export interface NalaFastStoreResolution {
   subject: NalaFastStoreSubject;
@@ -77,6 +77,31 @@ function isWhatsappQuestion(message: string): boolean {
   ].some(pattern => pattern.test(text));
 }
 
+/** « Comment télécharger l'application ? », « posso scaricare l'app ? », « install the app ». */
+function isAppInstallQuestion(message: string): boolean {
+  const text = normalize(message);
+  const app = /\b(?:app|appli|application|applications|applicazione)\b/.test(text);
+  const action = /\b(?:telecharg|install|scaric|download|ecran d accueil|schermata home|home screen)/.test(text);
+  return app && action;
+}
+
+function appInstallReply(locale: string, tenantName: string, url: string): string {
+  switch (language(locale)) {
+    case 'it': return `Puoi installare ${tenantName} sul telefono, gratis e senza passare da uno store: trovi i passaggi qui ${url}`;
+    case 'en': return `You can install ${tenantName} on your phone, free and without an app store: the steps are here ${url}`;
+    default: return `Vous pouvez installer ${tenantName} sur votre téléphone, gratuitement et sans passer par un store : les étapes sont ici ${url}`;
+  }
+}
+
+function closuresSuffix(locale: string, closuresText: string | null | undefined): string {
+  if (!closuresText) return '';
+  switch (language(locale)) {
+    case 'it': return ` Chiusure straordinarie: ${closuresText}.`;
+    case 'en': return ` Exceptional closures: ${closuresText}.`;
+    default: return ` Fermetures exceptionnelles : ${closuresText}.`;
+  }
+}
+
 function extractOpeningHoursFromContext(context: string | null | undefined): string | null {
   if (!context) return null;
   const candidates = context
@@ -128,14 +153,26 @@ export function resolveNalaFastStoreInformation(params: {
   message: string;
   locale: string;
   tenant: FastStoreTenant;
+  /** Faits calculés côté serveur (lib/ai/nalaStoreFacts.ts), déjà dans la langue du client. */
+  extras?: { tenantName?: string; closuresText?: string | null; appInstallUrl?: string | null };
 }): NalaFastStoreResolution | null {
+  // Avant les horaires : « télécharger l'application » ne doit jamais tomber sur une autre réponse.
+  if (params.extras?.appInstallUrl && isAppInstallQuestion(params.message)) {
+    return {
+      subject: 'app_install',
+      reply: appInstallReply(params.locale, params.extras.tenantName ?? 'la boutique', params.extras.appInstallUrl),
+    };
+  }
+
   if (isOpeningHoursQuestion(params.message)) {
     const hours = cleaned(
       language(params.locale) === 'it'
         ? params.tenant.click_collect_hours_it ?? params.tenant.click_collect_hours
         : params.tenant.click_collect_hours ?? params.tenant.click_collect_hours_it,
     ) ?? extractOpeningHoursFromContext(params.tenant.chatbox_extra_context);
-    return hours ? { subject: 'opening_hours', reply: hoursReply(params.locale, hours) } : null;
+    return hours
+      ? { subject: 'opening_hours', reply: hoursReply(params.locale, hours) + closuresSuffix(params.locale, params.extras?.closuresText) }
+      : null;
   }
 
   if (isAddressQuestion(params.message)) {
