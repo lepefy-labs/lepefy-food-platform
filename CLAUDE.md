@@ -320,6 +320,11 @@ For **authenticated** customers the cart is mirrored server-side (`carts` table)
 - `POST /api/customers/me/cart` sends `{ expectedVersion, mutations }`; the server applies them atomically via the `apply_cart_mutations` RPC (migration `070_cart_versioning.sql`) and returns the canonical `{ items, version }`. A stale version yields **409** with the canonical state, never an overwrite.
 - Full details, conflict-resolution strategy and manual test procedure: `docs/CART_SYNC.md`.
 
+### Customer sign-in (e-mail code, Google)
+
+- `OtpLoginForm` (account page, checkout) = e-mail code + `GoogleSignIn` (Google Identity Services button; One Tap prompt only on `/compte/connexion`, hidden in in-app browsers and without `NEXT_PUBLIC_GOOGLE_CLIENT_ID`). No Supabase redirect flow (no Custom Domain needed): the browser gives Google `sha256(nonce)` and posts the ID token + raw nonce to `POST /api/auth/google`.
+- The route verifies the token itself first (`lib/auth/googleIdToken.ts`, WebCrypto + Google JWKS; pure claims rule `googleIdTokenClaims.ts`: issuer, audience = client IDs, expiry, nonce, `email_verified`) and writes nothing until then; a new customer of the tenant without `termsAccepted` gets `needsConsent` (CGV + marketing boxes, same token re-sent). Then `signInWithIdToken` → `resolveOrCreateCustomer` → `finishCustomerSignIn` (consent + referral, shared with `verify-otp`, `lib/auth/customerSignIn.ts`).
+
 ### Supabase Clients
 
 Two separate clients exist — use the right one:
@@ -377,6 +382,7 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
 NEXT_PUBLIC_APP_URL=
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=        # Sign in with Google: web client of THIS shop's Google Cloud project (one project per tenant, shop name on the consent screen); empty = no button. Every tenant's client ID is also listed in Supabase → Auth → Google → Client IDs
 
 # Server-only (never expose to client)
 SUPABASE_SERVICE_ROLE_KEY=

@@ -32,7 +32,7 @@ export function ConnexionClient({ initialCustomer }: { initialCustomer: SessionC
         </p>
       </div>
       <div className="w-full">
-        <OtpLoginForm onAuthenticated={() => router.push('/compte')} />
+        <OtpLoginForm oneTap onAuthenticated={() => router.push('/compte')} />
       </div>
     </div>
   );

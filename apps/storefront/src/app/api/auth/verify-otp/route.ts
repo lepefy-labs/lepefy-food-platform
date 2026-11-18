@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteClient } from '@/lib/supabase/server';
 import { verifyOtp } from '@/lib/auth/verifyOtp';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { registerWithReferral } from '@/lib/loyalty/registerWithReferral';
-import { registerSignupConsent } from '@/lib/legal/registerSignupConsent';
+import { finishCustomerSignIn } from '@/lib/auth/customerSignIn';
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,57 +24,17 @@ export async function POST(req: NextRequest) {
 
     const response = applyCookies(NextResponse.json({ authenticated: true }));
 
-    // ── Consentement CGV/marketing : uniquement au premier signup (Ciclo 4).
-    // Best-effort — un échec ici ne doit jamais invalider un compte déjà
-    // créé avec succès (cf. règle permanente du prompt).
-    if (result.isNewCustomer) {
-      try {
-        await registerSignupConsent({
-          tenantId: tenant.id,
-          customerId: result.customerId!,
-          marketingOptIn: marketingOptIn === true,
-        });
-      } catch (consentErr) {
-        console.error('[api/auth/verify-otp] registerSignupConsent failed:', consentErr,
-          '— customer_id:', result.customerId);
-      }
-    }
-
-    // ── Attribution referral: solo al primo login/creazione di questo customer
-    // (isNewCustomer, vedi verifyOtp.ts) — mai su un re-login successivo, e mai
-    // se non c'è un cookie referral_code posato da /invite/[code]. Best-effort:
-    // un fallimento qui non deve mai invalidare un login già riuscito.
-    const referralCookie = req.cookies.get('referral_code')?.value;
-
-    if (referralCookie && result.isNewCustomer) {
-      const forwardedFor = req.headers.get('x-forwarded-for');
-      const signupIp = forwardedFor?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || '';
-
-      try {
-        // Esito definitivo (referred: true o false con reason) → il codice è
-        // stato valutato, il cookie va consumato in entrambi i casi. Solo
-        // un'eccezione imprevista (errore permessi, rete, RPC) prima di
-        // arrivare a un esito lascia il cookie intatto, per permettere un
-        // retry entro la finestra dei 30 giorni già prevista.
-        await registerWithReferral({
-          tenantId: tenant.id,
-          newCustomerId: result.customerId!,
-          referralCode: referralCookie,
-          signupIp,
-          // Nessun device fingerprinting esiste altrove nel progetto — non
-          // introdotto qui (fuori scope di questo fix mirato). checkFraudSignals
-          // confronterà una stringa vuota, che semplicemente non potrà mai
-          // produrre un match SAME_DEVICE finché non verrà implementato altrove.
-          deviceFingerprint: '',
-        });
-
-        // Consumato — non riusabile su un secondo account.
-        response.cookies.delete('referral_code');
-      } catch (referralErr) {
-        console.error('[api/auth/verify-otp] registerWithReferral failed:', referralErr,
-          '— customer_id:', result.customerId);
-      }
-    }
+    // Consent (Ciclo 4) and referral attribution: only on the first
+    // sign-in of this customer (isNewCustomer, see verifyOtp.ts).
+    await finishCustomerSignIn({
+      req,
+      response,
+      tenantId: tenant.id,
+      customerId: result.customerId!,
+      isNewCustomer: result.isNewCustomer === true,
+      marketingOptIn: marketingOptIn === true,
+      logTag: 'api/auth/verify-otp',
+    });
 
     return response;
   } catch (err) {

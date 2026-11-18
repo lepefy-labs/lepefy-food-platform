@@ -5,14 +5,17 @@ import Link from 'next/link';
 import { useTenant } from '@/providers/TenantProvider';
 import { marketingConsentLabel } from '@/lib/legal/consentCopy';
 import { FieldMessage, TextField } from '@/components/ui/form';
+import { GoogleSignIn } from './GoogleSignIn';
 
 const RESEND_DELAY_S = 60;
 
 interface OtpLoginFormProps {
   onAuthenticated?: () => void;
+  /** Show Google's One Tap prompt as well as the "Continuer avec Google" button. */
+  oneTap?: boolean;
 }
 
-export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
+export function OtpLoginForm({ onAuthenticated, oneTap = false }: OtpLoginFormProps) {
   const tenant = useTenant();
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [email, setEmail] = useState('');
@@ -129,6 +132,7 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
       {step === 'email' ? (
         <div className="space-y-3">
           <p className="text-sm font-semibold text-gray-800">Connectez-vous pour gagner des points</p>
+          <GoogleSignIn onAuthenticated={onAuthenticated} oneTap={oneTap} />
           <TextField
             label="Votre e-mail"
             hint="Nous vous envoyons un code à 6 chiffres."
