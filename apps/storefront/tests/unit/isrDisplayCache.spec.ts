@@ -23,6 +23,7 @@ const ISR_PAGES = [
   '(shop)/avis/page.tsx',
   '(shop)/politique-confidentialite/page.tsx',
   '(shop)/conditions-generales-vente/page.tsx',
+  'apercu-catalogue/page.tsx',
 ];
 const ISR_TREE = [...ISR_PAGES, 'layout.tsx', '(shop)/layout.tsx', 'card/layout.tsx'];
 

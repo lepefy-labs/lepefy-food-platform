@@ -10,6 +10,7 @@ import { getActivePromotions, PROMOTIONS_SHELF_LIMIT } from '@/lib/catalog/promo
 import { getActiveNovelties, NOVELTIES_SHELF_LIMIT } from '@/lib/catalog/novelties';
 import { ADD_ONS_SHELF_LIMIT, getAddOnProducts } from '@/lib/catalog/addOnShelf';
 import { isPromoFilter } from '@/lib/catalog/catalogSearchUrl';
+import { catalogMetadata } from '@/lib/catalog/catalogMetadata';
 import type { ProductWithCategory } from '@lepefy/types';
 
 // Toujours dynamique : recherche/filtre/pagination pilotés par ?q=/?category=/
@@ -22,7 +23,7 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata(): Promise<Metadata> {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  return { title: 'Catalogue', description: `Découvrez les produits de ${tenant.name}` };
+  return catalogMetadata(tenant.name);
 }
 
 interface ProductsPageProps {

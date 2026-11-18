@@ -1,4 +1,5 @@
 import { adminHostRedirects } from './adminHostRedirects.mjs';
+import { storefrontRewrites } from './storefrontRewrites.mjs';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -27,17 +28,7 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    const eventsSubdomain = process.env.NEXT_PUBLIC_EVENTS_SUBDOMAIN;
-    if (!eventsSubdomain) return { beforeFiles: [] };
-    const onEventsHost = [{ type: 'host', value: eventsSubdomain }];
-    return {
-      beforeFiles: [
-        { source: '/admin', has: onEventsHost, destination: '/admin/evenementiel' },
-        { source: '/', has: onEventsHost, destination: '/evenementiel' },
-        { source: '/evenements/:path*', has: onEventsHost, destination: '/evenementiel/evenements/:path*' },
-        { source: '/services/:path*', has: onEventsHost, destination: '/evenementiel/services/:path*' },
-      ],
-    };
+    return storefrontRewrites(process.env);
   },
 };
 
