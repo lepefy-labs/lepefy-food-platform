@@ -71,9 +71,16 @@ export function buildNalaStoreFactsText(input: NalaStoreFactsInput): string {
   return lines.join('\n');
 }
 
-/** Empreinte des faits : une réponse mémorisée n'est réutilisée que si elle n'a pas changé. */
+/**
+ * Version des règles qui accompagnent les faits dans le prompt (chatbox.ts) : à
+ * incrémenter quand ces règles changent, pour que les réponses mémorisées sous
+ * l'ancienne règle ne soient plus réutilisées. 2 = faits exclusifs sur leurs sujets.
+ */
+export const NALA_STORE_FACTS_RULES_VERSION = 2;
+
+/** Empreinte des faits et de leurs règles : une réponse mémorisée n'est réutilisée que si rien n'a changé. */
 export function nalaStoreFactsRevision(text: string): string {
-  return createHash('sha256').update(text).digest('hex').slice(0, 16);
+  return createHash('sha256').update(`rules:${NALA_STORE_FACTS_RULES_VERSION}\n${text}`).digest('hex').slice(0, 16);
 }
 
 export interface NalaStoreFacts {

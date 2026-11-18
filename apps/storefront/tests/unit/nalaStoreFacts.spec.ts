@@ -66,6 +66,9 @@ test.describe('faits du magasin pour Nala', () => {
     const factsAt = prompt.indexOf('Faits actuels du magasin (SOURCE DE VÉRITÉ');
     expect(factsAt).toBeGreaterThan(0);
     expect(factsAt).toBeLessThan(prompt.indexOf('Informations sur le magasin :'));
+    // Exclusifs sur leurs sujets : une liste de pays écrite à la main ne doit plus être reprise.
+    expect(prompt).toContain('les pays de livraison et l\'application, utilise UNIQUEMENT ces faits');
+    expect(prompt).toContain('Ignore tout ce que les informations plus bas ou les connaissances disent sur ces sujets');
   });
 
   test('« Aidez-moi à composer mon panier » est un indice du prompt, plus un préfixe du message', () => {

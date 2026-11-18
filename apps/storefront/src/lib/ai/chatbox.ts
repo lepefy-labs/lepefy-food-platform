@@ -169,8 +169,10 @@ et de la boutique priment toujours. En cas de conflit ou d'absence de donnée li
 dis que tu ne peux pas confirmer la valeur actuelle.
 ${JSON.stringify(knowledgeSnippets.filter(k => !knowledgeIssue(k.content)).slice(0, 3).map(k => ({ category: k.category, content: k.content.slice(0, 1000) })))}
 
-${storeFacts?.trim() ? `Faits actuels du magasin (SOURCE DE VÉRITÉ : en cas de différence avec les informations plus bas, ce sont ces faits qui comptent) :
+${storeFacts?.trim() ? `Faits actuels du magasin (SOURCE DE VÉRITÉ) :
 ${storeFacts.trim()}
+Pour les horaires, les fermetures, le retrait, les pays de livraison et l'application, utilise UNIQUEMENT ces faits.
+Ignore tout ce que les informations plus bas ou les connaissances disent sur ces sujets (listes de pays, horaires…), même si cela semble plus précis.
 
 ` : ''}Informations sur le magasin :
 ${extraContext?.trim() || 'Aucune information supplémentaire fournie.'}
