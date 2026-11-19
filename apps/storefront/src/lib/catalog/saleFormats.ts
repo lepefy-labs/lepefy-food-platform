@@ -168,70 +168,90 @@ export function aggregateStockDemand(lines: StockDemandLine[]): Map<string, numb
   return demand;
 }
 
-/** Ligne de panier minimale lue par la proposition de passage au lot. */
-export interface SwapCartLine {
-  productId: string;
+/** Une ligne du plan : format et quantité achetée de ce format. */
+export interface FormatPlanLine {
+  option: SaleFormatOption;
   quantity: number;
-  price: number;
-  minimum: number;
-  step: number;
 }
 
-export interface FormatSwapProposal {
-  baseId: string;
-  formatId: string;
-  /** Nouvelle quantité de la base (0 = ligne retirée). */
-  baseQuantity: number;
-  /** Lots ajoutés. */
-  formatQuantity: number;
-  label: string;
+export interface FormatBundlePlan {
+  /** Unités de base au total (ce que montre le compteur). */
   units: number;
-  /** Économie totale (euros) sur ce passage. */
+  /** Lignes du panier, base en premier ; jamais de quantité 0. */
+  lines: FormatPlanLine[];
+  /** Total payé (somme des prix effectifs). */
+  total: number;
+  /** Économie par rapport à `units` unités de base au prix de la base ; 0 si aucune. */
   savings: number;
 }
 
 /**
- * « Passer au lot et économiser X € » : seulement si le format est actif,
- * achetable pour la quantité proposée (stock dérivé compris), moins cher que
- * les unités qu'il remplace, et si ce qui reste de la base respecte encore sa
- * règle. Les unités physiques restent identiques. Choisit l'économie la plus
- * grande ; null = ne rien proposer.
+ * Regroupement automatique (migration 187, v2) : le client compte en unités
+ * de base (« 4 paquets ») et le panier choisit la combinaison la moins chère
+ * de formats (1 lot de 3 + 1 paquet). Programmation dynamique bornée : marche
+ * avec plusieurs tailles de lot (3 et 12), respecte le maximum achetable et
+ * la règle minimum/pas de chaque format. À coût égal, la base l'emporte : un
+ * lot qui ne fait rien économiser n'est jamais imposé. null = impossible
+ * (stock ou règles).
  */
-export function proposeFormatSwap(
-  base: SwapCartLine,
-  options: SaleFormatOption[],
-  formatLines: ReadonlyMap<string, number>,
-): FormatSwapProposal | null {
-  if (base.quantity <= 0 || options.length === 0) return null;
-  let best: FormatSwapProposal | null = null;
-  for (const option of options) {
-    if (option.isBase || !option.purchasable) continue;
-    const perLotSaving = formatSavings(base.price, option.units, option.price);
-    if (perLotSaving <= 0) continue;
-    const inCart = formatLines.get(option.id) ?? 0;
-    for (let lots = Math.floor(base.quantity / option.units); lots >= 1; lots -= 1) {
-      const total = inCart + lots;
-      if (computeQuantityRuleState(total, option.minimum, option.step).nextValidQuantity !== total) continue;
-      // Stock partagé : les unités physiques ne changent pas ; le lot doit seulement tenir dans son stock dérivé.
-      if (total > option.maxPurchasable) continue;
-      const remaining = base.quantity - lots * option.units;
-      if (remaining > 0 && computeQuantityRuleState(remaining, base.minimum, base.step).nextValidQuantity !== remaining) continue;
-      const savings = roundCents(perLotSaving * lots);
-      if (!best || savings > best.savings) {
-        best = {
-          baseId: base.productId,
-          formatId: option.id,
-          baseQuantity: remaining,
-          formatQuantity: lots,
-          label: option.label,
-          units: option.units,
-          savings,
-        };
-      }
-      break;
+export function planFormatBundle(units: number, options: SaleFormatOption[]): FormatBundlePlan | null {
+  const target = Math.max(0, Math.trunc(units));
+  if (options.length === 0) return null;
+  if (target === 0) return { units: 0, lines: [], total: 0, savings: 0 };
+  // Base d'abord : à coût égal, la combinaison trouvée en premier (singles) est gardée.
+  const ordered = [...options].sort((a, b) => Number(b.isBase) - Number(a.isBase) || a.units - b.units);
+  const cents = (value: number) => Math.round(value * 100);
+  let best: Array<{ cost: number; counts: number[] } | null> = Array.from({ length: target + 1 }, () => null);
+  best[0] = { cost: 0, counts: ordered.map(() => 0) };
+  ordered.forEach((option, index) => {
+    const next = best.slice();
+    const allowed: number[] = [];
+    const maxCount = Math.min(option.maxPurchasable, Math.floor(target / option.units));
+    for (let count = 1; count <= maxCount; count += 1) {
+      if (computeQuantityRuleState(count, option.minimum, option.step).nextValidQuantity === count) allowed.push(count);
     }
+    for (let total = 0; total <= target; total += 1) {
+      const from = best[total];
+      if (!from) continue;
+      for (const count of allowed) {
+        const reach = total + count * option.units;
+        if (reach > target) break;
+        const cost = from.cost + cents(option.price) * count;
+        const current = next[reach];
+        if (!current || cost < current.cost) {
+          const counts = from.counts.slice();
+          counts[index] = count;
+          next[reach] = { cost, counts };
+        }
+      }
+    }
+    best = next;
+  });
+  const result = best[target];
+  if (!result) return null;
+  const lines = ordered
+    .map((option, index) => ({ option, quantity: result.counts[index]! }))
+    .filter((line) => line.quantity > 0);
+  const base = options.find((option) => option.isBase);
+  const total = result.cost / 100;
+  const savings = base ? Math.max(0, roundCents(base.price * target - total)) : 0;
+  return { units: target, lines, total, savings: savings >= 0.01 ? savings : 0 };
+}
+
+/** Plus grand nombre d'unités de base qu'un plan peut servir (stock et règles compris). */
+export function maxBundleUnits(options: SaleFormatOption[], ceiling = 999): number {
+  const base = options.find((option) => option.isBase);
+  let candidate = Math.min(ceiling, options.reduce((sum, option) => sum + option.maxPurchasable * option.units, 0));
+  if (base && options.every((option) => option.isBase || (option.row.format_stock_mode ?? 'shared') === 'shared')) {
+    candidate = Math.min(candidate, Math.max(0, base.stock));
   }
-  return best;
+  while (candidate > 0 && !planFormatBundle(candidate, options)) candidate -= 1;
+  return candidate;
+}
+
+/** « 1 lot de 3 + 1 paquet » : composition lisible d'un plan. */
+export function describeBundle(plan: FormatBundlePlan): string {
+  return plan.lines.map((line) => formatQuantityLabel(line.option.label, line.quantity)).join(' + ');
 }
 
 /** « 1 lot de 3 paquets », « 2 paquets » : quantité + libellé du format, sans ambiguïté. */

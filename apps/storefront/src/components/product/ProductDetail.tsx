@@ -32,8 +32,9 @@ import { IconBuildingStore, IconCircleOff, IconHourglassHigh, IconTruck, IconTru
 import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { productFulfillmentHint } from '@/lib/storefrontCopy/fulfillmentCopy';
 import type { ProductWithCategory } from '@lepefy/types';
-import { buildSaleFormatOptions, formatQuantityLabel, lowestUnitPrice, type SaleFormatRow } from '@/lib/catalog/saleFormats';
-import { toFormatCartProduct } from '@/lib/cart/saleFormatCart';
+import { buildSaleFormatOptions, formatQuantityLabel, type SaleFormatRow } from '@/lib/catalog/saleFormats';
+import { useFormatUnits } from '@/lib/cart/useFormatUnits';
+import { bundleCaption, saleFormatOfferLine } from '@/lib/storefrontCopy/saleFormatCopy';
 import { SaleFormatPicker } from './SaleFormatPicker';
 
 export function ProductDetail({ product }: { product: ProductWithCategory & { formats?: SaleFormatRow[] | null } }) {
@@ -85,11 +86,11 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
   const totalPrice = unitPrice * quantity;
   const needsFormatChoice = multiFormat && !selectedFormat;
   const countLabel = (count: number) => selectedFormat ? formatQuantityLabel(selectedFormat.label, count) : formatCount(sellingFormat, count);
-  const formatsInCart = multiFormat
-    ? formatOptions
-        .map((option) => ({ option, quantity: cartItems.find((item) => item.product.id === option.id)?.quantity ?? 0 }))
-        .filter((entry) => entry.quantity > 0)
-    : [];
+  // Regroupement automatique (187 v2) : une fois dans le panier, un seul
+  // compteur en unités de base pour toute la fiche, recomposé par le panier.
+  const formatParent = { ...product, fulfillment_policy: normalizeFulfillmentPolicy(product.fulfillment_policy) };
+  const formatUnits = useFormatUnits(formatParent, formatOptions);
+  const offerLine = multiFormat ? saleFormatOfferLine(formatOptions, currency) : null;
   const group = groups.find((entry) => entry.productIds.includes(product.id));
   const groupQuantity = group
     ? cartItems.filter((item) => group.productIds.includes(item.product.id))
@@ -118,7 +119,11 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
   // Déjà dans le panier : la fiche montre le même +/− que le panier (la
   // quantité réelle du panier), au lieu d'un sélecteur qui ajouterait par-dessus.
   // La barre d'achat mobile garde la même hauteur dans les deux états.
-  const showsCartLine = inCartQuantity > 0 && !outOfStock;
+  // Plusieurs formats : compteur en unités tant qu'aucun format n'est choisi pour un nouvel ajout.
+  const showsCartLine = multiFormat
+    ? formatUnits.units > 0 && !selectedFormat && anyFormatPurchasable
+    : inCartQuantity > 0 && !outOfStock;
+  const cartUnitsLabel = (count: number) => formatCount(sellingFormat, count);
 
   function continueShopping() {
     markShoppingReturn();
@@ -134,11 +139,18 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
 
   function handleAddToCart() {
     if (needsFormatChoice || outOfStock || quantity > maxPurchasable) return;
-    const cartProductId = selectedFormat?.id ?? product.id;
-    const previous = useCartStore.getState().items.find((item) => item.product.id === cartProductId)?.quantity ?? 0;
     if (selectedFormat) {
-      addItem(toFormatCartProduct({ ...product, fulfillment_policy: normalizeFulfillmentPolicy(product.fulfillment_policy) }, selectedFormat), quantity);
-    } else addItem({
+      // Le format choisi dit combien d'unités ajouter ; le panier choisit la combinaison.
+      if (!formatUnits.addUnits(selectedFormat.units * quantity)) return;
+      clearTimeout(justAddedTimer.current);
+      setJustAdded(true);
+      justAddedTimer.current = setTimeout(() => setJustAdded(false), 1200);
+      setSelectedFormatId(null);
+      return;
+    }
+    const cartProductId = product.id;
+    const previous = useCartStore.getState().items.find((item) => item.product.id === cartProductId)?.quantity ?? 0;
+    addItem({
       id:           product.id,
       name:         product.name,
       slug:         product.slug,
@@ -164,25 +176,36 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
       order_quantity_step: orderQuantityStep,
       fulfillment_policy: normalizeFulfillmentPolicy(product.fulfillment_policy),
     };
-    // Un format enfant (lot) : la ligne « dans votre panier » de la fiche suffit ;
-    // la confirmation partagée décrit la fiche, pas le lot.
-    if (!selectedFormat || selectedFormat.isBase) showConfirmation(cardProduct, { continueHref: getShoppingReturn(catalogHref) });
+    showConfirmation(cardProduct, { continueHref: getShoppingReturn(catalogHref) });
   }
 
-  const cartStepper = (
+  const cartStepper = multiFormat ? (
+    <CartStepper
+      variant="panel"
+      quantity={formatUnits.units}
+      productName={product.name}
+      removesOnDecrement={formatUnits.removesOnDecrement}
+      canIncrement={formatUnits.canIncrement}
+      onIncrement={formatUnits.increment}
+      onDecrement={formatUnits.decrement}
+    />
+  ) : (
     <CartStepper
       variant="panel"
       quantity={inCartQuantity}
-      productName={selectedFormat ? `${product.name}, ${selectedFormat.label}` : product.name}
+      productName={product.name}
       removesOnDecrement={line.removesOnDecrement}
       canIncrement={line.canIncrement && inCartQuantity < maxPurchasable}
       onIncrement={line.increment}
       onDecrement={line.decrement}
     />
   );
+  const cartQuantityText = multiFormat ? cartUnitsLabel(formatUnits.units) : countLabel(inCartQuantity);
+  const cartTotal = multiFormat ? formatUnits.current?.total ?? 0 : unitPrice * inCartQuantity;
+  const cartComposition = multiFormat ? bundleCaption(formatUnits.current, formatOptions, sellingFormat, currency) : null;
   const inCartLine = showsCartLine && (
-    <p role="status" className="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-1 text-sm text-green-900">
-      <span>✓ <span className="font-bold">{countLabel(inCartQuantity)}</span> dans votre panier · {formatPrice(unitPrice * inCartQuantity, currency)}</span>
+    <p role="status" aria-live="polite" className="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-1 text-sm text-green-900">
+      <span>✓ <span className="font-bold">{cartQuantityText}</span> dans votre panier · {formatPrice(cartTotal, currency)}{cartComposition && cartComposition !== 'dans le panier' ? <span className="block text-xs font-semibold">{cartComposition}</span> : null}</span>
       <Link href="/cart" prefetch={false} className="inline-flex min-h-10 shrink-0 items-center font-bold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>Voir mon panier</Link>
     </p>
   );
@@ -232,14 +255,8 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
                 <PromoBadge product={product} />
               </div>
             )}
-            {multiFormat ? (
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-sm font-medium text-gray-700">dès</span>
-                <ProductPrice price={lowestUnitPrice(formatOptions) ?? product.price} currency={currency} product={product} compareAtPrice={null} size="detail" />
-              </div>
-            ) : (
-              <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} size="detail" />
-            )}
+            <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} size="detail" />
+            {offerLine && <p className="mt-2 inline-block rounded-md bg-green-100 px-2 py-0.5 text-sm font-bold text-green-900">{offerLine}</p>}
             {promotionEndLabel(product, 'long') && (
               <p className="mt-2 text-sm font-semibold text-red-900">{promotionEndLabel(product, 'long')}</p>
             )}
@@ -255,9 +272,9 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
                 baseFormat={sellingFormat}
                 unitContent={contentLabel(sellingFormat) ?? product.net_quantity_display}
               />
-              {formatsInCart.length > 0 && (
+              {formatUnits.units > 0 && selectedFormat && (
                 <p role="status" className="text-sm text-gray-800">
-                  Dans votre panier : <span className="font-semibold">{formatsInCart.map((entry) => formatQuantityLabel(entry.option.label, entry.quantity)).join(' + ')}</span>
+                  Déjà dans votre panier : <span className="font-semibold">{cartUnitsLabel(formatUnits.units)}</span>. Le panier fait les lots tout seul.
                 </p>
               )}
             </section>
@@ -373,7 +390,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
                         style={{ backgroundColor: 'var(--color-primary)' }}
                       >
                         <span className="max-w-full truncate text-sm">Voir mon panier</span>
-                        <span className="text-xs font-medium opacity-90">{countLabel(inCartQuantity)} · {formatPrice(unitPrice * inCartQuantity, currency)}</span>
+                        <span className="text-xs font-medium opacity-90">{cartQuantityText} · {formatPrice(cartTotal, currency)}</span>
                       </Link>
                     </>
                   ) : (

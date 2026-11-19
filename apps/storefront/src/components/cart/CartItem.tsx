@@ -10,8 +10,6 @@ import { describePrice, formatCount, orderLineDetail, resolveSellingFormat } fro
 import { cartLineIssue } from '@/lib/storefrontCopy/availability';
 import { FulfillmentPolicyChip } from '@/components/catalog/FulfillmentPolicyChip';
 import { formatLabelOf, formatQuantityLabel } from '@/lib/catalog/saleFormats';
-import { formatSwapTitle } from '@/lib/storefrontCopy/saleFormatCopy';
-import type { CartFormatSwap } from '@/lib/cart/useCartFormatSwaps';
 
 interface CartItemProps {
   item: CartItemType;
@@ -26,8 +24,6 @@ interface CartItemProps {
   variant?: 'drawer' | 'page';
   /** Mode de réception lu frais (panier) : seul un mode imposé est affiché. */
   fulfillmentPolicy?: ProductFulfillmentPolicy;
-  /** « Passer au lot et économiser X € » (formats de vente, migration 187). */
-  formatSwap?: CartFormatSwap;
 }
 
 
@@ -42,7 +38,6 @@ export function CartItem({
   onAdjust,
   variant = 'drawer',
   fulfillmentPolicy,
-  formatSwap,
 }: CartItemProps) {
   const { product, quantity } = item;
   const state = deriveCartItemState({
@@ -173,22 +168,6 @@ export function CartItem({
             <span className="text-lg font-extrabold tabular-nums text-gray-950">{formatPrice(lineTotal, currency)}</span>
           </p>
         </div>
-        {formatSwap && !blocked && (
-          <div role="region" aria-label="Proposition de format" className="mt-2.5 rounded-xl border border-green-300 bg-green-50 px-3 py-2.5 text-green-950">
-            <p className="text-sm font-bold">{formatSwapTitle(formatSwap.proposal.savings, currency)}</p>
-            <p className="mt-0.5 text-xs leading-snug">
-              {countLabel(quantity)} → {formatQuantityLabel(formatSwap.proposal.label, formatSwap.proposal.formatQuantity)}
-              {formatSwap.proposal.baseQuantity > 0 ? ` + ${countLabel(formatSwap.proposal.baseQuantity)}` : ''}. Même quantité de produit.
-            </p>
-            <button
-              type="button"
-              onClick={() => formatSwap.apply()}
-              className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-green-700 px-3 text-sm font-bold text-white hover:bg-green-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-            >
-              Passer au lot · −{formatPrice(formatSwap.proposal.savings, currency)}
-            </button>
-          </div>
-        )}
       </li>
     );
   }

@@ -18,8 +18,12 @@ export function selectCartItems(state: CartItemsSource): CartItem[] {
   return state.items;
 }
 
+/**
+ * Articles du panier comptés comme le client les voit : un « Lot de 3 paquets »
+ * compte 3 (formats de vente, migration 187), comme le compteur en paquets.
+ */
 export function selectCartItemCount(state: CartItemsSource): number {
-  return state.items.reduce((sum, item) => sum + item.quantity, 0);
+  return state.items.reduce((sum, item) => sum + item.quantity * Math.max(1, item.product.units_per_sale ?? 1), 0);
 }
 
 export function selectCartSubtotal(state: CartItemsSource): number {

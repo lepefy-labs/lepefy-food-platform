@@ -25,7 +25,8 @@ import { decrementRemovesLine, getMaximumValidQuantity } from '@/lib/purchaseQua
 import { useCartStore } from '@/stores/cartStore';
 import { useHasMounted } from '@/hooks/useHasMounted';
 import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
-import { useCartFormatSwaps } from '@/lib/cart/useCartFormatSwaps';
+import { useCartFormatGroups } from '@/lib/cart/useCartFormatGroups';
+import { CartFormatGroupItem } from '@/components/cart/CartFormatGroupItem';
 import { ACTION_COPY, SUMMARY_COPY, productsPriceLabel } from '@/lib/storefrontCopy/copy';
 import type { CartItem as CartItemType, PublicTenant } from '@lepefy/types';
 import { useEffect, useRef, useState } from 'react';
@@ -56,8 +57,10 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
   const {
     groups: quantityGroups, error: groupsError, reloadGroups, blockedMessage, canProceed, checking, fulfillment,
   } = useCartPurchaseGate(items);
-  // « Passer au lot » : seulement pour les fiches à formats présentes dans le panier.
-  const formatSwaps = useCartFormatSwaps(items);
+  // Formats de vente (187) : une ligne par fiche, en unités de base, recomposée
+  // automatiquement ; un panier enregistré avant est recomposé une fois au meilleur prix.
+  const formatGroups = useCartFormatGroups(items, { normalize: true });
+  const renderedGroups = new Set<string>();
   // Une seule estimation pour la page : barre mobile, récapitulatifs et « Ça rentre dans votre colis ».
   const { estimate: shippingEstimate, settled: estimateSettled, chooseCountry } = useShippingEstimate();
 
@@ -176,7 +179,14 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
 
             <section aria-label="Articles du panier">
               <ul className="space-y-3">
-                {items.map((item) => (
+                {items.map((item) => {
+                  const group = [...formatGroups.values()].find((entry) => entry.ids.includes(item.product.id));
+                  if (group && !group.ids.some((id) => unavailableProductIds.includes(id))) {
+                    if (renderedGroups.has(group.parent.id)) return null;
+                    renderedGroups.add(group.parent.id);
+                    return <CartFormatGroupItem key={`format-group-${group.parent.id}`} group={group} currency={tenant.currency} onRemoveLast={remove} />;
+                  }
+                  return (
                   <CartItem
                     key={item.product.id}
                     item={item}
@@ -189,9 +199,9 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
                     onDecrement={decrement}
                     onRemove={remove}
                     onAdjust={updateQuantity}
-                    formatSwap={formatSwaps.get(item.product.id)}
                   />
-                ))}
+                  );
+                })}
               </ul>
               {/* Mobile : l'annulation vit dans la barre du bas, toujours visible. */}
               {undo && <div className="hidden pt-3 md:block">{undoToast('')}</div>}

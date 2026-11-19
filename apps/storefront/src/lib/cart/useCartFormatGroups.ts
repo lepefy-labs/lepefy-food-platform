@@ -1,0 +1,82 @@
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { CartItem } from '@lepefy/types';
+import type { ProductFormatsResponse } from '@/app/api/products/formats/route';
+import { buildSaleFormatOptions, planFormatBundle, type SaleFormatOption } from '@/lib/catalog/saleFormats';
+import type { FormatParentForCart } from './saleFormatCart';
+import { setFormatUnits } from './useFormatUnits';
+
+export interface CartFormatGroup {
+  parent: FormatParentForCart & ProductFormatsResponse['products'][number];
+  options: SaleFormatOption[];
+  /** Ids des formats de la fiche (lignes réelles du panier regroupées). */
+  ids: string[];
+}
+
+/**
+ * Fiches à plusieurs formats présentes dans le panier, lues fraîches
+ * (`GET /api/products/formats`, une requête par visite) : le panier et le
+ * drawer les affichent comme une seule ligne en unités de base. Sans données
+ * fraîches, rien n'est regroupé (les lignes restent comme avant).
+ *
+ * `normalize` (page panier seulement) : un panier enregistré avant le
+ * regroupement automatique (3 paquets séparés) est recomposé une fois au
+ * prix le plus bas ; le total ne peut que baisser.
+ */
+export function useCartFormatGroups(
+  items: CartItem[],
+  { enabled = true, onlyKnownFormats = false, normalize = false }: { enabled?: boolean; onlyKnownFormats?: boolean; normalize?: boolean } = {},
+): Map<string, CartFormatGroup> {
+  const parentIds = useMemo(() => Array.from(new Set(items
+    .filter((item) => !onlyKnownFormats || item.product.format_parent_id || item.product.format_label)
+    .map((item) => item.product.format_parent_id ?? item.product.id)
+    .filter((id): id is string => Boolean(id)))).sort().slice(0, 50).join(','), [items, onlyKnownFormats]);
+  const [fresh, setFresh] = useState<{ key: string; products: ProductFormatsResponse['products'] } | null>(null);
+  const normalized = useRef(new Set<string>());
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
+  useEffect(() => {
+    if (!enabled || !parentIds) return;
+    if (fresh?.key === parentIds) return;
+    const controller = new AbortController();
+    fetch(`/api/products/formats?ids=${encodeURIComponent(parentIds)}`, { signal: controller.signal })
+      .then(async (res) => (res.ok ? res.json() as Promise<ProductFormatsResponse> : null))
+      .then((data) => {
+        if (!data || controller.signal.aborted) return;
+        // Réponse vide alors qu'un lot est déjà au panier : jamais retenue (nouvel essai à la prochaine ouverture).
+        if ((data.products ?? []).length === 0 && itemsRef.current.some((item) => item.product.format_parent_id)) return;
+        setFresh({ key: parentIds, products: data.products ?? [] });
+      })
+      .catch(() => { /* Sans données fraîches : lignes séparées, comme avant. */ });
+    return () => controller.abort();
+  }, [enabled, parentIds, fresh?.key]);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, CartFormatGroup>();
+    if (!fresh || fresh.key !== parentIds) return map;
+    for (const parent of fresh.products) {
+      const options = buildSaleFormatOptions(parent);
+      if (options.length === 0) continue;
+      const ids = options.map((option) => option.id);
+      if (!items.some((item) => ids.includes(item.product.id))) continue;
+      map.set(parent.id, { parent: parent as CartFormatGroup['parent'], options, ids });
+    }
+    return map;
+  }, [fresh, parentIds, items]);
+
+  useEffect(() => {
+    if (!normalize) return;
+    for (const group of groups.values()) {
+      if (normalized.current.has(group.parent.id)) continue;
+      normalized.current.add(group.parent.id);
+      const units = group.options.reduce((sum, option) => sum + (items.find((item) => item.product.id === option.id)?.quantity ?? 0) * option.units, 0);
+      const current = group.options.reduce((sum, option) => sum + (items.find((item) => item.product.id === option.id)?.quantity ?? 0) * option.price, 0);
+      const best = planFormatBundle(units, group.options);
+      if (best && best.total < current - 0.004) setFormatUnits(group.parent, group.options, units);
+    }
+  }, [groups, items, normalize]);
+
+  return groups;
+}

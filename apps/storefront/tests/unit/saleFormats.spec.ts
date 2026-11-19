@@ -7,12 +7,14 @@ import {
   formatQuantityLabel,
   formatSavings,
   lowestUnitPrice,
-  proposeFormatSwap,
+  describeBundle,
+  maxBundleUnits,
+  planFormatBundle,
   type SaleFormatParent,
 } from '../../src/lib/catalog/saleFormats';
 import { parseSaleFormatsBody, saleFormatRpcError, saleFormatSlugBase, saleFormatWarnings } from '../../src/lib/catalog/saleFormatsAdmin';
 import { orderItemFormatLabel, orderItemPhysicalUnits } from '../../src/lib/orders/documents/itemFormat';
-import { saleFormatCardChip, saleFormatSavingsLine, saleFormatUnitPriceLine } from '../../src/lib/storefrontCopy/saleFormatCopy';
+import { bundleCaption, saleFormatCardChip, saleFormatOfferLine, saleFormatSavingsLine, saleFormatUnitPriceLine } from '../../src/lib/storefrontCopy/saleFormatCopy';
 import { resolveSellingFormat } from '../../src/lib/storefrontCopy/sellingFormat';
 
 // Demo prices only (pilot price is the tenant's decision).
@@ -75,18 +77,47 @@ test('stock 7: 2 lots + 1 single = 7 packs, 2 lots + 2 singles = 8 packs', () =>
   expect(own.has('base')).toBe(false);
 });
 
-test('swap proposal: 3 singles → 1 lot, same packs, only when cheaper and purchasable', () => {
-  const options = buildSaleFormatOptions(ndole(7));
-  const swap = proposeFormatSwap({ productId: 'base', quantity: 3, price: 3.5, minimum: 1, step: 1 }, options, new Map([['base', 3]]));
-  expect(swap).toEqual({ baseId: 'base', formatId: 'lot', baseQuantity: 0, formatQuantity: 1, label: 'Lot de 3 paquets', units: 3, savings: 0.6 });
-  // 7 singles → 2 lots + 1 single.
-  expect(proposeFormatSwap({ productId: 'base', quantity: 7, price: 3.5, minimum: 1, step: 1 }, options, new Map())?.baseQuantity).toBe(1);
-  // Fewer than 3 singles, not cheaper, sold out: nothing.
-  expect(proposeFormatSwap({ productId: 'base', quantity: 2, price: 3.5, minimum: 1, step: 1 }, options, new Map())).toBeNull();
-  expect(proposeFormatSwap({ productId: 'base', quantity: 3, price: 3.5, minimum: 1, step: 1 }, buildSaleFormatOptions(ndole(7, { price: 10.5 })), new Map())).toBeNull();
-  expect(proposeFormatSwap({ productId: 'base', quantity: 3, price: 3.5, minimum: 1, step: 1 }, buildSaleFormatOptions(ndole(2)), new Map())).toBeNull();
-  // Remaining singles would break the base rule (minimum 3): not proposed.
-  expect(proposeFormatSwap({ productId: 'base', quantity: 4, price: 3.5, minimum: 3, step: 1 }, options, new Map())).toBeNull();
+test('automatic bundling: the customer counts packs, the cart picks the cheapest combination', () => {
+  const options = buildSaleFormatOptions(ndole(291, { price: 10 }));
+  const shape = (n: number) => planFormatBundle(n, options)!.lines.map((l) => [l.option.id, l.quantity]);
+  expect(shape(1)).toEqual([['base', 1]]);
+  expect(shape(2)).toEqual([['base', 2]]);
+  expect(shape(3)).toEqual([['lot', 1]]);
+  expect(shape(4)).toEqual([['base', 1], ['lot', 1]]);
+  expect(shape(6)).toEqual([['lot', 2]]);
+  expect(planFormatBundle(4, options)!.total).toBe(13.5);
+  expect(planFormatBundle(4, options)!.savings).toBe(0.5);
+  expect(describeBundle(planFormatBundle(7, options)!)).toBe('1 paquet + 2 lots de 3 paquets');
+  expect(planFormatBundle(0, options)).toEqual({ units: 0, lines: [], total: 0, savings: 0 });
+  // A lot that saves nothing is never imposed (equal cost keeps singles).
+  expect(planFormatBundle(3, buildSaleFormatOptions(ndole(291, { price: 10.5 })))!.lines.map((l) => l.option.id)).toEqual(['base']);
+  // Lot sold out (stock 2): singles only; stock caps the counter.
+  expect(planFormatBundle(2, buildSaleFormatOptions(ndole(2)))!.lines.map((l) => [l.option.id, l.quantity])).toEqual([['base', 2]]);
+  expect(maxBundleUnits(buildSaleFormatOptions(ndole(7)))).toBe(7);
+  expect(planFormatBundle(3, buildSaleFormatOptions(ndole(2)))).toBeNull();
+});
+
+test('several lot sizes: optimal, not greedy', () => {
+  const parent: SaleFormatParent = {
+    id: 'base', price: 1, stock: 100, format_label: '1 pièce',
+    formats: [
+      { id: 'l4', price: 3.6, stock: 25, active: true, format_parent_id: 'base', units_per_sale: 4, format_label: 'Lot de 4', format_position: 1 },
+      { id: 'l5', price: 4, stock: 20, active: true, format_parent_id: 'base', units_per_sale: 5, format_label: 'Lot de 5', format_position: 2 },
+    ],
+  };
+  // 8 pieces: lot de 5 + 3 pieces (7,00 €) is cheaper than 2 lots de 4 (7,20 €); greedy-by-size would miss neither, cost decides.
+  const plan = planFormatBundle(8, buildSaleFormatOptions(parent))!;
+  expect(plan.total).toBe(7);
+  expect(planFormatBundle(9, buildSaleFormatOptions(parent))!.total).toBe(7.6);
+});
+
+test('card and cart copy: offer line and composition caption', () => {
+  const options = buildSaleFormatOptions(ndole(291, { price: 10 }));
+  expect(saleFormatOfferLine(options)).toBe('3 pour 10,00 €');
+  expect(saleFormatOfferLine(buildSaleFormatOptions(ndole(291, { price: 10.5 })))).toBeNull();
+  expect(bundleCaption(planFormatBundle(4, options), options, paquet)).toBe('dont 1 lot de 3 paquets · −0,50 €');
+  expect(bundleCaption(planFormatBundle(2, options), options, paquet)).toBe('Encore 1 paquet : les 3 à 10,00 €');
+  expect(bundleCaption(null, options, paquet)).toBe('dans le panier');
 });
 
 test('quantity labels are never ambiguous', () => {

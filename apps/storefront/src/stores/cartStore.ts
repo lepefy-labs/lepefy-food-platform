@@ -44,11 +44,12 @@ interface CartState {
   incrementItem: (productId: string) => void;
   decrementItem: (productId: string) => 'decremented' | 'removed' | 'unchanged';
   /**
-   * « Passer au lot » (formats de vente, migration 187) : ajoute `formatQuantity`
-   * lots puis ramène la base à `baseQuantity` (0 = ligne retirée). Les unités
-   * physiques restent identiques. Rien ne change si le lot ne peut pas être ajouté.
+   * Regroupement automatique (formats de vente, migration 187) : fixe d'un coup
+   * la quantité de chaque format d'une fiche (`ids` = tous ses formats ; absent
+   * de `targets` = 0). Les unités physiques sont décidées par l'appelant
+   * (`planFormatBundle`), le store applique seulement le plan.
    */
-  swapToFormat: (baseId: string, formatProduct: CartItem['product'], formatQuantity: number, baseQuantity: number) => boolean;
+  applyFormatPlan: (targets: Array<{ product: CartItem['product']; quantity: number }>, ids: string[]) => void;
   clearCart: () => void;
   totalItems: () => number;
   totalPrice: () => number;
@@ -191,24 +192,23 @@ export const useCartStore = create<CartState>()(
         return 'decremented';
       },
 
-      swapToFormat(baseId, formatProduct, formatQuantity, baseQuantity) {
-        const state = get();
-        const base = state.items.find((item) => item.product.id === baseId);
-        if (!base || formatQuantity < 1 || baseQuantity < 0 || baseQuantity >= base.quantity) return false;
-        const before = state.items.find((item) => item.product.id === formatProduct.id)?.quantity ?? 0;
-        get().addItem(formatProduct, formatQuantity);
-        const after = get().items.find((item) => item.product.id === formatProduct.id)?.quantity ?? 0;
-        if (after !== before + formatQuantity) {
-          // Ajout partiel (stock, règle) : on revient à l'état d'avant, la base est intacte.
-          if (after !== before) {
-            if (before === 0) get().removeItem(formatProduct.id);
-            else get().updateQuantity(formatProduct.id, before);
-          }
-          return false;
+      applyFormatPlan(targets, ids) {
+        // Baisses d'abord, puis hausses : jamais plus d'unités que le plan, même un instant.
+        const wanted = new Map(targets.map((target) => [target.product.id, target]));
+        for (const id of ids) {
+          const target = wanted.get(id)?.quantity ?? 0;
+          const existing = get().items.find((item) => item.product.id === id);
+          if (!existing || existing.quantity <= target) continue;
+          if (target === 0) get().removeItem(id);
+          else get().updateQuantity(id, target);
         }
-        if (baseQuantity === 0) get().removeItem(baseId);
-        else get().updateQuantity(baseId, baseQuantity);
-        return true;
+        for (const id of ids) {
+          const target = wanted.get(id);
+          if (!target || target.quantity <= 0) continue;
+          const existing = get().items.find((item) => item.product.id === id);
+          if (!existing) get().addItem(target.product, target.quantity);
+          else if (existing.quantity < target.quantity) get().addItem(target.product, target.quantity - existing.quantity);
+        }
       },
 
       clearCart() {
@@ -220,7 +220,8 @@ export const useCartStore = create<CartState>()(
       },
 
       totalItems() {
-        return get().items.reduce((sum, i) => sum + i.quantity, 0);
+        // Un lot de 3 compte 3 articles (formats de vente, 187), comme le compteur en paquets.
+        return get().items.reduce((sum, i) => sum + i.quantity * Math.max(1, i.product.units_per_sale ?? 1), 0);
       },
 
       totalPrice() {

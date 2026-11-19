@@ -4,11 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { IconX } from '@tabler/icons-react';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
-import { useCartStore } from '@/stores/cartStore';
 import { useTenant } from '@/providers/TenantProvider';
 import { formatPrice } from '@/lib/utils/format';
 import { formatQuantityLabel, type SaleFormatOption } from '@/lib/catalog/saleFormats';
-import { toFormatCartProduct, type FormatParentForCart } from '@/lib/cart/saleFormatCart';
+import type { FormatParentForCart } from '@/lib/cart/saleFormatCart';
 import { contentLabel, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { SaleFormatPicker } from '@/components/product/SaleFormatPicker';
 
@@ -17,8 +16,11 @@ interface FormatChooserDialogProps {
   product: FormatParentForCart & { net_quantity_display?: string | null };
   options: SaleFormatOption[];
   onClose: () => void;
-  /** Après un ajout réussi (mesure de l'emplacement, retour visuel de la card). */
-  onAdded?: (option: SaleFormatOption) => void;
+  /**
+   * Ajoute le format choisi (unités de base : 1 paquet = 1, lot de 3 = 3) ; le
+   * panier recompose ensuite la combinaison la moins chère. true = ajouté.
+   */
+  onAddUnits: (option: SaleFormatOption) => boolean;
 }
 
 /**
@@ -26,7 +28,7 @@ interface FormatChooserDialogProps {
  * le « + » n'ajoute jamais un lot par surprise. Feuille en bas de l'écran sur
  * mobile, fenêtre centrée au-delà ; Échap ferme, Tab reste dans la fenêtre.
  */
-export function FormatChooserDialog({ open, product, options, onClose, onAdded }: FormatChooserDialogProps) {
+export function FormatChooserDialog({ open, product, options, onClose, onAddUnits }: FormatChooserDialogProps) {
   const { currency } = useTenant();
   const panelRef = useRef<HTMLDivElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -41,13 +43,7 @@ export function FormatChooserDialog({ open, product, options, onClose, onAdded }
 
   function add() {
     if (!selected || !selected.purchasable) return;
-    const before = useCartStore.getState().items.find((item) => item.product.id === selected.id)?.quantity ?? 0;
-    useCartStore.getState().addItem(toFormatCartProduct(product, selected), selected.minimum);
-    const after = useCartStore.getState().items.find((item) => item.product.id === selected.id)?.quantity ?? 0;
-    if (after > before) {
-      onAdded?.(selected);
-      onClose();
-    }
+    if (onAddUnits(selected)) onClose();
   }
 
   return createPortal(

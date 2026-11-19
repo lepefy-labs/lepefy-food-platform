@@ -10,7 +10,7 @@ import { formatPrice } from '@/lib/utils/format';
 import { useTenant } from '@/providers/TenantProvider';
 import { ShopTag } from '@/components/ui/ShopTag';
 import { rememberShoppingReturn } from '@/lib/catalog/shoppingReturn';
-import { describePrice, resolveSellingFormat, type SellingFormatSource } from '@/lib/storefrontCopy/sellingFormat';
+import { describePrice, quantityNoun, resolveSellingFormat, type SellingFormatSource } from '@/lib/storefrontCopy/sellingFormat';
 import { minimumChip } from '@/lib/storefrontCopy/quantityRuleCopy';
 import { AVAILABILITY_COPY, belowMinimumDetail } from '@/lib/storefrontCopy/availability';
 import { AvailabilityBadge } from './AvailabilityBadge';
@@ -25,9 +25,9 @@ import { PromoBadge } from './PromoBadge';
 import { NoveltyBadge } from './NoveltyBadge';
 import { promotionEndLabel } from '@/lib/catalog/promotions';
 import { hasNoveltyBadge } from '@/lib/catalog/novelties';
-import { buildSaleFormatOptions, formatQuantityLabel, lowestUnitPrice, type SaleFormatFields, type SaleFormatRow } from '@/lib/catalog/saleFormats';
-import { saleFormatCardChip } from '@/lib/storefrontCopy/saleFormatCopy';
-import { useHydratedCartItems } from '@/lib/cart/useHydratedCart';
+import { buildSaleFormatOptions, type SaleFormatFields, type SaleFormatRow } from '@/lib/catalog/saleFormats';
+import { bundleCaption, saleFormatCardChip, saleFormatOfferLine } from '@/lib/storefrontCopy/saleFormatCopy';
+import { useFormatUnits } from '@/lib/cart/useFormatUnits';
 import { FormatChooserDialog } from './FormatChooserDialog';
 
 /**
@@ -126,12 +126,10 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   // Un seul format achetable et c'est la base : la card reste un ajout direct.
   const choosesFormat = multiFormat && !(purchasableFormats.length === 1 && purchasableFormats[0]!.isBase);
   const [formatDialogOpen, setFormatDialogOpen] = useState(false);
-  const cartItems = useHydratedCartItems();
-  const formatsInCart = multiFormat
-    ? formatOptions
-        .map((option) => ({ option, quantity: cartItems.find((item) => item.product.id === option.id)?.quantity ?? 0 }))
-        .filter((entry) => entry.quantity > 0)
-    : [];
+  // Une fois dans le panier : un seul compteur en unités de base, recomposé
+  // automatiquement (3 paquets → 1 lot ; 1 lot − 1 → 2 paquets).
+  const formatUnits = useFormatUnits(product, formatOptions);
+  const offerLine = multiFormat ? saleFormatOfferLine(formatOptions, currency) : null;
   const ctaRef = useRef<HTMLButtonElement>(null);
   const stepperRef = useRef<HTMLDivElement>(null);
   const focusStepperAfterAdd = useRef(false);
@@ -179,8 +177,16 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
 
   // Une fois dans le panier, la card montre le même +/− que le panier (hors Goodies).
   // `line` est lu après l'hydratation : le HTML serveur (panier inconnu) reste identique au premier rendu.
-  const showStepper = !merchandise && !choosesFormat && line.quantity > 0 && !unavailable;
-  const stepperCaption = line.canIncrement ? 'dans le panier' : 'maximum disponible';
+  const showStepper = !merchandise && !unavailable && (multiFormat ? formatUnits.units > 0 : !choosesFormat && line.quantity > 0);
+  // Plusieurs formats : l'unité dans le compteur (« paquets »), la composition
+  // en dessous sur sa propre ligne (jamais tronquée dans une card étroite).
+  const stepperCaption = multiFormat
+    ? (formatUnits.canIncrement ? quantityNoun(sellingFormat, formatUnits.units) ?? 'dans le panier' : 'maximum disponible')
+    : line.canIncrement ? 'dans le panier' : 'maximum disponible';
+  const formatCaption = multiFormat && formatUnits.units > 0 ? bundleCaption(formatUnits.current, formatOptions, sellingFormat, currency) : null;
+  const formatCaptionLine = formatCaption && formatCaption !== 'dans le panier' && (
+    <p aria-live="polite" className={`mt-1 text-xs font-semibold leading-snug ${formatUnits.current && formatUnits.current.savings > 0 ? 'text-green-800' : 'text-gray-700'}`}>{formatCaption}</p>
+  );
 
   // Le bouton « Ajouter » disparaît au profit du +/− : le focus clavier le suit
   // (avant que la confirmation ne l'enregistre pour le lui rendre à la fermeture).
@@ -192,18 +198,19 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   }, [showStepper]);
 
   function handleStepperDecrement() {
-    if (line.decrement() === 'removed') requestAnimationFrame(() => ctaRef.current?.focus({ preventScroll: true }));
+    const result = multiFormat ? formatUnits.decrement() : line.decrement();
+    if (result === 'removed') requestAnimationFrame(() => ctaRef.current?.focus({ preventScroll: true }));
   }
 
   const stepper = (
     <CartStepper
       variant="card"
-      quantity={line.quantity}
+      quantity={multiFormat ? formatUnits.units : line.quantity}
       productName={product.name}
-      removesOnDecrement={line.removesOnDecrement}
-      canIncrement={line.canIncrement && !atLimit}
+      removesOnDecrement={multiFormat ? formatUnits.removesOnDecrement : line.removesOnDecrement}
+      canIncrement={multiFormat ? formatUnits.canIncrement : line.canIncrement && !atLimit}
       caption={stepperCaption}
-      onIncrement={line.increment}
+      onIncrement={multiFormat ? formatUnits.increment : line.increment}
       onDecrement={handleStepperDecrement}
     />
   );
@@ -301,14 +308,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             {merchandise && product.category?.name && <p className="mb-2 truncate text-xs text-gray-500">{product.category.name}</p>}
             <div className={`flex items-end justify-between gap-2 ${merchandise ? 'flex-wrap' : ''}`}>
               <div className="min-w-0">
-                {multiFormat ? (
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xs font-medium text-gray-700">dès</span>
-                    <ProductPrice price={lowestUnitPrice(formatOptions) ?? product.price} currency={currency} product={product} compareAtPrice={null} />
-                  </div>
-                ) : (
-                  <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} />
-                )}
+                <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} />
                 {hasDiscount && !multiFormat && <p className="mt-1 text-xs font-semibold leading-snug text-red-700">Économisez {formatPrice(savings, currency)}</p>}
                 {promoEnd && !unavailable && <p className="mt-0.5 text-xs font-semibold leading-snug text-red-900">{promoEnd}</p>}
               </div>
@@ -328,20 +328,17 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
                 <span>{minimumChip(minOrderQuantity, product.price, currency)}</span>
               </p>
             )}
-            {multiFormat && (
+            {multiFormat && (offerLine ? (
+              <p className="mt-2 rounded-md border border-green-300 bg-green-50 px-1.5 py-1 text-xs font-bold leading-snug text-green-900">{offerLine}</p>
+            ) : (
               <p className="mt-2 rounded-md border border-orange-200 bg-orange-50 px-1.5 py-1 text-xs font-semibold leading-snug text-orange-900">
                 {saleFormatCardChip(formatOptions, currency)}
               </p>
-            )}
-            {formatsInCart.length > 0 && (
-              <p className="mt-1.5 rounded-md bg-gray-100 px-1.5 py-1 text-xs leading-snug text-gray-800">
-                Dans le panier : {formatsInCart.map((entry) => formatQuantityLabel(entry.option.label, entry.quantity)).join(' + ')}
-              </p>
-            )}
+            ))}
             {!merchandise && !multiFormat && availability === 'below_minimum' && (
               <p className="mt-2 text-xs leading-snug text-gray-700">{belowMinimumDetail(minOrderQuantity)}</p>
             )}
-            {showStepper && <div ref={stepperRef} className="mt-2">{stepper}</div>}
+            {showStepper && <div ref={stepperRef} className="mt-2">{stepper}{formatCaptionLine}</div>}
             {!merchandise && !showStepper && (
               <button
                 ref={ctaRef}
@@ -374,8 +371,8 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             </p>
             {promoEnd && !unavailable && <p className="mt-0.5 text-xs font-semibold leading-snug text-red-900">{promoEnd}</p>}
             {multiFormat && !unavailable && (
-              <span className="mt-1 inline-flex items-center rounded-md border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-xs font-semibold leading-tight text-orange-900">
-                {formatOptions.length} formats
+              <span className="mt-1 inline-flex items-center rounded-md border border-green-300 bg-green-50 px-1.5 py-0.5 text-xs font-bold leading-tight text-green-900">
+                {offerLine ?? `${formatOptions.length} formats`}
               </span>
             )}
             {hasMinRule && (
@@ -385,7 +382,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             )}
             {showFulfillment && <FulfillmentPolicyChip policy={fulfillmentPolicy} className="mt-1" />}
             {unavailable && <AvailabilityBadge state={availability} className="mt-1" />}
-            {showStepper && <div ref={stepperRef} className="mt-2">{stepper}</div>}
+            {showStepper && <div ref={stepperRef} className="mt-2">{stepper}{formatCaptionLine}</div>}
           </div>
         )}
       </div>
@@ -408,7 +405,14 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
           product={product}
           options={formatOptions}
           onClose={() => setFormatDialogOpen(false)}
-          onAdded={() => onAdded?.(product)}
+          onAddUnits={(option) => {
+            const added = formatUnits.addUnits(option.units * option.minimum);
+            if (added) {
+              focusStepperAfterAdd.current = true;
+              onAdded?.(product);
+            }
+            return added;
+          }}
         />
       )}
     </Link>

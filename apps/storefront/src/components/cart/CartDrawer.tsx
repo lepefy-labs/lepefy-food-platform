@@ -18,6 +18,8 @@ import { CartDrawerHeader } from './CartDrawerHeader';
 import { CartDrawerFooter } from './CartDrawerFooter';
 import { CartDrawerEmpty } from './CartDrawerEmpty';
 import { CartItem } from './CartItem';
+import { CartFormatGroupItem } from './CartFormatGroupItem';
+import { useCartFormatGroups } from '@/lib/cart/useCartFormatGroups';
 import { CartUndoToast } from './CartUndoToast';
 import { QuantityGroupProgress } from './QuantityGroupProgress';
 import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
@@ -60,6 +62,10 @@ export function CartDrawer() {
   const addItem = useCartStore((s) => s.addItem);
   // Monté sur toutes les pages : les règles ne sont demandées qu'à l'ouverture d'un panier non vide.
   const { groups: quantityGroups, loading: groupsLoading, error: groupsError } = useQuantityGroups({ enabled: isOpen && !isEmpty });
+
+  // Formats de vente (187) : une ligne par fiche ; lu seulement à l'ouverture, pour les lignes déjà marquées comme formats.
+  const formatGroups = useCartFormatGroups(items, { enabled: isOpen && !isEmpty, onlyKnownFormats: true });
+  const renderedGroups = new Set<string>();
 
   const panelRef = useRef<HTMLDivElement>(null);
   const [undo, setUndo] = useState<{ item: CartItemType; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
@@ -150,7 +156,14 @@ export function CartDrawer() {
             )}
             <QuantityGroupProgress groups={quantityGroups} items={items} />
             <ul>
-              {items.map((item) => (
+              {items.map((item) => {
+                const group = [...formatGroups.values()].find((entry) => entry.ids.includes(item.product.id));
+                if (group && !group.ids.some((id) => unavailableProductIds.includes(id))) {
+                  if (renderedGroups.has(group.parent.id)) return null;
+                  renderedGroups.add(group.parent.id);
+                  return <CartFormatGroupItem key={`format-group-${group.parent.id}`} group={group} currency={tenant.currency} variant="drawer" onRemoveLast={handleRemove} />;
+                }
+                return (
                 <CartItem
                   key={item.product.id}
                   item={item}
@@ -162,7 +175,8 @@ export function CartDrawer() {
                   onRemove={handleRemove}
                   onAdjust={updateQuantity}
                 />
-              ))}
+                );
+              })}
             </ul>
           </div>
         )}

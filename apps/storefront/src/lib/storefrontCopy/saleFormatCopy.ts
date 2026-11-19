@@ -1,4 +1,4 @@
-import type { SaleFormatOption } from '@/lib/catalog/saleFormats';
+import { formatQuantityLabel, type FormatBundlePlan, type SaleFormatOption } from '@/lib/catalog/saleFormats';
 import { formatPrice } from '@/lib/utils/format';
 import { formatCount, unitPhrase, type SellingFormat } from './sellingFormat';
 
@@ -32,9 +32,37 @@ export function saleFormatCardChip(options: SaleFormatOption[], currency = 'EUR'
   return `${options.length} formats · ${lowerFirst(first.label)} à ${formatPrice(first.price, currency)}`;
 }
 
-/** « Passer au lot et économiser 0,60 € ». */
-export function formatSwapTitle(savings: number, currency = 'EUR'): string {
-  return `Passer au lot et économiser ${formatPrice(savings, currency)}`;
+/** Lot le plus avantageux en vente (prix par unité le plus bas, économie positive). */
+function bestOffer(options: SaleFormatOption[]): SaleFormatOption | null {
+  return options
+    .filter((option) => !option.isBase && option.purchasable && option.savings > 0)
+    .sort((a, b) => (a.unitPrice ?? a.price) - (b.unitPrice ?? b.price))[0] ?? null;
+}
+
+/** « 3 pour 10,00 € » : l'offre lot sous le prix unitaire (card, fiche) ; null sans lot avantageux. */
+export function saleFormatOfferLine(options: SaleFormatOption[], currency = 'EUR'): string | null {
+  const offer = bestOffer(options);
+  return offer ? `${offer.units} pour ${formatPrice(offer.price, currency)}` : null;
+}
+
+/**
+ * Sous le compteur en unités : « dont 1 lot de 3 paquets · −0,50 € » quand un
+ * lot est appliqué, sinon « Encore 1 paquet : les 3 à 10,00 € », sinon
+ * « dans le panier ». Jamais d'action demandée au client.
+ */
+export function bundleCaption(plan: FormatBundlePlan | null, options: SaleFormatOption[], base: SellingFormat, currency = 'EUR'): string {
+  if (!plan || plan.units === 0) return 'dans le panier';
+  const lots = plan.lines.filter((line) => !line.option.isBase);
+  if (lots.length > 0) {
+    const text = lots.map((line) => formatQuantityLabel(line.option.label, line.quantity)).join(' + ');
+    return plan.savings > 0 ? `dont ${text} · −${formatPrice(plan.savings, currency)}` : `dont ${text}`;
+  }
+  const offer = bestOffer(options);
+  if (offer && plan.units < offer.units) {
+    const missing = offer.units - plan.units;
+    return `Encore ${formatCount(base, missing)} : les ${offer.units} à ${formatPrice(offer.price, currency)}`;
+  }
+  return 'dans le panier';
 }
 
 function lowerFirst(text: string): string {
