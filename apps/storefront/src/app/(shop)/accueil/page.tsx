@@ -13,6 +13,7 @@ import { CategoryBlocksGrid } from '@/components/home/CategoryBlocksGrid';
 import { SuggestionsRow, type SuggestionProduct } from '@/components/home/SuggestionsRow';
 import { getActiveNovelties, NOVELTIES_ROW_LIMIT } from '@/lib/catalog/novelties';
 import { getShopCategories } from '@/lib/catalog/catalogCache';
+import { planCategoryBlocks, type CategoryBlockRow } from '@/lib/home/categoryBlocks';
 import { formatDate, formatPrice } from '@/lib/utils/format';
 import type { EventRow, ProductFulfillmentPolicy, ServiceOffering } from '@lepefy/types';
 
@@ -75,7 +76,7 @@ export default async function HomePage() {
   const [
     { data: categoriesRaw },
     { data: featuredRaw },
-    { count: activeProductsCount },
+    { data: activeProductRows },
     { data: discountCandidatesRaw },
     { data: heroSlidesRaw, error: heroSlidesError },
     nextEventResult,
@@ -96,14 +97,16 @@ export default async function HomePage() {
       .eq('featured', true)
       .order('position', { ascending: true })
       .limit(8),
-    // 2bis. Compte réel de produits actifs — alimente la statistique "Notre
-    // origine" (Task B) : jamais un nombre codé en dur, toujours la vraie
-    // cardinalité au moment du rendu.
+    // 2bis. Liste légère des produits actifs (id, catégorie, dans l'ordre du
+    // catalogue) : donne le vrai nombre de produits actifs (statistique « Notre
+    // origine », jamais codée en dur), le total de chaque catégorie et les
+    // produits de ses blocs, en une requête au lieu de deux par catégorie.
     supabase
       .from('products')
-      .select('id', { count: 'exact', head: true })
+      .select('id, category_id')
       .eq('tenant_id', tenant.id)
-      .eq('active', true),
+      .eq('active', true)
+      .order('position', { ascending: true }),
     // 4. Suggestions (Feature 3) — étiquettes honnêtes uniquement, jamais de
     // personnalisation inventée (pas de login client actif côté storefront).
     supabase
@@ -147,11 +150,15 @@ export default async function HomePage() {
   const storyEnabled = Boolean(tenant.story_heading && tenant.story_text);
 
   // 3. Prodotti per categoria (escludi featured) — alimente à la fois le
-  // bloc-catégorie (Feature 2, grille 2×2 de 4 images max) et son compteur.
-  const featuredIds = featuredProducts.map(p => p.id);
-  const excludeIds  = featuredIds.length > 0
-    ? featuredIds
-    : ['00000000-0000-0000-0000-000000000000'];
+  // bloc-catégorie (Feature 2, grille 2×2 de 4 images max) et son compteur
+  // (total réel, featured compris). Calculés depuis la liste légère 2bis.
+  const blockPlan = planCategoryBlocks(
+    (activeProductRows as CategoryBlockRow[] | null) ?? [],
+    categories.map((cat) => cat.id),
+    featuredProducts.map((p) => p.id),
+    4,
+  );
+  const activeProductsCount = blockPlan.activeCount;
 
   const offerProducts: SuggestionProduct[] = (
     (discountCandidatesRaw as unknown as SuggestionProduct[] | null) ?? []
@@ -161,37 +168,12 @@ export default async function HomePage() {
   const offerIds = offerProducts.map(p => p.id);
   const excludeForRecent = offerIds.length > 0 ? offerIds : ['00000000-0000-0000-0000-000000000000'];
 
-  // categoryProducts, categoryCounts et recentRaw sont mutuellement
-  // indépendants (aucun ne dépend du résultat d'un autre) — un seul
-  // Promise.all au lieu de 3 étapes séquentielles.
-  const [categoryProductsEntries, categoryCountsEntries, { data: recentRaw }] = await Promise.all([
-    Promise.all(
-      categories.map(async (cat) => {
-        const { data: catRaw } = await supabase
-          .from('products')
-          .select(PRODUCT_CARD_SELECT)
-          .eq('tenant_id', tenant.id)
-          .eq('active', true)
-          .eq('category_id', cat.id)
-          .not('id', 'in', `(${excludeIds.join(',')})`)
-          .order('position', { ascending: true })
-          .limit(4);
-        return [cat.id, (catRaw as unknown as HomeProduct[] | null) ?? []] as const;
-      }),
-    ),
-    // Compte total réel par catégorie (indépendant de la limite de 4
-    // ci-dessus) — alimente le sous-titre "N produits" du bloc-catégorie.
-    Promise.all(
-      categories.map(async (cat) => {
-        const { count } = await supabase
-          .from('products')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', tenant.id)
-          .eq('active', true)
-          .eq('category_id', cat.id);
-        return [cat.id, count ?? 0] as const;
-      }),
-    ),
+  // Cartes des blocs-catégorie (une seule lecture) et « Sélection du moment »
+  // sont indépendantes : un seul Promise.all.
+  const [{ data: blockRaw }, { data: recentRaw }] = await Promise.all([
+    blockPlan.ids.length > 0
+      ? supabase.from('products').select(PRODUCT_CARD_SELECT).eq('tenant_id', tenant.id).eq('active', true).in('id', blockPlan.ids)
+      : Promise.resolve({ data: [] }),
     supabase
       .from('products')
       .select(PRODUCT_CARD_SELECT)
@@ -201,8 +183,14 @@ export default async function HomePage() {
       .order('created_at', { ascending: false })
       .limit(6),
   ]);
-  const categoryProducts: Record<string, HomeProduct[]> = Object.fromEntries(categoryProductsEntries);
-  const categoryCounts: Record<string, number> = Object.fromEntries(categoryCountsEntries);
+  const blockProductsById = new Map(((blockRaw as unknown as HomeProduct[] | null) ?? []).map((p) => [p.id, p]));
+  const categoryProducts: Record<string, HomeProduct[]> = Object.fromEntries(
+    Object.entries(blockPlan.idsByCategory).map(([categoryId, ids]) => [
+      categoryId,
+      ids.map((id) => blockProductsById.get(id)).filter((p): p is HomeProduct => Boolean(p)),
+    ]),
+  );
+  const categoryCounts: Record<string, number> = blockPlan.counts;
   const recentProducts: SuggestionProduct[] = (recentRaw as unknown as SuggestionProduct[] | null) ?? [];
   // Nouveautés choisies par le commerçant (migration 156) : elles remplacent la
   // « Sélection du moment » (derniers ajoutés) tant qu'il y en a.
@@ -484,7 +472,7 @@ export default async function HomePage() {
         heading={tenant.story_heading}
         text={tenant.story_text}
         imageUrl={tenant.story_image_url}
-        productsCount={activeProductsCount ?? 0}
+        productsCount={activeProductsCount}
         countriesServed={tenant.countries_served}
       />
 
