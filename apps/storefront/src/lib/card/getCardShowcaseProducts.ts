@@ -45,7 +45,7 @@ export async function getCardShowcaseProducts(tenantId: string): Promise<CardSho
       .from('products')
       .select(SHOWCASE_SELECT)
       .eq('tenant_id', tenantId)
-      .eq('active', true)
+      .eq('active', true).is('format_parent_id', null)
       .in('category_id', categoryIds)
       .not('image_url', 'is', null);
     const results = await Promise.all([

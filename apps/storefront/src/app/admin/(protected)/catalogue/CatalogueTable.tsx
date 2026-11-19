@@ -199,6 +199,7 @@ export default function CatalogueTable({ products, tenantCurrency, canManage, li
           </Badge>
         )}
         {product.new_until && <Badge tone={PRODUCT_NOVELTY_META.active!.tone}>Nouveauté · jusqu’au {formatShopDate(product.new_until)}</Badge>}
+        {(product.formats?.length ?? 0) > 0 && <Badge tone="info">{(product.formats?.length ?? 0) + 1} formats</Badge>}
         {showPolicy && (
           <Badge tone={policy === 'pickup_only' && pickupDisabled ? 'warning' : 'neutral'}>
             {FULFILLMENT_POLICY_ADMIN_LABELS[policy]}{policy === 'pickup_only' && pickupDisabled ? ' · retrait désactivé' : ''}

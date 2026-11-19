@@ -120,7 +120,7 @@ export async function getActivePromotions<T extends PromotionCandidate = Promoti
     .from('products')
     .select(PRODUCT_CARD_SELECT)
     .eq('tenant_id', tenantId)
-    .eq('active', true)
+    .eq('active', true).is('format_parent_id', null)
     .in('category_id', categoryIds)
     .not('compare_at_price', 'is', null)
     .order('position')

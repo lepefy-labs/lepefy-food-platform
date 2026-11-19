@@ -32,7 +32,7 @@ export default async function GoodiesPage({ searchParams }: { searchParams: { ca
   function merchandiseQuery() {
     return supabase.from('products')
       .select(`${PRODUCT_CARD_BASE_COLUMNS}, description, category:categories!inner(name)`, { count: 'exact' })
-      .eq('tenant_id', tenant.id).eq('active', true)
+      .eq('tenant_id', tenant.id).eq('active', true).is('format_parent_id', null)
       .eq('category.tenant_id', tenant.id).eq('category.catalog_scope', 'gadgets');
   }
   let productsQuery = merchandiseQuery();

@@ -1,5 +1,5 @@
 import {
-  CONTENT_UNITS, contentLabel, parseNetQuantity, resolveSellingFormat,
+  CONTENT_UNITS, contentLabel, formatCount, parseNetQuantity, resolveSellingFormat,
   type ContentUnit, type NetContent, type SellingFormat, type SellingFormatSource,
 } from '@/lib/storefrontCopy/sellingFormat';
 
@@ -13,9 +13,16 @@ import {
  * la commande, fiche sans format) n'affiche rien : comportement historique.
  */
 
-/** Snapshot persisté (v1) : copie brute des champs de format de la fiche (154 + 018). */
+/**
+ * Snapshot persisté : v1 = champs de format de la fiche (154 + 018) ; v2 (187)
+ * ajoute le format de vente acheté (libellé, unités de base par vente, stock
+ * qui fait foi). Les champs de format d'un lot décrivent son unité de base.
+ */
 export interface OrderItemFormatSnapshot extends SellingFormatSource {
-  v: 1;
+  v: 1 | 2;
+  format_label?: string | null;
+  units_per_sale?: number | null;
+  stock_product_id?: string | null;
 }
 
 const MAX_TEXT_LENGTH = 40;
@@ -23,12 +30,18 @@ const MAX_TEXT_LENGTH = 40;
 export function parseFormatSnapshot(raw: unknown): OrderItemFormatSnapshot | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const value = raw as Record<string, unknown>;
-  if (value.v !== 1) return null;
+  if (value.v !== 1 && value.v !== 2) return null;
+  // v2 (187) est toujours écrit avec le libellé du format : sans lui, snapshot non fiable.
+  if (value.v === 2 && (typeof value.format_label !== 'string' || !value.format_label.trim())) return null;
   const text = (key: string) => (typeof value[key] === 'string' ? (value[key] as string) : null);
   const num = (key: string) => (typeof value[key] === 'number' || typeof value[key] === 'string' ? Number(value[key]) : null);
   const pack = num('pack_count');
+  const units = num('units_per_sale');
   return {
-    v: 1,
+    v: value.v,
+    format_label: value.v === 2 ? text('format_label')?.slice(0, 60) ?? null : null,
+    units_per_sale: value.v === 2 && units != null && Number.isInteger(units) && units >= 1 ? units : null,
+    stock_product_id: value.v === 2 ? text('stock_product_id') : null,
     sale_unit: text('sale_unit'),
     net_content_value: num('net_content_value'),
     net_content_unit: text('net_content_unit'),
@@ -91,6 +104,38 @@ function normalize(text: string): string {
 export function orderItemFormatLabel(snapshotRaw: unknown, itemName: string): string | null {
   const snapshot = parseFormatSnapshot(snapshotRaw);
   if (!snapshot) return null;
+  if (snapshot.format_label) return saleFormatLine(snapshot, itemName);
+  return baseFormatLabel(snapshot, itemName);
+}
+
+/**
+ * Format de vente acheté (187) : « 1 paquet · 500 g », « Lot de 3 paquets » +
+ * « 3 × 500 g ». Le libellé n'est pas répété s'il est déjà dans le nom.
+ */
+function saleFormatLine(snapshot: OrderItemFormatSnapshot, itemName: string): string | null {
+  const label = snapshot.format_label!;
+  const units = snapshot.units_per_sale ?? 1;
+  const base = baseFormatLabel({ ...snapshot, format_label: null }, itemName.replace(label, ''));
+  const content = base && units > 1 ? `${units} × ${base}` : base;
+  const parts = [normalize(itemName).includes(normalize(label)) ? null : label, content].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
+}
+
+/**
+ * Unités physiques à préparer pour une ligne d'un format de plusieurs unités
+ * (« 6 paquets » pour 2 × « Lot de 3 paquets ») ; null sinon. Même source
+ * (snapshot) : jamais le catalogue actuel.
+ */
+export function orderItemPhysicalUnits(snapshotRaw: unknown, quantity: number): string | null {
+  const snapshot = parseFormatSnapshot(snapshotRaw);
+  const units = snapshot?.units_per_sale ?? 1;
+  if (!snapshot || units <= 1 || !Number.isInteger(quantity) || quantity < 1) return null;
+  const total = units * quantity;
+  const format = resolveSellingFormat(snapshot);
+  return format.unit && !format.unit.byWeight ? formatCount(format, total) : `${total} unités`;
+}
+
+function baseFormatLabel(snapshot: OrderItemFormatSnapshot, itemName: string): string | null {
   const format = withStructuredContent(resolveSellingFormat(snapshot), snapshot);
 
   if (format.unit?.byWeight) return /\bkg\b|kilo/i.test(itemName) ? null : 'Vendu au kilo';

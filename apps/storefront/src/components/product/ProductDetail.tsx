@@ -32,8 +32,11 @@ import { IconBuildingStore, IconCircleOff, IconHourglassHigh, IconTruck, IconTru
 import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { productFulfillmentHint } from '@/lib/storefrontCopy/fulfillmentCopy';
 import type { ProductWithCategory } from '@lepefy/types';
+import { buildSaleFormatOptions, formatQuantityLabel, lowestUnitPrice, type SaleFormatRow } from '@/lib/catalog/saleFormats';
+import { toFormatCartProduct } from '@/lib/cart/saleFormatCart';
+import { SaleFormatPicker } from './SaleFormatPicker';
 
-export function ProductDetail({ product }: { product: ProductWithCategory }) {
+export function ProductDetail({ product }: { product: ProductWithCategory & { formats?: SaleFormatRow[] | null } }) {
   const router = useRouter();
   const tenant = useTenant();
   const catalogHref = product.category?.catalog_scope === 'gadgets' ? '/gadgets' : '/';
@@ -45,8 +48,15 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const addItem = useCartStore((s) => s.addItem);
   const cartItems = useHydratedCartItems();
   const { groups, loading: groupsLoading, error: groupsError, reload: reloadGroups } = useQuantityGroups();
-  const minOrderQuantity = product.min_order_quantity ?? 1;
-  const orderQuantityStep = product.order_quantity_step ?? 1;
+  // Formats de vente (187) : choix explicite, jamais de présélection. Sans
+  // format enfant actif, `formatOptions` est vide et la fiche reste inchangée.
+  const formatOptions = buildSaleFormatOptions(product);
+  const multiFormat = formatOptions.length > 0;
+  const [selectedFormatId, setSelectedFormatId] = useState<string | null>(null);
+  const selectedFormat = formatOptions.find((option) => option.id === selectedFormatId) ?? null;
+  const anyFormatPurchasable = formatOptions.some((option) => option.purchasable);
+  const minOrderQuantity = selectedFormat?.minimum ?? product.min_order_quantity ?? 1;
+  const orderQuantityStep = selectedFormat?.step ?? product.order_quantity_step ?? 1;
   const [quantity, setQuantity] = useState(minOrderQuantity);
   // « ✓ Ajouté » : retour bref sur le bouton uniquement. Les actions de
   // navigation vivent dans la confirmation partagée et dans la ligne « dans
@@ -55,13 +65,31 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const justAddedTimer = useRef<ReturnType<typeof setTimeout>>();
   const showConfirmation = useAddToCartUiStore((s) => s.show);
   const [returnToResults, setReturnToResults] = useState(false);
-  const line = useCartLineQuantity(product.id);
-  const inCartQuantity = line.quantity;
-  const maxPurchasable = getMaximumValidQuantity(product.stock, minOrderQuantity, orderQuantityStep);
+  const line = useCartLineQuantity(selectedFormat?.id ?? product.id);
+  const inCartQuantity = multiFormat && !selectedFormat ? 0 : line.quantity;
+  const maxPurchasable = multiFormat
+    ? selectedFormat?.maxPurchasable ?? (anyFormatPurchasable ? 1 : 0)
+    : getMaximumValidQuantity(product.stock, minOrderQuantity, orderQuantityStep);
   const outOfStock = maxPurchasable === 0;
-  const availability = deriveAvailability({ stock: product.stock, minimum: minOrderQuantity, step: orderQuantityStep, maxPurchasable });
+  // Plusieurs formats : épuisé seulement si aucun format n'est achetable ; avant
+  // le choix, aucun minimum ne s'applique encore (chaque format a le sien).
+  const availability = !multiFormat
+    ? deriveAvailability({ stock: product.stock, minimum: minOrderQuantity, step: orderQuantityStep, maxPurchasable })
+    : !anyFormatPurchasable
+      ? deriveAvailability({ stock: 0, minimum: 1, step: 1, maxPurchasable: 0 })
+      : selectedFormat
+        ? deriveAvailability({ stock: selectedFormat.stock, minimum: selectedFormat.minimum, step: selectedFormat.step, maxPurchasable: selectedFormat.maxPurchasable })
+        : deriveAvailability({ stock: Number.MAX_SAFE_INTEGER, minimum: 1, step: 1, maxPurchasable: Number.MAX_SAFE_INTEGER });
   const sellingFormat = resolveSellingFormat(product);
-  const totalPrice = product.price * quantity;
+  const unitPrice = selectedFormat?.price ?? product.price;
+  const totalPrice = unitPrice * quantity;
+  const needsFormatChoice = multiFormat && !selectedFormat;
+  const countLabel = (count: number) => selectedFormat ? formatQuantityLabel(selectedFormat.label, count) : formatCount(sellingFormat, count);
+  const formatsInCart = multiFormat
+    ? formatOptions
+        .map((option) => ({ option, quantity: cartItems.find((item) => item.product.id === option.id)?.quantity ?? 0 }))
+        .filter((entry) => entry.quantity > 0)
+    : [];
   const group = groups.find((entry) => entry.productIds.includes(product.id));
   const groupQuantity = group
     ? cartItems.filter((item) => group.productIds.includes(item.product.id))
@@ -73,8 +101,9 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const groupProgress = group && groupState
     ? groupProgressCopy(group.name, groupQuantity, groupState.nextValidQuantity, group.min_quantity)
     : null;
-  const hasIndividualRule = minOrderQuantity > 1 || orderQuantityStep > 1;
-  const quantityLabel = formatCount(sellingFormat, quantity);
+  // Encadré « Achetez N minimum » : règle de la fiche, ou du format de base choisi.
+  const hasIndividualRule = (!multiFormat || Boolean(selectedFormat?.isBase)) && (minOrderQuantity > 1 || orderQuantityStep > 1);
+  const quantityLabel = countLabel(quantity);
   const explicitQuantityLabel = `Ajouter ${quantityLabel}`;
   const ruleStepLine = stepLine(minOrderQuantity, orderQuantityStep);
   const fulfillmentPolicy = normalizeFulfillmentPolicy(product.fulfillment_policy);
@@ -96,10 +125,20 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
     router.push(getShoppingReturn(catalogHref), { scroll: false });
   }
 
+  function chooseFormat(id: string) {
+    const option = formatOptions.find((entry) => entry.id === id);
+    if (!option) return;
+    setSelectedFormatId(id);
+    setQuantity(option.minimum);
+  }
+
   function handleAddToCart() {
-    if (outOfStock || quantity > maxPurchasable) return;
-    const previous = useCartStore.getState().items.find((item) => item.product.id === product.id)?.quantity ?? 0;
-    addItem({
+    if (needsFormatChoice || outOfStock || quantity > maxPurchasable) return;
+    const cartProductId = selectedFormat?.id ?? product.id;
+    const previous = useCartStore.getState().items.find((item) => item.product.id === cartProductId)?.quantity ?? 0;
+    if (selectedFormat) {
+      addItem(toFormatCartProduct({ ...product, fulfillment_policy: normalizeFulfillmentPolicy(product.fulfillment_policy) }, selectedFormat), quantity);
+    } else addItem({
       id:           product.id,
       name:         product.name,
       slug:         product.slug,
@@ -113,7 +152,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
       fulfillment_policy: normalizeFulfillmentPolicy(product.fulfillment_policy),
       ...pickSellingFormatFields(product),
     }, quantity);
-    const updated = useCartStore.getState().items.find((item) => item.product.id === product.id)?.quantity ?? 0;
+    const updated = useCartStore.getState().items.find((item) => item.product.id === cartProductId)?.quantity ?? 0;
     if (updated <= previous) return;
     clearTimeout(justAddedTimer.current);
     setJustAdded(true);
@@ -125,14 +164,16 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
       order_quantity_step: orderQuantityStep,
       fulfillment_policy: normalizeFulfillmentPolicy(product.fulfillment_policy),
     };
-    showConfirmation(cardProduct, { continueHref: getShoppingReturn(catalogHref) });
+    // Un format enfant (lot) : la ligne « dans votre panier » de la fiche suffit ;
+    // la confirmation partagée décrit la fiche, pas le lot.
+    if (!selectedFormat || selectedFormat.isBase) showConfirmation(cardProduct, { continueHref: getShoppingReturn(catalogHref) });
   }
 
   const cartStepper = (
     <CartStepper
       variant="panel"
       quantity={inCartQuantity}
-      productName={product.name}
+      productName={selectedFormat ? `${product.name}, ${selectedFormat.label}` : product.name}
       removesOnDecrement={line.removesOnDecrement}
       canIncrement={line.canIncrement && inCartQuantity < maxPurchasable}
       onIncrement={line.increment}
@@ -141,7 +182,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   );
   const inCartLine = showsCartLine && (
     <p role="status" className="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-1 text-sm text-green-900">
-      <span>✓ <span className="font-bold">{formatCount(sellingFormat, inCartQuantity)}</span> dans votre panier · {formatPrice(product.price * inCartQuantity, currency)}</span>
+      <span>✓ <span className="font-bold">{countLabel(inCartQuantity)}</span> dans votre panier · {formatPrice(unitPrice * inCartQuantity, currency)}</span>
       <Link href="/cart" prefetch={false} className="inline-flex min-h-10 shrink-0 items-center font-bold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>Voir mon panier</Link>
     </p>
   );
@@ -191,11 +232,36 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                 <PromoBadge product={product} />
               </div>
             )}
-            <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} size="detail" />
+            {multiFormat ? (
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-sm font-medium text-gray-700">dès</span>
+                <ProductPrice price={lowestUnitPrice(formatOptions) ?? product.price} currency={currency} product={product} compareAtPrice={null} size="detail" />
+              </div>
+            ) : (
+              <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} size="detail" />
+            )}
             {promotionEndLabel(product, 'long') && (
               <p className="mt-2 text-sm font-semibold text-red-900">{promotionEndLabel(product, 'long')}</p>
             )}
           </div>
+
+          {multiFormat && anyFormatPurchasable && (
+            <section aria-label="Choix du format" className="grid gap-2">
+              <SaleFormatPicker
+                options={formatOptions}
+                value={selectedFormatId}
+                onChange={chooseFormat}
+                currency={currency}
+                baseFormat={sellingFormat}
+                unitContent={contentLabel(sellingFormat) ?? product.net_quantity_display}
+              />
+              {formatsInCart.length > 0 && (
+                <p role="status" className="text-sm text-gray-800">
+                  Dans votre panier : <span className="font-semibold">{formatsInCart.map((entry) => formatQuantityLabel(entry.option.label, entry.quantity)).join(' + ')}</span>
+                </p>
+              )}
+            </section>
+          )}
 
           {availability === 'sold_out' || availability === 'below_minimum' ? (
             <section aria-label="Disponibilité" className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm ${availability === 'sold_out' ? 'border-gray-300 bg-gray-50 text-gray-900' : 'border-amber-300 bg-amber-50 text-amber-950'}`}>
@@ -286,10 +352,11 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                     </div>
                     <button
                       onClick={handleAddToCart}
-                      className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all active:scale-95 flex items-center justify-center gap-2"
+                      disabled={needsFormatChoice}
+                      className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all active:scale-95 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:!bg-gray-200 disabled:text-gray-800 disabled:active:scale-100"
                       style={{ backgroundColor: justAdded ? '#16a34a' : 'var(--color-primary)' }}
                     >
-                      {justAdded ? '✓ Ajouté au panier' : `${explicitQuantityLabel} au panier · ${formatPrice(totalPrice, currency)}`}
+                      {justAdded ? '✓ Ajouté au panier' : needsFormatChoice ? 'Choisissez un format' : `${explicitQuantityLabel} au panier · ${formatPrice(totalPrice, currency)}`}
                     </button>
                   </>
                 )}
@@ -306,7 +373,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                         style={{ backgroundColor: 'var(--color-primary)' }}
                       >
                         <span className="max-w-full truncate text-sm">Voir mon panier</span>
-                        <span className="text-xs font-medium opacity-90">{formatCount(sellingFormat, inCartQuantity)} · {formatPrice(product.price * inCartQuantity, currency)}</span>
+                        <span className="text-xs font-medium opacity-90">{countLabel(inCartQuantity)} · {formatPrice(unitPrice * inCartQuantity, currency)}</span>
                       </Link>
                     </>
                   ) : (
@@ -318,11 +385,12 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                       <button
                         onClick={handleAddToCart}
                         aria-live="polite"
-                        className="flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-3 py-2 font-semibold text-white transition-all active:scale-[0.98]"
+                        disabled={needsFormatChoice}
+                        className="flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-3 py-2 font-semibold text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:!bg-gray-200 disabled:text-gray-800"
                         style={{ backgroundColor: justAdded ? '#16a34a' : 'var(--color-primary)' }}
                       >
-                        <span className="max-w-full truncate text-sm">{justAdded ? '✓ Ajouté au panier' : explicitQuantityLabel}</span>
-                        {!justAdded && <span className="text-xs font-medium opacity-90">Total : {formatPrice(totalPrice, currency)}</span>}
+                        <span className="max-w-full truncate text-sm">{justAdded ? '✓ Ajouté au panier' : needsFormatChoice ? 'Choisissez un format' : explicitQuantityLabel}</span>
+                        {!justAdded && !needsFormatChoice && <span className="text-xs font-medium opacity-90">Total : {formatPrice(totalPrice, currency)}</span>}
                       </button>
                     </>
                   )}

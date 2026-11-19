@@ -93,7 +93,7 @@ export default async function HomePage() {
       .from('products')
       .select(PRODUCT_CARD_SELECT)
       .eq('tenant_id', tenant.id)
-      .eq('active', true)
+      .eq('active', true).is('format_parent_id', null)
       .eq('featured', true)
       .order('position', { ascending: true })
       .limit(8),
@@ -105,7 +105,7 @@ export default async function HomePage() {
       .from('products')
       .select('id, category_id')
       .eq('tenant_id', tenant.id)
-      .eq('active', true)
+      .eq('active', true).is('format_parent_id', null)
       // Même ordre que le catalogue (lib/catalog/pagination.ts) : `id` départage
       // les nombreuses positions égales, donc les blocs restent stables.
       .order('position', { ascending: true })
@@ -116,7 +116,7 @@ export default async function HomePage() {
       .from('products')
       .select(PRODUCT_CARD_SELECT)
       .eq('tenant_id', tenant.id)
-      .eq('active', true)
+      .eq('active', true).is('format_parent_id', null)
       .not('compare_at_price', 'is', null)
       .order('position', { ascending: true })
       .limit(50),
@@ -175,13 +175,13 @@ export default async function HomePage() {
   // sont indépendantes : un seul Promise.all.
   const [{ data: blockRaw }, { data: recentRaw }] = await Promise.all([
     blockPlan.ids.length > 0
-      ? supabase.from('products').select(PRODUCT_CARD_SELECT).eq('tenant_id', tenant.id).eq('active', true).in('id', blockPlan.ids)
+      ? supabase.from('products').select(PRODUCT_CARD_SELECT).eq('tenant_id', tenant.id).eq('active', true).is('format_parent_id', null).in('id', blockPlan.ids)
       : Promise.resolve({ data: [] }),
     supabase
       .from('products')
       .select(PRODUCT_CARD_SELECT)
       .eq('tenant_id', tenant.id)
-      .eq('active', true)
+      .eq('active', true).is('format_parent_id', null)
       .not('id', 'in', `(${excludeForRecent.join(',')})`)
       .order('created_at', { ascending: false })
       .limit(6),

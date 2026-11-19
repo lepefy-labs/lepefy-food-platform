@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
+import Link from 'next/link'
+import ProductSaleFormatsSection from './ProductSaleFormatsSection';
 import { Suspense } from 'react';
 import ResourceActivity from '../../../_components/data/ResourceActivity';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -48,13 +49,19 @@ export default async function AdminProductEditPage({
       quid_ingredient, quid_percentage, alcohol_pct, net_quantity_display,
       sale_unit, net_content_value, net_content_unit, pack_count, fulfillment_policy,
       packaging_material, recycling_note, nutrition_basis, nutrition,
-      label_background_image_url, label_background_color, barcode_value
+      label_background_image_url, label_background_color, barcode_value,
+      format_parent_id, units_per_sale, format_label, format_stock_mode
     `)
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)
     .single();
 
   if (!product) notFound();
+  // Formats de vente (187) : un format renvoie à sa fiche, qui porte le stock partagé.
+  const formatParent = product.format_parent_id
+    ? (await supabase.from('products').select('id, name, stock').eq('id', product.format_parent_id).eq('tenant_id', tenant.id).maybeSingle()).data
+    : null;
+  const derivedStock = Boolean(product.format_parent_id) && product.format_stock_mode !== 'own';
 
   const { data: campaignLinks } = await supabase.from('catalog_campaign_products')
     .select('campaign_id').eq('tenant_id',tenant.id).eq('product_id',product.id);
@@ -105,6 +112,14 @@ export default async function AdminProductEditPage({
           {index>0?', ':''}<Link href={`/admin/catalogue/campagnes/${campaign.id}`} className="font-semibold underline">{campaign.name}</Link>
         </span>)}. Les prix d’une campagne programmée ou en cours se modifient depuis sa fiche.
       </div>}
+      {formatParent && <div className="mb-4 rounded-xl border border-tone-info-border bg-tone-info-bg px-4 py-3 text-sm text-tone-info-fg">
+        Ce produit est le format « {product.format_label} » de{' '}
+        <Link href={`/admin/catalogue/${formatParent.id}`} className="font-semibold underline">{formatParent.name}</Link>.
+        {derivedStock
+          ? ` Son stock est calculé à partir de la fiche (${formatParent.stock} unités de base ÷ ${product.units_per_sale}) : il se modifie sur la fiche, jamais ici.`
+          : ' Il a son propre stock (cartons séparés).'}
+        {' '}Nom du format, unités, prix et poids : section « Formats de vente » de la fiche.
+      </div>}
       <ProductEditWorkspace
         isNew={false}
         productName={product.name}
@@ -131,8 +146,14 @@ export default async function AdminProductEditPage({
           fromCategory={searchParams.from_category}
           canManage={canManage}
           clickCollectEnabled={Boolean(tenant.click_collect_enabled)}
+          stockLocked={derivedStock}
         />
       </ProductEditWorkspace>
+      {!product.format_parent_id && (
+        <div className="mt-4">
+          <ProductSaleFormatsSection productId={product.id} currency={tenant.currency} canManage={canManage} />
+        </div>
+      )}
       {/* Gestion (flag business_management) : coût d'achat en lecture seule, rendu serveur uniquement. */}
       <ProductCostPanel tenantId={tenant.id} productId={product.id} price={Number(product.price)} currency={tenant.currency} />
       {/* Journal d'activité : prix, disponibilité, règles de vente, stock ajusté par un admin. */}

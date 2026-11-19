@@ -32,12 +32,14 @@ test.describe('Catalogue : produits des blocs exclus avant la découpe en pages'
   test('requête de repli : exclusion appliquée, toujours sur le tenant', () => {
     const calls: unknown[][] = [];
     const builder: Record<string, (...a: unknown[]) => unknown> = {};
-    for (const method of ['select', 'eq', 'in', 'not', 'ilike', 'order']) {
+    for (const method of ['select', 'eq', 'in', 'not', 'ilike', 'order', 'is']) {
       builder[method] = (...args: unknown[]) => { calls.push([method, ...args]); return builder; };
     }
     const client = { from: (table: string) => { calls.push(['from', table]); return builder; } };
     buildProductsQuery(client as never, 'tenant-1', [{ id: 'cat-1', slug: 'epices' }], { excludeIds: [A, B] });
     expect(calls).toContainEqual(['eq', 'tenant_id', 'tenant-1']);
+    // Formats de vente (187) : une card par fiche, jamais un format enfant.
+    expect(calls).toContainEqual(['is', 'format_parent_id', null]);
     expect(calls).toContainEqual(['not', 'id', 'in', `(${A},${B})`]);
 
     calls.length = 0;

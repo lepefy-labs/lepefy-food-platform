@@ -5,7 +5,7 @@ import { displayCountry, formatDocumentDate, formatKg, orderShortRef, readableBr
 import { androidAppStatus } from '@/lib/mobileApp/androidApp';
 import { formatWhatsappDisplay } from '@/lib/orders/portal/supportChannels';
 import type { OrderDocumentsConfig } from './settings';
-import { orderItemFormatLabel, parseFormatSnapshot } from './itemFormat';
+import { orderItemFormatLabel, orderItemPhysicalUnits, parseFormatSnapshot } from './itemFormat';
 
 /**
  * View-models des documents de commande, construits champ par champ.
@@ -68,6 +68,8 @@ export interface PickingItemVM {
   format: string | null;
   /** Repli sans snapshot (commande ancienne, produit sans format) : poids d'expédition actuel du catalogue, indicatif. */
   catalogueWeight: string | null;
+  /** Format de plusieurs unités (187) : unités physiques à prendre (« 6 paquets ») ; null sinon. */
+  physicalUnits?: string | null;
 }
 
 /**
@@ -207,6 +209,7 @@ export function buildPickingListViewModel(input: {
     storage: item.storage_type === 'fresh' || item.storage_type === 'frozen' ? item.storage_type : null,
     location: item.warehouse_location?.trim() || null,
     ...pickingLineFormat(item, input.productWeights),
+    physicalUnits: orderItemPhysicalUnits(item.format_snapshot, item.quantity),
   }));
   const a = address(order);
   const parts = { postalCode: addressText(a.postal_code), city: addressText(a.city), country: displayCountry(addressText(a.country)) };
@@ -272,6 +275,8 @@ export interface PackingSlipItemVM {
   /** Format acheté (« 500 g »), seulement depuis le snapshot de la commande ; null sinon. */
   format: string | null;
   quantity: number;
+  /** Format de plusieurs unités (187) : « 6 paquets » ; null sinon. */
+  physicalUnits?: string | null;
   unitPrice: string | null;
   lineTotal: string | null;
 }
@@ -337,6 +342,7 @@ export function buildPackingSlipViewModel(input: {
     nameAlt: item.name_alt,
     format: orderItemFormatLabel(item.format_snapshot, item.name),
     quantity: item.quantity,
+    physicalUnits: orderItemPhysicalUnits(item.format_snapshot, item.quantity),
     // Prix historiques de la commande (order_items), jamais le catalogue actuel.
     unitPrice: showPrices && item.price != null ? formatPrice(Number(item.price), currency) : null,
     lineTotal: showPrices && item.subtotal != null ? formatPrice(Number(item.subtotal), currency) : null,

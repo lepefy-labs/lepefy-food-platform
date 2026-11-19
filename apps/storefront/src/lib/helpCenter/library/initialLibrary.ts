@@ -173,6 +173,28 @@ export const INITIAL_LIBRARY: LibraryGuide[] = [
     ],
   },
   {
+    slug: 'formats-de-vente',
+    module: 'catalogue',
+    title: 'Vendre un produit à l’unité et en lot',
+    summary: 'Proposer plusieurs formats (ex. 1 paquet ou lot de 3) sous une seule fiche.',
+    requiredPermission: 'catalog.manage',
+    contexts: ['/admin/catalogue/[id]'],
+    watch: ['app/admin/(protected)/catalogue/[id]/ProductSaleFormatsSection.tsx', 'lib/catalog/saleFormats.ts', 'lib/catalog/saleFormatsAdmin.ts'],
+    blocks: [
+      p('Un format est une façon de vendre le même produit : 1 paquet, lot de 3 paquets… Le client voit une seule fiche et choisit lui-même son format ; aucun format n’est présélectionné.'),
+      steps(
+        'Ouvrez le produit dans **Produits** et descendez jusqu’à la section **Formats de vente**.',
+        'Donnez un nom au format de base (ex. « 1 paquet »), puis cliquez sur **Ajouter un format**.',
+        'Renseignez le nom du format, les **Unités par vente**, le **Prix du format** et le **Poids du format (g)** de l’ensemble emballé.',
+        'Vérifiez l’**Aperçu client** et les points « À vérifier avant d’enregistrer », puis cliquez sur **Enregistrer les formats**.',
+      ),
+      info('Le stock reste celui de la fiche, compté en unités : un lot de 3 vendu retire 3 unités. Le stock d’un lot ne se modifie jamais à part.'),
+      warn('Un minimum supérieur à 1 dans **Règles de vente**, ou un groupe de quantité actif, s’applique toujours : il n’est jamais retiré automatiquement.'),
+      info('Pour arrêter un format, décochez **En vente** et enregistrez : les commandes déjà passées restent intactes et se préparent normalement.'),
+      rel('regles-de-vente-quantite-minimale'),
+    ],
+  },
+  {
     slug: 'dupliquer-un-produit',
     module: 'catalogue',
     title: 'Dupliquer un produit',

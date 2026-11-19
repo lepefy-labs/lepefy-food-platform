@@ -186,6 +186,9 @@ async function handlePATCH(
     if (error.message.includes('campaign_price_owned')) return NextResponse.json({
       error:'Le prix est désormais géré par une campagne. Actualisez la fiche et modifiez le prix depuis cette campagne.',
     },{ status:409 });
+    if (error.message.includes('format_stock_is_derived')) return NextResponse.json({
+      error: 'Ce produit est un format de vente : son stock se modifie sur la fiche du produit.',
+    }, { status: 409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

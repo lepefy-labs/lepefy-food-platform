@@ -170,6 +170,7 @@ test.describe('Nouveautés', () => {
       eq: (...a: unknown[]) => { calls.push(['eq', ...a]); return builder; },
       in: (...a: unknown[]) => { calls.push(['in', ...a]); return builder; },
       gt: (...a: unknown[]) => { calls.push(['gt', ...a]); return builder; },
+      is: (...a: unknown[]) => { calls.push(['is', ...a]); return builder; },
       order: (...a: unknown[]) => { calls.push(['order', ...a]); return builder; },
       limit: async () => ({ data: [row('n1', '2026-10-29T00:00:00Z'), row('n2', '2026-10-01T00:00:00Z')], error: null }),
     };
@@ -180,6 +181,7 @@ test.describe('Nouveautés', () => {
     expect(calls).toContainEqual(['eq', 'active', true]);
     expect(calls).toContainEqual(['in', 'category_id', ['cat-shop']]);
     expect(calls).toContainEqual(['gt', 'new_until', NOW.toISOString()]);
+    expect(calls).toContainEqual(['is', 'format_parent_id', null]);
     expect(await getActiveNovelties(client as never, '', ['cat-shop'], NOW)).toEqual([]);
   });
 

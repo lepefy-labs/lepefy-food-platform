@@ -233,6 +233,42 @@ export const LIBRARY_TRANSLATIONS: Record<string, Record<Locale, LibraryTranslat
       ],
     },
   },
+  'formats-de-vente': {
+    it: {
+      title: 'Vendere un prodotto singolo e in lotto',
+      summary: 'Proporre più formati (es. 1 pacco o lotto da 3) sotto un\'unica scheda.',
+      blocks: [
+        p('Un formato è un modo di vendere lo stesso prodotto: 1 pacco, lotto da 3 pacchi… Il cliente vede un\'unica scheda e sceglie da sé il formato; nessun formato è preselezionato.'),
+        steps(
+          'Aprite il prodotto in **Produits** e scendete fino alla sezione **Formats de vente**.',
+          'Date un nome al formato di base (es. « 1 paquet »), poi cliccate su **Ajouter un format**.',
+          'Compilate il nome del formato, le **Unités par vente**, il **Prix du format** e il **Poids du format (g)** dell\'insieme imballato.',
+          'Controllate l\'**Aperçu client** e i punti « À vérifier avant d’enregistrer », poi cliccate su **Enregistrer les formats**.',
+        ),
+        info('Lo stock resta quello della scheda, contato in unità: un lotto da 3 venduto toglie 3 unità. Lo stock di un lotto non si modifica mai a parte.'),
+        warn('Un minimo superiore a 1 in **Règles de vente**, o un gruppo di quantità attivo, si applica sempre: non viene mai tolto automaticamente.'),
+        info('Per fermare un formato, togliete la spunta a **En vente** e salvate: gli ordini già passati restano intatti e si preparano normalmente.'),
+        rel('regles-de-vente-quantite-minimale'),
+      ],
+    },
+    en: {
+      title: 'Sell a product singly and in packs',
+      summary: 'Offer several formats (e.g. 1 pack or a pack of 3) under a single product page.',
+      blocks: [
+        p('A format is a way to sell the same product: 1 pack, a lot of 3 packs… The customer sees one product page and picks the format; no format is preselected.'),
+        steps(
+          'Open the product in **Produits** and scroll to the **Formats de vente** section.',
+          'Name the base format (e.g. « 1 paquet »), then click **Ajouter un format**.',
+          'Fill in the format name, the **Unités par vente**, the **Prix du format** and the **Poids du format (g)** of the packed set.',
+          'Check the **Aperçu client** and the « À vérifier avant d’enregistrer » points, then click **Enregistrer les formats**.',
+        ),
+        info('Stock stays on the product page, counted in units: a lot of 3 sold removes 3 units. The stock of a lot is never edited on its own.'),
+        warn('A minimum above 1 in **Règles de vente**, or an active quantity group, still applies: it is never removed automatically.'),
+        info('To stop a format, untick **En vente** and save: orders already placed stay intact and are prepared as usual.'),
+        rel('regles-de-vente-quantite-minimale'),
+      ],
+    },
+  },
   'dupliquer-un-produit': {
     it: {
       title: 'Duplicare un prodotto',

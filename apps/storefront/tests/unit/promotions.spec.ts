@@ -21,6 +21,7 @@ function fakeSupabase(rows: Array<PromotionCandidate & { tenant_id: string; acti
     eq: (column: string, value: unknown) => { calls.push(['eq', column, value]); return builder; },
     in: (column: string, values: unknown[]) => { calls.push(['in', column, values]); return builder; },
     not: (column: string, op: string, value: unknown) => { calls.push(['not', column, op, value]); return builder; },
+    is: (column: string, value: unknown) => { calls.push(['is', column, value]); return builder; },
     order: (column: string) => { calls.push(['order', column]); return builder; },
     limit: async (count: number) => {
       calls.push(['limit', count]);

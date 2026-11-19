@@ -25,6 +25,7 @@ import { decrementRemovesLine, getMaximumValidQuantity } from '@/lib/purchaseQua
 import { useCartStore } from '@/stores/cartStore';
 import { useHasMounted } from '@/hooks/useHasMounted';
 import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
+import { useCartFormatSwaps } from '@/lib/cart/useCartFormatSwaps';
 import { ACTION_COPY, SUMMARY_COPY, productsPriceLabel } from '@/lib/storefrontCopy/copy';
 import type { CartItem as CartItemType, PublicTenant } from '@lepefy/types';
 import { useEffect, useRef, useState } from 'react';
@@ -55,6 +56,8 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
   const {
     groups: quantityGroups, error: groupsError, reloadGroups, blockedMessage, canProceed, checking, fulfillment,
   } = useCartPurchaseGate(items);
+  // « Passer au lot » : seulement pour les fiches à formats présentes dans le panier.
+  const formatSwaps = useCartFormatSwaps(items);
   // Une seule estimation pour la page : barre mobile, récapitulatifs et « Ça rentre dans votre colis ».
   const { estimate: shippingEstimate, settled: estimateSettled, chooseCountry } = useShippingEstimate();
 
@@ -186,6 +189,7 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
                     onDecrement={decrement}
                     onRemove={remove}
                     onAdjust={updateQuantity}
+                    formatSwap={formatSwaps.get(item.product.id)}
                   />
                 ))}
               </ul>

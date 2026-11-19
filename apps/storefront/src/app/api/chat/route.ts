@@ -201,13 +201,13 @@ export async function POST(req: NextRequest) {
         supabase.from('products')
           .select('id, name, name_alt, stock')
           .eq('tenant_id', tenant.id)
-          .eq('active', true)
+          .eq('active', true).is('format_parent_id', null)
           .ilike('name', lookupPattern)
           .limit(4),
         supabase.from('products')
           .select('id, name, name_alt, stock')
           .eq('tenant_id', tenant.id)
-          .eq('active', true)
+          .eq('active', true).is('format_parent_id', null)
           .ilike('name_alt', lookupPattern)
           .limit(4),
       ]);

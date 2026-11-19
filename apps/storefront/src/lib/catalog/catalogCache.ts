@@ -58,7 +58,7 @@ export function getCategoryPreviewRows(tenantId: string, categoryIds: string[]):
       .from('products')
       .select('category_id, image_url')
       .eq('tenant_id', tenantId)
-      .eq('active', true)
+      .eq('active', true).is('format_parent_id', null)
       .in('category_id', ids)
       .not('image_url', 'is', null)
       .order('position', { ascending: true })

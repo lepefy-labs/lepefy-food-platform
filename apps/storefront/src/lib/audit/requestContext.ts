@@ -103,7 +103,7 @@ const AUDITED_WRITE_RPCS = new Set([
   'record_supplier_receipt', 'reverse_supplier_receipt', 'adjust_inventory', 'adjust_event_capacity',
   'delete_customer_account_data', 'select_shipping_tariff_shadow_version', 'activate_shipping_tariff_version', 'publish_shipping_tariff_version',
   'rollback_shipping_tariff_to_provider_cost', 'retire_shipping_tariff_country', 'process_manual_purchase_points_atomic',
-  'record_audit_event', 'apply_product_promotion_schedule',
+  'record_audit_event', 'apply_product_promotion_schedule', 'set_product_sale_formats',
   'catalog_campaign_select_products', 'catalog_campaign_remove_products', 'catalog_campaign_override_price',
   'catalog_campaign_create', 'catalog_campaign_duplicate', 'catalog_campaign_action',
   'support_create_ticket', 'support_post_message', 'support_set_status', 'support_update_ticket',

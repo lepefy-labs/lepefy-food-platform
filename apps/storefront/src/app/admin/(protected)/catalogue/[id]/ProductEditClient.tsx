@@ -118,6 +118,8 @@ interface ProductEditProps {
   clickCollectEnabled?: boolean;
   /** Création à partir d'un produit existant (brouillon de `toDuplicateDraft`) ; le serveur relit la source. */
   duplicateFrom?: { id: string; name: string } | null;
+  /** Format de vente en stock partagé (187) : le stock est celui de sa fiche, jamais saisi ici. */
+  stockLocked?: boolean;
 }
 
 interface FormState {
@@ -342,6 +344,7 @@ export default function ProductEditClient({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   fromCategory,
   canManage = true,
+  stockLocked = false,
   clickCollectEnabled = true,
   duplicateFrom = null,
 }: ProductEditProps) {
@@ -942,8 +945,12 @@ export default function ProductEditClient({
                   value={formData.stock}
                   onChange={(e) => setField('stock', e.target.value)}
                   className={INPUT_CLS}
+                  disabled={stockLocked}
+                  aria-describedby={stockLocked ? 'product-stock-locked' : undefined}
                 />
-                {!isNew && <p className="mt-1 text-xs text-a-text-3">Enregistré seulement si vous le modifiez : les ventes en cours ne sont pas écrasées.</p>}
+                {stockLocked
+                  ? <p id="product-stock-locked" className="mt-1 text-xs text-a-text-3">Calculé à partir du stock de la fiche (format de vente) : il se modifie sur la fiche.</p>
+                  : !isNew && <p className="mt-1 text-xs text-a-text-3">Enregistré seulement si vous le modifiez : les ventes en cours ne sont pas écrasées.</p>}
               </div>
             </section>
 

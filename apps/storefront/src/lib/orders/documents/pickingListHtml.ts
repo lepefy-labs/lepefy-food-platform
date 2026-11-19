@@ -148,7 +148,10 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 
 /** Format acheté (snapshot de la ligne) ; à défaut seulement, le poids du catalogue actuel. */
 function weightHint(item: PickingItemVM): string {
-  if (item.format) return `<span class="pl-alt pl-format">Format : ${escapeHtml(item.format)}</span>`;
+  // Format de plusieurs unités : le nombre réel d'unités à prendre, en gras.
+  const physical = item.physicalUnits ? `<span class="pl-alt pl-format">= ${escapeHtml(item.physicalUnits)} à prendre</span>` : '';
+  if (item.format) return `<span class="pl-alt pl-format">Format : ${escapeHtml(item.format)}</span>${physical}`;
+  if (physical) return physical;
   return item.catalogueWeight ? `<span class="pl-alt">Poids catalogue : ${escapeHtml(item.catalogueWeight)}</span>` : '';
 }
 

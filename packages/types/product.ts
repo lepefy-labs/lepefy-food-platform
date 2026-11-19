@@ -73,6 +73,15 @@ export interface Product {
   promo_applied: boolean;
   // Nouveauté jusqu'à cette date (migration 156, lib/catalog/novelties.ts).
   new_until: string | null;
+  // Formats de vente (migration 187, lib/catalog/saleFormats.ts) : une ligne
+  // enfant (`format_parent_id`) est un format de la fiche parente, jamais une
+  // fiche du catalogue. `units_per_sale` = unités de base du stock du parent
+  // par vente (1 pour toute fiche). `format_stock_mode` shared = stock dérivé.
+  format_parent_id: string | null;
+  units_per_sale: number;
+  format_label: string | null;
+  format_position: number;
+  format_stock_mode: 'shared' | 'own';
   created_at: string;
   updated_at: string;
 }
@@ -91,7 +100,8 @@ export interface CartItem {
   // avant leur ajout reste valide et s'affiche avec le libellé de repli.
   product: Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'image_url' | 'weight_grams' | 'stock' | 'storage_type'>
     & Partial<Pick<Product, 'min_order_quantity' | 'order_quantity_step' | 'net_quantity_display'
-      | 'sale_unit' | 'net_content_value' | 'net_content_unit' | 'pack_count' | 'fulfillment_policy'>>;
+      | 'sale_unit' | 'net_content_value' | 'net_content_unit' | 'pack_count' | 'fulfillment_policy'
+      | 'format_parent_id' | 'units_per_sale' | 'format_label' | 'format_stock_mode'>>;
   quantity: number;
 }
 

@@ -71,7 +71,7 @@ export function buildProductsQuery(
     .from('products')
     .select(PRODUCT_SELECT, { count: 'exact' })
     .eq('tenant_id', tenantId)
-    .eq('active', true)
+    .eq('active', true).is('format_parent_id', null)
     .in('category_id', categories.map(category => category.id));
 
   if (filters.productIds !== undefined) query = query.in('id', filters.productIds);
@@ -139,7 +139,7 @@ export async function getCatalogPage(
       const { ids, count } = ranking;
       if (!ids.length) return { data: [], count, error: null };
       const result = await supabase.from('products').select(PRODUCT_SELECT)
-        .eq('tenant_id', tenantId).eq('active', true).in('id', ids);
+        .eq('tenant_id', tenantId).eq('active', true).is('format_parent_id', null).in('id', ids);
       if (result.error) return { data: null, count: null, error: result.error };
       const byId = new Map((result.data ?? []).map(product => [product.id, product]));
       return { data: ids.map(id => byId.get(id)).filter((product): product is NonNullable<typeof product> => Boolean(product)),

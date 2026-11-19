@@ -103,9 +103,15 @@ export async function revalidateProductAvailability(db: SupabaseClient, tenantId
   try {
     const ids = [...new Set(productIds.filter((id): id is string => typeof id === 'string' && id.length > 0))].slice(0, MAX_PRODUCTS_PER_REVALIDATION);
     if (ids.length === 0) return;
-    const { data, error } = await db.from('products').select('slug').eq('tenant_id', tenantId).in('id', ids);
+    const { data, error } = await db.from('products').select('slug, format_parent_id').eq('tenant_id', tenantId).in('id', ids);
     if (error) throw error;
-    const paths = productAvailabilityPaths(((data ?? []) as Array<{ slug: string | null }>).map((row) => row.slug));
+    const rows = (data ?? []) as Array<{ slug: string | null; format_parent_id: string | null }>;
+    // Formats de vente (187) : un lot vendu change le stock de sa fiche, dont la page affiche tous les formats.
+    const parentIds = [...new Set(rows.map((row) => row.format_parent_id).filter((id): id is string => Boolean(id)))];
+    const parents = parentIds.length
+      ? ((await db.from('products').select('slug').eq('tenant_id', tenantId).in('id', parentIds)).data ?? []) as Array<{ slug: string | null }>
+      : [];
+    const paths = productAvailabilityPaths([...rows, ...parents].map((row) => row.slug));
     safely(() => { for (const path of paths) revalidatePath(path); });
   } catch (error) {
     console.warn('[cache] Product availability invalidation skipped', error);

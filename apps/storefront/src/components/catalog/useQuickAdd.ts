@@ -7,6 +7,7 @@ import type { ProductCardProduct } from './ProductCard';
 import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import { deriveAvailability } from '@/lib/storefrontCopy/availability';
 import { pickSellingFormatFields } from '@/lib/storefrontCopy/sellingFormat';
+import { pickSaleFormatFields } from '@/lib/cart/saleFormatCart';
 
 /** Shared quick-add behavior; merchandise retains its existing cart behavior. */
 export function useQuickAdd(product: ProductCardProduct, enforceStockLimit = false) {
@@ -56,6 +57,7 @@ export function useQuickAdd(product: ProductCardProduct, enforceStockLimit = fal
       order_quantity_step: product.order_quantity_step,
       fulfillment_policy: product.fulfillment_policy,
       ...pickSellingFormatFields(product),
+      ...pickSaleFormatFields(product),
     });
     const updated = useCartStore.getState().items.find(item => item.product.id === product.id)?.quantity ?? 0;
     if (updated <= previous) return false;

@@ -14,6 +14,10 @@ Defaults are `m=1,s=1`. The maximum possible amount is `0` if `stock < minimum`,
 
 An *active* combinable group with minimum `gm`, step `gs` applies to the sum of its members **only when at least one member is in the cart**. Members can be freely mixed but SKU-level rules also apply independently. Membership is explicit, **not inferred from merchandising categories**. Each product should belong to at most one active group.
 
+## Sale formats (migration 187)
+
+A product can be sold in several formats (`docs/PRODUCT_SALE_FORMATS.md`). Each format is its own SKU for these rules (its own minimum/step, its own cart line), but stock is checked **per authoritative stock in base units**: a shared format consumes `quantity × units_per_sale` of its base product's stock. `validateCheckoutItems` and `decrement_stock_for_order` aggregate per stock row before checking/decrementing. Group rules are never derived from formats and are never disabled implicitly: the admin « Formats de vente » section only warns when a base minimum or an active group would prevent buying a single unit.
+
 ## Authoritative enforcement
 
 `apps/storefront/src/lib/purchaseQuantityRules.ts` contains the pure rules engine; `apps/storefront/src/lib/checkout/validateCheckoutItems.ts` (which also enforces the product fulfillment policy, migration 155, via `lib/fulfillment/fulfillmentPolicy.ts`) is the only server-side loading/enforcement entry point and must be called in **every route that creates or changes payment state**:

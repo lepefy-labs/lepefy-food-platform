@@ -9,6 +9,8 @@ import { cartFulfillmentBlockingMessage, type CartFulfillmentEligibility } from 
 import { formatQuantityViolationMessage, getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import { insufficientStockMessage } from '@/lib/storefrontCopy/availability';
 import { useTenant } from '@/providers/TenantProvider';
+import { aggregateStockDemand, stockSourceId, unitsPerSale } from '@/lib/catalog/saleFormats';
+import { formatCount, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 
 export interface CartPurchaseGate {
   /** Groupes à mélanger actifs (pour afficher leur progression). */
@@ -45,6 +47,7 @@ export function useCartPurchaseGate(items: CartItem[]): CartPurchaseGate {
       issues.push(insufficientStockMessage(item.product.name, stock));
     }
   }
+  issues.push(...formatStockIssues(items));
   const checking = loading || fulfillmentState.loading;
   const combinedError = error ?? fulfillmentState.error;
   const blockedMessage = checking
@@ -60,4 +63,32 @@ export function useCartPurchaseGate(items: CartItem[]): CartPurchaseGate {
     canProceed: !blockedMessage,
     reloadGroups: () => { reload(); fulfillmentState.reload(); },
   };
+}
+
+/**
+ * Formats de vente (187) : plusieurs lignes peuvent puiser dans le même stock
+ * (2 lots de 3 + 1 paquet = 7 paquets). Stock connu côté client : celui de la
+ * fiche si elle est dans le panier, sinon la meilleure borne déduite des lots.
+ * Guide seulement ; le serveur recompte tout.
+ */
+function formatStockIssues(items: CartItem[]): string[] {
+  const shared = items.filter((item) => stockSourceId(item.product) !== item.product.id
+    || items.some((other) => other !== item && other.product.format_parent_id === item.product.id));
+  if (shared.length < 2) return [];
+  const demand = aggregateStockDemand(shared.map((item) => ({ productId: item.product.id, quantity: item.quantity, row: item.product })));
+  const issues: string[] = [];
+  for (const [sourceId, units] of demand) {
+    const lines = shared.filter((item) => stockSourceId(item.product) === sourceId);
+    if (lines.length < 2) continue;
+    const base = items.find((item) => item.product.id === sourceId);
+    const available = base
+      ? base.product.stock
+      : Math.max(...lines.map((item) => item.product.stock * unitsPerSale(item.product)));
+    if (units > available) {
+      const name = base?.product.name ?? lines[0]!.product.name.split(' — ')[0]!;
+      const count = base ? formatCount(resolveSellingFormat(base.product), available) : String(available);
+      issues.push(`${name} : il en reste ${count} au total pour tous les formats. Réduisez une des quantités pour continuer.`);
+    }
+  }
+  return issues;
 }

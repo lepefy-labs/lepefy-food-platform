@@ -95,7 +95,7 @@ export async function getActiveNovelties<T extends NoveltyCandidate = NoveltyCan
     .from('products')
     .select(PRODUCT_CARD_SELECT)
     .eq('tenant_id', tenantId)
-    .eq('active', true)
+    .eq('active', true).is('format_parent_id', null)
     .in('category_id', categoryIds)
     .gt('new_until', now.toISOString())
     .order('created_at', { ascending: false })

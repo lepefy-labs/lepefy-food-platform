@@ -43,6 +43,12 @@ interface CartState {
    */
   incrementItem: (productId: string) => void;
   decrementItem: (productId: string) => 'decremented' | 'removed' | 'unchanged';
+  /**
+   * « Passer au lot » (formats de vente, migration 187) : ajoute `formatQuantity`
+   * lots puis ramène la base à `baseQuantity` (0 = ligne retirée). Les unités
+   * physiques restent identiques. Rien ne change si le lot ne peut pas être ajouté.
+   */
+  swapToFormat: (baseId: string, formatProduct: CartItem['product'], formatQuantity: number, baseQuantity: number) => boolean;
   clearCart: () => void;
   totalItems: () => number;
   totalPrice: () => number;
@@ -183,6 +189,26 @@ export const useCartStore = create<CartState>()(
         if (previous === 0) { get().removeItem(productId); return 'removed'; }
         get().updateQuantity(productId, previous);
         return 'decremented';
+      },
+
+      swapToFormat(baseId, formatProduct, formatQuantity, baseQuantity) {
+        const state = get();
+        const base = state.items.find((item) => item.product.id === baseId);
+        if (!base || formatQuantity < 1 || baseQuantity < 0 || baseQuantity >= base.quantity) return false;
+        const before = state.items.find((item) => item.product.id === formatProduct.id)?.quantity ?? 0;
+        get().addItem(formatProduct, formatQuantity);
+        const after = get().items.find((item) => item.product.id === formatProduct.id)?.quantity ?? 0;
+        if (after !== before + formatQuantity) {
+          // Ajout partiel (stock, règle) : on revient à l'état d'avant, la base est intacte.
+          if (after !== before) {
+            if (before === 0) get().removeItem(formatProduct.id);
+            else get().updateQuantity(formatProduct.id, before);
+          }
+          return false;
+        }
+        if (baseQuantity === 0) get().removeItem(baseId);
+        else get().updateQuantity(baseId, baseQuantity);
+        return true;
       },
 
       clearCart() {

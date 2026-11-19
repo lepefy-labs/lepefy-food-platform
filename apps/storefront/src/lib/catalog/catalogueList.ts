@@ -37,6 +37,8 @@ export interface CatalogueListProduct {
   promo_ends_at: string | null;
   new_until: string | null;
   categories: { name: string; slug: string } | null;
+  /** Formats de vente actifs de la fiche (migration 187) ; vide = format unique. */
+  formats?: Array<{ id: string }> | null;
 }
 
 export interface CatalogueListResult {
@@ -85,7 +87,8 @@ export async function loadCatalogueList(
   /** Every filter of the list state, minus the facet being counted. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function narrow<Q extends Record<string, any>>(query: Q, skip?: Facet | 'category'): Q {
-    let next = query.eq('tenant_id', tenantId);
+    // Formats de vente (187) : gérés depuis leur fiche, jamais une ligne de la liste.
+    let next = query.eq('tenant_id', tenantId).is('format_parent_id', null);
     if (categoryId && skip !== 'category') next = next.eq('category_id', categoryId);
     if (state.reception) next = next.eq('fulfillment_policy', state.reception);
     if (q) next = next.or(`name.ilike.%${q}%,slug.ilike.%${q}%,barcode_value.ilike.%${q}%`);
@@ -101,7 +104,7 @@ export async function loadCatalogueList(
       id, name, slug, price, stock, active, weight_grams, category_id,
       image_url, storage_type, fulfillment_policy, warehouse_location, description_source,
       compare_at_price, promo_price, promo_applied, promo_ends_at, new_until,
-      barcode_value, net_quantity_display, categories(name, slug)
+      barcode_value, net_quantity_display, categories(name, slug), formats:sale_formats(id)
     `, { count: 'exact' }));
 
   const from = (page - 1) * limit;
@@ -113,7 +116,7 @@ export async function loadCatalogueList(
   ];
   const [{ data, count, error }, totalResult, categoryCounts, ...countResults] = await Promise.all([
     query.order(sort.column, { ascending: sort.ascending }).order('id', { ascending: true }).range(from, from + limit - 1),
-    head().eq('tenant_id', tenantId),
+    head().eq('tenant_id', tenantId).is('format_parent_id', null),
     countByCategory(),
     ...facets.map((facet) => applyCatalogueStatus(narrow(head(), facet.skip), facet.key)),
   ]);

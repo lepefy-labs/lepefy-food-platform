@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LepefyImage } from '@/components/images/LepefyImage';
 import { IconInfoCircle, IconSnowflake, IconShoppingCart } from '@tabler/icons-react';
 import type { CatalogScope, ProductFulfillmentPolicy } from '@lepefy/types';
@@ -25,13 +25,17 @@ import { PromoBadge } from './PromoBadge';
 import { NoveltyBadge } from './NoveltyBadge';
 import { promotionEndLabel } from '@/lib/catalog/promotions';
 import { hasNoveltyBadge } from '@/lib/catalog/novelties';
+import { buildSaleFormatOptions, formatQuantityLabel, lowestUnitPrice, type SaleFormatFields, type SaleFormatRow } from '@/lib/catalog/saleFormats';
+import { saleFormatCardChip } from '@/lib/storefrontCopy/saleFormatCopy';
+import { useHydratedCartItems } from '@/lib/cart/useHydratedCart';
+import { FormatChooserDialog } from './FormatChooserDialog';
 
 /**
  * Forme minimale requise par la card — satisfaite à la fois par
  * `ProductWithCategory` (grille catalogue) et `HomeProduct` (shelves home),
  * sans coupler le composant à l'un des deux types d'origine.
  */
-export interface ProductCardProduct extends SellingFormatSource {
+export interface ProductCardProduct extends SellingFormatSource, SaleFormatFields {
   id: string;
   name: string;
   slug: string;
@@ -64,6 +68,8 @@ export interface ProductCardProduct extends SellingFormatSource {
   promo_until_sold_out?: boolean | null;
   /** Nouveauté jusqu'à cette date (migration 156). */
   new_until?: string | null;
+  /** Formats de vente actifs de la fiche (migration 187, `sale_formats`) ; absent ou vide = format unique. */
+  formats?: SaleFormatRow[] | null;
 }
 
 interface ProductCardProps {
@@ -113,6 +119,19 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   const { addToCart, added, outOfStock, atLimit, availability } = useQuickAdd(product, !merchandise);
   const showConfirmation = useAddToCartUiStore(s => s.show);
   const line = useCartLineQuantity(product.id);
+  // Formats de vente (187) : une seule card, choix explicite du format (jamais un lot par surprise).
+  const formatOptions = merchandise ? [] : buildSaleFormatOptions(product);
+  const multiFormat = formatOptions.length > 0;
+  const purchasableFormats = formatOptions.filter((option) => option.purchasable);
+  // Un seul format achetable et c'est la base : la card reste un ajout direct.
+  const choosesFormat = multiFormat && !(purchasableFormats.length === 1 && purchasableFormats[0]!.isBase);
+  const [formatDialogOpen, setFormatDialogOpen] = useState(false);
+  const cartItems = useHydratedCartItems();
+  const formatsInCart = multiFormat
+    ? formatOptions
+        .map((option) => ({ option, quantity: cartItems.find((item) => item.product.id === option.id)?.quantity ?? 0 }))
+        .filter((entry) => entry.quantity > 0)
+    : [];
   const ctaRef = useRef<HTMLButtonElement>(null);
   const stepperRef = useRef<HTMLDivElement>(null);
   const focusStepperAfterAdd = useRef(false);
@@ -134,8 +153,8 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   const cartonDetail = cartonMatch ? `${cartonMatch[1]} paquets · ${cartonMatch[2]} bâtons` : null;
   const displayName = cartonMatch ? product.name.split(/\s*[—–-]\s*carton de/i)[0] : product.name;
   const minOrderQuantity = product.min_order_quantity ?? 1;
-  const hasMinRule = !merchandise && minOrderQuantity > 1;
-  const unavailable = availability === 'sold_out' || availability === 'below_minimum';
+  const hasMinRule = !merchandise && !multiFormat && minOrderQuantity > 1;
+  const unavailable = multiFormat ? purchasableFormats.length === 0 : availability === 'sold_out' || availability === 'below_minimum';
   // Seuls les modes imposés sont mentionnés sur la card : le cas standard
   // (« Livraison ou retrait ») est dit sur la fiche produit, sans charger la grille.
   const fulfillmentPolicy = normalizeFulfillmentPolicy(product.fulfillment_policy);
@@ -143,12 +162,16 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   const shelfPrice = describePrice(product.price, sellingFormat, currency);
   const ctaLabel = added
     ? 'Ajouté ✓'
+    : choosesFormat && !unavailable
+      ? 'Choisir le format'
     : unavailable
       ? AVAILABILITY_COPY.unavailableCta
       : atLimit
         ? AVAILABILITY_COPY.atLimitCta
         : hasMinRule ? `Ajouter ${minOrderQuantity}` : 'Ajouter au panier';
-  const ctaAriaLabel = unavailable
+  const ctaAriaLabel = choosesFormat && !unavailable
+    ? `${product.name} : choisir le format`
+    : unavailable
     ? `${product.name} : ${AVAILABILITY_COPY.unavailableCta.toLowerCase()}`
     : atLimit
       ? `${product.name} : ${AVAILABILITY_COPY.atLimitHelp}`
@@ -156,7 +179,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
 
   // Une fois dans le panier, la card montre le même +/− que le panier (hors Goodies).
   // `line` est lu après l'hydratation : le HTML serveur (panier inconnu) reste identique au premier rendu.
-  const showStepper = !merchandise && line.quantity > 0 && !unavailable;
+  const showStepper = !merchandise && !choosesFormat && line.quantity > 0 && !unavailable;
   const stepperCaption = line.canIncrement ? 'dans le panier' : 'maximum disponible';
 
   // Le bouton « Ajouter » disparaît au profit du +/− : le focus clavier le suit
@@ -188,6 +211,10 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    if (choosesFormat) {
+      setFormatDialogOpen(true);
+      return;
+    }
     // Même confirmation pour toute card (grille, shelf, Goodies) : actions
     // « Voir mon panier » / « Continuer mes achats » qui ne disparaissent pas.
     if (addToCart()) {
@@ -274,8 +301,15 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             {merchandise && product.category?.name && <p className="mb-2 truncate text-xs text-gray-500">{product.category.name}</p>}
             <div className={`flex items-end justify-between gap-2 ${merchandise ? 'flex-wrap' : ''}`}>
               <div className="min-w-0">
-                <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} />
-                {hasDiscount && <p className="mt-1 text-xs font-semibold leading-snug text-red-700">Économisez {formatPrice(savings, currency)}</p>}
+                {multiFormat ? (
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xs font-medium text-gray-700">dès</span>
+                    <ProductPrice price={lowestUnitPrice(formatOptions) ?? product.price} currency={currency} product={product} compareAtPrice={null} />
+                  </div>
+                ) : (
+                  <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} />
+                )}
+                {hasDiscount && !multiFormat && <p className="mt-1 text-xs font-semibold leading-snug text-red-700">Économisez {formatPrice(savings, currency)}</p>}
                 {promoEnd && !unavailable && <p className="mt-0.5 text-xs font-semibold leading-snug text-red-900">{promoEnd}</p>}
               </div>
               {merchandise && <button
@@ -294,7 +328,17 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
                 <span>{minimumChip(minOrderQuantity, product.price, currency)}</span>
               </p>
             )}
-            {!merchandise && availability === 'below_minimum' && (
+            {multiFormat && (
+              <p className="mt-2 rounded-md border border-orange-200 bg-orange-50 px-1.5 py-1 text-xs font-semibold leading-snug text-orange-900">
+                {saleFormatCardChip(formatOptions, currency)}
+              </p>
+            )}
+            {formatsInCart.length > 0 && (
+              <p className="mt-1.5 rounded-md bg-gray-100 px-1.5 py-1 text-xs leading-snug text-gray-800">
+                Dans le panier : {formatsInCart.map((entry) => formatQuantityLabel(entry.option.label, entry.quantity)).join(' + ')}
+              </p>
+            )}
+            {!merchandise && !multiFormat && availability === 'below_minimum' && (
               <p className="mt-2 text-xs leading-snug text-gray-700">{belowMinimumDetail(minOrderQuantity)}</p>
             )}
             {showStepper && <div ref={stepperRef} className="mt-2">{stepper}</div>}
@@ -303,16 +347,18 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
                 ref={ctaRef}
                 type="button"
                 onClick={handleAddToCart}
-                disabled={unavailable || atLimit}
-                aria-disabled={atLimit || undefined}
+                disabled={unavailable || (atLimit && !choosesFormat)}
+                aria-disabled={(atLimit && !choosesFormat) || undefined}
                 aria-label={ctaAriaLabel}
                 className="mt-2 flex min-h-11 w-full items-center justify-center rounded-lg px-1 py-2 text-[13px] font-semibold leading-tight whitespace-nowrap text-white transition-opacity hover:opacity-90 active:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:!bg-gray-200 disabled:text-gray-700 sm:text-sm motion-reduce:transition-none"
-                style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
+                style={choosesFormat && !unavailable
+                  ? { backgroundColor: 'white', color: 'var(--color-primary)', boxShadow: 'inset 0 0 0 1.5px var(--color-primary)' }
+                  : { backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
               >
                 {ctaLabel}
               </button>
             )}
-            {!merchandise && atLimit && !unavailable && !showStepper && (
+            {!merchandise && !choosesFormat && atLimit && !unavailable && !showStepper && (
               <p className="mt-1.5 text-xs leading-snug text-gray-700">{AVAILABILITY_COPY.atLimitHelp}</p>
             )}
           </div>
@@ -327,6 +373,11 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
               )}
             </p>
             {promoEnd && !unavailable && <p className="mt-0.5 text-xs font-semibold leading-snug text-red-900">{promoEnd}</p>}
+            {multiFormat && !unavailable && (
+              <span className="mt-1 inline-flex items-center rounded-md border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-xs font-semibold leading-tight text-orange-900">
+                {formatOptions.length} formats
+              </span>
+            )}
             {hasMinRule && (
               <span className="mt-1 inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold leading-tight text-amber-900">
                 {minOrderQuantity} minimum
@@ -344,12 +395,21 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
           ref={ctaRef}
           onClick={handleAddToCart}
           aria-label={ctaAriaLabel}
-          disabled={unavailable || atLimit}
+          disabled={unavailable || (atLimit && !choosesFormat)}
           className="absolute bottom-2 right-2 w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-bold transition-all active:scale-90 shadow-card disabled:cursor-not-allowed disabled:!bg-gray-300 disabled:text-gray-700"
           style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
         >
           {added ? '✓' : '+'}
         </button>
+      )}
+      {multiFormat && (
+        <FormatChooserDialog
+          open={formatDialogOpen}
+          product={product}
+          options={formatOptions}
+          onClose={() => setFormatDialogOpen(false)}
+          onAdded={() => onAdded?.(product)}
+        />
       )}
     </Link>
   );

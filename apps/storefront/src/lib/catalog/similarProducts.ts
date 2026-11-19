@@ -29,7 +29,7 @@ export async function getSimilarProducts(
     .from('products')
     .select('id, name')
     .eq('tenant_id', tenantId)
-    .eq('active', true)
+    .eq('active', true).is('format_parent_id', null)
     .in('category_id', categoryIds)
     .limit(MAX_CANDIDATES);
   if (error || !candidates) return [];
@@ -41,7 +41,7 @@ export async function getSimilarProducts(
     .from('products')
     .select(PRODUCT_CARD_SELECT)
     .eq('tenant_id', tenantId)
-    .eq('active', true)
+    .eq('active', true).is('format_parent_id', null)
     .in('id', ids);
   if (rowsError || !rows) return [];
   const byId = new Map((rows as unknown as Array<{ id: string }>).map((row) => [row.id, row]));

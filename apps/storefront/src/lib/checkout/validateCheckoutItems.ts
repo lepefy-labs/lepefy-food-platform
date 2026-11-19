@@ -13,6 +13,7 @@ import {
   type FulfillmentViolation,
 } from '@/lib/fulfillment/fulfillmentPolicy';
 import type { ProductFulfillmentPolicy } from '@lepefy/types';
+import { aggregateStockDemand, stockSourceId } from '@/lib/catalog/saleFormats';
 
 const MAX_QUANTITY_PER_ITEM = 999;
 
@@ -25,6 +26,10 @@ export interface CanonicalCheckoutProduct {
   min_order_quantity: number;
   order_quantity_step: number;
   fulfillment_policy: ProductFulfillmentPolicy;
+  /** Format de vente (migration 187) : stock partagé avec la fiche parente. */
+  format_parent_id: string | null;
+  units_per_sale: number;
+  format_stock_mode: 'shared' | 'own';
 }
 
 export interface CanonicalCheckoutItem {
@@ -101,7 +106,7 @@ export async function validateCheckoutItems(
   const productIds = [...quantityByProduct.keys()];
   const { data: dbProducts, error: productsError } = await supabase
     .from('products')
-    .select('id, name, price, storage_type, stock, min_order_quantity, order_quantity_step, fulfillment_policy')
+    .select('id, name, price, storage_type, stock, min_order_quantity, order_quantity_step, fulfillment_policy, format_parent_id, units_per_sale, format_stock_mode')
     .eq('tenant_id', tenantId)
     .eq('active', true)
     .in('id', productIds) as {
@@ -119,6 +124,34 @@ export async function validateCheckoutItems(
     return { ok: false, status: 400, body: {
       error: ERROR_COPY.productsUnavailable, code: 'PRODUCT_UNAVAILABLE',
     } };
+  }
+
+  // Formats de vente (187) : le stock d'un format partagé est celui de sa
+  // fiche, en unités de base. La fiche doit être en vente et du même tenant.
+  const stockById = new Map<string, { name: string; stock: number }>(
+    dbProducts.map((product) => [product.id, { name: product.name, stock: product.stock }]),
+  );
+  const parentIds = [...new Set(dbProducts
+    .map((product) => product.format_parent_id)
+    .filter((id): id is string => Boolean(id) && !productById.has(id as string)))];
+  if (parentIds.length > 0) {
+    const { data: parents, error: parentsError } = await supabase
+      .from('products')
+      .select('id, name, stock')
+      .eq('tenant_id', tenantId)
+      .eq('active', true)
+      .is('format_parent_id', null)
+      .in('id', parentIds) as { data: Array<{ id: string; name: string; stock: number }> | null; error: unknown };
+    if (parentsError || !parents) {
+      console.error('[checkout] Format parent lookup failed:', parentsError);
+      return { ok: false, status: 500, body: { error: ERROR_COPY.server, code: 'SERVER_ERROR' } };
+    }
+    for (const parent of parents) stockById.set(parent.id, { name: parent.name, stock: parent.stock });
+    if (parentIds.some((id) => !stockById.has(id))) {
+      return { ok: false, status: 400, body: {
+        error: ERROR_COPY.productsUnavailable, code: 'PRODUCT_UNAVAILABLE',
+      } };
+    }
   }
 
   // Mode de réception : panier incompatible, mode refusé ou retrait impossible
@@ -171,9 +204,15 @@ export async function validateCheckoutItems(
     } };
   }
 
-  const insufficientStock = [...quantityByProduct.entries()]
-    .filter(([id, quantity]) => productById.get(id)!.stock < quantity)
-    .map(([id]) => productById.get(id)!.name);
+  // Stock agrégé par stock qui fait foi : 2 lots de 3 + 1 paquet = 7 paquets.
+  // Même règle que decrement_stock_for_order (187), qui reste l'arbitre final.
+  const demand = aggregateStockDemand([...quantityByProduct.entries()].map(([id, quantity]) => ({
+    productId: id, quantity, row: productById.get(id)!,
+  })));
+  const insufficientStock = [...demand.entries()]
+    .filter(([sourceId, units]) => (stockById.get(sourceId)?.stock ?? 0) < units)
+    .map(([sourceId]) => stockById.get(sourceId)?.name
+      ?? productById.get([...quantityByProduct.keys()].find((id) => stockSourceId(productById.get(id)!) === sourceId)!)!.name);
   if (insufficientStock.length) {
     return { ok: false, status: 400, body: {
       error: `Il n'en reste pas assez pour : ${insufficientStock.join(', ')}. Changez la quantité dans le panier.`,

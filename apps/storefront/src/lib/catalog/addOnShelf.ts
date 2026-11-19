@@ -24,7 +24,7 @@ export async function getAddOnProducts<T extends SuggestionCandidate>(
     .from('products')
     .select(PRODUCT_CARD_SELECT)
     .eq('tenant_id', tenantId)
-    .eq('active', true)
+    .eq('active', true).is('format_parent_id', null)
     .in('category_id', [...categoryIds])
     .not('add_on_position', 'is', null)
     .order('add_on_position')

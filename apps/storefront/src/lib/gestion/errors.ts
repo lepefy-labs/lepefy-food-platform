@@ -55,6 +55,8 @@ const MESSAGES: Record<string, [number, string]> = {
   invalid_conversion: [400, 'Conversion vers le stock invalide (nombre positif, 6 décimales au plus).'],
   stock_units_not_integer: [409, 'La quantité reçue convertie en unités de stock doit être un nombre entier. Vérifiez la quantité ou la conversion.'],
   invalid_payment_terms: [400, 'Conditions de paiement invalides (0 à 3650 jours).'],
+  // Formats de vente (187) : le stock d'un lot partagé suit sa fiche.
+  format_stock_is_derived: [409, 'Ce produit est un format de vente en stock partagé : recevez ou ajustez le stock sur la fiche du produit.'],
 };
 
 export interface GestionErrorInfo {

@@ -9,6 +9,9 @@ import { decrementRemovesLine, getMaximumValidQuantity, stepPurchaseQuantity } f
 import { describePrice, formatCount, orderLineDetail, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { cartLineIssue } from '@/lib/storefrontCopy/availability';
 import { FulfillmentPolicyChip } from '@/components/catalog/FulfillmentPolicyChip';
+import { formatLabelOf, formatQuantityLabel } from '@/lib/catalog/saleFormats';
+import { formatSwapTitle } from '@/lib/storefrontCopy/saleFormatCopy';
+import type { CartFormatSwap } from '@/lib/cart/useCartFormatSwaps';
 
 interface CartItemProps {
   item: CartItemType;
@@ -23,6 +26,8 @@ interface CartItemProps {
   variant?: 'drawer' | 'page';
   /** Mode de réception lu frais (panier) : seul un mode imposé est affiché. */
   fulfillmentPolicy?: ProductFulfillmentPolicy;
+  /** « Passer au lot et économiser X € » (formats de vente, migration 187). */
+  formatSwap?: CartFormatSwap;
 }
 
 
@@ -37,6 +42,7 @@ export function CartItem({
   onAdjust,
   variant = 'drawer',
   fulfillmentPolicy,
+  formatSwap,
 }: CartItemProps) {
   const { product, quantity } = item;
   const state = deriveCartItemState({
@@ -50,13 +56,22 @@ export function CartItem({
   const blocked = state === 'unavailable' || state === 'out_of_stock' || insufficientForPack;
   const sellingFormat = resolveSellingFormat(product);
   const price = describePrice(product.price, sellingFormat, currency);
+  // Formats de vente (187) : « 1 lot de 3 paquets » / « 2 paquets », jamais ambigu.
+  const formatLabel = formatLabelOf(product);
+  const countLabel = (count: number) => formatLabel ? formatQuantityLabel(formatLabel, count) : formatCount(sellingFormat, count);
+  const displayName = formatLabel && product.name.endsWith(` — ${formatLabel}`)
+    ? product.name.slice(0, -(` — ${formatLabel}`).length)
+    : product.name;
+  const lineDetail = formatLabel && !product.sale_unit && !product.net_quantity_display
+    ? `${countLabel(quantity)} · ${formatPrice(product.price, currency)} ${quantity > 1 ? 'chacun' : ''}`.trim()
+    : orderLineDetail(product.price, quantity, sellingFormat, currency);
   const issue = cartLineIssue({
     removed: state === 'unavailable',
     stock: product.stock,
     quantity,
     minimum: product.min_order_quantity ?? 1,
     step: product.order_quantity_step ?? 1,
-    countLabel: (count) => formatCount(sellingFormat, count),
+    countLabel,
   });
   const minimum = product.min_order_quantity ?? 1;
   const step = product.order_quantity_step ?? 1;
@@ -73,7 +88,7 @@ export function CartItem({
           onClick={() => onAdjust(product.id, issue.target)}
           className="relative z-20 inline-flex min-h-9 items-center font-bold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
         >
-          Passer à {formatCount(sellingFormat, issue.target)}
+          Passer à {countLabel(issue.target)}
         </button>
       )}
     </p>
@@ -82,7 +97,7 @@ export function CartItem({
     <div className="flex items-center gap-1.5">
       <CartStepper
         quantity={quantity}
-        productName={product.name}
+        productName={formatLabel ? `${displayName}, ${formatLabel}` : product.name}
         removesOnDecrement={removesOnDecrement}
         canIncrement={!blocked && canIncrement && quantity < maxPurchasable}
         disabled={state === 'unavailable'}
@@ -124,9 +139,14 @@ export function CartItem({
           <div className="min-w-0 flex-1">
             <Link href={href}
               className="block break-words text-[15px] font-bold leading-snug text-gray-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:text-base">
-              {product.name}
+              {displayName}
             </Link>
-            <p className="mt-0.5 text-sm leading-snug text-gray-700">{orderLineDetail(product.price, quantity, sellingFormat, currency)}</p>
+            {formatLabel && (
+              <span className="mt-1 inline-block rounded-md px-1.5 py-0.5 text-xs font-bold text-gray-900" style={{ backgroundColor: 'color-mix(in srgb, var(--color-primary) 12%, white)' }}>
+                {countLabel(quantity)}
+              </span>
+            )}
+            <p className="mt-0.5 text-sm leading-snug text-gray-700">{lineDetail}</p>
             {fulfillmentPolicy && fulfillmentPolicy !== 'delivery_or_pickup' && (
               <FulfillmentPolicyChip policy={fulfillmentPolicy} className="mt-1.5" />
             )}
@@ -138,7 +158,7 @@ export function CartItem({
             <CartStepper
               variant="cart"
               quantity={quantity}
-              productName={product.name}
+              productName={formatLabel ? `${displayName}, ${formatLabel}` : product.name}
               removesOnDecrement={removeOnly || removesOnDecrement}
               canIncrement={!blocked && canIncrement && quantity < maxPurchasable}
               onIncrement={() => onIncrement(product.id)}
@@ -153,6 +173,22 @@ export function CartItem({
             <span className="text-lg font-extrabold tabular-nums text-gray-950">{formatPrice(lineTotal, currency)}</span>
           </p>
         </div>
+        {formatSwap && !blocked && (
+          <div role="region" aria-label="Proposition de format" className="mt-2.5 rounded-xl border border-green-300 bg-green-50 px-3 py-2.5 text-green-950">
+            <p className="text-sm font-bold">{formatSwapTitle(formatSwap.proposal.savings, currency)}</p>
+            <p className="mt-0.5 text-xs leading-snug">
+              {countLabel(quantity)} → {formatQuantityLabel(formatSwap.proposal.label, formatSwap.proposal.formatQuantity)}
+              {formatSwap.proposal.baseQuantity > 0 ? ` + ${countLabel(formatSwap.proposal.baseQuantity)}` : ''}. Même quantité de produit.
+            </p>
+            <button
+              type="button"
+              onClick={() => formatSwap.apply()}
+              className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-green-700 px-3 text-sm font-bold text-white hover:bg-green-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            >
+              Passer au lot · −{formatPrice(formatSwap.proposal.savings, currency)}
+            </button>
+          </div>
+        )}
       </li>
     );
   }
@@ -175,10 +211,14 @@ export function CartItem({
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="line-clamp-2 text-sm font-bold leading-snug text-gray-950">{product.name}</p>
-        <p className="mt-1 text-xs text-gray-700">
-          <span className="font-semibold">{price.amount}</span> {price.unitPhrase}
-        </p>
+        <p className="line-clamp-2 text-sm font-bold leading-snug text-gray-950">{displayName}</p>
+        {formatLabel ? (
+          <p className="mt-1 text-xs text-gray-800"><span className="font-bold">{countLabel(quantity)}</span> · {formatPrice(product.price, currency)}</p>
+        ) : (
+          <p className="mt-1 text-xs text-gray-700">
+            <span className="font-semibold">{price.amount}</span> {price.unitPhrase}
+          </p>
+        )}
         {fulfillmentPolicy && fulfillmentPolicy !== 'delivery_or_pickup' && (
           <FulfillmentPolicyChip policy={fulfillmentPolicy} className="mt-1.5" />
         )}

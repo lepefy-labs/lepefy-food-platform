@@ -260,7 +260,7 @@ export async function getRelatedProducts(params: {
     .from('products')
     .select(PRODUCT_SELECT)
     .eq('tenant_id', params.tenantId)
-    .eq('active', true)
+    .eq('active', true).is('format_parent_id', null)
     .gt('stock', 0)
     .in('id', semanticIds);
 

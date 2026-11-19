@@ -27,7 +27,7 @@ export async function buildNalaProductActions(params: {
       .from('products')
       .select(`id, tenant_id, name, slug, image_url, price, compare_at_price, stock, active, weight_grams, storage_type, min_order_quantity, order_quantity_step, ${PRODUCT_SELLING_FORMAT_COLUMNS}`)
       .eq('tenant_id', params.tenantId)
-      .eq('active', true)
+      .eq('active', true).is('format_parent_id', null)
       .in('id', candidateIds);
 
     if (error) throw new Error(error.message);

@@ -80,7 +80,7 @@ async function getComplementary(
     .from('products')
     .select(PRODUCT_CARD_SELECT)
     .eq('tenant_id', tenantId)
-    .eq('active', true)
+    .eq('active', true).is('format_parent_id', null)
     .in('category_id', categoryIds)
     .in('id', targetIds);
   const byId = new Map(((rows ?? []) as unknown as CardRow[]).map((row) => [row.id, row]));

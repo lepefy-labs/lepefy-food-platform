@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { getDisplayTenant } from '@/lib/tenant/getTenant';
 import { createPublicClient } from '@/lib/supabase/public';
 import { ProductDetail } from '@/components/product/ProductDetail';
@@ -7,6 +7,7 @@ import { RelatedProducts } from '@/components/product/RelatedProducts';
 import { ProductAddOns } from '@/components/product/ProductAddOns';
 import type { ProductWithCategory } from '@lepefy/types';
 import { getRelatedProducts } from '@/lib/catalog/getRelatedProducts';
+import { PRODUCT_SALE_FORMAT_COLUMNS } from '@/lib/catalog/productCardSelect';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getAiCapabilities } from '@/lib/ai/aiSettings';
 
@@ -29,7 +30,8 @@ export async function generateStaticParams() {
       .from('products')
       .select('slug')
       .eq('tenant_id', tenant.id)
-      .eq('active', true);
+      .eq('active', true)
+      .is('format_parent_id', null);
     return (data ?? []).map((p) => ({ slug: p.slug }));
   } catch (err) {
     // Vérifié empiriquement : une erreur non interceptée ici (Supabase
@@ -70,11 +72,23 @@ export default async function ProductPage({ params }: ProductPageProps) {
       usage_instructions, conservation_instructions, conservation_after_opening,
       country_of_origin, net_quantity_display, sale_unit, net_content_value, net_content_unit, pack_count,
       fulfillment_policy, promo_applied, promo_ends_at, promo_until_sold_out, new_until,
+      ${PRODUCT_SALE_FORMAT_COLUMNS},
       category:categories(name, slug, catalog_scope)
     `)
-    .eq('slug', params.slug).eq('tenant_id', tenant.id).eq('active', true).single();
+    .eq('slug', params.slug).eq('tenant_id', tenant.id).eq('active', true).maybeSingle();
 
-  if (!product) notFound();
+  // Formats de vente (187) : un format n'a pas de page à lui. Son lien (ancien,
+  // partagé, ou format mis hors vente) mène à la fiche unique.
+  if (!product || product.format_parent_id) {
+    const parentId = product?.format_parent_id ?? (await supabase.from('products').select('format_parent_id')
+      .eq('slug', params.slug).eq('tenant_id', tenant.id).not('format_parent_id', 'is', null).maybeSingle()).data?.format_parent_id;
+    if (parentId) {
+      const { data: parent } = await supabase.from('products').select('slug')
+        .eq('id', parentId).eq('tenant_id', tenant.id).eq('active', true).maybeSingle();
+      if (parent?.slug) permanentRedirect(`/products/${parent.slug}`);
+    }
+    notFound();
+  }
 
   const goodies = (product as unknown as ProductWithCategory).category?.catalog_scope === 'gadgets';
   const ai = await getAiCapabilities(createServiceClient(), tenant.id, tenant);

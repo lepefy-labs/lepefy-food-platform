@@ -18,7 +18,7 @@ import {
   IconTruck,
 } from '@tabler/icons-react'
 import { formatPrice, formatDate } from '@/lib/utils/format'
-import { orderItemFormatLabel } from '@/lib/orders/documents/itemFormat'
+import { orderItemFormatLabel, orderItemPhysicalUnits } from '@/lib/orders/documents/itemFormat'
 import OrderDetail, { type NextStepGuide } from '../../../orders/[id]/OrderDetail'
 import PickingChecklist from '../../../orders/[id]/PickingChecklist'
 import ShipmentTrackingCard from '../../../orders/[id]/ShipmentTrackingCard'
@@ -655,11 +655,13 @@ export default async function AdminOrderPage({ params }: PageProps) {
             <ul aria-label="Articles et prix" className="mb-4 divide-y divide-a-border border-y border-a-border text-sm">
               {summaryItems.map((item) => {
                 const format = orderItemFormatLabel((item as OrderItem & { format_snapshot?: unknown }).format_snapshot, item.name)
+                const physical = orderItemPhysicalUnits((item as OrderItem & { format_snapshot?: unknown }).format_snapshot, item.quantity)
                 return (
                   <li key={item.id} className="flex items-start justify-between gap-4 py-2.5">
                     <div className="min-w-0">
                       <p className="text-a-text"><span className="font-semibold tabular-nums">{item.quantity} ×</span> {item.name}</p>
                       <p className="mt-0.5 text-xs text-a-text-3">{format ? `${format} · ` : ''}{formatPrice(item.price, tenant.currency)} l’unité</p>
+                      {physical && <p className="mt-0.5 text-xs font-semibold text-a-text-2">= {physical} à préparer</p>}
                     </div>
                     <span className="shrink-0 font-semibold tabular-nums text-a-text">{formatPrice(item.subtotal, tenant.currency)}</span>
                   </li>

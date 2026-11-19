@@ -56,7 +56,7 @@ export async function getRelatedProducts(
       .select('embedding')
       .eq('id', product.id)
       .eq('tenant_id', tenant.id)
-      .eq('active', true)
+      .eq('active', true).is('format_parent_id', null)
       .single();
 
     const embedding = parseEmbedding((embeddingRow as { embedding?: unknown } | null)?.embedding);
@@ -107,7 +107,7 @@ export async function getRelatedProducts(
       .from('products')
       .select(PRODUCT_CARD_SELECT)
       .eq('tenant_id', tenant.id)
-      .eq('active', true)
+      .eq('active', true).is('format_parent_id', null)
       .neq('stock', 0)
       .not('id', 'in', `(${excludeIds.join(',')})`)
       .order('position', { ascending: true })
