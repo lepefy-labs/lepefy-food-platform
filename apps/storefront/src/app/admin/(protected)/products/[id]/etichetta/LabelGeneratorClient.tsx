@@ -5,6 +5,7 @@ import { IconCheck, IconX, IconUpload, IconPrinter, IconAlertTriangle } from '@t
 import { calculateLayout } from '@/lib/labels/calculateLayout';
 import type { ProductLabelData, LabelSections, LabelSettings, LabelLayout } from '@lepefy/types';
 import { labelClasses } from '@/app/admin/_components/ui/Form';
+import { usePdfPrint } from '@/app/admin/_components/documents/PdfPrintProvider';
 
 interface LabelGeneratorProps {
   product: ProductLabelData;
@@ -31,6 +32,7 @@ export default function LabelGeneratorClient({ product, tenantId, tenantHasLogo,
   const [hasLogo, setHasLogo] = useState(tenantHasLogo);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const pdfPrint = usePdfPrint();
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [layout, setLayout] = useState<LabelLayout | null>(null);
@@ -158,7 +160,9 @@ export default function LabelGeneratorClient({ product, tenantId, tenantHasLogo,
       const data = await res.json() as { pdfUrl?: string; error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Échec de la génération');
 
-      window.open(data.pdfUrl, '_blank');
+      // iPhone / iPad: share sheet › Imprimer (a tab would crop the print and add the URL).
+      if (data.pdfUrl && pdfPrint.sharedPrint) pdfPrint.openPdf(data.pdfUrl, `Étiquettes · ${product.name}`);
+      else window.open(data.pdfUrl, '_blank');
       showToast('PDF généré', 'success');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Échec de la génération', 'error');

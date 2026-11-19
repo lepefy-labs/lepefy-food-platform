@@ -8,6 +8,7 @@ import {
   IconCheck, IconX, IconPlus, IconCopy, IconTrash, IconFileText, IconClock, IconArrowLeft,
 } from '@tabler/icons-react';
 import type { LabelPrintJob } from '@lepefy/types';
+import { PdfLink } from '@/app/admin/_components/documents/PdfPrintProvider';
 
 interface LabelJobsListProps {
   productId: string;
@@ -185,14 +186,13 @@ export default function LabelJobsListClient({ productId, productName, jobs }: La
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {job.pdf_url && (
-                    <a
+                    <PdfLink
                       href={job.pdf_url}
-                      target="_blank"
-                      rel="noreferrer"
+                      documentTitle="Étiquettes"
                       className="px-3 py-1.5 rounded-lg text-xs font-medium border border-a-border text-a-text-2 hover:bg-a-surface-2 transition-colors"
                     >
                       Voir le PDF
-                    </a>
+                    </PdfLink>
                   )}
                   <button
                     onClick={() => createJob(job.id)}

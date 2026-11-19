@@ -2,17 +2,19 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from 'react';
 import { IconDownload, IconFileTypePdf, IconPrinter } from '@tabler/icons-react';
-import { needsSharedPdfPrint, pdfDownloadHref, pdfFilenameFromDisposition } from '@/lib/orders/documents/pdfPrintPlatform';
+import { needsSharedPdfPrint, pdfFallbackFilename, pdfFilenameFromDisposition } from '@/lib/orders/documents/pdfPrintPlatform';
 import Button, { ButtonAnchor, buttonClasses, type ButtonSize, type ButtonVariant } from '../ui/Button';
 import Dialog from '../ui/Dialog';
 import InlineAlert from '../ui/InlineAlert';
 
 /**
- * Order document PDFs on iPhone / iPad (see `pdfPrintPlatform.ts`): printing
+ * Printable admin PDFs (order documents, product labels, card poster, event
+ * reservation lists) on iPhone / iPad (see `pdfPrintPlatform.ts`): printing
  * the PDF from the browser tab crops it and adds the URL, so the PDF is
  * fetched here and handed as a file to the share sheet (« Imprimer »).
  * Two steps on purpose: the share sheet needs a fresh tap, and Gotenberg can
  * take several seconds. Other devices keep the plain link navigation.
+ * The URL must be same-origin or CORS-readable (Supabase public storage is).
  */
 interface PdfPrintApi {
   /** true when this device must print through the share sheet. */
@@ -55,7 +57,7 @@ export default function PdfPrintProvider({ children }: { children: ReactNode }) 
           throw new Error(body?.error ?? 'Le document n’a pas pu être généré.');
         }
         const blob = await response.blob();
-        const filename = pdfFilenameFromDisposition(response.headers.get('content-disposition'), 'document');
+        const filename = pdfFilenameFromDisposition(response.headers.get('content-disposition'), pdfFallbackFilename(href));
         const file = new File([blob], filename, { type: 'application/pdf' });
         const canShare = typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] });
         if (!abort.signal.aborted) setJob({ href, title, status: 'ready', file, canShare });
@@ -103,7 +105,7 @@ export default function PdfPrintProvider({ children }: { children: ReactNode }) 
               </Button>
             )}
             {(job.status === 'error' || (job.status === 'ready' && !job.canShare)) && (
-              <ButtonAnchor variant="primary" href={pdfDownloadHref(job.href)}>
+              <ButtonAnchor variant="primary" href={job.href} download target="_blank" rel="noopener noreferrer">
                 <IconDownload size={16} aria-hidden="true" /> Télécharger le PDF
               </ButtonAnchor>
             )}

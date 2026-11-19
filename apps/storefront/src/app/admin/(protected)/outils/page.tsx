@@ -2,6 +2,7 @@ import { IconDownload, IconFileTypePdf } from '@tabler/icons-react';
 import { getTenant } from '@/lib/tenant/getTenant';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import ShareLinkActions from '../../_components/ui/ShareLinkActions';
+import { PdfLink } from '../../_components/documents/PdfPrintProvider';
 import { SettingsIconTile } from '../parametres/_components/SettingsUi';
 
 export const dynamic = 'force-dynamic';
@@ -79,7 +80,7 @@ export default async function OutilsPage() {
             <h3 className="text-base font-semibold text-a-text">Affiche carte digitale</h3>
             <p className="mt-0.5 text-sm text-a-text-3">PDF prêt à imprimer avec le QR de votre carte.</p>
           </div>
-          <a href="/api/admin/card/poster" className={ACTION_CLS}><IconDownload size={16} aria-hidden="true" />Affiche PDF</a>
+          <PdfLink href="/api/admin/card/poster" documentTitle="Affiche carte digitale" target={undefined} className={ACTION_CLS}><IconDownload size={16} aria-hidden="true" />Affiche PDF</PdfLink>
         </div>
       </section>
 

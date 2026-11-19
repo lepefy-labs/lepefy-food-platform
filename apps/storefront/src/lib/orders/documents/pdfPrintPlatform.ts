@@ -8,6 +8,7 @@
  * Handing the FILE to the share sheet (« Imprimer ») uses the native PDF
  * print path instead: real page size, scaled to the paper, no header.
  *
+ * Applies to every printable admin PDF (`PdfLink`), not only order documents.
  * Everywhere else (desktop Chrome/Edge/Safari/Firefox viewers, Android, which
  * opens the PDF in a PDF viewer) printing the PDF directly is already correct,
  * so the link keeps its plain navigation.
@@ -36,10 +37,11 @@ export function pdfFilenameFromDisposition(header: string | null, fallback: stri
   return /\.pdf$/i.test(name) ? name : `${name}.pdf`;
 }
 
-/** Same URL with `download=1` (fallback when the share sheet cannot take a file). */
-export function pdfDownloadHref(href: string): string {
-  const [path, query = ''] = href.split('?');
-  const params = new URLSearchParams(query);
-  params.set('download', '1');
-  return `${path}?${params.toString()}`;
+/** Name for a PDF served without Content-Disposition (e.g. a storage URL): last path segment, else « document ». */
+export function pdfFallbackFilename(href: string): string {
+  const path = href.split(/[?#]/)[0] ?? '';
+  const last = path.split('/').filter(Boolean).pop() ?? '';
+  let name = last;
+  try { name = decodeURIComponent(last); } catch { /* keep raw */ }
+  return /\.pdf$/i.test(name) ? name : 'document';
 }

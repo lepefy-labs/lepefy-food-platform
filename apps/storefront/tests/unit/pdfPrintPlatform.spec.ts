@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { needsSharedPdfPrint, pdfDownloadHref, pdfFilenameFromDisposition } from '../../src/lib/orders/documents/pdfPrintPlatform';
+import { needsSharedPdfPrint, pdfFallbackFilename, pdfFilenameFromDisposition } from '../../src/lib/orders/documents/pdfPrintPlatform';
 
 const IPHONE_SAFARI = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';
 const IPHONE_CHROME = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0.6778.73 Mobile/15E148 Safari/604.1';
@@ -29,8 +29,8 @@ test('pdfFilenameFromDisposition reads the server filename', () => {
   expect(pdfFilenameFromDisposition('inline; filename="../x/y"', 'document')).toBe('..-x-y.pdf');
 });
 
-test('pdfDownloadHref adds download=1 and keeps the query', () => {
-  expect(pdfDownloadHref('/api/admin/orders/abc/documents/picking-list?format=a5')).toBe('/api/admin/orders/abc/documents/picking-list?format=a5&download=1');
-  expect(pdfDownloadHref('/api/admin/orders/abc/documents/packing-slip')).toBe('/api/admin/orders/abc/documents/packing-slip?download=1');
-  expect(pdfDownloadHref('/x?download=0&ids=a,b')).toBe('/x?download=1&ids=a%2Cb');
+test('pdfFallbackFilename keeps a storage file name, else « document »', () => {
+  expect(pdfFallbackFilename('https://x.supabase.co/storage/v1/object/public/assets/labels/job-1.pdf')).toBe('job-1.pdf');
+  expect(pdfFallbackFilename('/api/admin/card/poster')).toBe('document');
+  expect(pdfFallbackFilename('/api/admin/evenementiel/reservations/print-list?event_id=1')).toBe('document');
 });

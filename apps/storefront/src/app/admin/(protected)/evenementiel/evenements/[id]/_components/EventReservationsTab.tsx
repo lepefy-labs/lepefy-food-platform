@@ -9,6 +9,7 @@ import { formatPrice } from '@/lib/utils/format';
 import ManualEventReservationModal from './ManualEventReservationModal';
 import ConfirmDialog from '@/app/admin/_components/ui/ConfirmDialog';
 import InlineAlert from '@/app/admin/_components/ui/InlineAlert';
+import { PdfLink } from '@/app/admin/_components/documents/PdfPrintProvider';
 
 const STATUS_LABELS: Record<EventReservationStatus, string> = {
   confirmed: 'Confirmée',
@@ -156,8 +157,8 @@ export default function EventReservationsTab({
           <div className="flex flex-wrap gap-2 lg:justify-end">
             <button type="button" onClick={() => setManualOpen(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-a-brand px-3 text-xs font-semibold text-a-on-brand transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus focus-visible:ring-offset-2"><IconPlus size={16} /> Ajouter une réservation</button>
             <a href={`${exportBase}/report?${eventQuery}`} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-a-border px-3 text-xs font-semibold text-a-text-2 transition-colors hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconFileSpreadsheet size={16} /> Rapport détaillé</a>
-            <a href={`${exportBase}/print-list?${eventQuery}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-a-border px-3 text-xs font-semibold text-a-text-2 transition-colors hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconPrinter size={16} /> Liste imprimable</a>
-            <a href={`${exportBase}/table-cards?${eventQuery}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-a-border px-3 text-xs font-semibold text-a-text-2 transition-colors hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconTicket size={16} /> Codes A5</a>
+            <PdfLink href={`${exportBase}/print-list?${eventQuery}`} documentTitle="Liste des réservations" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-a-border px-3 text-xs font-semibold text-a-text-2 transition-colors hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconPrinter size={16} /> Liste imprimable</PdfLink>
+            <PdfLink href={`${exportBase}/table-cards?${eventQuery}`} documentTitle="Codes des réservations · A5" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-a-border px-3 text-xs font-semibold text-a-text-2 transition-colors hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconTicket size={16} /> Codes A5</PdfLink>
           </div>
         </div>
       </section>
