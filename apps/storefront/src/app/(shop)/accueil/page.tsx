@@ -106,7 +106,10 @@ export default async function HomePage() {
       .select('id, category_id')
       .eq('tenant_id', tenant.id)
       .eq('active', true)
-      .order('position', { ascending: true }),
+      // Même ordre que le catalogue (lib/catalog/pagination.ts) : `id` départage
+      // les nombreuses positions égales, donc les blocs restent stables.
+      .order('position', { ascending: true })
+      .order('id', { ascending: true }),
     // 4. Suggestions (Feature 3) — étiquettes honnêtes uniquement, jamais de
     // personnalisation inventée (pas de login client actif côté storefront).
     supabase
