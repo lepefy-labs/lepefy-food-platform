@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { IconFileTypePdf, IconPrinter } from '@tabler/icons-react';
 import type { OrderDocumentFormat } from '@/lib/orders/documents/formats';
 import { START_SKIP_LABELS, type StartResult } from '@/lib/orders/preparation/preparationPolicy';
-import Button, { ButtonAnchor } from '../../../_components/ui/Button';
+import Button from '../../../_components/ui/Button';
+import { PdfButtonLink, usePdfPrint } from '../../../_components/documents/PdfPrintProvider';
 import { Card } from '../../../_components/ui/Panel';
 import { useAdminToast } from '../../../_components/ui/Toaster';
 import { FormatSelect } from '../../../orders/[id]/OrderDocumentsCard';
@@ -25,11 +26,13 @@ export default function PreparationSessionActions({ orderIds, canManage, default
   const toast = useAdminToast();
   const [format, setFormat] = useState<OrderDocumentFormat>(defaultFormat);
   const [pending, setPending] = useState(false);
+  const pdfPrint = usePdfPrint();
   const pdf = (kind: 'picking-list' | 'preparation-summary', ids = orderIds) => `/api/admin/orders/documents/${kind}?ids=${ids.join(',')}&format=${format}`;
 
   async function printAndStart() {
     // Opened in the click handler so the browser does not block it, filled once the start is recorded.
-    const tab = window.open('', '_blank');
+    // iPhone / iPad print through the share sheet instead (no tab).
+    const tab = pdfPrint.sharedPrint ? null : window.open('', '_blank');
     setPending(true);
     try {
       const response = await fetch('/api/admin/orders/preparation/start', {
@@ -38,7 +41,8 @@ export default function PreparationSessionActions({ orderIds, canManage, default
       const body = await response.json().catch(() => null) as (StartResult & { error?: string }) | null;
       if (!response.ok || !body) throw new Error(body?.error ?? 'Impossible de démarrer la préparation.');
       if (body.ready.length > 0) {
-        if (tab) tab.location.href = pdf('picking-list', body.ready);
+        if (pdfPrint.sharedPrint) pdfPrint.openPdf(pdf('picking-list', body.ready), 'Listes de préparation');
+        else if (tab) tab.location.href = pdf('picking-list', body.ready);
         else window.location.href = pdf('picking-list', body.ready);
       } else tab?.close();
       const skipped = body.skipped.map((entry) => `#${entry.id.slice(0, 8).toUpperCase()} : ${START_SKIP_LABELS[entry.reason]}`);
@@ -65,12 +69,12 @@ export default function PreparationSessionActions({ orderIds, canManage, default
         {canManage && notPrinted > 0 && <p className="text-xs text-a-text-3">{notPrinted} commande{notPrinted > 1 ? 's' : ''} sans liste imprimée.</p>}
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-        <ButtonAnchor href={pdf('preparation-summary')} target="_blank" rel="noopener noreferrer">
+        <PdfButtonLink href={pdf('preparation-summary')} documentTitle="Liste groupée">
           <IconFileTypePdf size={16} aria-hidden="true" /> Liste groupée<span className="sr-only"> (PDF, nouvel onglet)</span>
-        </ButtonAnchor>
-        <ButtonAnchor href={pdf('picking-list')} target="_blank" rel="noopener noreferrer" title="Ouvre les listes sans rien enregistrer">
+        </PdfButtonLink>
+        <PdfButtonLink href={pdf('picking-list')} documentTitle="Listes de préparation" title="Ouvre les listes sans rien enregistrer">
           <IconFileTypePdf size={16} aria-hidden="true" /> Listes individuelles<span className="sr-only"> (PDF, nouvel onglet)</span>
-        </ButtonAnchor>
+        </PdfButtonLink>
         {canManage && (
           <Button onClick={() => void printAndStart()} loading={pending}>
             <IconPrinter size={16} aria-hidden="true" /> Imprimer et démarrer la préparation

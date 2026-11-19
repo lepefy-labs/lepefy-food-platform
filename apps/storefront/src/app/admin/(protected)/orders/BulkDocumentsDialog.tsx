@@ -5,9 +5,10 @@ import { IconFileTypePdf } from '@tabler/icons-react';
 import { FormatSelect, type OrderDocumentsDefaults } from '../../orders/[id]/OrderDocumentsCard';
 import { MAX_BULK_ORDER_DOCUMENTS as MAX_BULK_DOCUMENTS, type OrderDocumentFormat } from '@/lib/orders/documents/formats';
 import { cn } from '@/lib/utils/cn';
-import Button, { ButtonAnchor } from '../../_components/ui/Button';
+import Button from '../../_components/ui/Button';
 import Dialog from '../../_components/ui/Dialog';
 import InlineAlert from '../../_components/ui/InlineAlert';
+import { PdfButtonLink } from '../../_components/documents/PdfPrintProvider';
 
 type Kind = 'picking-list' | 'packing-slip';
 
@@ -37,9 +38,9 @@ export default function BulkDocumentsDialog({ orderIds, defaults, onClose }: { o
         <Button variant="secondary" onClick={onClose}>Annuler</Button>
         {tooMany
           ? <Button disabled><IconFileTypePdf size={16} aria-hidden="true" /> Générer le PDF</Button>
-          : <ButtonAnchor variant="primary" href={href} target="_blank" rel="noopener noreferrer" onClick={onClose}>
+          : <PdfButtonLink variant="primary" href={href} documentTitle={kind === 'picking-list' ? 'Listes de préparation' : 'Bons de colis'} onClick={onClose}>
               <IconFileTypePdf size={16} aria-hidden="true" /> Générer le PDF<span className="sr-only"> (nouvel onglet)</span>
-            </ButtonAnchor>}
+            </PdfButtonLink>}
       </>}
     >
       <div className="space-y-4">

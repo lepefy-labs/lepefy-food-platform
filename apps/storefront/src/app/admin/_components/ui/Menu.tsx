@@ -125,7 +125,9 @@ export default function Menu({ trigger, label, align = 'end', header, children, 
   );
 }
 
-const ITEM_CLASS = 'flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm text-a-text hover:bg-a-hover focus:bg-a-hover focus:outline-none';
+/** Exported for menu items rendered elsewhere (e.g. PDF links on iPhone). */
+export const MENU_ITEM_CLASS = 'flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm text-a-text hover:bg-a-hover focus:bg-a-hover focus:outline-none';
+const ITEM_CLASS = MENU_ITEM_CLASS;
 
 export function MenuLink({ href, children, active = false, external = false, newTab = false }: { href: string; children: ReactNode; active?: boolean; external?: boolean; /** Opens in a new tab (PDF, customer page); say so in the item text. */ newTab?: boolean }) {
   const className = cn(ITEM_CLASS, active && 'bg-a-selected font-semibold text-a-brand-fg');

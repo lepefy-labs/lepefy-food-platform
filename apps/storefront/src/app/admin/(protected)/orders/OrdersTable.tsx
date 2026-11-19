@@ -27,7 +27,8 @@ import Badge from '../../_components/ui/Badge';
 import Button, { ButtonAnchor, buttonClasses } from '../../_components/ui/Button';
 import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import CopyableValue from '../../_components/ui/CopyableValue';
-import Menu, { MenuButton, MenuLink } from '../../_components/ui/Menu';
+import Menu, { MENU_ITEM_CLASS, MenuButton, MenuLink } from '../../_components/ui/Menu';
+import { PdfButtonLink, PdfLink } from '../../_components/documents/PdfPrintProvider';
 import StatusBadge from '../../_components/ui/StatusBadge';
 import { useAdminToast } from '../../_components/ui/Toaster';
 import BulkTrackingModal, { type PendingTrackingOrder } from '../../_components/ui/BulkTrackingModal';
@@ -319,8 +320,8 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
         <MenuButton onSelect={() => toggleDetail(order)}>
           <IconChevronDown size={16} aria-hidden="true" className={open ? 'rotate-180' : undefined} />{open ? 'Masquer le détail' : 'Afficher le détail'}
         </MenuButton>
-        {order.status !== 'cancelled' && <MenuLink newTab href={`/api/admin/orders/${order.id}/documents/picking-list`}><IconPrinter size={16} aria-hidden="true" />Liste de préparation (PDF)</MenuLink>}
-        {order.status !== 'cancelled' && order.fulfillment_type === 'delivery' && documentDefaults.packingSlipEnabled && <MenuLink newTab href={`/api/admin/orders/${order.id}/documents/packing-slip`}><IconFileTypePdf size={16} aria-hidden="true" />Bon de colis (PDF)</MenuLink>}
+        {order.status !== 'cancelled' && <PdfLink role="menuitem" className={MENU_ITEM_CLASS} documentTitle={`Liste de préparation · ${shortId(order.id)}`} href={`/api/admin/orders/${order.id}/documents/picking-list`}><IconPrinter size={16} aria-hidden="true" />Liste de préparation (PDF)</PdfLink>}
+        {order.status !== 'cancelled' && order.fulfillment_type === 'delivery' && documentDefaults.packingSlipEnabled && <PdfLink role="menuitem" className={MENU_ITEM_CLASS} documentTitle={`Bon de colis · ${shortId(order.id)}`} href={`/api/admin/orders/${order.id}/documents/packing-slip`}><IconFileTypePdf size={16} aria-hidden="true" />Bon de colis (PDF)</PdfLink>}
         {order.fulfillment_type === 'delivery' && (order.tracking_code || order.shipping_provider_reference) && <MenuLink newTab href={customerTrackingHref(order.id)}><IconExternalLink size={16} aria-hidden="true" />Suivi client</MenuLink>}
         {carrierUrl && <MenuLink newTab href={carrierUrl}><IconTruckDelivery size={16} aria-hidden="true" />Suivi transporteur</MenuLink>}
       </Menu>
@@ -360,8 +361,8 @@ export default function OrdersTable({ orders, tenantPreparationMode, tenantCurre
         <section aria-label="Actions"><h3 className={heading}>Actions</h3>
           <div className="flex flex-col items-stretch gap-2 sm:items-start">
             {/* Action rapide au format par défaut du tenant ; le choix ponctuel A5/A4 reste dans le détail et « Documents… ». */}
-            {order.status !== 'cancelled' && <ButtonAnchor href={`/api/admin/orders/${order.id}/documents/picking-list`} target="_blank" rel="noopener noreferrer"><IconPrinter size={16} aria-hidden="true" /> Liste de préparation · {ORDER_DOCUMENT_FORMATS[documentDefaults.pickingFormat].label}<span className="sr-only"> (PDF, nouvel onglet)</span></ButtonAnchor>}
-            {order.status !== 'cancelled' && order.fulfillment_type === 'delivery' && documentDefaults.packingSlipEnabled && <ButtonAnchor href={`/api/admin/orders/${order.id}/documents/packing-slip`} target="_blank" rel="noopener noreferrer"><IconFileTypePdf size={16} aria-hidden="true" /> Bon de colis · {ORDER_DOCUMENT_FORMATS[documentDefaults.packingSlipFormat].label}<span className="sr-only"> (PDF, nouvel onglet)</span></ButtonAnchor>}
+            {order.status !== 'cancelled' && <PdfButtonLink documentTitle={`Liste de préparation · ${shortId(order.id)}`} href={`/api/admin/orders/${order.id}/documents/picking-list`}><IconPrinter size={16} aria-hidden="true" /> Liste de préparation · {ORDER_DOCUMENT_FORMATS[documentDefaults.pickingFormat].label}<span className="sr-only"> (PDF, nouvel onglet)</span></PdfButtonLink>}
+            {order.status !== 'cancelled' && order.fulfillment_type === 'delivery' && documentDefaults.packingSlipEnabled && <PdfButtonLink documentTitle={`Bon de colis · ${shortId(order.id)}`} href={`/api/admin/orders/${order.id}/documents/packing-slip`}><IconFileTypePdf size={16} aria-hidden="true" /> Bon de colis · {ORDER_DOCUMENT_FORMATS[documentDefaults.packingSlipFormat].label}<span className="sr-only"> (PDF, nouvel onglet)</span></PdfButtonLink>}
             <Link href={`/admin/orders/${order.id}`} className={buttonClasses({ variant: 'secondary' })}>Voir la commande</Link>
             {trackingUrl && <ButtonAnchor href={trackingUrl} target="_blank" rel="noopener noreferrer">Voir le suivi transporteur <IconExternalLink size={14} aria-hidden="true" /></ButtonAnchor>}
           </div>

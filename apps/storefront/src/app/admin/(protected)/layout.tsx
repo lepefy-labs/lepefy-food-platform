@@ -30,6 +30,7 @@ import AdminGlobalNotices from '../_components/AdminGlobalNotices';
 import DemoVisitorBanner from '../_components/demo/DemoVisitorBanner';
 import { DEMO_VISITOR_ROLE } from '@/lib/demo/visitorPermissions';
 import { AdminToaster } from '../_components/ui/Toaster';
+import PdfPrintProvider from '../_components/documents/PdfPrintProvider';
 import { getTenantServiceState } from '@/lib/billing/tenantServiceState';
 import { SUSPENDED_ADMIN_PERMISSIONS, isAdminPathAllowedWhenSuspended } from '@/lib/billing/subscriptionRules';
 
@@ -153,6 +154,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   return (
     <AdminThemeProvider>
       <AdminToaster>
+        <PdfPrintProvider>
         <SupportProvider enabled={supportEnabled} readOnly={access.isPlatformOwner} unread={supportUnread} pageLabels={supportPageLabels}>
         <HelpProvider enabled={helpEnabled}>
         <AdminShell
@@ -171,6 +173,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
         </AdminShell>
         </HelpProvider>
         </SupportProvider>
+        </PdfPrintProvider>
       </AdminToaster>
     </AdminThemeProvider>
   );

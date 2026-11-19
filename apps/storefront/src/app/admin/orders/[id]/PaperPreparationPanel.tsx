@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import { IconCheck, IconFileTypePdf, IconPrinter, IconSnowflake } from '@tabler/icons-react';
 import type { PreparationModeValue, StartResult } from '@/lib/orders/preparation/preparationPolicy';
 import { formatDate } from '@/lib/admin/format';
-import Button, { ButtonAnchor } from '../../_components/ui/Button';
+import Button from '../../_components/ui/Button';
 import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import Dialog from '../../_components/ui/Dialog';
 import { FormField, Input } from '../../_components/ui/Form';
 import InlineAlert from '../../_components/ui/InlineAlert';
+import { PdfButtonLink, usePdfPrint } from '../../_components/documents/PdfPrintProvider';
 import { useAdminToast } from '../../_components/ui/Toaster';
 
 export interface PaperPreparationProps {
@@ -39,6 +40,7 @@ export interface PaperPreparationProps {
 export default function PaperPreparationPanel(props: PaperPreparationProps) {
   const router = useRouter();
   const toast = useAdminToast();
+  const pdfPrint = usePdfPrint();
   const [open, setOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -54,14 +56,16 @@ export default function PaperPreparationPanel(props: PaperPreparationProps) {
   const active = props.status === 'new' || props.status === 'preparing';
 
   async function printAndStart() {
-    const tab = window.open('', '_blank');
+    // iPhone / iPad print through the share sheet instead of a tab.
+    const tab = pdfPrint.sharedPrint ? null : window.open('', '_blank');
     setPending(true);
     try {
       const response = await fetch('/api/admin/orders/preparation/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderIds: [props.orderId] }) });
       const body = await response.json().catch(() => null) as (StartResult & { error?: string }) | null;
       if (!response.ok || !body) throw new Error(body?.error ?? 'Impossible de démarrer la préparation.');
       if (body.ready.includes(props.orderId)) {
-        if (tab) tab.location.href = pdfHref; else window.location.href = pdfHref;
+        if (pdfPrint.sharedPrint) pdfPrint.openPdf(pdfHref, 'Liste de préparation');
+        else if (tab) tab.location.href = pdfHref; else window.location.href = pdfHref;
         toast.success('Liste imprimée : préparation démarrée.');
       } else {
         tab?.close();
@@ -103,7 +107,7 @@ export default function PaperPreparationPanel(props: PaperPreparationProps) {
       <section aria-labelledby="paper-preparation-title" className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm">
         <h2 id="paper-preparation-title" className="text-sm font-semibold text-a-text">Préparation sans confirmation</h2>
         <p className="mt-1 text-sm text-a-text-2">Votre boutique n’enregistre pas la préparation dans Lepefy : la commande avance quand vous {props.delivery ? 'l’expédiez' : 'la marquez prête au retrait'}. Aucun contrôle n’est attesté.</p>
-        <div className="mt-3"><ButtonAnchor href={pdfHref} target="_blank" rel="noopener noreferrer"><IconFileTypePdf size={16} aria-hidden="true" /> Liste de préparation · {props.pickingFormat.toUpperCase()}</ButtonAnchor></div>
+        <div className="mt-3"><PdfButtonLink href={pdfHref} documentTitle="Liste de préparation"><IconFileTypePdf size={16} aria-hidden="true" /> Liste de préparation · {props.pickingFormat.toUpperCase()}</PdfButtonLink></div>
       </section>
     );
   }
@@ -131,9 +135,9 @@ export default function PaperPreparationPanel(props: PaperPreparationProps) {
         {props.canManage && active && props.paid && !props.printedAt && (
           <Button onClick={() => void printAndStart()} loading={pending}><IconPrinter size={16} aria-hidden="true" /> Imprimer et démarrer la préparation</Button>
         )}
-        <ButtonAnchor href={pdfHref} target="_blank" rel="noopener noreferrer" title="Ouvre la liste sans rien enregistrer">
+        <PdfButtonLink href={pdfHref} documentTitle="Liste de préparation" title="Ouvre la liste sans rien enregistrer">
           <IconFileTypePdf size={16} aria-hidden="true" /> {props.printedAt ? 'Réimprimer la liste' : 'Ouvrir la liste'}<span className="sr-only"> (PDF, nouvel onglet)</span>
-        </ButtonAnchor>
+        </PdfButtonLink>
         {props.canManage && props.status === 'preparing' && props.paid && !props.completedAt && (
           <Button variant={props.printedAt ? 'primary' : 'secondary'} onClick={() => { setError(null); setOpen(true); }}><IconCheck size={16} aria-hidden="true" /> Préparation terminée</Button>
         )}

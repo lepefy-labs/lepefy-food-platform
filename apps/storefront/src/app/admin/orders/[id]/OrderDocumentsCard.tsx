@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { IconDownload, IconFileTypePdf } from '@tabler/icons-react';
 import { ORDER_DOCUMENT_FORMATS, ORDER_DOCUMENT_FORMAT_IDS, isOrderDocumentFormat, orderDocumentFormatOptionLabel, type OrderDocumentFormat } from '@/lib/orders/documents/formats';
 import { Select } from '../../_components/ui/Form';
+import { PdfLink } from '../../_components/documents/PdfPrintProvider';
 
 export interface OrderDocumentsDefaults {
   pickingFormat: OrderDocumentFormat;
@@ -49,9 +50,10 @@ function DocumentRow({ title, hint, href, initial }: { title: string; hint: stri
       <FormatSelect value={format} onChange={setFormat} label={`Format — ${title}`} />
       <div className="flex flex-wrap items-center gap-2">
         {/* Navigation HTTP directe vers le PDF serveur : fiable aussi en PWA. */}
-        <a href={url} target="_blank" rel="noopener noreferrer" className={`${openCls} bg-a-inverse text-a-on-inverse hover:bg-a-inverse`}>
+        {/* Sur iPhone / iPad : feuille de partage › Imprimer (PdfPrintProvider). */}
+        <PdfLink href={url} documentTitle={title} className={`${openCls} bg-a-inverse text-a-on-inverse hover:bg-a-inverse`}>
           <IconFileTypePdf size={16} aria-hidden="true" /> Ouvrir le PDF<span className="sr-only"> (nouvel onglet)</span>
-        </a>
+        </PdfLink>
         <a href={`${url}&download=1`} className={`${openCls} border border-a-border text-a-text-2 hover:bg-a-surface-2`}>
           <IconDownload size={16} aria-hidden="true" /> Télécharger
         </a>
