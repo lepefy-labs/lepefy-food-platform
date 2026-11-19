@@ -6,9 +6,8 @@ name: Engineering Hub sync
 # index is refreshed on a schedule (and on demand, via workflow_dispatch) instead.
 on:
   schedule:
-    # Incremental index of `main` once a day (Monday is covered by the full re-index below).
-    - cron: '23 3 * * 0,2-6'
-    # Weekly full re-index (re-sends every blob).
+    # Weekly full re-index of `main` (re-sends every blob). Only once a week: even an incremental
+    # sync re-sends every index row (~250 calls, ~16 s of Active CPU per run).
     - cron: '17 3 * * 1'
   workflow_dispatch:
     inputs:
@@ -76,6 +75,6 @@ jobs:
         run: |
           MODE="${{ github.event.inputs.mode }}"
           TRIGGER="schedule"
-          if [ "${{ github.event.schedule }}" = "17 3 * * 1" ]; then MODE="full"; fi
+          if [ "${{ github.event_name }}" = "schedule" ]; then MODE="full"; fi
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then TRIGGER="manual"; fi
           pnpm engineering:sync -- --ref "${{ github.sha }}" --branch main --mode "${MODE:-incremental}" --trigger "$TRIGGER"

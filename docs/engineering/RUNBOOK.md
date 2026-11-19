@@ -14,7 +14,7 @@ Il token di ingest autorizza **solo** `POST /api/internal/engineering/ingest`; n
 
 ## 2. Come funziona la sincronizzazione
 
-`engineering-sync.yml`: ogni notte alle 03:23 UTC su `main` (incrementale, lunedì escluso; non più a ogni push: ogni sync costa decine di invocazioni Vercel; senza commit nuovi la run è già completata e non carica nulla) + lunedì 03:17 UTC (completa) + manuale. Una sola esecuzione alla volta (`concurrency`, senza cancellare quella in corso). Passi di `pnpm engineering:sync`:
+`engineering-sync.yml`: una volta a settimana, lunedì 03:17 UTC su `main` (completa; GitHub può avviarla con ore di ritardo) + manuale. Non più a ogni push né ogni notte: anche un sync incrementale reinvia tutte le righe dell'indice (~250 invocazioni Vercel, ~16 s di Active CPU). Dopo un cambiamento da consultare subito nel Hub: *Run workflow* manuale. Una sola esecuzione alla volta (`concurrency`, senza cancellare quella in corso). Passi di `pnpm engineering:sync`:
 
 ```text
 start (run_key "<sha>:<mode>") → missing → blobs → rows (modules, files, excluded, symbols, relations, documents, chunks) → complete (finalize + activate + purge)
