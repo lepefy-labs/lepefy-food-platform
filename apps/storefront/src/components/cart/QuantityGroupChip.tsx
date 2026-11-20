@@ -35,14 +35,20 @@ export function QuantityGroupChip({ productId, withLink = false, onNavigate, cla
   const done = current > 0 && state.isValid;
   const text = groupChipText(group.name, group.min_quantity, current, state.nextValidQuantity);
   return (
-    <p className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-md border px-1.5 py-1 text-xs font-semibold leading-snug ${done ? 'border-green-300 bg-green-50 text-green-900' : 'border-sky-300 bg-sky-50 text-sky-950'} ${className}`}>
-      <IconStack2 size={14} aria-hidden="true" className="shrink-0" />
-      <span aria-live="polite">{text}</span>
-      {withLink && !done && (
-        <Link href={`/?quantityGroup=${encodeURIComponent(group.id)}`} prefetch={false} onClick={onNavigate} className="font-bold underline underline-offset-2">
-          Voir les produits à mélanger
-        </Link>
-      )}
+    // Icône à gauche, texte (et lien) qui passent à la ligne à côté : jamais l'icône seule sur sa ligne.
+    <p className={`flex items-start gap-1.5 rounded-md border px-1.5 py-1 text-xs font-semibold leading-snug ${done ? 'border-green-300 bg-green-50 text-green-900' : 'border-sky-300 bg-sky-50 text-sky-950'} ${className}`}>
+      <IconStack2 size={14} aria-hidden="true" className="mt-px shrink-0" />
+      <span className="min-w-0">
+        <span aria-live="polite">{text}</span>
+        {withLink && !done && (
+          <>
+            {' '}
+            <Link href={`/?quantityGroup=${encodeURIComponent(group.id)}`} prefetch={false} onClick={onNavigate} className="font-bold underline underline-offset-2">
+              Voir les produits à mélanger
+            </Link>
+          </>
+        )}
+      </span>
     </p>
   );
 }
