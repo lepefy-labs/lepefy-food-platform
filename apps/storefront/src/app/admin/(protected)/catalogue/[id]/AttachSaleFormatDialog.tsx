@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { IconSearch } from '@tabler/icons-react';
 import Dialog from '../../../_components/ui/Dialog';
 import Button from '../../../_components/ui/Button';
@@ -39,6 +39,14 @@ export default function AttachSaleFormatDialog({ open, productId, currency, base
   const [stockMode, setStockMode] = useState<'own' | 'shared'>('own');
   const [baseLabel, setBaseLabel] = useState(base.format_label ?? '');
   const { run, pending, error } = useAdminMutation();
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // showModal() met le focus sur le premier bouton (×) : on le place sur la recherche.
+  useEffect(() => {
+    if (!open || selected) return;
+    const timer = window.setTimeout(() => searchRef.current?.focus(), 50);
+    return () => window.clearTimeout(timer);
+  }, [open, selected]);
 
   useEffect(() => {
     if (!open) {
@@ -116,7 +124,7 @@ export default function AttachSaleFormatDialog({ open, productId, currency, base
             <label htmlFor={`${ids}-q`} className={labelClasses}>Produit à rattacher</label>
             <div className="relative">
               <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" aria-hidden="true" />
-              <input id={`${ids}-q`} type="search" className={`${controlClasses} pl-9`} value={query} autoFocus
+              <input id={`${ids}-q`} type="search" className={`${controlClasses} pl-9`} value={query} ref={searchRef}
                 placeholder="Ex. carton" onChange={(event) => setQuery(event.target.value)} />
             </div>
             <p className={hintClasses}>Tapez au moins 2 lettres du nom.</p>
