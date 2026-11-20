@@ -147,6 +147,7 @@ export default async function AdminProductEditPage({
           canManage={canManage}
           clickCollectEnabled={Boolean(tenant.click_collect_enabled)}
           stockLocked={derivedStock}
+          formatParent={formatParent ? { id: formatParent.id, name: formatParent.name } : null}
         />
       </ProductEditWorkspace>
       {!product.format_parent_id && (

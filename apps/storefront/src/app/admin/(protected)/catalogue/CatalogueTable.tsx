@@ -190,7 +190,7 @@ export default function CatalogueTable({ products, tenantCurrency, canManage, li
     const showPolicy = policy !== 'delivery_or_pickup';
     const promo = promotionState(product);
     const promoMeta = promo === 'none' ? null : PRODUCT_PROMOTION_META[promo]!;
-    if (product.description_source !== 'ai' && list.length === 0 && !showPolicy && !promoMeta && !product.new_until) return null;
+    if (product.description_source !== 'ai' && list.length === 0 && !showPolicy && !promoMeta && !product.new_until && !product.format_parent_id) return null;
     return (
       <span className="mt-1 flex flex-wrap gap-1">
         {promoMeta && (
@@ -200,6 +200,9 @@ export default function CatalogueTable({ products, tenantCurrency, canManage, li
         )}
         {product.new_until && <Badge tone={PRODUCT_NOVELTY_META.active!.tone}>Nouveauté · jusqu’au {formatShopDate(product.new_until)}</Badge>}
         {(product.formats?.length ?? 0) > 0 && <Badge tone="info">{(product.formats?.length ?? 0) + 1} formats</Badge>}
+        {product.format_parent_id && (
+          <Badge tone="info">Format « {product.format_label} »{product.format_parent ? ` de ${product.format_parent.name}` : ''}</Badge>
+        )}
         {showPolicy && (
           <Badge tone={policy === 'pickup_only' && pickupDisabled ? 'warning' : 'neutral'}>
             {FULFILLMENT_POLICY_ADMIN_LABELS[policy]}{policy === 'pickup_only' && pickupDisabled ? ' · retrait désactivé' : ''}

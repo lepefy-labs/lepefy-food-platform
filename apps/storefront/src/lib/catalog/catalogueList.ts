@@ -39,7 +39,19 @@ export interface CatalogueListProduct {
   categories: { name: string; slug: string } | null;
   /** Formats de vente actifs de la fiche (migration 187) ; vide = format unique. */
   formats?: Array<{ id: string }> | null;
+  /** Format à stock propre (188, ex. un carton rattaché) : sa fiche mère et son nom de format. */
+  format_parent_id?: string | null;
+  format_label?: string | null;
+  format_parent?: { id: string; name: string } | null;
 }
+
+/**
+ * Lignes de la liste admin : les fiches, plus les formats à stock propre
+ * (cartons séparés, souvent rattachés par 188) dont le stock se gère sur leur
+ * propre fiche. Les formats à stock partagé n'ont pas de stock à eux (miroir
+ * de la fiche) et restent gérés depuis la section « Formats de vente ».
+ */
+export const CATALOGUE_ROW_FILTER = 'format_parent_id.is.null,format_stock_mode.eq.own';
 
 export interface CatalogueListResult {
   products: CatalogueListProduct[];
@@ -87,11 +99,13 @@ export async function loadCatalogueList(
   /** Every filter of the list state, minus the facet being counted. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function narrow<Q extends Record<string, any>>(query: Q, skip?: Facet | 'category'): Q {
-    // Formats de vente (187) : gérés depuis leur fiche, jamais une ligne de la liste.
-    let next = query.eq('tenant_id', tenantId).is('format_parent_id', null);
+    // Une seule condition `or` par requête : la recherche est combinée au filtre des lignes.
+    let next = query.eq('tenant_id', tenantId);
+    next = q
+      ? next.or(`and(or(${CATALOGUE_ROW_FILTER}),or(name.ilike.%${q}%,slug.ilike.%${q}%,barcode_value.ilike.%${q}%))`)
+      : next.or(CATALOGUE_ROW_FILTER);
     if (categoryId && skip !== 'category') next = next.eq('category_id', categoryId);
     if (state.reception) next = next.eq('fulfillment_policy', state.reception);
-    if (q) next = next.or(`name.ilike.%${q}%,slug.ilike.%${q}%,barcode_value.ilike.%${q}%`);
     if (skip !== 'status') next = applyCatalogueStatus(next, state.status);
     if (state.highlight && skip !== 'highlight') next = applyCatalogueStatus(next, state.highlight);
     if (state.issue && skip !== 'issue') next = applyCatalogueStatus(next, state.issue);
@@ -104,7 +118,8 @@ export async function loadCatalogueList(
       id, name, slug, price, stock, active, weight_grams, category_id,
       image_url, storage_type, fulfillment_policy, warehouse_location, description_source,
       compare_at_price, promo_price, promo_applied, promo_ends_at, new_until,
-      barcode_value, net_quantity_display, categories(name, slug), formats:sale_formats(id)
+      barcode_value, net_quantity_display, categories(name, slug), formats:sale_formats(id),
+      format_parent_id, format_label
     `, { count: 'exact' }));
 
   const from = (page - 1) * limit;
@@ -116,7 +131,7 @@ export async function loadCatalogueList(
   ];
   const [{ data, count, error }, totalResult, categoryCounts, ...countResults] = await Promise.all([
     query.order(sort.column, { ascending: sort.ascending }).order('id', { ascending: true }).range(from, from + limit - 1),
-    head().eq('tenant_id', tenantId).is('format_parent_id', null),
+    head().eq('tenant_id', tenantId).or(CATALOGUE_ROW_FILTER),
     countByCategory(),
     ...facets.map((facet) => applyCatalogueStatus(narrow(head(), facet.skip), facet.key)),
   ]);
@@ -134,8 +149,17 @@ export async function loadCatalogueList(
     return counts;
   }
 
+  // Nom de la fiche mère des formats de la page (une requête, même tenant).
+  const products = (data ?? []) as unknown as CatalogueListProduct[];
+  const parentIds = [...new Set(products.map((product) => product.format_parent_id).filter((id): id is string => Boolean(id)))];
+  if (parentIds.length) {
+    const { data: parents } = await db.from('products').select('id, name').eq('tenant_id', tenantId).in('id', parentIds);
+    const byId = new Map(((parents ?? []) as Array<{ id: string; name: string }>).map((parent) => [parent.id, parent]));
+    for (const product of products) product.format_parent = product.format_parent_id ? byId.get(product.format_parent_id) ?? null : null;
+  }
+
   return {
-    products: (data ?? []) as unknown as CatalogueListProduct[],
+    products,
     total: count ?? 0,
     page,
     limit,

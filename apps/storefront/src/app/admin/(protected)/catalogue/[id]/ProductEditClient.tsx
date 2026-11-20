@@ -120,6 +120,11 @@ interface ProductEditProps {
   duplicateFrom?: { id: string; name: string } | null;
   /** Format de vente en stock partagé (187) : le stock est celui de sa fiche, jamais saisi ici. */
   stockLocked?: boolean;
+  /**
+   * Format de vente (187/188) : nom, catégorie, conservation et mode de
+   * réception viennent de la fiche mère (trigger) ; verrouillés ici.
+   */
+  formatParent?: { id: string; name: string } | null;
 }
 
 interface FormState {
@@ -345,6 +350,7 @@ export default function ProductEditClient({
   fromCategory,
   canManage = true,
   stockLocked = false,
+  formatParent = null,
   clickCollectEnabled = true,
   duplicateFrom = null,
 }: ProductEditProps) {
@@ -685,7 +691,16 @@ export default function ProductEditClient({
                     value={formData.name}
                     onChange={(e) => setField('name', e.target.value)}
                     className={INPUT_CLS}
+                    disabled={Boolean(formatParent)}
+                    aria-describedby={formatParent ? 'product-inherited-fields' : undefined}
                   />
+                  {formatParent && (
+                    <p id="product-inherited-fields" className="mt-1 text-xs text-a-text-3">
+                      Format de vente : le nom (fiche + nom du format), la catégorie, le type de stockage et le mode de réception viennent de la fiche{' '}
+                      <Link href={`/admin/catalogue/${formatParent.id}`} prefetch={false} className="font-semibold text-a-brand-fg underline-offset-2 hover:underline">{formatParent.name}</Link>
+                      {' '}et se modifient là-bas (nom du format : section « Formats de vente »).
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="product-category" className={LABEL_CLS}>Catégorie</label>
@@ -694,6 +709,8 @@ export default function ProductEditClient({
                     value={formData.category_id}
                     onChange={(e) => setField('category_id', e.target.value)}
                     className={INPUT_CLS}
+                    disabled={Boolean(formatParent)}
+                    aria-describedby={formatParent ? 'product-inherited-fields' : undefined}
                   >
                     {categories.map(c => (
                       <option key={c.id} value={c.id}>{c.name} — {c.catalog_scope === 'gadgets' ? 'Goodies' : 'Catalogue'}</option>
@@ -707,6 +724,8 @@ export default function ProductEditClient({
                     value={formData.storage_type}
                     onChange={(e) => setField('storage_type', e.target.value)}
                     className={INPUT_CLS}
+                    disabled={Boolean(formatParent)}
+                    aria-describedby={formatParent ? 'product-inherited-fields' : undefined}
                   >
                     <option value="dry">Sec</option>
                     <option value="fresh">Frais</option>
@@ -1010,9 +1029,9 @@ export default function ProductEditClient({
               <select
                 id="product-fulfillment-policy"
                 value={formData.fulfillment_policy}
-                disabled={!canManage}
+                disabled={!canManage || Boolean(formatParent)}
                 onChange={(e) => setField('fulfillment_policy', normalizeFulfillmentPolicy(e.target.value))}
-                aria-describedby="product-fulfillment-help"
+                aria-describedby={formatParent ? 'product-fulfillment-help product-inherited-fields' : 'product-fulfillment-help'}
                 className={INPUT_CLS}
               >
                 {FULFILLMENT_POLICIES.map((policy) => (

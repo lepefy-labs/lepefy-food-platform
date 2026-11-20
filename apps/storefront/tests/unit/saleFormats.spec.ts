@@ -181,7 +181,7 @@ test('public listing queries exclude sale format rows', () => {
     'lib/catalog/pagination.ts', 'lib/catalog/catalogCache.ts', 'lib/catalog/getRelatedProducts.ts', 'lib/catalog/novelties.ts',
     'lib/catalog/promotions.ts', 'lib/catalog/similarProducts.ts', 'lib/catalog/addOnShelf.ts', 'lib/catalog/productRelationships.ts',
     'lib/card/getCardShowcaseProducts.ts', 'app/api/cart/suggestions/route.ts', 'app/(shop)/accueil/page.tsx', 'app/(shop)/gadgets/page.tsx',
-    'lib/ai/nalaProductActions.ts', 'app/api/chat/route.ts', 'lib/catalog/catalogueList.ts',
+    'lib/ai/nalaProductActions.ts', 'app/api/chat/route.ts',
   ];
   for (const file of listings) {
     const source = readFileSync(join(root, file), 'utf8');
@@ -192,6 +192,10 @@ test('public listing queries exclude sale format rows', () => {
   }
   const migration = readFileSync(join(root, '../../../supabase/migrations/187_product_sale_formats.sql'), 'utf8');
   expect(migration).toContain('and p.format_parent_id is null');
+  // Admin list (not public): base rows plus own-stock formats, on every query including the search.
+  const adminList = readFileSync(join(root, 'lib/catalog/catalogueList.ts'), 'utf8');
+  expect(adminList).toContain("format_parent_id.is.null,format_stock_mode.eq.own");
+  expect(adminList.split('CATALOGUE_ROW_FILTER').length - 1).toBeGreaterThanOrEqual(4);
 });
 
 test.describe('Rattacher un produit existant comme format (188)', () => {
