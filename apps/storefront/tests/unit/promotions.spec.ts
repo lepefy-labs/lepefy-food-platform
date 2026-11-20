@@ -5,6 +5,7 @@ import {
   isActivePromotion,
   promotionDiscountPercent,
   PROMOTIONS_QUERY_LIMIT,
+  resolvePromotionFormats,
   selectActivePromotions,
   type PromotionCandidate,
 } from '../../src/lib/catalog/promotions';
@@ -110,5 +111,32 @@ test.describe('Lecture des promotions par tenant', () => {
     } finally {
       console.error = originalError;
     }
+  });
+});
+
+test.describe('Formats de vente en promotion', () => {
+  const parents = [
+    { id: 'bobolo', slug: 'bobolo-sous-vide', active: true },
+    { id: 'off', slug: 'fiche-hors-vente', active: false },
+  ];
+
+  test('un format en promo garde sa card et mène à la fiche mère', () => {
+    const rows = [
+      { ...row('carton-10', 25.9, 30), format_parent_id: 'bobolo' },
+      { ...row('simple', 5, 7), format_parent_id: null },
+    ];
+    expect(resolvePromotionFormats(rows, parents)).toEqual([
+      { ...rows[0], format_parent_slug: 'bobolo-sous-vide' },
+      rows[1],
+    ]);
+  });
+
+  test('fiche mère hors vente ou introuvable : le format n’est pas montré', () => {
+    const rows = [
+      { ...row('a', 25.9, 30), format_parent_id: 'off' },
+      { ...row('b', 25.9, 30), format_parent_id: 'missing' },
+    ];
+    expect(resolvePromotionFormats(rows, parents)).toEqual([]);
+    expect(resolvePromotionFormats(rows, [])).toEqual([]);
   });
 });

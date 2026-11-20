@@ -97,6 +97,37 @@ export function selectActivePromotions<T extends PromotionCandidate>(rows: reado
     .map(({ row }) => row);
 }
 
+/** Fiche mère d'un format de vente (migration 187), lue pour le lien de sa card promo. */
+export interface PromotionFormatParent {
+  id: string;
+  slug: string;
+  active: boolean;
+}
+
+/**
+ * Un format de vente en promotion (ex. « Carton de 10 paquets » à prix barré)
+ * a sa propre card dans « Nos promos » : c'est la seule liste publique qui
+ * montre un format. Sa card mène à la fiche mère (`format_parent_slug`), où
+ * le format se choisit ; sans fiche mère active, le format n'est pas montré.
+ * Les fiches sans parent passent inchangées.
+ */
+export function resolvePromotionFormats<T extends { format_parent_id?: string | null }>(
+  rows: readonly T[],
+  parents: readonly PromotionFormatParent[],
+): Array<T & { format_parent_slug?: string }> {
+  const activeParents = new Map(parents.filter((parent) => parent.active).map((parent) => [parent.id, parent.slug]));
+  const out: Array<T & { format_parent_slug?: string }> = [];
+  for (const row of rows) {
+    if (!row.format_parent_id) {
+      out.push(row);
+      continue;
+    }
+    const slug = activeParents.get(row.format_parent_id);
+    if (slug) out.push({ ...row, format_parent_slug: slug });
+  }
+  return out;
+}
+
 /** Plafond de lecture : bien au-delà d'une offre réelle, borne la requête. */
 export const PROMOTIONS_QUERY_LIMIT = 200;
 /** Cartes affichées dans la section « Nos promos » du catalogue. */
@@ -109,18 +140,22 @@ type SupabaseClient = ReturnType<typeof createClient>;
  * Toujours filtrée par `tenant_id` et `active` (en plus de la RLS) ; prix et
  * stock lus à chaque appel, jamais mis en cache. Une erreur de lecture rend
  * une liste vide : les promotions ne doivent jamais casser le catalogue.
+ *
+ * Les formats de vente en promotion sont inclus (`resolvePromotionFormats`) :
+ * leur fiche mère est relue dans le même tenant et doit être active ; si
+ * cette lecture échoue, seuls les formats sont omis.
  */
 export async function getActivePromotions<T extends PromotionCandidate = PromotionCandidate>(
   supabase: SupabaseClient,
   tenantId: string,
   categoryIds: readonly string[],
-): Promise<T[]> {
+): Promise<Array<T & { format_parent_slug?: string }>> {
   if (!tenantId || categoryIds.length === 0) return [];
   const { data, error } = await supabase
     .from('products')
     .select(PRODUCT_CARD_SELECT)
     .eq('tenant_id', tenantId)
-    .eq('active', true).is('format_parent_id', null)
+    .eq('active', true)
     .in('category_id', categoryIds)
     .not('compare_at_price', 'is', null)
     .order('position')
@@ -129,5 +164,19 @@ export async function getActivePromotions<T extends PromotionCandidate = Promoti
     console.error('[catalog] Promotions unavailable:', error.message);
     return [];
   }
-  return selectActivePromotions((data ?? []) as unknown as T[]);
+  const rows = selectActivePromotions((data ?? []) as unknown as Array<T & { format_parent_id?: string | null }>);
+  const parentIds = [...new Set(rows.map((row) => row.format_parent_id).filter((id): id is string => Boolean(id)))];
+  let parents: PromotionFormatParent[] = [];
+  if (parentIds.length > 0) {
+    const { data: parentRows, error: parentError } = await supabase
+      .from('products')
+      .select('id, slug, active')
+      .eq('tenant_id', tenantId)
+      .in('id', parentIds)
+      .is('format_parent_id', null)
+      .limit(PROMOTIONS_QUERY_LIMIT);
+    if (parentError) console.error('[catalog] Promotion format parents unavailable:', parentError.message);
+    else parents = (parentRows ?? []) as PromotionFormatParent[];
+  }
+  return resolvePromotionFormats(rows, parents);
 }

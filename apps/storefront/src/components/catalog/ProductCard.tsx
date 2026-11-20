@@ -70,6 +70,8 @@ export interface ProductCardProduct extends SellingFormatSource, SaleFormatField
   new_until?: string | null;
   /** Formats de vente actifs de la fiche (migration 187, `sale_formats`) ; absent ou vide = format unique. */
   formats?: SaleFormatRow[] | null;
+  /** Format en promotion montré dans « Nos promos » : sa card mène à la fiche mère (`getActivePromotions`). */
+  format_parent_slug?: string | null;
 }
 
 interface ProductCardProps {
@@ -239,7 +241,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
 
   return (
     <Link
-      href={`/products/${product.slug}${merchandise ? '?from=gadgets' : ''}`}
+      href={`/products/${product.format_parent_slug ?? product.slug}${merchandise ? '?from=gadgets' : ''}`}
       onClick={() => rememberShoppingReturn(window.location)}
       className={
         variant === 'grid'

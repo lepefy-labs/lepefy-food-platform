@@ -163,7 +163,9 @@ test('admin body parsing, slugs, warnings and RPC errors', () => {
   expect(saleFormatRpcError('Could not find the function public.set_product_sale_formats in the schema cache').status).toBe(503);
 });
 
-// One card per product: every public listing excludes format rows.
+// One card per product: every public listing excludes format rows. Exception: promotions.ts
+// keeps a format in promotion (its card links to the base page, `resolvePromotionFormats`) and
+// filters `format_parent_id` on the base lookup.
 test('public listing queries exclude sale format rows', () => {
   const root = join(__dirname, '../../src');
   const listings = [
