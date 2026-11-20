@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconArrowDown, IconArrowUp, IconLink, IconLinkOff, IconPlus, IconTrash } from '@tabler/icons-react';
 import Badge from '../../../_components/ui/Badge';
 import Button, { IconButton } from '../../../_components/ui/Button';
 import InlineAlert, { ErrorText } from '../../../_components/ui/InlineAlert';
+import ConfirmDialog from '../../../_components/ui/ConfirmDialog';
 import HelpHint from '../../../_components/help/HelpHint';
+import AttachSaleFormatDialog from './AttachSaleFormatDialog';
 import { controlClasses, hintClasses, labelClasses } from '@/app/admin/_components/ui/Form';
 import { useAdminMutation } from '@/app/admin/_components/ui/useAdminMutation';
 import { formatPrice } from '@/lib/utils/format';
@@ -69,6 +71,15 @@ export default function ProductSaleFormatsSection({ productId, currency, canMana
   const [baseLabel, setBaseLabel] = useState('');
   const [drafts, setDrafts] = useState<DraftFormat[]>([]);
   const { run, pending, error } = useAdminMutation();
+  const detachMutation = useAdminMutation();
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [detachTarget, setDetachTarget] = useState<DraftFormat | null>(null);
+
+  const apply = useCallback((result: AdminSaleFormatsResponse) => {
+    setData(result);
+    setBaseLabel(result.base.format_label ?? '');
+    setDrafts(result.formats.map(toDraft));
+  }, []);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -76,13 +87,11 @@ export default function ProductSaleFormatsSection({ productId, currency, canMana
       const response = await fetch(`/api/admin/catalogue/${productId}/formats`, { cache: 'no-store' });
       const json = await response.json().catch(() => ({})) as AdminSaleFormatsResponse & { error?: string };
       if (!response.ok) { setLoadError(json.error ?? 'Impossible de charger les formats.'); return; }
-      setData(json);
-      setBaseLabel(json.base.format_label ?? '');
-      setDrafts(json.formats.map(toDraft));
+      apply(json);
     } catch {
       setLoadError('Connexion impossible. Vérifiez le réseau puis réessayez.');
     }
-  }, [productId]);
+  }, [productId, apply]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -150,12 +159,29 @@ export default function ProductSaleFormatsSection({ productId, currency, canMana
       },
       successMessage: 'Formats enregistrés',
     });
+    if (result && 'base' in result) apply(result);
+  }
+
+  async function detach() {
+    if (!detachTarget?.id) return;
+    const result = await detachMutation.run<AdminSaleFormatsResponse>(`/api/admin/catalogue/${productId}/formats/detach`, {
+      method: 'POST',
+      body: { formatId: detachTarget.id },
+      successMessage: 'Format détaché',
+    });
     if (result && 'base' in result) {
-      setData(result);
-      setBaseLabel(result.base.format_label ?? '');
-      setDrafts(result.formats.map(toDraft));
+      apply(result);
+      setDetachTarget(null);
     }
   }
+
+  // Rattacher / détacher écrivent tout de suite et rechargent la liste :
+  // jamais par-dessus des modifications non enregistrées.
+  const dirty = data != null && (
+    baseLabel !== (data.base.format_label ?? '')
+    || JSON.stringify(drafts) !== JSON.stringify(data.formats.map(toDraft))
+  );
+  const savedOwn = new Set((data?.formats ?? []).filter((row) => row.format_stock_mode === 'own').map((row) => row.id));
 
   const activeCount = drafts.filter((draft) => draft.active).length;
 
@@ -244,6 +270,10 @@ export default function ProductSaleFormatsSection({ productId, currency, canMana
                       <span className="ml-auto flex items-center gap-1">
                         <IconButton label="Monter" icon={<IconArrowUp size={16} />} disabled={!canManage || index === 0} onClick={() => move(index, -1)} />
                         <IconButton label="Descendre" icon={<IconArrowDown size={16} />} disabled={!canManage || index === drafts.length - 1} onClick={() => move(index, 1)} />
+                        {canManage && draft.id && savedOwn.has(draft.id) && (
+                          <IconButton label="Détacher ce format (redevient un produit autonome)" icon={<IconLinkOff size={16} />}
+                            disabled={dirty} onClick={() => setDetachTarget(draft)} />
+                        )}
                         {!draft.id && <IconButton label="Retirer ce format" icon={<IconTrash size={16} />} disabled={!canManage} onClick={() => setDrafts((list) => list.filter((entry) => entry.key !== draft.key))} />}
                       </span>
                     </div>
@@ -258,8 +288,14 @@ export default function ProductSaleFormatsSection({ productId, currency, canMana
               <Button variant="secondary" onClick={addFormat} disabled={drafts.length >= MAX_SALE_FORMATS}>
                 <IconPlus size={16} aria-hidden="true" /> Ajouter un format
               </Button>
+              <Button variant="secondary" onClick={() => setAttachOpen(true)} disabled={dirty || drafts.length >= MAX_SALE_FORMATS}>
+                <IconLink size={16} aria-hidden="true" /> Rattacher un produit existant
+              </Button>
               <Button onClick={() => void save()} loading={pending}>Enregistrer les formats</Button>
             </div>
+          )}
+          {canManage && dirty && (
+            <p className={hintClasses}>Enregistrez d’abord les formats pour rattacher ou détacher un produit.</p>
           )}
           <ErrorText message={error} />
 
@@ -291,6 +327,25 @@ export default function ProductSaleFormatsSection({ productId, currency, canMana
             </div>
           )}
         </div>
+      )}
+      {data && canManage && (
+        <>
+          <AttachSaleFormatDialog open={attachOpen} productId={productId} currency={currency} base={data.base}
+            onClose={() => setAttachOpen(false)}
+            onAttached={(result) => { apply(result); setAttachOpen(false); }} />
+          <ConfirmDialog
+            open={detachTarget != null}
+            title="Détacher ce format ?"
+            description={detachTarget ? (
+              <>« {detachTarget.label} » redevient un produit autonome : même identifiant, prix, stock propre ({detachTarget.stock}) et adresse. Il réapparaît seul dans le catalogue s’il est en vente. Il garde son nom de format (fiche + « {detachTarget.label} ») : renommez-le depuis sa fiche.</>
+            ) : undefined}
+            confirmLabel="Détacher"
+            loading={detachMutation.pending}
+            error={detachMutation.error}
+            onConfirm={() => void detach()}
+            onCancel={() => setDetachTarget(null)}
+          />
+        </>
       )}
     </section>
   );

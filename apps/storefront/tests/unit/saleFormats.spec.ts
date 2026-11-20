@@ -12,7 +12,16 @@ import {
   planFormatBundle,
   type SaleFormatParent,
 } from '../../src/lib/catalog/saleFormats';
-import { parseSaleFormatsBody, saleFormatRpcError, saleFormatSlugBase, saleFormatWarnings } from '../../src/lib/catalog/saleFormatsAdmin';
+import {
+  attachBlocker,
+  attachConsequences,
+  parseAttachSaleFormatBody,
+  parseSaleFormatsBody,
+  saleFormatRpcError,
+  saleFormatSlugBase,
+  saleFormatWarnings,
+  type AttachCandidate,
+} from '../../src/lib/catalog/saleFormatsAdmin';
 import { orderItemFormatLabel, orderItemPhysicalUnits } from '../../src/lib/orders/documents/itemFormat';
 import { bundleCaption, saleFormatCardChip, saleFormatOfferLine, saleFormatSavingsLine, saleFormatUnitPriceLine } from '../../src/lib/storefrontCopy/saleFormatCopy';
 import { resolveSellingFormat } from '../../src/lib/storefrontCopy/sellingFormat';
@@ -183,4 +192,54 @@ test('public listing queries exclude sale format rows', () => {
   }
   const migration = readFileSync(join(root, '../../../supabase/migrations/187_product_sale_formats.sql'), 'utf8');
   expect(migration).toContain('and p.format_parent_id is null');
+});
+
+test.describe('Rattacher un produit existant comme format (188)', () => {
+  const carton: AttachCandidate = {
+    id: '0b6c4a52-1d1e-4c39-9f53-0d5d8a6f1a10', name: 'Bobolo carton de 10', slug: 'bobolo-carton-10', price: 25.9, compare_at_price: 30,
+    stock: 142, active: true, featured: true, min_order_quantity: 2, order_quantity_step: 2, add_on_position: 3, image_url: null,
+    format_parent_id: null, has_formats: false,
+  };
+
+  test('corps du POST : produit, nom, unités ; stock propre par défaut', () => {
+    const ok = parseAttachSaleFormatBody({ productId: carton.id, label: ' Carton de 10 paquets ', units_per_sale: 10 });
+    expect(ok).toEqual({ ok: true, body: { productId: carton.id, label: 'Carton de 10 paquets', units_per_sale: 10, stock_mode: 'own', baseLabel: '' } });
+    expect(parseAttachSaleFormatBody({ productId: 'x', label: 'A', units_per_sale: 3 }).ok).toBe(false);
+    expect(parseAttachSaleFormatBody({ productId: carton.id, label: '', units_per_sale: 3 }).ok).toBe(false);
+    expect(parseAttachSaleFormatBody({ productId: carton.id, label: 'A', units_per_sale: 1 }).ok).toBe(false);
+    expect(parseAttachSaleFormatBody({ productId: carton.id, label: 'Lot', units_per_sale: 3, baseLabel: 'lot' }).ok).toBe(false);
+    const shared = parseAttachSaleFormatBody({ productId: carton.id, label: 'Lot', units_per_sale: 3, stock_mode: 'shared' });
+    expect(shared.ok && shared.body.stock_mode).toBe('shared');
+  });
+
+  test('pas rattachable : la fiche elle-même, un format, un produit qui a des formats', () => {
+    expect(attachBlocker(carton, 'parent')).toBeNull();
+    expect(attachBlocker(carton, carton.id)).not.toBeNull();
+    expect(attachBlocker({ ...carton, format_parent_id: 'autre' }, 'parent')).not.toBeNull();
+    expect(attachBlocker({ ...carton, has_formats: true }, 'parent')).not.toBeNull();
+  });
+
+  test('la confirmation dit tout ce qui change, rien en silence', () => {
+    const lines = attachConsequences({ candidate: carton, parent: { name: 'Bobolo sous vide', stock: 30 }, label: 'Carton de 10', units: 10, stockMode: 'own' });
+    expect(lines[0]).toContain('« Bobolo sous vide — Carton de 10 »');
+    expect(lines.join(' ')).toContain('stock propre : 142');
+    expect(lines.join(' ')).toContain('promotion est conservée');
+    expect(lines.join(' ')).toContain('quantité minimale (2)');
+    expect(lines.join(' ')).toContain('plus mis en avant');
+    expect(lines.join(' ')).toContain('Petits plus');
+    const plain = attachConsequences({
+      candidate: { ...carton, stock: 0, compare_at_price: null, featured: false, min_order_quantity: 1, order_quantity_step: 1, add_on_position: null },
+      parent: { name: 'Ndole', stock: 7 }, label: 'Lot de 3', units: 3, stockMode: 'shared',
+    });
+    expect(plain).toHaveLength(3);
+    expect(plain[2]).toContain('2 disponibles');
+  });
+
+  test('erreurs de la RPC 188 en français', () => {
+    expect(saleFormatRpcError('format_attach_stock_not_empty').status).toBe(400);
+    expect(saleFormatRpcError('format_attach_already_format').status).toBe(409);
+    expect(saleFormatRpcError('format_detach_shared').error).toContain('hors vente');
+    expect(saleFormatRpcError('Could not find the function public.attach_product_as_sale_format in the schema cache'))
+      .toEqual({ status: 503, error: 'Fonction indisponible : la migration 188 n’est pas encore appliquée.' });
+  });
 });

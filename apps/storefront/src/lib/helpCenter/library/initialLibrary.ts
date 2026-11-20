@@ -179,7 +179,7 @@ export const INITIAL_LIBRARY: LibraryGuide[] = [
     summary: 'Proposer plusieurs formats (ex. 1 paquet ou lot de 3) sous une seule fiche.',
     requiredPermission: 'catalog.manage',
     contexts: ['/admin/catalogue/[id]'],
-    watch: ['app/admin/(protected)/catalogue/[id]/ProductSaleFormatsSection.tsx', 'lib/catalog/saleFormats.ts', 'lib/catalog/saleFormatsAdmin.ts', 'lib/cart/useFormatUnits.ts'],
+    watch: ['app/admin/(protected)/catalogue/[id]/ProductSaleFormatsSection.tsx', 'app/admin/(protected)/catalogue/[id]/AttachSaleFormatDialog.tsx', 'lib/catalog/saleFormats.ts', 'lib/catalog/saleFormatsAdmin.ts', 'lib/cart/useFormatUnits.ts'],
     blocks: [
       p('Un format est une façon de vendre le même produit : 1 paquet, lot de 3 paquets… Le client voit une seule fiche et choisit lui-même son format ; aucun format n’est présélectionné.'),
       steps(
@@ -192,6 +192,7 @@ export const INITIAL_LIBRARY: LibraryGuide[] = [
       info('Dans le panier, le client compte en unités : 3 paquets ajoutés un par un deviennent automatiquement un lot, et un lot moins un redevient 2 paquets. Le panier applique toujours la combinaison la moins chère.'),
       warn('Un minimum supérieur à 1 dans **Règles de vente**, ou un groupe de quantité actif, s’applique toujours : il n’est jamais retiré automatiquement.'),
       info('Pour arrêter un format, décochez **En vente** et enregistrez : les commandes déjà passées restent intactes et se préparent normalement.'),
+      info('Un produit déjà en vente (ex. un carton) peut devenir un format : **Rattacher un produit existant**, cherchez-le, donnez le nom du format et le nombre d’unités, vérifiez « Ce qui va changer » puis **Rattacher**. Il garde son prix, sa promotion, son stock propre, les paniers et les commandes. Pour l’annuler : **Détacher ce format**.'),
       rel('regles-de-vente-quantite-minimale'),
     ],
   },
