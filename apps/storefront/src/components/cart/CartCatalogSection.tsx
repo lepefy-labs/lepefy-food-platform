@@ -203,6 +203,10 @@ export function CartCatalogSection({ categories, wide = false, headroomG = null,
 
   const { items, hasMore, isLoadingMore, loadMoreFailed } = catalog;
   const empty = items.length === 0 && !hasMore && !isLoadingMore;
+  // L'étagère est figée (jamais réordonnée sous le doigt) mais son titre suit la
+  // marge : quand moins de 2 de ses produits rentrent encore, ce n'est plus
+  // « Ça rentre dans votre colis ».
+  const fitsNow = Boolean(shelf?.fits) && (suggestions ?? []).filter((product) => fitsHeadroom(product, headroomG)).length >= 2;
 
   return (
     <div className="mt-8 space-y-8" onClickCapture={rememberPosition}>
@@ -217,8 +221,8 @@ export function CartCatalogSection({ categories, wide = false, headroomG = null,
         </section>
       ) : (
         <CatalogShelf id="cart-suggestions" tone="novelty" confirmOnAdd={false} className="" products={suggestions}
-          title={shelf?.fits ? 'Ça rentre dans votre colis' : 'Complétez votre panier'} icon={shelf?.fits ? '📦' : '🧺'}
-          subtitle={shelf?.fits && headroomG ? `Encore ${formatHeadroom(headroomG)} sans frais de livraison en plus` : null}
+          title={fitsNow ? 'Ça rentre dans votre colis' : 'Complétez votre panier'} icon={fitsNow ? '📦' : '🧺'}
+          subtitle={fitsNow && headroomG ? `Encore ${formatHeadroom(headroomG)} sans frais de livraison en plus` : null}
           // Étiquette seulement tant que le produit rentre encore (la marge baisse à chaque ajout).
           note={shelf?.fits ? (product) => (fitsHeadroom(product, headroomG) ? parcelFitLabel(product) : null) : undefined}
           onAdded={(product) => recordAddSource(product.id, shelf?.fits ? 'cart_fits' : 'cart_suggestions')} />

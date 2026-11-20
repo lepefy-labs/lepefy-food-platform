@@ -18,7 +18,8 @@ export function shippingEstimateParts(estimate: Estimate | null, currency: strin
   if (!estimate) return null;
   const country = countryLabel(estimate.country);
   const price = estimate.freeShipping ? 'Offerte' : formatPrice(estimate.finalCents / 100, currency);
-  const nudge = estimate.freeShipping ? null
+  // Panier changé, nouvelle estimation en route : l'ancienne marge ne décrit plus ce panier.
+  const nudge = estimate.freeShipping || estimate.updating ? null
     : estimate.freeShippingRemainingCents !== null ? `Plus que ${formatPrice(estimate.freeShippingRemainingCents / 100, currency)} pour la livraison offerte`
       : estimate.headroomG !== null ? `Encore ${formatHeadroom(estimate.headroomG)} sans frais de livraison en plus`
         : null;
@@ -33,7 +34,7 @@ export function CartShippingEstimateCompact({ estimate, currency, id }: { estima
   const parts = shippingEstimateParts(estimate, currency);
   if (!parts) return <p id={id} className="mt-1 text-xs leading-snug text-gray-600">Livraison {SUMMARY_COPY.shippingNextStep}</p>;
   return (
-    <p id={id} className="mt-1 text-xs leading-snug text-gray-700" aria-live="polite">
+    <p id={id} className={`mt-1 text-xs leading-snug text-gray-700 transition-opacity ${estimate?.updating ? 'opacity-50' : ''}`} aria-live="polite" aria-busy={estimate?.updating || undefined}>
       Livraison {parts.estimated ? 'estimée ' : ''}({parts.country}) : <span className="font-semibold text-gray-900">{parts.price}</span>
       {parts.nudge && <><span aria-hidden="true"> · </span><span className="font-semibold text-emerald-800">{parts.nudge}</span></>}
     </p>
@@ -58,7 +59,7 @@ export function CartShippingEstimateDetail({ estimate, currency, onChooseCountry
   }
   const several = estimate.countries.length > 1 && estimate.source !== 'address';
   return (
-    <div className="space-y-1.5 py-1 text-sm" aria-live="polite">
+    <div className={`space-y-1.5 py-1 text-sm transition-opacity ${estimate.updating ? 'opacity-50' : ''}`} aria-live="polite" aria-busy={estimate.updating || undefined}>
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-gray-700">Livraison {parts.estimated ? 'estimée' : ''} ({parts.country})</span>
         <span className="font-semibold text-gray-900">{parts.price}</span>

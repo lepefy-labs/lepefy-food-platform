@@ -259,22 +259,51 @@ export interface CheaperWithMore {
   total: number;
 }
 
+/** Poids (g) d'une composition ; null si un format n'a pas de poids. */
+export function planWeightG(lines: ReadonlyArray<{ option: SaleFormatOption; quantity: number }>): number | null {
+  let grams = 0;
+  for (const line of lines) {
+    const weight = line.option.row.weight_grams;
+    if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0) return null;
+    grams += weight * line.quantity;
+  }
+  return grams;
+}
+
 /**
  * Le regroupement peut rendre une unité de MOINS plus chère : 50 paquets =
  * 2 cartons de 20 + 1 carton de 10 (117,70 €), 49 paquets = 2 cartons + 9
  * paquets (118,80 €). Cherche le plus petit ajout (jusqu'à la taille du plus
  * grand format) qui coûte au plus le total actuel, dans la limite achetable.
- * null quand rien de tel n'existe : jamais d'incitation qui ferait payer plus.
+ *
+ * La livraison compte aussi : le poids ajouté doit tenir dans `weightBudgetG`
+ * (marge avant la hausse du forfait, estimation du panier). Sans estimation
+ * (`undefined`) ou sans poids connu, seule une composition qui ne pèse pas
+ * plus est proposée. null quand rien de tel n'existe : jamais d'incitation
+ * qui ferait payer plus.
  */
-export function cheaperWithMoreUnits(units: number, currentTotal: number, options: SaleFormatOption[], maxUnits: number): CheaperWithMore | null {
+export function cheaperWithMoreUnits(
+  units: number,
+  currentTotal: number,
+  options: SaleFormatOption[],
+  maxUnits: number,
+  { currentLines = [], weightBudgetG }: {
+    currentLines?: ReadonlyArray<{ option: SaleFormatOption; quantity: number }>;
+    /** Marge de poids sans hausse de livraison ; undefined = inconnue. */
+    weightBudgetG?: number | null;
+  } = {},
+): CheaperWithMore | null {
   if (units <= 0 || options.length < 2) return null;
   const lookahead = Math.max(...options.map((option) => option.units)) - 1;
   const ceiling = Math.min(maxUnits, units + lookahead);
+  const currentWeight = planWeightG(currentLines);
+  const budget = typeof weightBudgetG === 'number' ? Math.max(0, weightBudgetG) : 0;
   for (let target = units + 1; target <= ceiling; target += 1) {
     const plan = planFormatBundle(target, options);
-    if (plan && Math.round(plan.total * 100) <= Math.round(currentTotal * 100)) {
-      return { extra: target - units, units: target, total: plan.total };
-    }
+    if (!plan || Math.round(plan.total * 100) > Math.round(currentTotal * 100)) continue;
+    const weight = planWeightG(plan.lines);
+    if (currentWeight === null || weight === null || weight - currentWeight > budget) continue;
+    return { extra: target - units, units: target, total: plan.total };
   }
   return null;
 }

@@ -5,7 +5,23 @@ import type { ShippingEstimate } from '@/lib/shipping/tariff/shippingEstimate';
 import type { EstimateCountrySource } from '@/lib/shipping/tariff/estimateCountry';
 import { useHydratedCartItems } from '@/lib/cart/useHydratedCart';
 
-export type CartShippingEstimate = ShippingEstimate & { source: EstimateCountrySource; countries: string[] };
+export type CartShippingEstimate = ShippingEstimate & {
+  source: EstimateCountrySource;
+  countries: string[];
+  /**
+   * Le panier a changé depuis cette estimation et la nouvelle n'est pas
+   * encore arrivée : prix affiché atténué, « Encore X kg » masqué (il
+   * décrivait le panier précédent).
+   */
+  updating?: boolean;
+};
+
+/** Marge de poids utilisable par l'interface ; undefined si inconnue ou en cours de mise à jour. */
+export function usableHeadroomG(estimate: CartShippingEstimate | null): number | undefined {
+  if (!estimate || estimate.updating) return undefined;
+  if (estimate.freeShipping) return Number.POSITIVE_INFINITY;
+  return estimate.headroomG ?? 0;
+}
 
 const CHOSEN_COUNTRY_KEY = 'lepefy-shipping-country';
 const CHECKOUT_DRAFT_KEY = 'lepefy-checkout-shipping';
@@ -40,7 +56,8 @@ export function useShippingEstimate({ address = null, enabled = true }: {
   enabled?: boolean;
 } = {}) {
   const items = useHydratedCartItems();
-  const [estimate, setEstimate] = useState<CartShippingEstimate | null>(null);
+  // Chaque réponse garde la clé du panier qu'elle décrit.
+  const [result, setResult] = useState<{ key: string; estimate: CartShippingEstimate | null } | null>(null);
   const [chosenCountry, setChosen] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   // Première réponse reçue (ou panier vide) : le panier peut décider une fois de ses suggestions.
@@ -53,7 +70,7 @@ export function useShippingEstimate({ address = null, enabled = true }: {
 
   useEffect(() => {
     if (!ready) return;
-    if (!enabled || lines.length === 0) { setEstimate(null); setSettled(true); return; }
+    if (!enabled || lines.length === 0) { setResult({ key, estimate: null }); setSettled(true); return; }
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       fetch('/api/shipping/estimate', {
@@ -63,8 +80,8 @@ export function useShippingEstimate({ address = null, enabled = true }: {
         signal: controller.signal,
       })
         .then((res) => (res.ok ? res.json() : { estimate: null }))
-        .then((data: { estimate?: CartShippingEstimate | null }) => { setEstimate(data.estimate ?? null); setSettled(true); })
-        .catch(() => { if (!controller.signal.aborted) { setEstimate(null); setSettled(true); } });
+        .then((data: { estimate?: CartShippingEstimate | null }) => { setResult({ key, estimate: data.estimate ?? null }); setSettled(true); })
+        .catch(() => { if (!controller.signal.aborted) { setResult({ key, estimate: null }); setSettled(true); } });
     }, 400);
     return () => { window.clearTimeout(timer); controller.abort(); };
     // `key` résume lignes, adresse et pays choisi.
@@ -76,5 +93,9 @@ export function useShippingEstimate({ address = null, enabled = true }: {
     setChosen(country);
   }, []);
 
+  const estimate = useMemo<CartShippingEstimate | null>(
+    () => (result?.estimate ? { ...result.estimate, updating: result.key !== key } : null),
+    [result, key],
+  );
   return { estimate, settled, chooseCountry };
 }

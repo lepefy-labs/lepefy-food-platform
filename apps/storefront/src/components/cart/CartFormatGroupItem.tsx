@@ -20,6 +20,12 @@ interface CartFormatGroupItemProps {
    * Reçoit l'id de la seule ligne restante (le format de base).
    */
   onRemoveLast: (productId: string) => void;
+  /**
+   * Marge de poids avant une hausse de livraison (estimation du panier) ;
+   * undefined = inconnue : « 1 de plus coûte moins » n'est alors proposé que
+   * sans poids ajouté.
+   */
+  shippingHeadroomG?: number;
 }
 
 /**
@@ -29,7 +35,7 @@ interface CartFormatGroupItemProps {
  * Les lignes réelles (lot × n, paquet × m) restent celles du panier et de la
  * commande ; ce composant ne fait que les présenter et les recomposer.
  */
-export function CartFormatGroupItem({ group, currency, variant = 'page', onRemoveLast }: CartFormatGroupItemProps) {
+export function CartFormatGroupItem({ group, currency, variant = 'page', onRemoveLast, shippingHeadroomG }: CartFormatGroupItemProps) {
   const { parent, options } = group;
   const control = useFormatUnits(parent, options);
   const sellingFormat = resolveSellingFormat(parent);
@@ -39,7 +45,10 @@ export function CartFormatGroupItem({ group, currency, variant = 'page', onRemov
   const total = control.current?.total ?? 0;
   const overStock = control.units > control.maxUnits;
   // Une unité de moins peut coûter plus (49 paquets > 50) : on le dit, le client choisit.
-  const cheaper = !overStock && control.current ? cheaperWithMoreUnits(control.units, total, options, control.maxUnits) : null;
+  // La livraison compte : jamais proposé si le poids ajouté ferait monter le forfait.
+  const cheaper = !overStock && control.current
+    ? cheaperWithMoreUnits(control.units, total, options, control.maxUnits, { currentLines: control.current.lines, weightBudgetG: shippingHeadroomG })
+    : null;
   const href = `/products/${parent.slug}`;
   const priceLine = [
     base ? `${formatPrice(base.price, currency)} ${sellingFormat.unit && !sellingFormat.unit.byWeight ? unitPhrase(sellingFormat) : "l'unité"}` : null,
@@ -132,6 +141,29 @@ export function CartFormatGroupItem({ group, currency, variant = 'page', onRemov
           <span className="block text-xs font-medium text-gray-600">Total</span>
           <span className="text-lg font-extrabold tabular-nums text-gray-950">{formatPrice(total, currency)}</span>
         </p>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * Place d'une fiche à formats tant que ses formats ne sont pas lus (une
+ * requête, souvent < 1 s) : le nom tout de suite, le reste en attente.
+ */
+export function CartFormatGroupSkeleton({ name }: { name: string }) {
+  return (
+    <li className="rounded-2xl border border-gray-200 bg-white p-3 shadow-[0_1px_3px_rgba(15,23,42,0.06)] sm:p-4" aria-busy="true">
+      <div className="flex gap-3 sm:gap-4">
+        <div className="h-[72px] w-[72px] shrink-0 animate-pulse rounded-xl bg-gray-100 motion-reduce:animate-none sm:h-20 sm:w-20" />
+        <div className="min-w-0 flex-1">
+          <p className="break-words text-[15px] font-bold leading-snug text-gray-950 sm:text-base">{name}</p>
+          <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-gray-100 motion-reduce:animate-none" />
+          <div className="mt-1.5 h-3 w-1/2 animate-pulse rounded bg-gray-100 motion-reduce:animate-none" />
+        </div>
+      </div>
+      <div className="mt-2.5 flex items-center justify-between gap-3 border-t border-gray-100 pt-2.5">
+        <div className="h-11 w-32 animate-pulse rounded-full bg-gray-100 motion-reduce:animate-none" />
+        <div className="h-8 w-20 animate-pulse rounded bg-gray-100 motion-reduce:animate-none" />
       </div>
     </li>
   );

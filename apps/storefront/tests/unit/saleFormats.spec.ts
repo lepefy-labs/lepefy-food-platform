@@ -255,27 +255,35 @@ const sp = (text: string) => text.replace(/[  ]/g, ' ');
 test.describe('Une unité de moins ne coûte jamais plus sans le dire', () => {
   // Bobolo (Chloe Food, 20/11/2026) : 1 paquet 3,00 €, carton de 10 à 25,90 €, carton de 20 à 45,90 € (stock propre).
   const bobolo = buildSaleFormatOptions({
-    id: 'bobolo', price: 3, stock: 992, format_label: '1 paquet',
+    id: 'bobolo', price: 3, stock: 992, format_label: '1 paquet', weight_grams: 500,
     formats: [
-      { id: 'c10', price: 25.9, stock: 142, active: true, format_parent_id: 'bobolo', units_per_sale: 10, format_label: 'Carton de 10 paquets', format_position: 1, format_stock_mode: 'own' },
-      { id: 'c20', price: 45.9, stock: 145, active: true, format_parent_id: 'bobolo', units_per_sale: 20, format_label: 'Carton de 20 paquets', format_position: 2, format_stock_mode: 'own' },
+      { id: 'c10', price: 25.9, stock: 142, active: true, format_parent_id: 'bobolo', units_per_sale: 10, format_label: 'Carton de 10 paquets', format_position: 1, format_stock_mode: 'own', weight_grams: 6500 },
+      { id: 'c20', price: 45.9, stock: 145, active: true, format_parent_id: 'bobolo', units_per_sale: 20, format_label: 'Carton de 20 paquets', format_position: 2, format_stock_mode: 'own', weight_grams: 12000 },
     ],
   });
 
   test('49 paquets (118,80 €) : 1 de plus fait 117,70 €', () => {
     const plan49 = planFormatBundle(49, bobolo)!;
     expect(plan49.total).toBe(118.8);
-    expect(cheaperWithMoreUnits(49, plan49.total, bobolo, 999)).toEqual({ extra: 1, units: 50, total: 117.7 });
+    // 50 paquets pèsent 2 kg de plus (carton de 10 = 6,5 kg contre 9 paquets = 4,5 kg).
+    const current = { currentLines: plan49.lines };
+    expect(cheaperWithMoreUnits(49, plan49.total, bobolo, 999, { ...current, weightBudgetG: 3000 })).toEqual({ extra: 1, units: 50, total: 117.7 });
+    // Marge de 1,5 kg (forfait Italie, 30 kg par colis) : un 2e colis coûterait 10,40 € de plus, rien n'est proposé.
+    expect(cheaperWithMoreUnits(49, plan49.total, bobolo, 999, { ...current, weightBudgetG: 1500 })).toBeNull();
+    // Estimation inconnue : seulement sans poids ajouté.
+    expect(cheaperWithMoreUnits(49, plan49.total, bobolo, 999, current)).toBeNull();
+    // Livraison offerte : la marge est illimitée.
+    expect(cheaperWithMoreUnits(49, plan49.total, bobolo, 999, { ...current, weightBudgetG: Number.POSITIVE_INFINITY })?.units).toBe(50);
     expect(sp(cheaperWithMoreLine({ extra: 1, units: 50, total: 117.7 }, 118.8, paquet))).toBe('Avec 1 paquet de plus : 117,70 € au lieu de 118,80 €');
   });
 
   test('rien à proposer quand plus coûte plus, ou au-delà du stock', () => {
     const plan41 = planFormatBundle(41, bobolo)!;
-    expect(cheaperWithMoreUnits(41, plan41.total, bobolo, 999)).toBeNull();
-    expect(cheaperWithMoreUnits(49, 118.8, bobolo, 49)).toBeNull();
+    expect(cheaperWithMoreUnits(41, plan41.total, bobolo, 999, { currentLines: plan41.lines, weightBudgetG: 99999 })).toBeNull();
+    expect(cheaperWithMoreUnits(49, 118.8, bobolo, 49, { currentLines: planFormatBundle(49, bobolo)!.lines, weightBudgetG: 99999 })).toBeNull();
     // Ndole : 2 paquets à 7,00 € contre le lot de 3 à 9,90 € : pas moins cher.
     const ndoleOptions = buildSaleFormatOptions(ndole(7));
-    expect(cheaperWithMoreUnits(2, 7, ndoleOptions, 7)).toBeNull();
+    expect(cheaperWithMoreUnits(2, 7, ndoleOptions, 7, { weightBudgetG: 99999 })).toBeNull();
   });
 
   test('même prix : dit sans prétendre une économie', () => {

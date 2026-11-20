@@ -15,7 +15,7 @@ import { QuantityGroupProgress } from '@/components/cart/QuantityGroupProgress';
 import { CartFulfillmentNotice } from '@/components/cart/CartFulfillmentNotice';
 import { CartCatalogSection, type CartCatalogCategory } from '@/components/cart/CartCatalogSection';
 import { CartShippingEstimateDetail } from '@/components/cart/CartShippingEstimate';
-import { useShippingEstimate } from '@/lib/cart/useShippingEstimate';
+import { usableHeadroomG, useShippingEstimate } from '@/lib/cart/useShippingEstimate';
 import { cartProductPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { selectCartIsEmpty, selectCartItemCount, selectCartItems, selectCartSubtotal, selectPendingProductIds } from '@/lib/cart/cartSelectors';
 import { formatProductCount } from '@/lib/cart/formatProductCount';
@@ -26,7 +26,7 @@ import { useCartStore } from '@/stores/cartStore';
 import { useHasMounted } from '@/hooks/useHasMounted';
 import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
 import { isKnownFormatLine, useCartFormatGroups } from '@/lib/cart/useCartFormatGroups';
-import { CartFormatGroupItem } from '@/components/cart/CartFormatGroupItem';
+import { CartFormatGroupItem, CartFormatGroupSkeleton } from '@/components/cart/CartFormatGroupItem';
 import { ACTION_COPY, SUMMARY_COPY, productsPriceLabel } from '@/lib/storefrontCopy/copy';
 import type { CartItem as CartItemType, PublicTenant } from '@lepefy/types';
 import { useEffect, useRef, useState } from 'react';
@@ -184,7 +184,15 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
                   if (group && !group.ids.some((id) => unavailableProductIds.includes(id))) {
                     if (renderedGroups.has(group.parent.id)) return null;
                     renderedGroups.add(group.parent.id);
-                    return <CartFormatGroupItem key={`format-group-${group.parent.id}`} group={group} currency={tenant.currency} onRemoveLast={remove} />;
+                    return <CartFormatGroupItem key={`format-group-${group.parent.id}`} group={group} currency={tenant.currency} onRemoveLast={remove} shippingHeadroomG={usableHeadroomG(shippingEstimate)} />;
+                  }
+                  // Formats encore en lecture : une seule ligne d'attente par fiche, jamais les
+                  // lignes brutes (« 2 cartons de 20 pièces ») qui changeraient sous les yeux.
+                  if (formatsPending && isKnownFormatLine(item)) {
+                    const pendingKey = item.product.format_parent_id ?? item.product.id;
+                    if (renderedGroups.has(pendingKey)) return null;
+                    renderedGroups.add(pendingKey);
+                    return <CartFormatGroupSkeleton key={`format-pending-${pendingKey}`} name={item.product.name.split(' — ')[0] ?? item.product.name} />;
                   }
                   return (
                   <CartItem
