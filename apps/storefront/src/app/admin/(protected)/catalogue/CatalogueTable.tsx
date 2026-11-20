@@ -190,7 +190,7 @@ export default function CatalogueTable({ products, tenantCurrency, canManage, li
     const showPolicy = policy !== 'delivery_or_pickup';
     const promo = promotionState(product);
     const promoMeta = promo === 'none' ? null : PRODUCT_PROMOTION_META[promo]!;
-    if (product.description_source !== 'ai' && list.length === 0 && !showPolicy && !promoMeta && !product.new_until && !product.format_parent_id) return null;
+    if (product.description_source !== 'ai' && list.length === 0 && !showPolicy && !promoMeta && !product.new_until && !product.format_parent_id && !(product.formats?.length)) return null;
     return (
       <span className="mt-1 flex flex-wrap gap-1">
         {promoMeta && (
