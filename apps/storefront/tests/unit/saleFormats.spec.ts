@@ -4,6 +4,7 @@ import { test, expect } from '@playwright/test';
 import {
   aggregateStockDemand,
   buildSaleFormatOptions,
+  cheaperWithMoreUnits,
   formatQuantityLabel,
   formatSavings,
   lowestUnitPrice,
@@ -23,7 +24,7 @@ import {
   type AttachCandidate,
 } from '../../src/lib/catalog/saleFormatsAdmin';
 import { orderItemFormatLabel, orderItemPhysicalUnits } from '../../src/lib/orders/documents/itemFormat';
-import { bundleCaption, saleFormatCardChip, saleFormatOfferLine, saleFormatSavingsLine, saleFormatUnitPriceLine } from '../../src/lib/storefrontCopy/saleFormatCopy';
+import { bundleCaption, cheaperWithMoreLine, saleFormatCardChip, saleFormatOfferLine, saleFormatSavingsLine, saleFormatUnitPriceLine } from '../../src/lib/storefrontCopy/saleFormatCopy';
 import { resolveSellingFormat } from '../../src/lib/storefrontCopy/sellingFormat';
 
 // Demo prices only (pilot price is the tenant's decision).
@@ -245,5 +246,39 @@ test.describe('Rattacher un produit existant comme format (188)', () => {
     expect(saleFormatRpcError('format_detach_shared').error).toContain('hors vente');
     expect(saleFormatRpcError('Could not find the function public.attach_product_as_sale_format in the schema cache'))
       .toEqual({ status: 503, error: 'Fonction indisponible : la migration 188 n’est pas encore appliquée.' });
+  });
+});
+
+/** Prix « 117,70 € » : espace insécable d'Intl ramené à un espace simple pour comparer. */
+const sp = (text: string) => text.replace(/[  ]/g, ' ');
+
+test.describe('Une unité de moins ne coûte jamais plus sans le dire', () => {
+  // Bobolo (Chloe Food, 20/11/2026) : 1 paquet 3,00 €, carton de 10 à 25,90 €, carton de 20 à 45,90 € (stock propre).
+  const bobolo = buildSaleFormatOptions({
+    id: 'bobolo', price: 3, stock: 992, format_label: '1 paquet',
+    formats: [
+      { id: 'c10', price: 25.9, stock: 142, active: true, format_parent_id: 'bobolo', units_per_sale: 10, format_label: 'Carton de 10 paquets', format_position: 1, format_stock_mode: 'own' },
+      { id: 'c20', price: 45.9, stock: 145, active: true, format_parent_id: 'bobolo', units_per_sale: 20, format_label: 'Carton de 20 paquets', format_position: 2, format_stock_mode: 'own' },
+    ],
+  });
+
+  test('49 paquets (118,80 €) : 1 de plus fait 117,70 €', () => {
+    const plan49 = planFormatBundle(49, bobolo)!;
+    expect(plan49.total).toBe(118.8);
+    expect(cheaperWithMoreUnits(49, plan49.total, bobolo, 999)).toEqual({ extra: 1, units: 50, total: 117.7 });
+    expect(sp(cheaperWithMoreLine({ extra: 1, units: 50, total: 117.7 }, 118.8, paquet))).toBe('Avec 1 paquet de plus : 117,70 € au lieu de 118,80 €');
+  });
+
+  test('rien à proposer quand plus coûte plus, ou au-delà du stock', () => {
+    const plan41 = planFormatBundle(41, bobolo)!;
+    expect(cheaperWithMoreUnits(41, plan41.total, bobolo, 999)).toBeNull();
+    expect(cheaperWithMoreUnits(49, 118.8, bobolo, 49)).toBeNull();
+    // Ndole : 2 paquets à 7,00 € contre le lot de 3 à 9,90 € : pas moins cher.
+    const ndoleOptions = buildSaleFormatOptions(ndole(7));
+    expect(cheaperWithMoreUnits(2, 7, ndoleOptions, 7)).toBeNull();
+  });
+
+  test('même prix : dit sans prétendre une économie', () => {
+    expect(sp(cheaperWithMoreLine({ extra: 1, units: 3, total: 7 }, 7, paquet))).toBe('Avec 1 paquet de plus : même prix, 7,00 €');
   });
 });

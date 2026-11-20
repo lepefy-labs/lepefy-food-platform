@@ -249,6 +249,36 @@ export function maxBundleUnits(options: SaleFormatOption[], ceiling = 999): numb
   return candidate;
 }
 
+/** Quelques unités de plus pour payer moins (ou autant) que la composition actuelle. */
+export interface CheaperWithMore {
+  /** Unités de base à ajouter (au moins 1). */
+  extra: number;
+  /** Nouveau total d'unités de base. */
+  units: number;
+  /** Total payé avec ces unités (≤ total actuel). */
+  total: number;
+}
+
+/**
+ * Le regroupement peut rendre une unité de MOINS plus chère : 50 paquets =
+ * 2 cartons de 20 + 1 carton de 10 (117,70 €), 49 paquets = 2 cartons + 9
+ * paquets (118,80 €). Cherche le plus petit ajout (jusqu'à la taille du plus
+ * grand format) qui coûte au plus le total actuel, dans la limite achetable.
+ * null quand rien de tel n'existe : jamais d'incitation qui ferait payer plus.
+ */
+export function cheaperWithMoreUnits(units: number, currentTotal: number, options: SaleFormatOption[], maxUnits: number): CheaperWithMore | null {
+  if (units <= 0 || options.length < 2) return null;
+  const lookahead = Math.max(...options.map((option) => option.units)) - 1;
+  const ceiling = Math.min(maxUnits, units + lookahead);
+  for (let target = units + 1; target <= ceiling; target += 1) {
+    const plan = planFormatBundle(target, options);
+    if (plan && Math.round(plan.total * 100) <= Math.round(currentTotal * 100)) {
+      return { extra: target - units, units: target, total: plan.total };
+    }
+  }
+  return null;
+}
+
 /** « 1 lot de 3 + 1 paquet » : composition lisible d'un plan. */
 export function describeBundle(plan: FormatBundlePlan): string {
   // Les lots d'abord (« 1 lot de 3 paquets + 1 paquet »), du plus grand au plus petit.

@@ -5,7 +5,8 @@ import { IconPhoto } from '@tabler/icons-react';
 import { LepefyImage } from '@/components/images/LepefyImage';
 import { formatPrice } from '@/lib/utils/format';
 import { formatCount, resolveSellingFormat, unitPhrase } from '@/lib/storefrontCopy/sellingFormat';
-import { bundleCaption, saleFormatOfferLine } from '@/lib/storefrontCopy/saleFormatCopy';
+import { bundleCaption, cheaperWithMoreLine, saleFormatOfferLine } from '@/lib/storefrontCopy/saleFormatCopy';
+import { cheaperWithMoreUnits } from '@/lib/catalog/saleFormats';
 import { setFormatUnits, useFormatUnits } from '@/lib/cart/useFormatUnits';
 import type { CartFormatGroup } from '@/lib/cart/useCartFormatGroups';
 import { CartStepper } from './CartStepper';
@@ -37,6 +38,8 @@ export function CartFormatGroupItem({ group, currency, variant = 'page', onRemov
   const caption = bundleCaption(control.current, options, sellingFormat, currency);
   const total = control.current?.total ?? 0;
   const overStock = control.units > control.maxUnits;
+  // Une unité de moins peut coûter plus (49 paquets > 50) : on le dit, le client choisit.
+  const cheaper = !overStock && control.current ? cheaperWithMoreUnits(control.units, total, options, control.maxUnits) : null;
   const href = `/products/${parent.slug}`;
   const priceLine = [
     base ? `${formatPrice(base.price, currency)} ${sellingFormat.unit && !sellingFormat.unit.byWeight ? unitPhrase(sellingFormat) : "l'unité"}` : null,
@@ -73,6 +76,15 @@ export function CartFormatGroupItem({ group, currency, variant = 'page', onRemov
     </p>
   );
 
+  const cheaperNotice = cheaper && (
+    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 rounded-lg bg-green-50 px-2 py-1 text-xs font-semibold leading-snug text-green-900" role="status">
+      <span>{cheaperWithMoreLine(cheaper, total, sellingFormat, currency)}.</span>
+      <button type="button" onClick={() => setFormatUnits(parent, options, cheaper.units)} className="inline-flex min-h-9 items-center font-bold underline underline-offset-2">
+        Passer à {formatCount(sellingFormat, cheaper.units)}
+      </button>
+    </p>
+  );
+
   if (variant === 'drawer') {
     return (
       <li className="flex gap-4 border-b border-gray-100 py-4 last:border-0">
@@ -85,6 +97,7 @@ export function CartFormatGroupItem({ group, currency, variant = 'page', onRemov
           <p className="line-clamp-2 text-sm font-bold leading-snug text-gray-950">{parent.name}</p>
           <p className="mt-1 text-xs text-gray-700">{priceLine}</p>
           {composition}
+          {cheaperNotice}
           {stockNotice}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             {stepper}
@@ -109,6 +122,7 @@ export function CartFormatGroupItem({ group, currency, variant = 'page', onRemov
           </Link>
           <p className="mt-0.5 text-sm leading-snug text-gray-700">{formatCount(sellingFormat, control.units)} · {priceLine}</p>
           {composition}
+          {cheaperNotice}
           {stockNotice}
         </div>
       </div>

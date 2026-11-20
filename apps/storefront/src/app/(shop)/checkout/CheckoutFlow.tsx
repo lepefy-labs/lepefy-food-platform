@@ -48,6 +48,10 @@ import { CheckoutAddOns } from '@/components/checkout/CheckoutAddOns';
 import { formatPrice } from '@/lib/utils/format';
 import { useCartStore } from '@/stores/cartStore';
 import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
+import { useCartFormatGroups } from '@/lib/cart/useCartFormatGroups';
+import { buildCartSummaryLines } from '@/lib/cart/cartSummaryLines';
+import { selectCartItemCount } from '@/lib/cart/cartSelectors';
+import { formatProductCount } from '@/lib/cart/formatProductCount';
 import type { PublicTenant, TenantPaymentMethod } from '@lepefy/types';
 import { ACTION_COPY, ERROR_COPY, FORM_COPY, SUMMARY_COPY, TERMS_NOTICE_COPY, productsPriceLabel, totalWithPendingShipping } from '@/lib/storefrontCopy/copy';
 import { ADDRESS_COPY } from '@/lib/storefrontCopy/addressCopy';
@@ -160,6 +164,8 @@ export default function CheckoutFlow({
   // The whole checkout holds a lock: no automatic reload while it is mounted (lib/pwa).
   useBusyLock(true, 'checkout');
   const { items, totalPrice, shippingPayload } = useCartStore();
+  // Récapitulatif présenté comme le panier : une fiche à formats = une ligne en unités de base.
+  const { groups: formatGroups } = useCartFormatGroups(items, { onlyKnownFormats: true });
   const hydrated = useHasMounted();
   // Pré-contrôle des minimums et du stock (même moteur que /cart et le
   // serveur) : guide seulement, /api/checkout reste l'autorité.
@@ -327,7 +333,9 @@ export default function CheckoutFlow({
   const shippingValue = !shippingKnown
     ? SUMMARY_COPY.shippingAfterAddress
     : effectiveShippingTotal === 0 ? SUMMARY_COPY.shippingFree : formatPrice(effectiveShippingTotal, tenant.currency);
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  // Même compte que le badge et le panier : un carton de 20 paquets compte 20.
+  const itemCount = selectCartItemCount({ items });
+  const summaryLines = buildCartSummaryLines(items, formatGroups, tenant.currency);
   const recipientName = `${firstName ?? ''} ${lastName ?? ''}`.trim();
   const addressErrors = validateAddressDraft(address, { recipientName });
   const hasCompleteAddress = Object.keys(addressErrors).length === 0;
@@ -682,14 +690,17 @@ export default function CheckoutFlow({
         <span>
           <span className="block text-xs font-medium text-gray-600">{SUMMARY_COPY.totalToPay}</span>
           <span className="text-lg font-black text-gray-950">{shippingKnown ? formatPrice(total, tenant.currency) : totalWithPendingShipping(subtotal - ambassadorDiscount, tenant.currency)}</span>
-          <span className="ml-2 text-xs text-gray-600">· {itemCount} article{itemCount > 1 ? 's' : ''}</span>
+          <span className="ml-2 text-xs text-gray-600">· {formatProductCount(itemCount)}</span>
         </span>
         <IconChevronDown size={18} className={`text-gray-500 transition-transform ${showOrderDetails ? 'rotate-180' : ''}`} />
       </button>
       {showOrderDetails && (
         <div className="border-t border-gray-100 px-4 py-3 text-sm">
-          {items.map((item) => (
-            <div key={item.product.id} className="flex justify-between gap-4 py-1.5"><span className="min-w-0 truncate text-gray-600">{item.quantity}× {item.product.name}</span><span className="font-medium">{formatPrice(item.product.price * item.quantity, tenant.currency)}</span></div>
+          {summaryLines.map((line) => (
+            <div key={line.key} className="py-1.5">
+              <div className="flex justify-between gap-4"><span className="min-w-0 truncate text-gray-600">{line.label}</span><span className="font-medium">{formatPrice(line.total, tenant.currency)}</span></div>
+              {line.detail && <p className="mt-0.5 text-xs font-semibold text-green-800">{line.detail}</p>}
+            </div>
           ))}
           <div className="mt-2 flex justify-between border-t border-gray-100 pt-2"><span className="text-gray-600">{SUMMARY_COPY.shippingPrice}</span><span className="font-semibold">{shippingValue}</span></div>
           {ambassadorDiscount > 0 && <div className="flex justify-between py-1.5 text-green-700"><span>Avantage ambassadeur</span><span>-{formatPrice(ambassadorDiscount, tenant.currency)}</span></div>}

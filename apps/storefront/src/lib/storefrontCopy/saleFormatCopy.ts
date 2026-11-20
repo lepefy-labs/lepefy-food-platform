@@ -1,4 +1,4 @@
-import { formatQuantityLabel, type FormatBundlePlan, type SaleFormatOption } from '@/lib/catalog/saleFormats';
+import { formatQuantityLabel, type CheaperWithMore, type FormatBundlePlan, type SaleFormatOption } from '@/lib/catalog/saleFormats';
 import { formatPrice } from '@/lib/utils/format';
 import { formatCount, unitPhrase, type SellingFormat } from './sellingFormat';
 
@@ -63,6 +63,18 @@ export function bundleCaption(plan: FormatBundlePlan | null, options: SaleFormat
     return `Encore ${formatCount(base, missing)} : les ${offer.units} à ${formatPrice(offer.price, currency)}`;
   }
   return 'dans le panier';
+}
+
+/**
+ * « Avec 1 paquet de plus : 117,70 € au lieu de 118,80 € » (même prix :
+ * « … pour le même prix »). Le client garde la main : le bouton propose
+ * « Passer à 50 paquets », rien n'est ajouté tout seul.
+ */
+export function cheaperWithMoreLine(hint: CheaperWithMore, currentTotal: number, base: SellingFormat, currency = 'EUR'): string {
+  const extra = formatCount(base, hint.extra);
+  return Math.round(hint.total * 100) < Math.round(currentTotal * 100)
+    ? `Avec ${extra} de plus : ${formatPrice(hint.total, currency)} au lieu de ${formatPrice(currentTotal, currency)}`
+    : `Avec ${extra} de plus : même prix, ${formatPrice(hint.total, currency)}`;
 }
 
 function lowerFirst(text: string): string {
