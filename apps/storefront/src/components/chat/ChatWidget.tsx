@@ -105,11 +105,25 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
   useEffect(() => {
     if (!enabled || !proactiveOffer || open || turns.length > 0) return;
     try { if (sessionStorage.getItem(SHOPPING_OFFER_STORAGE_KEY)) return; } catch { /* memory-only */ }
-    const timer = window.setTimeout(() => {
-      setOfferVisible(true);
-      try { sessionStorage.setItem(SHOPPING_OFFER_STORAGE_KEY, 'shown'); } catch { /* memory-only */ }
-    }, 8000);
-    return () => window.clearTimeout(timer);
+    // Proposée après 8 s SANS interaction (jamais au milieu d'un geste : choix
+    // d'un format, message d'erreur, fenêtre ouverte) ; chaque toucher, touche
+    // ou défilement relance l'attente.
+    let timer = 0;
+    const arm = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        if (document.querySelector('[aria-modal="true"]')) { arm(); return; }
+        setOfferVisible(true);
+        try { sessionStorage.setItem(SHOPPING_OFFER_STORAGE_KEY, 'shown'); } catch { /* memory-only */ }
+      }, 8000);
+    };
+    const events = ['pointerdown', 'keydown', 'scroll'] as const;
+    events.forEach((name) => window.addEventListener(name, arm, { passive: true }));
+    arm();
+    return () => {
+      window.clearTimeout(timer);
+      events.forEach((name) => window.removeEventListener(name, arm));
+    };
   }, [enabled, proactiveOffer, open, turns.length]);
 
   useEffect(() => {

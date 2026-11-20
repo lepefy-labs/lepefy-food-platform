@@ -14,7 +14,8 @@ import { buildCatalogUrl, catalogSearchHref } from '@/lib/catalog/catalogSearchU
 import { rememberShoppingReturn } from '@/lib/catalog/shoppingReturn';
 import { isCatalogSearchPath } from '@/lib/storefront/shopChrome';
 import { deriveAvailability } from '@/lib/storefrontCopy/availability';
-import { describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
+import { describePrice, formatCount, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
+import { useSmartQuickAdd } from '@/components/catalog/useSmartQuickAdd';
 import { useCatalogSearchStore } from '@/stores/catalogSearchStore';
 import { useProductSuggestions } from './useProductSuggestions';
 
@@ -310,6 +311,9 @@ function SuggestionRow({ id, product, active, onSelect }: {
   const minimum = product.min_order_quantity ?? 1;
   const availability = deriveAvailability({ stock: product.stock, minimum, step: product.order_quantity_step });
   const unavailable = availability === 'sold_out' || availability === 'below_minimum';
+  // Lecture seule (une option de liste ne contient pas de bouton) : offre lot et quantité déjà au panier.
+  const smart = useSmartQuickAdd(product, currency);
+  const inCartLabel = smart.inCart ? `✓ ${formatCount(resolveSellingFormat(product), smart.quantity)} dans le panier` : null;
 
   return (
     <li id={id} role="option" aria-selected={active} className={active ? 'bg-gray-50' : undefined}>
@@ -328,10 +332,13 @@ function SuggestionRow({ id, product, active, onSelect }: {
             {!unavailable && <PromoBadge product={product} size="sm" />}
             {unavailable
               ? <AvailabilityBadge state={availability} />
-              : minimum > 1 && (
-                <span className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-900">{minimum} minimum</span>
-              )}
+              : smart.offerLine
+                ? <span className="inline-flex items-center rounded-md border border-green-300 bg-green-50 px-1.5 py-0.5 text-xs font-bold text-green-900">{smart.offerLine}</span>
+                : minimum > 1 && (
+                  <span className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-900">{minimum} minimum</span>
+                )}
           </span>
+          {inCartLabel && <span className="mt-0.5 block text-xs font-semibold text-green-800">{inCartLabel}</span>}
         </span>
       </Link>
     </li>

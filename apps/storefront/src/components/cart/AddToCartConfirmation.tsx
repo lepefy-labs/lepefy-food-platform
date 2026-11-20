@@ -18,6 +18,10 @@ import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import { useCartLineQuantity } from '@/lib/cart/useCartLineQuantity';
 import { CartStepper } from './CartStepper';
 import { QuantityGroupChip } from './QuantityGroupChip';
+import { buildSaleFormatOptions } from '@/lib/catalog/saleFormats';
+import { useFormatUnits } from '@/lib/cart/useFormatUnits';
+import { bundleCaption } from '@/lib/storefrontCopy/saleFormatCopy';
+import { useSmartQuickAdd } from '@/components/catalog/useSmartQuickAdd';
 import { PromoBadge } from '@/components/catalog/PromoBadge';
 import { describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { AVAILABILITY_COPY } from '@/lib/storefrontCopy/availability';
@@ -44,9 +48,13 @@ function RecommendationItem({ product, onAdded, onClose }: {
   onClose: () => void;
 }) {
   const { currency } = useTenant();
-  const { addToCart, added, outOfStock, atLimit } = useQuickAdd(product, true);
-  const minOrderQuantity = product.min_order_quantity ?? 1;
-  const hasMinRule = minOrderQuantity > 1;
+  const { atLimit } = useQuickAdd(product, true);
+  // Une fois ajouté : le même +/− que le panier (plus de « Ajouté ✓ » qui
+  // redevient « Ajouter » et rajoute un exemplaire sans le dire).
+  const smart = useSmartQuickAdd(product, currency);
+  const outOfStock = smart.unavailable;
+  const minOrderQuantity = smart.firstAdd;
+  const hasMinRule = !smart.offerLine && minOrderQuantity > 1;
   const price = describePrice(product.price, resolveSellingFormat(product), currency);
   return (
     <li className="flex w-36 shrink-0 flex-col rounded-lg border border-gray-300 bg-white p-2 sm:w-auto sm:min-w-0">
@@ -64,14 +72,32 @@ function RecommendationItem({ product, onAdded, onClose }: {
             {minOrderQuantity} minimum
           </span>
         )}
+        {smart.offerLine && (
+          <span className="mt-1 inline-flex items-center rounded-md border border-green-300 bg-green-50 px-1.5 py-0.5 text-xs font-bold text-green-900">{smart.offerLine}</span>
+        )}
       </div>
+      {smart.inCart ? (
+        <CartStepper
+          variant="panel"
+          quantity={smart.quantity}
+          productName={product.name}
+          removesOnDecrement={smart.removesOnDecrement}
+          canIncrement={smart.canIncrement}
+          onIncrement={smart.increment}
+          onDecrement={() => { smart.decrement(); }}
+        />
+      ) : smart.needsChoice ? (
+        <Link href={`/products/${product.slug}`} onClick={onClose}
+          className={`${recommendationActionClass} text-white hover:opacity-90`} style={primary}>Choisir le format</Link>
+      ) : (
       <button type="button" disabled={outOfStock || atLimit} aria-disabled={atLimit || undefined}
         aria-label={atLimit ? `${product.name} : ${AVAILABILITY_COPY.atLimitHelp}` : hasMinRule ? `Ajouter ${minOrderQuantity} ${product.name}` : `Ajouter ${product.name}`}
         className={`${recommendationActionClass} text-white hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:!bg-gray-200 disabled:text-gray-700 disabled:opacity-100 aria-disabled:cursor-not-allowed`}
-        style={added ? { backgroundColor: '#16a34a' } : primary}
-        onClick={() => { if (addToCart()) onAdded(product.id); }}>
-        {added ? 'Ajouté ✓' : atLimit ? AVAILABILITY_COPY.atLimitCta : outOfStock ? AVAILABILITY_COPY.unavailableCta : hasMinRule ? `Ajouter ${minOrderQuantity}` : 'Ajouter'}
+        style={primary}
+        onClick={() => { if (smart.add()) onAdded(product.id); }}>
+        {atLimit ? AVAILABILITY_COPY.atLimitCta : outOfStock ? AVAILABILITY_COPY.unavailableCta : hasMinRule ? `Ajouter ${minOrderQuantity}` : 'Ajouter'}
       </button>
+      )}
     </li>
   );
 }
@@ -94,9 +120,15 @@ function ConfirmationPanel({ product, continueHref, onClose }: {
     product.order_quantity_step,
   );
 
+  // Fiche à formats (ajoutée par « Choisir le format ») : compteur en unités de base, recomposé au meilleur prix.
+  const formatOptions = buildSaleFormatOptions(product);
+  const multiFormat = formatOptions.length > 0;
+  const formatUnits = useFormatUnits(product, formatOptions);
+  const formatCaption = multiFormat ? bundleCaption(formatUnits.current, formatOptions, resolveSellingFormat(product), currency) : null;
+
   function decrement() {
     // Au minimum, «−» retire le produit : la confirmation n'a plus d'objet.
-    if (line.decrement() === 'removed') onClose();
+    if ((multiFormat ? formatUnits.decrement() : line.decrement()) === 'removed') onClose();
   }
   const [recommendations, setRecommendations] = useState<ProductCardProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,7 +184,7 @@ function ConfirmationPanel({ product, continueHref, onClose }: {
 
   const visible = recommendations.filter(p => addedHere.has(p.id) || !items.some(item => item.product.id === p.id));
   const minOrderQuantity = product.min_order_quantity ?? 1;
-  const hasMinRule = minOrderQuantity > 1;
+  const hasMinRule = !multiFormat && minOrderQuantity > 1;
   const price = describePrice(product.price, resolveSellingFormat(product), currency);
 
   function continueShopping() {
@@ -194,15 +226,18 @@ function ConfirmationPanel({ product, continueHref, onClose }: {
               <div className="mt-2">
                 <CartStepper
                   variant="panel"
-                  quantity={line.quantity}
+                  quantity={multiFormat ? formatUnits.units : line.quantity}
                   productName={product.name}
-                  removesOnDecrement={line.removesOnDecrement}
-                  canIncrement={line.canIncrement && line.quantity < maxStock}
-                  onIncrement={line.increment}
+                  removesOnDecrement={multiFormat ? formatUnits.removesOnDecrement : line.removesOnDecrement}
+                  canIncrement={multiFormat ? formatUnits.canIncrement : line.canIncrement && line.quantity < maxStock}
+                  onIncrement={multiFormat ? formatUnits.increment : line.increment}
                   onDecrement={decrement}
                   valueTestId="confirmation-quantity"
                 />
               </div>
+              {formatCaption && formatCaption !== 'dans le panier' && (
+                <p aria-live="polite" className="mt-1.5 text-sm font-semibold text-green-800">{formatCaption}</p>
+              )}
               {hasMinRule && line.quantity === minOrderQuantity && (
                 <p role="status" className="mt-1.5 text-sm font-semibold text-gray-800">Minimum de {minOrderQuantity} ajouté.</p>
               )}

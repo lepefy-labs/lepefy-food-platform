@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { IconArrowRight, IconLoader2, IconPhoto, IconPlus, IconRefresh, IconSearch, IconX } from '@tabler/icons-react';
 import type { ProductCardProduct } from '@/components/catalog/ProductCard';
 import { useQuickAdd } from '@/components/catalog/useQuickAdd';
+import { useSmartQuickAdd } from '@/components/catalog/useSmartQuickAdd';
 import { AvailabilityBadge } from '@/components/catalog/AvailabilityBadge';
 import { PromoBadge } from '@/components/catalog/PromoBadge';
 import { LepefyImage } from '@/components/images/LepefyImage';
@@ -12,7 +13,6 @@ import { useProductSuggestions } from '@/components/search/useProductSuggestions
 import { useVirtualKeyboard } from '@/hooks/useVirtualKeyboard';
 import { catalogSearchHref } from '@/lib/catalog/catalogSearchUrl';
 import { rememberShoppingReturn } from '@/lib/catalog/shoppingReturn';
-import { useCartLineQuantity } from '@/lib/cart/useCartLineQuantity';
 import { describePrice, formatCount, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import { useTenant } from '@/providers/TenantProvider';
@@ -265,17 +265,18 @@ function CartSearchResult({ product, currency, onOpen, onAdded, onDecrement }: {
   onAdded: (count: string) => void;
   onDecrement: (productId: string) => void;
 }) {
-  const { addToCart, atLimit, availability } = useQuickAdd(product, true);
+  // Fiche à formats : unités de base et regroupement au meilleur prix, comme la card.
+  const smart = useSmartQuickAdd(product, currency);
+  const { availability } = useQuickAdd(product, true);
   // Texte du bouton lisible sur blanc quelle que soit la couleur du tenant.
   const accent = accentTextOnWhite(useTenant().primary_color);
-  const line = useCartLineQuantity(product.id);
   const actionRef = useRef<HTMLDivElement>(null);
   const focusStepperAfterAdd = useRef(false);
   const format = resolveSellingFormat(product);
   const price = describePrice(product.price, format, currency);
-  const minimum = product.min_order_quantity ?? 1;
-  const unavailable = availability === 'sold_out' || availability === 'below_minimum';
-  const inCart = line.quantity > 0;
+  const minimum = smart.firstAdd;
+  const unavailable = smart.unavailable;
+  const inCart = smart.inCart;
   const href = `/products/${product.slug}`;
 
   // « Ajouter » laisse place au +/− : le focus clavier suit sur le «+».
@@ -287,9 +288,15 @@ function CartSearchResult({ product, currency, onOpen, onAdded, onDecrement }: {
   }, [inCart]);
 
   function add() {
-    if (!addToCart()) return;
+    if (!smart.add()) return;
     focusStepperAfterAdd.current = true;
     onAdded(formatCount(format, minimum));
+  }
+
+  function decrement() {
+    // Dernière unité : même chemin que les lignes du panier (retrait avec annulation).
+    if (smart.removesOnDecrement) onDecrement(smart.lastLineId);
+    else smart.decrement();
   }
 
   return (
@@ -310,21 +317,29 @@ function CartSearchResult({ product, currency, onOpen, onAdded, onDecrement }: {
           {!unavailable && <PromoBadge product={product} size="sm" />}
           {unavailable
             ? <AvailabilityBadge state={availability} />
-            : minimum > 1 && !inCart && (
-              <span className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-900">{minimum} minimum</span>
-            )}
+            : smart.offerLine
+              ? <span className="inline-flex items-center rounded-md border border-green-300 bg-green-50 px-1.5 py-0.5 text-xs font-bold text-green-900">{smart.offerLine}</span>
+              : minimum > 1 && !inCart && (
+                <span className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-900">{minimum} minimum</span>
+              )}
         </p>
       </div>
       <div ref={actionRef} className="shrink-0">
         {unavailable ? null : inCart ? (
           <CartStepper
-            quantity={line.quantity}
+            quantity={smart.quantity}
             productName={product.name}
-            removesOnDecrement={line.removesOnDecrement}
-            canIncrement={line.canIncrement && !atLimit}
-            onIncrement={line.increment}
-            onDecrement={() => onDecrement(product.id)}
+            removesOnDecrement={smart.removesOnDecrement}
+            canIncrement={smart.canIncrement}
+            onIncrement={smart.increment}
+            onDecrement={decrement}
           />
+        ) : smart.needsChoice ? (
+          <Link href={href} onClick={onOpen}
+            className="inline-flex min-h-11 items-center rounded-xl border-2 border-[var(--color-primary)] bg-white px-3 text-sm font-bold"
+            style={{ color: accent }}>
+            Choisir
+          </Link>
         ) : (
           <button
             type="button"

@@ -414,6 +414,8 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             const added = formatUnits.addUnits(option.units * option.minimum);
             if (added) {
               focusStepperAfterAdd.current = true;
+              // Même confirmation qu'un ajout direct (« Voir mon panier », suggestions).
+              if (confirmOnAdd) showConfirmation(product);
               onAdded?.(product);
             }
             return added;
