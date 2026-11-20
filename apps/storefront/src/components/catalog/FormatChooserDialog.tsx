@@ -32,9 +32,11 @@ export function FormatChooserDialog({ open, product, options, onClose, onAddUnit
   const { currency } = useTenant();
   const panelRef = useRef<HTMLDivElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Bouton toujours actif : sans format choisi, il le dit et ramène au choix.
+  const [prompt, setPrompt] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  useEffect(() => { if (!open) setSelectedId(null); }, [open]);
+  useEffect(() => { if (!open) { setSelectedId(null); setPrompt(false); } }, [open]);
   useFocusTrap(panelRef, open, onClose);
 
   if (!open || !mounted) return null;
@@ -42,7 +44,11 @@ export function FormatChooserDialog({ open, product, options, onClose, onAddUnit
   const selected = options.find((option) => option.id === selectedId) ?? null;
 
   function add() {
-    if (!selected || !selected.purchasable) return;
+    if (!selected || !selected.purchasable) {
+      setPrompt(true);
+      panelRef.current?.querySelector<HTMLInputElement>('input[type="radio"]:not([disabled])')?.focus();
+      return;
+    }
     if (onAddUnits(selected)) onClose();
   }
 
@@ -70,23 +76,27 @@ export function FormatChooserDialog({ open, product, options, onClose, onAddUnit
         <SaleFormatPicker
           options={options}
           value={selectedId}
-          onChange={setSelectedId}
+          onChange={(id) => { setSelectedId(id); setPrompt(false); }}
           currency={currency}
           baseFormat={sellingFormat}
           unitContent={contentLabel(sellingFormat) ?? product.net_quantity_display ?? null}
           legend="Format"
           compact
         />
+        {prompt && (
+          <p role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">
+            Choisissez d’abord un format ci-dessus.
+          </p>
+        )}
         <button
           type="button"
           onClick={add}
-          disabled={!selected || !selected.purchasable}
-          className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:!bg-gray-200 disabled:text-gray-800"
+          className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl px-4 text-sm font-bold text-white"
           style={{ backgroundColor: 'var(--color-primary)' }}
         >
           {selected
             ? `Ajouter ${formatQuantityLabel(selected.label, selected.minimum)} · ${formatPrice(selected.price * selected.minimum, currency)}`
-            : 'Choisissez un format'}
+            : 'Ajouter au panier'}
         </button>
       </div>
     </div>,
