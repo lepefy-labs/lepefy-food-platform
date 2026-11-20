@@ -87,7 +87,7 @@ test('automatic bundling: the customer counts packs, the cart picks the cheapest
   expect(shape(6)).toEqual([['lot', 2]]);
   expect(planFormatBundle(4, options)!.total).toBe(13.5);
   expect(planFormatBundle(4, options)!.savings).toBe(0.5);
-  expect(describeBundle(planFormatBundle(7, options)!)).toBe('1 paquet + 2 lots de 3 paquets');
+  expect(describeBundle(planFormatBundle(7, options)!)).toBe('2 lots de 3 paquets + 1 paquet');
   expect(planFormatBundle(0, options)).toEqual({ units: 0, lines: [], total: 0, savings: 0 });
   // A lot that saves nothing is never imposed (equal cost keeps singles).
   expect(planFormatBundle(3, buildSaleFormatOptions(ndole(291, { price: 10.5 })))!.lines.map((l) => l.option.id)).toEqual(['base']);

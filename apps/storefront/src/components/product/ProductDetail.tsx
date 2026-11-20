@@ -32,7 +32,7 @@ import { IconBuildingStore, IconCircleOff, IconHourglassHigh, IconTruck, IconTru
 import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { productFulfillmentHint } from '@/lib/storefrontCopy/fulfillmentCopy';
 import type { ProductWithCategory } from '@lepefy/types';
-import { buildSaleFormatOptions, formatQuantityLabel, type SaleFormatRow } from '@/lib/catalog/saleFormats';
+import { buildSaleFormatOptions, describeBundle, planFormatBundle, type SaleFormatRow } from '@/lib/catalog/saleFormats';
 import { useFormatUnits } from '@/lib/cart/useFormatUnits';
 import { bundleCaption, saleFormatOfferLine } from '@/lib/storefrontCopy/saleFormatCopy';
 import { SaleFormatPicker } from './SaleFormatPicker';
@@ -56,8 +56,14 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
   const [selectedFormatId, setSelectedFormatId] = useState<string | null>(null);
   const selectedFormat = formatOptions.find((option) => option.id === selectedFormatId) ?? null;
   const anyFormatPurchasable = formatOptions.some((option) => option.purchasable);
-  const minOrderQuantity = selectedFormat?.minimum ?? product.min_order_quantity ?? 1;
-  const orderQuantityStep = selectedFormat?.step ?? product.order_quantity_step ?? 1;
+  // Regroupement automatique (187 v2) : un seul compteur en unités de base pour
+  // toute la fiche. Avant l'ajout aussi, « Quantité » compte des paquets : le
+  // format choisi ne fait que fixer le point de départ (1 ou 3) et le format
+  // surligné suit la combinaison la moins chère (3 paquets → le lot).
+  const formatParent = { ...product, fulfillment_policy: normalizeFulfillmentPolicy(product.fulfillment_policy) };
+  const formatUnits = useFormatUnits(formatParent, formatOptions);
+  const minOrderQuantity = multiFormat ? 1 : product.min_order_quantity ?? 1;
+  const orderQuantityStep = multiFormat ? 1 : product.order_quantity_step ?? 1;
   const [quantity, setQuantity] = useState(minOrderQuantity);
   // « ✓ Ajouté » : retour bref sur le bouton uniquement. Les actions de
   // navigation vivent dans la confirmation partagée et dans la ligne « dans
@@ -66,10 +72,11 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
   const justAddedTimer = useRef<ReturnType<typeof setTimeout>>();
   const showConfirmation = useAddToCartUiStore((s) => s.show);
   const [returnToResults, setReturnToResults] = useState(false);
-  const line = useCartLineQuantity(selectedFormat?.id ?? product.id);
-  const inCartQuantity = multiFormat && !selectedFormat ? 0 : line.quantity;
+  const line = useCartLineQuantity(product.id);
+  const inCartQuantity = multiFormat ? 0 : line.quantity;
+  // Plusieurs formats : unités encore ajoutables (stock partagé moins le panier).
   const maxPurchasable = multiFormat
-    ? selectedFormat?.maxPurchasable ?? (anyFormatPurchasable ? 1 : 0)
+    ? (anyFormatPurchasable ? Math.max(0, formatUnits.maxUnits - formatUnits.units) : 0)
     : getMaximumValidQuantity(product.stock, minOrderQuantity, orderQuantityStep);
   const outOfStock = maxPurchasable === 0;
   // Plusieurs formats : épuisé seulement si aucun format n'est achetable ; avant
@@ -78,18 +85,21 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
     ? deriveAvailability({ stock: product.stock, minimum: minOrderQuantity, step: orderQuantityStep, maxPurchasable })
     : !anyFormatPurchasable
       ? deriveAvailability({ stock: 0, minimum: 1, step: 1, maxPurchasable: 0 })
-      : selectedFormat
-        ? deriveAvailability({ stock: selectedFormat.stock, minimum: selectedFormat.minimum, step: selectedFormat.step, maxPurchasable: selectedFormat.maxPurchasable })
-        : deriveAvailability({ stock: Number.MAX_SAFE_INTEGER, minimum: 1, step: 1, maxPurchasable: Number.MAX_SAFE_INTEGER });
+      : deriveAvailability({ stock: Number.MAX_SAFE_INTEGER, minimum: 1, step: 1, maxPurchasable: Number.MAX_SAFE_INTEGER });
   const sellingFormat = resolveSellingFormat(product);
-  const unitPrice = selectedFormat?.price ?? product.price;
-  const totalPrice = unitPrice * quantity;
+  // Ce qui est en train d'être choisi (avant l'ajout) : combinaison des paquets
+  // demandés, et ce que l'ajout coûte vraiment une fois recomposé avec le panier.
+  const pickPlan = multiFormat && selectedFormat ? planFormatBundle(quantity, formatOptions) : null;
+  const afterAddPlan = multiFormat && selectedFormat ? planFormatBundle(formatUnits.units + quantity, formatOptions) : null;
+  const highlightedFormatId = multiFormat && pickPlan
+    ? ([...pickPlan.lines].sort((a, b) => b.option.units - a.option.units)[0]?.option.id ?? selectedFormatId)
+    : selectedFormatId;
+  const unitPrice = product.price;
+  const totalPrice = multiFormat
+    ? Math.max(0, Math.round(((afterAddPlan?.total ?? 0) - (formatUnits.current?.total ?? 0)) * 100) / 100)
+    : unitPrice * quantity;
   const needsFormatChoice = multiFormat && !selectedFormat;
-  const countLabel = (count: number) => selectedFormat ? formatQuantityLabel(selectedFormat.label, count) : formatCount(sellingFormat, count);
-  // Regroupement automatique (187 v2) : une fois dans le panier, un seul
-  // compteur en unités de base pour toute la fiche, recomposé par le panier.
-  const formatParent = { ...product, fulfillment_policy: normalizeFulfillmentPolicy(product.fulfillment_policy) };
-  const formatUnits = useFormatUnits(formatParent, formatOptions);
+  const countLabel = (count: number) => formatCount(sellingFormat, count);
   const offerLine = multiFormat ? saleFormatOfferLine(formatOptions, currency) : null;
   const group = groups.find((entry) => entry.productIds.includes(product.id));
   const groupQuantity = group
@@ -102,8 +112,8 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
   const groupProgress = group && groupState
     ? groupProgressCopy(group.name, groupQuantity, groupState.nextValidQuantity, group.min_quantity)
     : null;
-  // Encadré « Achetez N minimum » : règle de la fiche, ou du format de base choisi.
-  const hasIndividualRule = (!multiFormat || Boolean(selectedFormat?.isBase)) && (minOrderQuantity > 1 || orderQuantityStep > 1);
+  // Encadré « Achetez N minimum » : produits à format unique seulement.
+  const hasIndividualRule = !multiFormat && (minOrderQuantity > 1 || orderQuantityStep > 1);
   const quantityLabel = countLabel(quantity);
   const explicitQuantityLabel = `Ajouter ${quantityLabel}`;
   const ruleStepLine = stepLine(minOrderQuantity, orderQuantityStep);
@@ -134,14 +144,15 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
     const option = formatOptions.find((entry) => entry.id === id);
     if (!option) return;
     setSelectedFormatId(id);
-    setQuantity(option.minimum);
+    // Point de départ en unités de base : 1 paquet → 1, lot de 3 → 3.
+    setQuantity(Math.max(1, Math.min(option.units * option.minimum, Math.max(1, maxPurchasable))));
   }
 
   function handleAddToCart() {
     if (needsFormatChoice || outOfStock || quantity > maxPurchasable) return;
     if (selectedFormat) {
       // Le format choisi dit combien d'unités ajouter ; le panier choisit la combinaison.
-      if (!formatUnits.addUnits(selectedFormat.units * quantity)) return;
+      if (!formatUnits.addUnits(quantity)) return;
       clearTimeout(justAddedTimer.current);
       setJustAdded(true);
       justAddedTimer.current = setTimeout(() => setJustAdded(false), 1200);
@@ -266,14 +277,21 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
             <section aria-label="Choix du format" className="grid gap-2">
               <SaleFormatPicker
                 options={formatOptions}
-                value={selectedFormatId}
+                value={highlightedFormatId}
                 onChange={chooseFormat}
                 currency={currency}
                 baseFormat={sellingFormat}
                 unitContent={contentLabel(sellingFormat) ?? product.net_quantity_display}
               />
+              {pickPlan && (
+                <p role="status" aria-live="polite" className="text-sm text-gray-900">
+                  <span className="font-semibold">{cartUnitsLabel(quantity)}</span>
+                  {pickPlan.lines.some((pickLine) => !pickLine.option.isBase) ? ` = ${describeBundle(pickPlan)}` : ''}
+                  {pickPlan.savings > 0 ? <span className="font-semibold text-green-800"> · −{formatPrice(pickPlan.savings, currency)}</span> : null}
+                </p>
+              )}
               {formatUnits.units > 0 && selectedFormat && (
-                <p role="status" className="text-sm text-gray-800">
+                <p className="text-sm text-gray-700">
                   Déjà dans votre panier : <span className="font-semibold">{cartUnitsLabel(formatUnits.units)}</span>. Le panier fait les lots tout seul.
                 </p>
               )}

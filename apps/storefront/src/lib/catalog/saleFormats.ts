@@ -251,7 +251,10 @@ export function maxBundleUnits(options: SaleFormatOption[], ceiling = 999): numb
 
 /** « 1 lot de 3 + 1 paquet » : composition lisible d'un plan. */
 export function describeBundle(plan: FormatBundlePlan): string {
-  return plan.lines.map((line) => formatQuantityLabel(line.option.label, line.quantity)).join(' + ');
+  // Les lots d'abord (« 1 lot de 3 paquets + 1 paquet »), du plus grand au plus petit.
+  return [...plan.lines]
+    .sort((a, b) => b.option.units - a.option.units)
+    .map((line) => formatQuantityLabel(line.option.label, line.quantity)).join(' + ');
 }
 
 /** « 1 lot de 3 paquets », « 2 paquets » : quantité + libellé du format, sans ambiguïté. */
