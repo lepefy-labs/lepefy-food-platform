@@ -7,6 +7,24 @@ import { buildSaleFormatOptions, planFormatBundle, type SaleFormatOption } from 
 import type { FormatParentForCart } from './saleFormatCart';
 import { setFormatUnits } from './useFormatUnits';
 
+const MAX_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 1500;
+
+export interface CartFormatGroupsState {
+  groups: Map<string, CartFormatGroup>;
+  /**
+   * Formats pas encore lus : les lignes déjà marquées comme formats (lot,
+   * format de base) ne doivent pas offrir de +/− par ligne, sinon un « + »
+   * sur un lot ajouterait un lot entier au lieu d'un paquet.
+   */
+  pending: boolean;
+}
+
+/** Ligne d'un format connu (lot ou format de base) : regroupée dès que les formats sont lus. */
+export function isKnownFormatLine(item: CartItem): boolean {
+  return Boolean(item.product.format_parent_id || item.product.format_label);
+}
+
 export interface CartFormatGroup {
   parent: FormatParentForCart & ProductFormatsResponse['products'][number];
   options: SaleFormatOption[];
@@ -27,31 +45,43 @@ export interface CartFormatGroup {
 export function useCartFormatGroups(
   items: CartItem[],
   { enabled = true, onlyKnownFormats = false, normalize = false }: { enabled?: boolean; onlyKnownFormats?: boolean; normalize?: boolean } = {},
-): Map<string, CartFormatGroup> {
+): CartFormatGroupsState {
   const parentIds = useMemo(() => Array.from(new Set(items
     .filter((item) => !onlyKnownFormats || item.product.format_parent_id || item.product.format_label)
     .map((item) => item.product.format_parent_id ?? item.product.id)
     .filter((id): id is string => Boolean(id)))).sort().slice(0, 50).join(','), [items, onlyKnownFormats]);
   const [fresh, setFresh] = useState<{ key: string; products: ProductFormatsResponse['products'] } | null>(null);
   const normalized = useRef(new Set<string>());
+  const [attempt, setAttempt] = useState(0);
+  const [gaveUp, setGaveUp] = useState<string | null>(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
 
   useEffect(() => {
     if (!enabled || !parentIds) return;
-    if (fresh?.key === parentIds) return;
+    if (fresh?.key === parentIds || gaveUp === parentIds) return;
     const controller = new AbortController();
-    fetch(`/api/products/formats?ids=${encodeURIComponent(parentIds)}`, { signal: controller.signal })
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    // Échec ou réponse vide alors qu'un format est au panier : nouvel essai (3 au plus),
+    // puis lignes séparées comme avant (jamais bloquées indéfiniment).
+    const failed = () => {
+      if (controller.signal.aborted) return;
+      if (attempt + 1 < MAX_ATTEMPTS) retry = setTimeout(() => setAttempt((value) => value + 1), RETRY_DELAY_MS);
+      else setGaveUp(parentIds);
+    };
+    fetch(`/api/products/formats?ids=${encodeURIComponent(parentIds)}`, { signal: controller.signal, cache: 'no-store' })
       .then(async (res) => (res.ok ? res.json() as Promise<ProductFormatsResponse> : null))
       .then((data) => {
-        if (!data || controller.signal.aborted) return;
-        // Réponse vide alors qu'un lot est déjà au panier : jamais retenue (nouvel essai à la prochaine ouverture).
-        if ((data.products ?? []).length === 0 && itemsRef.current.some((item) => item.product.format_parent_id)) return;
+        if (controller.signal.aborted) return;
+        if (!data || ((data.products ?? []).length === 0 && itemsRef.current.some((item) => item.product.format_parent_id))) {
+          failed();
+          return;
+        }
         setFresh({ key: parentIds, products: data.products ?? [] });
       })
-      .catch(() => { /* Sans données fraîches : lignes séparées, comme avant. */ });
-    return () => controller.abort();
-  }, [enabled, parentIds, fresh?.key]);
+      .catch(failed);
+    return () => { controller.abort(); if (retry) clearTimeout(retry); };
+  }, [enabled, parentIds, fresh?.key, attempt, gaveUp]);
 
   const groups = useMemo(() => {
     const map = new Map<string, CartFormatGroup>();
@@ -78,5 +108,7 @@ export function useCartFormatGroups(
     }
   }, [groups, items, normalize]);
 
-  return groups;
+  const pending = Boolean(enabled && parentIds && fresh?.key !== parentIds && gaveUp !== parentIds
+    && items.some(isKnownFormatLine));
+  return { groups, pending };
 }

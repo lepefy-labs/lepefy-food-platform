@@ -67,10 +67,11 @@ async function rehydrateItems(
   const productIds = [...new Set(rawItems.map((i) => i.product_id))];
   const { data: dbProducts, error: productsError } = await supabase
     .from('products')
-    .select(`id, name, slug, price, storage_type, stock, image_url, weight_grams, active, min_order_quantity, order_quantity_step, fulfillment_policy, ${PRODUCT_SELLING_FORMAT_COLUMNS}`)
+    .select(`id, name, slug, price, storage_type, stock, image_url, weight_grams, active, min_order_quantity, order_quantity_step, fulfillment_policy, ${PRODUCT_SELLING_FORMAT_COLUMNS}, format_parent_id, units_per_sale, format_label, format_stock_mode`)
     .eq('tenant_id', tenantId)
     .in('id', productIds) as {
-      data: Array<Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'storage_type' | 'stock' | 'image_url' | 'weight_grams' | 'active' | 'min_order_quantity' | 'order_quantity_step' | 'net_quantity_display' | 'sale_unit' | 'net_content_value' | 'net_content_unit' | 'pack_count' | 'fulfillment_policy'>> | null;
+      data: Array<Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'storage_type' | 'stock' | 'image_url' | 'weight_grams' | 'active' | 'min_order_quantity' | 'order_quantity_step' | 'net_quantity_display' | 'sale_unit' | 'net_content_value' | 'net_content_unit' | 'pack_count' | 'fulfillment_policy'
+        | 'format_parent_id' | 'units_per_sale' | 'format_label' | 'format_stock_mode'>> | null;
       error: unknown;
     };
 
@@ -100,6 +101,12 @@ async function rehydrateItems(
         net_content_unit:     p.net_content_unit,
         pack_count:           p.pack_count,
         fulfillment_policy:   p.fulfillment_policy,
+        // Formats de vente (187) : sans ces champs, le panier synchronisé ne
+        // reconnaît plus un lot (+ = un lot entier, compteur faux).
+        format_parent_id:     p.format_parent_id ?? null,
+        units_per_sale:       p.units_per_sale ?? 1,
+        format_label:         p.format_label ?? null,
+        format_stock_mode:    p.format_stock_mode ?? 'shared',
       },
       // Do not clamp to raw stock: 12 -> 10 would invent an off-step quantity
       // for min=4/step=4. Preserve the customer's stored intent, expose the

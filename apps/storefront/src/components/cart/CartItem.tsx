@@ -24,6 +24,8 @@ interface CartItemProps {
   variant?: 'drawer' | 'page';
   /** Mode de réception lu frais (panier) : seul un mode imposé est affiché. */
   fulfillmentPolicy?: ProductFulfillmentPolicy;
+  /** Formats de vente pas encore lus : +/− bloqués le temps du regroupement (jamais un lot entier par erreur). */
+  locked?: boolean;
 }
 
 
@@ -38,6 +40,7 @@ export function CartItem({
   onAdjust,
   variant = 'drawer',
   fulfillmentPolicy,
+  locked = false,
 }: CartItemProps) {
   const { product, quantity } = item;
   const state = deriveCartItemState({
@@ -95,7 +98,7 @@ export function CartItem({
         productName={formatLabel ? `${displayName}, ${formatLabel}` : product.name}
         removesOnDecrement={removesOnDecrement}
         canIncrement={!blocked && canIncrement && quantity < maxPurchasable}
-        disabled={state === 'unavailable'}
+        disabled={state === 'unavailable' || locked}
         onIncrement={() => onIncrement(product.id)}
         onDecrement={() => onDecrement(product.id)}
       />
@@ -156,6 +159,7 @@ export function CartItem({
               productName={formatLabel ? `${displayName}, ${formatLabel}` : product.name}
               removesOnDecrement={removeOnly || removesOnDecrement}
               canIncrement={!blocked && canIncrement && quantity < maxPurchasable}
+              disabled={locked}
               onIncrement={() => onIncrement(product.id)}
               onDecrement={() => (removeOnly ? onRemove(product.id) : onDecrement(product.id))}
             />

@@ -195,6 +195,14 @@ export const useCartStore = create<CartState>()(
       applyFormatPlan(targets, ids) {
         // Baisses d'abord, puis hausses : jamais plus d'unités que le plan, même un instant.
         const wanted = new Map(targets.map((target) => [target.product.id, target]));
+        // Données fraîches du format (libellé, unités par vente, prix, stock) sur les lignes
+        // déjà présentes : un panier enregistré avant reste ainsi reconnu comme un format.
+        set((state) => ({
+          items: state.items.map((item) => {
+            const target = wanted.get(item.product.id);
+            return target ? { ...item, product: { ...item.product, ...target.product } } : item;
+          }),
+        }));
         for (const id of ids) {
           const target = wanted.get(id)?.quantity ?? 0;
           const existing = get().items.find((item) => item.product.id === id);

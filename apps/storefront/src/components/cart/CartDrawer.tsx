@@ -19,7 +19,7 @@ import { CartDrawerFooter } from './CartDrawerFooter';
 import { CartDrawerEmpty } from './CartDrawerEmpty';
 import { CartItem } from './CartItem';
 import { CartFormatGroupItem } from './CartFormatGroupItem';
-import { useCartFormatGroups } from '@/lib/cart/useCartFormatGroups';
+import { isKnownFormatLine, useCartFormatGroups } from '@/lib/cart/useCartFormatGroups';
 import { CartUndoToast } from './CartUndoToast';
 import { QuantityGroupProgress } from './QuantityGroupProgress';
 import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
@@ -63,8 +63,9 @@ export function CartDrawer() {
   // Monté sur toutes les pages : les règles ne sont demandées qu'à l'ouverture d'un panier non vide.
   const { groups: quantityGroups, loading: groupsLoading, error: groupsError } = useQuantityGroups({ enabled: isOpen && !isEmpty });
 
-  // Formats de vente (187) : une ligne par fiche ; lu seulement à l'ouverture, pour les lignes déjà marquées comme formats.
-  const formatGroups = useCartFormatGroups(items, { enabled: isOpen && !isEmpty, onlyKnownFormats: true });
+  // Formats de vente (187) : une ligne par fiche ; une seule lecture à l'ouverture (toutes les lignes :
+  // un panier enregistré avant la synchronisation des champs de format doit aussi être regroupé).
+  const { groups: formatGroups, pending: formatsPending } = useCartFormatGroups(items, { enabled: isOpen && !isEmpty });
   const renderedGroups = new Set<string>();
 
   const panelRef = useRef<HTMLDivElement>(null);
@@ -174,6 +175,7 @@ export function CartDrawer() {
                   onDecrement={handleDecrement}
                   onRemove={handleRemove}
                   onAdjust={updateQuantity}
+                  locked={formatsPending && isKnownFormatLine(item)}
                 />
                 );
               })}

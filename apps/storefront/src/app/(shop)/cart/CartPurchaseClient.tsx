@@ -25,7 +25,7 @@ import { decrementRemovesLine, getMaximumValidQuantity } from '@/lib/purchaseQua
 import { useCartStore } from '@/stores/cartStore';
 import { useHasMounted } from '@/hooks/useHasMounted';
 import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
-import { useCartFormatGroups } from '@/lib/cart/useCartFormatGroups';
+import { isKnownFormatLine, useCartFormatGroups } from '@/lib/cart/useCartFormatGroups';
 import { CartFormatGroupItem } from '@/components/cart/CartFormatGroupItem';
 import { ACTION_COPY, SUMMARY_COPY, productsPriceLabel } from '@/lib/storefrontCopy/copy';
 import type { CartItem as CartItemType, PublicTenant } from '@lepefy/types';
@@ -59,7 +59,7 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
   } = useCartPurchaseGate(items);
   // Formats de vente (187) : une ligne par fiche, en unités de base, recomposée
   // automatiquement ; un panier enregistré avant est recomposé une fois au meilleur prix.
-  const formatGroups = useCartFormatGroups(items, { normalize: true });
+  const { groups: formatGroups, pending: formatsPending } = useCartFormatGroups(items, { normalize: true });
   const renderedGroups = new Set<string>();
   // Une seule estimation pour la page : barre mobile, récapitulatifs et « Ça rentre dans votre colis ».
   const { estimate: shippingEstimate, settled: estimateSettled, chooseCountry } = useShippingEstimate();
@@ -199,6 +199,7 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
                     onDecrement={decrement}
                     onRemove={remove}
                     onAdjust={updateQuantity}
+                    locked={formatsPending && isKnownFormatLine(item)}
                   />
                   );
                 })}

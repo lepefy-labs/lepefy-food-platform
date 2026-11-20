@@ -40,13 +40,20 @@ export async function GET(request: Request) {
 
   try {
     const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
-    const { data, error } = await createPublicClient()
+    const client = createPublicClient();
+    // Un panier enregistré peut ne connaître que l'id d'un lot : on remonte à sa fiche.
+    const { data: rows, error: rowsError } = await client.from('products').select('id, format_parent_id')
+      .eq('tenant_id', tenant.id).in('id', ids) as { data: Array<{ id: string; format_parent_id: string | null }> | null; error: unknown };
+    if (rowsError || !rows) throw rowsError ?? new Error('formats_lookup_failed');
+    const parentIds = [...new Set(rows.map((row) => row.format_parent_id ?? row.id))];
+    if (parentIds.length === 0) return NextResponse.json({ products: [] } satisfies ProductFormatsResponse, { headers: { 'Cache-Control': 'no-store' } });
+    const { data, error } = await client
       .from('products')
       .select(`id, name, slug, price, compare_at_price, stock, active, image_url, storage_type, fulfillment_policy, weight_grams, min_order_quantity, order_quantity_step, ${PRODUCT_SELLING_FORMAT_COLUMNS}, ${PRODUCT_SALE_FORMAT_COLUMNS}`)
       .eq('tenant_id', tenant.id)
       .eq('active', true)
       .is('format_parent_id', null)
-      .in('id', ids);
+      .in('id', parentIds);
     if (error || !data) throw error ?? new Error('formats_lookup_failed');
     // Seules les fiches qui ont au moins un format actif intéressent le panier.
     const products = (data as unknown as ProductFormatsResponse['products']).filter((row) => (row.formats?.length ?? 0) > 0);

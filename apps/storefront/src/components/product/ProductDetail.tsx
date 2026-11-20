@@ -95,9 +95,9 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
     ? ([...pickPlan.lines].sort((a, b) => b.option.units - a.option.units)[0]?.option.id ?? selectedFormatId)
     : selectedFormatId;
   const unitPrice = product.price;
-  const totalPrice = multiFormat
-    ? Math.max(0, Math.round(((afterAddPlan?.total ?? 0) - (formatUnits.current?.total ?? 0)) * 100) / 100)
-    : unitPrice * quantity;
+  // Le bouton annonce le prix des paquets choisis eux-mêmes (2 paquets = 2 × le
+  // prix du paquet) ; l'effet sur le panier (regroupement en lot) est dit à part.
+  const totalPrice = multiFormat ? pickPlan?.total ?? 0 : unitPrice * quantity;
   const needsFormatChoice = multiFormat && !selectedFormat;
   // Bouton d'ajout toujours actif : sans format choisi, il explique quoi faire
   // et ramène au choix (jamais un bouton grisé sans explication).
@@ -319,9 +319,12 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
                   {pickPlan.savings > 0 ? <span className="font-semibold text-green-800"> · −{formatPrice(pickPlan.savings, currency)}</span> : null}
                 </p>
               )}
-              {formatUnits.units > 0 && selectedFormat && (
+              {formatUnits.units > 0 && selectedFormat && afterAddPlan && (
                 <p className="text-sm text-gray-700">
-                  Déjà dans votre panier : <span className="font-semibold">{cartUnitsLabel(formatUnits.units)}</span>. Le panier fait les lots tout seul.
+                  Déjà dans votre panier : <span className="font-semibold">{cartUnitsLabel(formatUnits.units)}</span>.
+                  {' '}Après l’ajout : <span className="font-semibold">{cartUnitsLabel(afterAddPlan.units)}</span>
+                  {afterAddPlan.lines.some((planLine) => !planLine.option.isBase) ? ` = ${describeBundle(afterAddPlan)}` : ''}
+                  {' '}· <span className="font-semibold">{formatPrice(afterAddPlan.total, currency)}</span> au total.
                 </p>
               )}
             </section>
