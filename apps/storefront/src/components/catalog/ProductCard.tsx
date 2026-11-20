@@ -21,6 +21,7 @@ import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy'
 import { hasValidPromotion } from '@/lib/catalog/promotions';
 import { useCartLineQuantity } from '@/lib/cart/useCartLineQuantity';
 import { CartStepper } from '@/components/cart/CartStepper';
+import { QuantityGroupChip } from '@/components/cart/QuantityGroupChip';
 import { PromoBadge } from './PromoBadge';
 import { NoveltyBadge } from './NoveltyBadge';
 import { promotionEndLabel } from '@/lib/catalog/promotions';
@@ -337,6 +338,8 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
                 {saleFormatCardChip(formatOptions, currency)}
               </p>
             ))}
+            {/* Groupe à mélanger (ex. Boissons, 12 minimum tous produits confondus). */}
+            {!merchandise && !unavailable && <QuantityGroupChip productId={product.id} className="mt-2" />}
             {!merchandise && !multiFormat && availability === 'below_minimum' && (
               <p className="mt-2 text-xs leading-snug text-gray-700">{belowMinimumDetail(minOrderQuantity)}</p>
             )}

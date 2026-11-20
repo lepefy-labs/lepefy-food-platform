@@ -17,6 +17,7 @@ import { formatPrice } from '@/lib/utils/format';
 import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import { useCartLineQuantity } from '@/lib/cart/useCartLineQuantity';
 import { CartStepper } from './CartStepper';
+import { QuantityGroupChip } from './QuantityGroupChip';
 import { PromoBadge } from '@/components/catalog/PromoBadge';
 import { describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { AVAILABILITY_COPY } from '@/lib/storefrontCopy/availability';
@@ -205,6 +206,7 @@ function ConfirmationPanel({ product, continueHref, onClose }: {
               {hasMinRule && line.quantity === minOrderQuantity && (
                 <p role="status" className="mt-1.5 text-sm font-semibold text-gray-800">Minimum de {minOrderQuantity} ajouté.</p>
               )}
+              <QuantityGroupChip productId={product.id} withLink onNavigate={onClose} className="mt-2" />
             </div>
           </div>
           <div data-testid="confirmation-actions" className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">

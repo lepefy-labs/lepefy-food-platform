@@ -33,6 +33,17 @@ export function groupHeadline(groupName: string, minimum: number): string {
   return `${groupName} : mélangez les produits pour arriver à ${minimum}.`;
 }
 
+/**
+ * Étiquette courte d'un produit d'un groupe à mélanger (card, confirmation) :
+ * « Boissons : 12 minimum, à mélanger » ; une fois entamé « Boissons : 3 / 12 »
+ * puis « Boissons : 12 ✓ ». `target` = prochaine quantité valide du groupe.
+ */
+export function groupChipText(groupName: string, minimum: number, current: number, target: number): string {
+  if (current <= 0) return `${groupName} : ${minimum} minimum, à mélanger`;
+  if (current >= target) return `${groupName} : ${current} ✓`;
+  return `${groupName} : ${current} / ${target}`;
+}
+
 export interface GroupProgressCopy {
   done: boolean;
   title: string;

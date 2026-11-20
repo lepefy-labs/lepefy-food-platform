@@ -12,7 +12,7 @@ import {
 } from '../../src/lib/storefrontCopy/sellingFormat';
 import { definiteArticle, getSaleUnit } from '../../src/lib/storefrontCopy/saleUnits';
 import {
-  groupProgressCopy,
+  groupChipText, groupProgressCopy,
   minimumChip,
   minimumHeadline,
   quantityViolationCopy,
@@ -248,4 +248,12 @@ test.describe('format de vente : saisie admin (migration 154)', () => {
       expect(parseSellingFormatInput(body).ok, JSON.stringify(body)).toBe(false);
     }
   });
+});
+
+test('étiquette d’un groupe à mélanger : règle, avancement, atteint', () => {
+  expect(groupChipText('Boissons', 12, 0, 12)).toBe('Boissons : 12 minimum, à mélanger');
+  expect(groupChipText('Boissons', 12, 3, 12)).toBe('Boissons : 3 / 12');
+  expect(groupChipText('Boissons', 12, 12, 12)).toBe('Boissons : 12 ✓');
+  // Pas de 6 au-delà du minimum : 13 vise 18.
+  expect(groupChipText('Boissons', 12, 13, 18)).toBe('Boissons : 13 / 18');
 });

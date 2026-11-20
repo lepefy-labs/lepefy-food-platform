@@ -216,6 +216,15 @@ export default function CartPurchaseClient({ tenant, promoCount = 0, categories 
               {undo && <div className="hidden pt-3 md:block">{undoToast('')}</div>}
             </section>
 
+            {/* Groupes à mélanger entamés (ex. « Boissons : 1 / 12 ») avec le lien vers leurs produits. */}
+            {groupsError && (
+              <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                {groupsError}
+                <button type="button" onClick={reloadGroups} className="ml-2 min-h-11 font-bold underline">{ACTION_COPY.retry}</button>
+              </div>
+            )}
+            <QuantityGroupProgress groups={quantityGroups} items={items} />
+
             <CartPromoReminder count={promoCount} />
 
             <div className="hidden flex-col gap-2 md:flex lg:hidden">
