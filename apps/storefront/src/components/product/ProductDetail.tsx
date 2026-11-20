@@ -34,7 +34,7 @@ import { productFulfillmentHint } from '@/lib/storefrontCopy/fulfillmentCopy';
 import type { ProductWithCategory } from '@lepefy/types';
 import { buildSaleFormatOptions, describeBundle, planFormatBundle, type SaleFormatRow } from '@/lib/catalog/saleFormats';
 import { useFormatUnits } from '@/lib/cart/useFormatUnits';
-import { bundleCaption, saleFormatOfferLine } from '@/lib/storefrontCopy/saleFormatCopy';
+import { bundleCaption } from '@/lib/storefrontCopy/saleFormatCopy';
 import { SaleFormatPicker } from './SaleFormatPicker';
 
 export function ProductDetail({ product }: { product: ProductWithCategory & { formats?: SaleFormatRow[] | null } }) {
@@ -104,7 +104,6 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
   const [formatPrompt, setFormatPrompt] = useState(false);
   const formatPickerRef = useRef<HTMLElement>(null);
   const countLabel = (count: number) => formatCount(sellingFormat, count);
-  const offerLine = multiFormat ? saleFormatOfferLine(formatOptions, currency) : null;
   const group = groups.find((entry) => entry.productIds.includes(product.id));
   const groupQuantity = group
     ? cartItems.filter((item) => group.productIds.includes(item.product.id))
@@ -283,19 +282,32 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
             </p>
           )}
           <ProductTitle product={product} />
-          <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
-            {(product.new_until || product.compare_at_price != null) && (
-              <div className="mb-2 flex flex-wrap gap-1.5">
+          {/* Plusieurs formats en vente : pas de bloc prix, chaque format porte son prix
+              dans le choix juste en dessous (sinon le prix du paquet apparaît deux fois). */}
+          {multiFormat && anyFormatPurchasable ? (
+            (product.new_until || product.compare_at_price != null || promotionEndLabel(product, 'long')) && (
+              <div className="flex flex-wrap items-center gap-1.5">
                 <NoveltyBadge product={product} />
                 <PromoBadge product={product} />
+                {promotionEndLabel(product, 'long') && (
+                  <p className="text-sm font-semibold text-red-900">{promotionEndLabel(product, 'long')}</p>
+                )}
               </div>
-            )}
-            <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} size="detail" />
-            {offerLine && <p className="mt-2 inline-block rounded-md bg-green-100 px-2 py-0.5 text-sm font-bold text-green-900">{offerLine}</p>}
-            {promotionEndLabel(product, 'long') && (
-              <p className="mt-2 text-sm font-semibold text-red-900">{promotionEndLabel(product, 'long')}</p>
-            )}
-          </div>
+            )
+          ) : (
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+              {(product.new_until || product.compare_at_price != null) && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  <NoveltyBadge product={product} />
+                  <PromoBadge product={product} />
+                </div>
+              )}
+              <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} size="detail" />
+              {promotionEndLabel(product, 'long') && (
+                <p className="mt-2 text-sm font-semibold text-red-900">{promotionEndLabel(product, 'long')}</p>
+              )}
+            </div>
+          )}
 
           {multiFormat && anyFormatPurchasable && (
             <section ref={formatPickerRef} aria-label="Choix du format" className="grid gap-2">
