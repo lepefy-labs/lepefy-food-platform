@@ -15,7 +15,7 @@ import { fitsHeadroom, parcelFitLabel, selectParcelFits } from '@/lib/cart/parce
 import { recordAddSource } from '@/lib/cart/recordAddSource';
 import { formatHeadroom } from '@/lib/shipping/tariff/shippingEstimate';
 import { buildSaleFormatOptions } from '@/lib/catalog/saleFormats';
-import { formatCount, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
+import { formatCountOrUnits, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 
 /** Taille des pages du catalogue intégré (plus petite que le Catalogue : chargement léger). */
 const CART_CATALOG_PAGE_SIZE = 12;
@@ -284,8 +284,8 @@ export function CartCatalogSection({ categories, wide = false, headroomG = null,
   );
 }
 
-/** « 1 paquet » pour une fiche à plusieurs formats (l'étiquette de poids s'y rapporte), null sinon. */
+/** « 1 paquet » (« 1 unité » sans unité connue) pour une fiche à plusieurs formats (l'étiquette de poids s'y rapporte), null sinon. */
 function parcelFitQuantity(product: ProductCardProduct): string | null {
   if (buildSaleFormatOptions(product).length === 0) return null;
-  return formatCount(resolveSellingFormat(product), Math.max(1, product.min_order_quantity ?? 1));
+  return formatCountOrUnits(resolveSellingFormat(product), Math.max(1, product.min_order_quantity ?? 1));
 }

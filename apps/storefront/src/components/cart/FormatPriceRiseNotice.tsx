@@ -2,7 +2,7 @@
 
 import type { MouseEvent } from 'react';
 import type { DecrementPriceRise } from '@/lib/catalog/saleFormats';
-import { formatCount, type SellingFormat } from '@/lib/storefrontCopy/sellingFormat';
+import { formatCountOrUnits, type SellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { decrementPriceRiseLine } from '@/lib/storefrontCopy/saleFormatCopy';
 
 interface FormatPriceRiseNoticeProps {
@@ -34,11 +34,11 @@ export function FormatPriceRiseNotice({ rise, sellingFormat, currency, onKeep, o
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
         <button type="button" onClick={(event) => handle(event, onKeep)}
           className="inline-flex min-h-9 items-center font-bold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">
-          Garder {formatCount(sellingFormat, rise.fromUnits)}
+          Garder {formatCountOrUnits(sellingFormat, rise.fromUnits)}
         </button>
         <button type="button" onClick={(event) => handle(event, onConfirm)}
           className="inline-flex min-h-9 items-center font-bold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">
-          Passer à {formatCount(sellingFormat, rise.units)}
+          Passer à {formatCountOrUnits(sellingFormat, rise.units)}
         </button>
       </div>
     </div>

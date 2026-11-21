@@ -309,6 +309,8 @@ test.describe('Une unité de moins ne coûte jamais plus sans le dire', () => {
     const rise = decrementPriceRise(10, 25.9, bobolo)!;
     expect(rise).toEqual({ fromUnits: 10, units: 9, currentTotal: 25.9, total: 27, extra: 1.1 });
     expect(sp(decrementPriceRiseLine(rise, paquet))).toBe('À 9 paquets, vous paieriez 27,00 € au lieu de 25,90 €, soit 1,10 € de plus.');
+    // Sans unité structurée : « unités », jamais un nombre nu (« À 9, vous paieriez »).
+    expect(sp(decrementPriceRiseLine(rise, resolveSellingFormat({})))).toBe('À 9 unités, vous paieriez 27,00 € au lieu de 25,90 €, soit 1,10 € de plus.');
     // Dernière unité (retrait) et produit à format unique : jamais d'avis.
     expect(decrementPriceRise(1, 3, bobolo)).toBeNull();
     expect(decrementPriceRise(5, 15, bobolo.slice(0, 1))).toBeNull();

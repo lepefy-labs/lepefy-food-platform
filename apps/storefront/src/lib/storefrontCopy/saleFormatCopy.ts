@@ -1,6 +1,6 @@
 import { formatQuantityLabel, type CheaperWithMore, type DecrementPriceRise, type FormatBundlePlan, type SaleFormatOption } from '@/lib/catalog/saleFormats';
 import { formatPrice } from '@/lib/utils/format';
-import { formatCount, unitPhrase, type SellingFormat } from './sellingFormat';
+import { formatCount, formatCountOrUnits, unitPhrase, type SellingFormat } from './sellingFormat';
 
 /**
  * Textes des formats de vente (migration 187). Le format de vente de la fiche
@@ -95,7 +95,7 @@ export function cheaperWithMoreLine(hint: CheaperWithMore, currentTotal: number,
  * « À 9 paquets, vous paieriez 27,00 € au lieu de 25,90 €, soit 1,10 € de plus. »
  */
 export function decrementPriceRiseLine(rise: DecrementPriceRise, base: SellingFormat, currency = 'EUR'): string {
-  return `À ${formatCount(base, rise.units)}, vous paieriez ${formatPrice(rise.total, currency)} au lieu de ${formatPrice(rise.currentTotal, currency)}, soit ${formatPrice(rise.extra, currency)} de plus.`;
+  return `À ${formatCountOrUnits(base, rise.units)}, vous paieriez ${formatPrice(rise.total, currency)} au lieu de ${formatPrice(rise.currentTotal, currency)}, soit ${formatPrice(rise.extra, currency)} de plus.`;
 }
 
 function lowerFirst(text: string): string {

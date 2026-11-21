@@ -180,6 +180,16 @@ export function formatCount(format: SellingFormat, count: number): string {
   return noun ? `${count} ${noun}` : String(count);
 }
 
+/**
+ * « 4 paquets », ou « 4 unités » quand l'unité n'est pas connue : pour une
+ * phrase qui doit rester lisible seule (« pour 1 unité », « Garder 10 unités »),
+ * là où un nombre nu ne dirait pas de quoi il s'agit.
+ */
+export function formatCountOrUnits(format: SellingFormat, count: number): string {
+  const noun = quantityNoun(format, count);
+  return noun ? `${count} ${noun}` : `${count} unité${count > 1 ? 's' : ''}`;
+}
+
 export interface PriceDisplay {
   amount: string;
   unitPhrase: string;
