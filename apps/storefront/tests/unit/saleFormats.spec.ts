@@ -24,7 +24,7 @@ import {
   saleFormatWarnings,
   type AttachCandidate,
 } from '../../src/lib/catalog/saleFormatsAdmin';
-import { orderItemFormatLabel, orderItemPhysicalUnits } from '../../src/lib/orders/documents/itemFormat';
+import { orderItemFormatLabel, orderItemPhysicalCount, orderItemPhysicalUnits } from '../../src/lib/orders/documents/itemFormat';
 import { bundleCaption, cheaperWithMoreLine, decrementPriceRiseLine, saleFormatCardChip, saleFormatOfferLine, saleFormatSavingsLine, saleFormatUnitPriceLine } from '../../src/lib/storefrontCopy/saleFormatCopy';
 import { resolveSellingFormat } from '../../src/lib/storefrontCopy/sellingFormat';
 
@@ -160,6 +160,15 @@ test('order documents read the frozen v2 snapshot: label, content, physical unit
   const single = { v: 2, format_label: '1 paquet', units_per_sale: 1, sale_unit: 'paquet', net_quantity_display: '500 g' };
   expect(orderItemFormatLabel(single, 'Arachides dépulpés (Ndole)')).toBe('1 paquet · 500 g');
   expect(orderItemPhysicalUnits(single, 4)).toBeNull();
+  // Pièces physiques pour le total de la liste : un lot de 3 compte 3.
+  expect(orderItemPhysicalCount(lot, 2)).toBe(6);
+  expect(orderItemPhysicalCount(single, 4)).toBe(4);
+  expect(orderItemPhysicalCount(null, 2)).toBe(2);
+  // Sans unité structurée (Okok, #4FC1BC4F) : le nom vient du libellé du lot, jamais « unités » s'il y en a un.
+  const okok = { v: 2, format_label: 'Lot de 3 paquets', units_per_sale: 3, net_quantity_display: '100 g' };
+  expect(orderItemPhysicalUnits(okok, 1)).toBe('3 paquets');
+  expect(orderItemPhysicalUnits({ ...okok, format_label: 'Carton de 10 kg', units_per_sale: 10 }, 1)).toBe('10 unités');
+  expect(orderItemPhysicalUnits({ ...okok, format_label: 'Lot de 3', units_per_sale: 3 }, 2)).toBe('6 unités');
   // v1 snapshots keep their historical output.
   expect(orderItemFormatLabel({ v: 1, sale_unit: 'sachet', net_content_value: 150, net_content_unit: 'g' }, 'Kaolin')).toBe('150 g');
 });

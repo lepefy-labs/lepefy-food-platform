@@ -132,7 +132,31 @@ export function orderItemPhysicalUnits(snapshotRaw: unknown, quantity: number): 
   if (!snapshot || units <= 1 || !Number.isInteger(quantity) || quantity < 1) return null;
   const total = units * quantity;
   const format = resolveSellingFormat(snapshot);
-  return format.unit && !format.unit.byWeight ? formatCount(format, total) : `${total} unités`;
+  if (format.unit && !format.unit.byWeight) return formatCount(format, total);
+  // Sans unité structurée : le nom de l'unité vient du libellé du lot
+  // (« Lot de 3 paquets » → « 6 paquets »), sinon « unités ».
+  return `${total} ${labelUnitNoun(snapshot.format_label) ?? 'unités'}`;
+}
+
+/**
+ * Pièces physiques d'une ligne de commande : quantité × unités par vente
+ * (2 × « Lot de 3 paquets » = 6). Une ligne sans format de vente compte sa
+ * quantité. C'est le nombre que la préparation prend et contrôle dans le colis.
+ */
+export function orderItemPhysicalCount(snapshotRaw: unknown, quantity: number): number {
+  if (!Number.isFinite(quantity) || quantity <= 0) return 0;
+  const units = parseFormatSnapshot(snapshotRaw)?.units_per_sale ?? 1;
+  return quantity * Math.max(1, units);
+}
+
+/** « Lot de 3 paquets » / « Carton de 10 paquets (20 bâtons) » → « paquets » ; null sans nom après le nombre. */
+function labelUnitNoun(label: string | null | undefined): string | null {
+  const match = /\d+\s+([a-zà-ÿœ]+)/i.exec(label ?? '');
+  if (!match) return null;
+  const noun = match[1]!.toLowerCase();
+  // Une mesure (« Carton de 10 kg ») n'est pas une unité à compter.
+  if (/^(g|gr|kg|kilos?|mg|ml|cl|l|litres?|grammes?)$/.test(noun)) return null;
+  return noun.endsWith('s') || noun.endsWith('x') ? noun : `${noun}s`;
 }
 
 function baseFormatLabel(snapshot: OrderItemFormatSnapshot, itemName: string): string | null {

@@ -5,7 +5,7 @@ import { displayCountry, formatDocumentDate, formatKg, orderShortRef, readableBr
 import { androidAppStatus } from '@/lib/mobileApp/androidApp';
 import { formatWhatsappDisplay } from '@/lib/orders/portal/supportChannels';
 import type { OrderDocumentsConfig } from './settings';
-import { orderItemFormatLabel, orderItemPhysicalUnits, parseFormatSnapshot } from './itemFormat';
+import { orderItemFormatLabel, orderItemPhysicalCount, orderItemPhysicalUnits, parseFormatSnapshot } from './itemFormat';
 
 /**
  * View-models des documents de commande, construits champ par champ.
@@ -256,7 +256,8 @@ export function buildPickingListViewModel(input: {
     destinationParts: isPickup ? null : parts,
     deliveryAddress: input.showDeliveryAddress && !isPickup ? pickingAddressLines(order) : null,
     items,
-    totalUnits: items.reduce((sum, item) => sum + item.quantity, 0),
+    // Pièces à prendre et à contrôler dans le colis : un lot de 3 compte 3 (pas 1).
+    totalUnits: input.items.reduce((sum, item) => sum + orderItemPhysicalCount(item.format_snapshot, item.quantity), 0),
     referenceCount: items.length,
     weight: weightG ? formatKg(weightG) : null,
     parcelCount: suggestion ? suggestion.parcels.length : null,

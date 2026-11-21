@@ -28,6 +28,36 @@ test.describe('contrôle des données de commande', () => {
     expect(ok('Via Giuseppe Verdi 3', 'Giuseppe Verdi')).toEqual([]);
   });
 
+  test('Italie : type de voie manquant et numéro répété dans le complément (#4FC1BC4F)', () => {
+    const it = (line1: string, line2: string | null = null) => orderDataIssues({
+      ...faulty, shipping_address: { full_name: 'Francine Mafotsing', line1, line2, country: 'IT' },
+    }).map((issue) => issue.code);
+    expect(it('Roma 10', '10')).toEqual(['street_type_missing', 'house_number_repeated']);
+    expect(it('Svezia 44')).toEqual(['street_type_missing']);
+    expect(it('Stada statale per voghera 12', 'Premier niveau')).toEqual(['street_type_missing']);
+    // Types de voie et abréviations courantes : rien à signaler.
+    for (const line1 of ['Via Roma 10', 'via roma 10', 'V.le Europa 3', 'P.za Garibaldi 1', 'Piazzale Loreto 2', 'Corso Italia 5',
+      'C.so Vittorio 7', 'Loc. Santa Maria 4', 'Località Pian del Sole 2', 'Frazione Ca’ Bianca 1', 'Contrada Fiumara 9',
+      'Strada Statale 7 12', 'SS 113 45', 'Vicolo Stretto 3', 'Lungomare Colombo 10', 'Borgo Pinti 21', '4 Novembre 12']) {
+      expect(it(line1), line1).toEqual([]);
+    }
+    // Complément utile ou numéro différent : pas de répétition.
+    expect(it('Via Roma 10', 'Scala B')).toEqual([]);
+    expect(it('Via Roma 10', '12')).toEqual([]);
+    expect(it('Via Roma 10', 'n. 10')).toEqual(['house_number_repeated']);
+    expect(it('Via Roma 10', 'civico 10')).toEqual(['house_number_repeated']);
+    // Hors Italie : le type de voie n'est pas exigé.
+    expect(orderDataIssues({ ...faulty, shipping_address: { full_name: 'Marie Kamga', line1: 'Grand-Rue 4', country: 'BE' } })).toEqual([]);
+  });
+
+  test('marche à suivre et message WhatsApp pour le type de voie', () => {
+    const issues = orderDataIssues({ ...faulty, shipping_address: { full_name: 'Francine Mafotsing', line1: 'Roma 10', line2: '10', country: 'IT' } });
+    const steps = orderDataIssueSteps(issues, 'Packlink');
+    expect(steps[0]).toContain('type de voie (Via, Piazza…)');
+    expect(steps[1]).toContain('laissez « Complément » vide');
+    expect(steps[2]).toContain('Refaites le brouillon Packlink');
+  });
+
   test('nom du destinataire incomplet', () => {
     const issues = orderDataIssues({ ...faulty, shipping_address: { full_name: 'Atsague J', line1: 'Via Roma 25' } });
     expect(issues.map((issue) => issue.code)).toEqual(['recipient_name_incomplete']);

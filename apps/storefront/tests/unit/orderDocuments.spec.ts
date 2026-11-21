@@ -243,7 +243,8 @@ test('picking follow-up: printable checkboxes, date and time in A5/A4; pickup us
     const html = pickingListHtml([delivery], format);
     expect(html).toContain('SUIVI DE PRÉPARATION');
     expect(html).toContain('EXPÉDITION');
-    expect(html).toContain('DATE</span><span>HEURE');
+    if (format === 'a4') expect(html).toContain('DATE</span><span>HEURE');
+    else expect(html).toContain('date et heure sous chaque étape');
     expect((html.match(/class="pl-follow-check"/g) ?? [])).toHaveLength(3);
     expect((html.match(/>Préparé par</g) ?? [])).toHaveLength(1);
     expect((html.match(/>Contrôlé par</g) ?? [])).toHaveLength(1);
@@ -256,7 +257,7 @@ test('picking A5 uses print-safe compact spacing without shrinking picking check
   const vm = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'T' }, carton: null });
   const a5 = pickingListHtml([vm], 'a5');
   const a4 = pickingListHtml([vm], 'a4');
-  expect(a5).toContain('.format-a5 .pl-follow-row { min-height: 7.5mm; }');
+  expect(a5).toContain('<div class="pl-follow-cols">');
   expect(a5).toContain('.format-a5 .pl-box { width: 6mm; height: 6mm; }');
   expect(a5).toContain('.format-a5 .pl-items td { padding-top: 0.9mm; padding-bottom: 0.9mm; }');
   expect(a4).toContain('.format-a4 .pl-items td { padding-top: 2.6mm; padding-bottom: 2.6mm;');

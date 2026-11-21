@@ -58,26 +58,29 @@ function picking(orderRow: DocumentOrderRow, showDeliveryAddress = false) {
 /** Colonne gauche (identification + adresse) et bloc marque (logo / nom) d'une section. */
 function headParts(html: string): { left: string; right: string } {
   const head = html.slice(html.indexOf('<div class="pl-head">'), html.indexOf('<div class="pl-section'));
-  const split = head.indexOf('<div class="pl-brandbox">');
+  const split = head.indexOf('<div class="pl-side">');
   return { left: head.slice(0, split), right: head.slice(split) };
 }
 
+/** CP et ville imprimés sous le logo : chaque morceau passe entier à la ligne. */
+const place = (...pieces: string[]) => `<div class="pl-postal-city">${pieces.map((piece) => `<span class="pl-place-piece">${piece}</span>`).join(' ')}</div>`;
+
 // ─── A. Liste de préparation : en-tête ──────────────────────────────────────
 
-test('picking header: date, title and reference on the left, address block with bold postal code and city under the street', () => {
+test('picking header: date, title, reference and street on the left, bold postal code and city under the logo', () => {
   for (const format of ['a5', 'a4'] as const) {
     const html = pickingListHtml([picking(order(ORDER_A), true)], format);
-    const { left } = headParts(html);
+    const { left, right } = headParts(html);
     expect(left.indexOf('pl-date')).toBeLessThan(left.indexOf('LISTE DE PRÉPARATION'));
     expect(left).toContain('<div class="pl-date">Lundi 05/10/2026 · 09:14</div>');
     expect(left).toContain('<div class="pl-meta pl-when pl-ref-line"><span>Commande #163835B8</span><span class="pl-mode">EXPÉDITION</span></div>');
     expect(left).toContain('<div class="pl-customer">Awa Diallo</div>');
-    const street = left.indexOf('12 rue Oberkampf');
-    const postalCity = left.indexOf('<div class="pl-postal-city">75011 Paris</div>');
-    expect(street).toBeGreaterThan(-1);
-    expect(postalCity).toBeGreaterThan(street);
-    expect(left).toContain('<div class="pl-route">France</div>');
-    expect(html).not.toContain('pl-dest');
+    expect(left).toContain('12 rue Oberkampf');
+    expect(left).not.toContain('pl-postal-city');
+    // Colonne de droite : logo puis destination (place libre de l'en-tête).
+    expect(right.indexOf('pl-brandbox')).toBeLessThan(right.indexOf('<div class="pl-dest">'));
+    expect(right.indexOf(place('75011', 'Paris'))).toBeGreaterThan(right.indexOf('<div class="pl-dest">'));
+    expect(right).toContain('<div class="pl-route">France</div>');
   }
   const a5 = pickingListHtml([picking(order(ORDER_A))], 'a5');
   const a4 = pickingListHtml([picking(order(ORDER_A))], 'a4');
@@ -91,24 +94,25 @@ test('picking header: date, title and reference on the left, address block with 
 test('picking header: postal code and city stay when the full address is disabled, nothing else of the address does', () => {
   const vm = picking(order(ORDER_A, { shipping_address: { full_name: 'Moussa Traoré', company_name: 'ACME', line1: '3 rue Lepic', line2: 'Bât. B', postal_code: '75018', city: 'Paris', country: 'FR' } }), false);
   for (const format of ['a5', 'a4'] as const) {
-    const { left } = headParts(pickingListHtml([vm], format));
-    expect(left).toContain('<div class="pl-postal-city">75018 Paris</div>');
-    for (const hidden of ['Lepic', 'Bât. B', 'ACME', 'Moussa']) expect(left).not.toContain(hidden);
+    const { left, right } = headParts(pickingListHtml([vm], format));
+    expect(right).toContain(place('75018', 'Paris'));
+    for (const hidden of ['Lepic', 'Bât. B', 'ACME', 'Moussa']) expect(left + right).not.toContain(hidden);
   }
   const giftAddress = { full_name: 'Moussa Traoré', company_name: 'ACME', line1: '3 rue Lepic', line2: 'Bât. B', postal_code: '75018', city: 'Paris', country: 'FR' };
-  const shown = headParts(pickingListHtml([picking(order(ORDER_A, { shipping_address: giftAddress }), true)], 'a5')).left;
-  expect(shown).toContain('Destinataire : Moussa Traoré');
-  expect(shown).toContain('Entreprise : ACME');
-  expect(shown.indexOf('Bât. B')).toBeLessThan(shown.indexOf('75018 Paris'));
+  const shown = headParts(pickingListHtml([picking(order(ORDER_A, { shipping_address: giftAddress }), true)], 'a5'));
+  expect(shown.left).toContain('Destinataire : Moussa Traoré');
+  expect(shown.left).toContain('Entreprise : ACME');
+  expect(shown.left).toContain('Bât. B');
+  expect(shown.right).toContain(place('75018', 'Paris'));
 });
 
 test('picking header: leading zeros and alphanumeric postal codes kept verbatim, countries compact', () => {
-  const rome = headParts(pickingListHtml([picking(withAddress({ line1: 'Via Prenestina 1', postal_code: '00132', city: 'Roma', country: 'IT' }))], 'a5')).left;
-  expect(rome).toContain('<div class="pl-postal-city">00132 Roma</div>');
+  const rome = headParts(pickingListHtml([picking(withAddress({ line1: 'Via Prenestina 1', postal_code: '00132', city: 'Roma', country: 'IT' }))], 'a5')).right;
+  expect(rome).toContain(place('00132', 'Roma'));
   expect(rome).toContain('<div class="pl-route">Italie</div>');
-  const london = headParts(pickingListHtml([picking(withAddress({ postal_code: 'SW1A 1AA', city: 'London', country: 'GB' }))], 'a4')).left;
-  expect(london).toContain('SW1A 1AA London');
-  const free = headParts(pickingListHtml([picking(withAddress({ postal_code: '1000', city: 'Bruxelles', country: 'Belgique' }))], 'a5')).left;
+  const london = headParts(pickingListHtml([picking(withAddress({ postal_code: 'SW1A 1AA', city: 'London', country: 'GB' }))], 'a4')).right;
+  expect(london).toContain(place('SW1A 1AA', 'London'));
+  const free = headParts(pickingListHtml([picking(withAddress({ postal_code: '1000', city: 'Bruxelles', country: 'Belgique' }))], 'a5')).right;
   expect(free).toContain('<div class="pl-route">Belgique</div>');
   // Un CP numérique en JSON reste lisible (ses zéros perdus ne sont jamais inventés).
   const numeric = picking(withAddress({ postal_code: 6100, city: 'Bergamo', country: 'IT' }));
@@ -117,10 +121,11 @@ test('picking header: leading zeros and alphanumeric postal codes kept verbatim,
 
 test('picking header: long cities wrap and are never truncated, accents and apostrophes escaped', () => {
   const html = pickingListHtml([picking(withAddress({ line1: "Via dell'Industria 4", postal_code: '20051', city: "CASSINA DE' PECCHI", country: 'IT' }), true)], 'a5');
-  expect(html).toContain('20051 CASSINA DE&#39; PECCHI');
+  expect(html).toContain(place('20051', 'CASSINA DE&#39; PECCHI'));
   expect(html).toContain('Via dell&#39;Industria 4');
   const long = pickingListHtml([picking(withAddress({ postal_code: '13210', city: 'Saint-Rémy-de-Provence-sur-Durance-en-Très-Longue-Commune', country: 'FR' }))], 'a5');
-  expect(long).toContain('13210 Saint-Rémy-de-Provence-sur-Durance-en-Très-Longue-Commune');
+  expect(long).toContain(place('13210', 'Saint-Rémy-de-Provence-sur-Durance-en-Très-Longue-Commune'));
+  expect(long).toContain('.pl-place-piece { display: inline-block; }');
   expect(long).not.toContain('text-overflow');
   expect(long).not.toContain('white-space: nowrap; margin');
 });
@@ -130,23 +135,23 @@ test('picking header: gift recipient and complement kept, all values escaped', (
     full_name: 'Moussa <b>Traoré</b>', line1: '3 rue Lepic', line2: 'Bât. B & escalier 2', postal_code: '75018', city: 'Paris <i>18e</i>', country: 'FR',
   }, { full_name: 'Awa "Diallo"' }), true);
   const html = pickingListHtml([vm], 'a5');
-  const { left } = headParts(html);
+  const { left, right } = headParts(html);
   expect(left).toContain('Destinataire : Moussa &lt;b&gt;Traoré&lt;/b&gt;');
   expect(left).toContain('Bât. B &amp; escalier 2');
   expect(left).toContain('Awa &quot;Diallo&quot;');
-  expect(left).toContain('75018 Paris &lt;i&gt;18e&lt;/i&gt;');
+  expect(right).toContain(place('75018', 'Paris &lt;i&gt;18e&lt;/i&gt;'));
   expect(html).not.toContain('<b>Traoré</b>');
   expect(html).not.toContain('<i>18e</i>');
 });
 
 test('picking header: incomplete address degrades without inventing anything', () => {
-  expect(headParts(pickingListHtml([picking(withAddress({ city: 'Lyon' }))], 'a5')).left).toContain('<div class="pl-postal-city">Lyon</div>');
-  const postalOnly = headParts(pickingListHtml([picking(withAddress({ postal_code: '69002', country: 'FR' }))], 'a5')).left;
-  expect(postalOnly).toContain('<div class="pl-postal-city">69002</div>');
+  expect(headParts(pickingListHtml([picking(withAddress({ city: 'Lyon' }))], 'a5')).right).toContain(place('Lyon'));
+  const postalOnly = headParts(pickingListHtml([picking(withAddress({ postal_code: '69002', country: 'FR' }))], 'a5')).right;
+  expect(postalOnly).toContain(place('69002'));
   for (const address of [{}, null]) {
     const html = pickingListHtml([picking(order(ORDER_A, { shipping_address: address as Address | null }), true)], 'a5');
-    const { left } = headParts(html);
-    expect(left).toContain('Destination non renseignée');
+    const { left, right } = headParts(html);
+    expect(right).toContain('Destination non renseignée');
     expect(left).not.toContain('class="pl-address"');
     expect(left).toContain('pl-mode">EXPÉDITION');
   }
@@ -436,13 +441,13 @@ test('picking list: purchased format from the order line, catalogue weight only 
 
 test('picking header: fulfilment badge next to the order reference, country line carries no mode, stored mode untouched', () => {
   for (const format of ['a5', 'a4'] as const) {
-    const ship = headParts(pickingListHtml([picking(order(ORDER_A), true)], format)).left;
-    expect(ship).toContain('<span>Commande #163835B8</span><span class="pl-mode">EXPÉDITION</span>');
-    expect(ship).toContain('<div class="pl-route">France</div>');
-    expect(ship).not.toContain('LIVRAISON');
-    const pickup = headParts(pickingListHtml([picking(order(ORDER_A, { fulfillment_type: 'pickup' }), true)], format)).left;
-    expect(pickup).toContain('<span>Commande #163835B8</span><span class="pl-mode">RETRAIT</span>');
-    expect(pickup).not.toContain('pl-route');
+    const ship = headParts(pickingListHtml([picking(order(ORDER_A), true)], format));
+    expect(ship.left).toContain('<span>Commande #163835B8</span><span class="pl-mode">EXPÉDITION</span>');
+    expect(ship.right).toContain('<div class="pl-route">France</div>');
+    expect(ship.left + ship.right).not.toContain('LIVRAISON');
+    const pickup = headParts(pickingListHtml([picking(order(ORDER_A, { fulfillment_type: 'pickup' }), true)], format));
+    expect(pickup.left).toContain('<span>Commande #163835B8</span><span class="pl-mode">RETRAIT</span>');
+    expect(pickup.left + pickup.right).not.toContain('pl-route');
   }
   // Badge lisible en noir et blanc : cadre fin, pas de fond sombre.
   const css = pickingListHtml([picking(order(ORDER_A))], 'a5');
@@ -502,12 +507,14 @@ test('packaging block: weight to declare only when it differs from the net weigh
   expect(netOnly).not.toContain('À déclarer');
 });
 
-test('follow-up block: more room for handwriting with fixed, content-independent heights', () => {
+test('follow-up block: fixed, content-independent heights; A5 stages side by side to stay on the sheet', () => {
   const a5 = pickingListHtml([picking(order(ORDER_A))], 'a5');
   const a4 = pickingListHtml([picking(order(ORDER_A))], 'a4');
-  expect(a5).toContain('.format-a5 .pl-follow-row { min-height: 7.5mm; }');
-  expect(a5).toContain('.format-a5 .pl-follow-line { height: 6.5mm; }');
-  expect(a5).toContain('.format-a5 .pl-follow-sign span { padding-bottom: 5mm; }');
+  expect(a5).toContain('.pl-follow-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3mm; }');
+  expect(a5).toContain('.pl-follow-cols .pl-follow-line { height: 6mm; }');
+  expect(a5).toContain('.format-a5 .pl-follow-sign span { padding-bottom: 4mm; }');
+  expect(a5).toContain('<div class="pl-follow-cols">');
+  expect(a4).not.toContain('<div class="pl-follow-cols">');
   expect(a4).toContain('.pl-follow-row { min-height: 10mm; }');
   expect(a4).toContain('.pl-follow-line { display: block; height: 8mm;');
   expect(a4).toContain('.pl-follow-sign span { padding-bottom: 7mm; }');

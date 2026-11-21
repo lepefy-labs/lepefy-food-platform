@@ -30,7 +30,12 @@ const STORAGE_LABEL: Record<NonNullable<PickingItemVM['storage']>, string> = {
 const CSS = `
 .pl-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 4mm; border-bottom: 0.6mm solid #111; padding-bottom: 2.5mm; margin-bottom: 2.5mm; }
 .pl-id { min-width: 0; overflow-wrap: anywhere; }
-.pl-brandbox { max-width: 40%; text-align: right; min-width: 0; }
+.pl-side { min-width: 0; text-align: right; }
+.format-a5 .pl-head { grid-template-columns: minmax(0, 1fr) 44mm; }
+.format-a4 .pl-head { grid-template-columns: minmax(0, 1fr) 62mm; }
+.pl-brandbox { text-align: right; min-width: 0; }
+.pl-dest { margin-top: 1.5mm; line-height: 1.25; }
+.pl-place-piece { display: inline-block; }
 .pl-logo { display: block; margin-left: auto; width: auto; height: auto; object-fit: contain; background: none; border: 0; padding: 0; }
 .pl-brand { display: block; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
 .pl-title { font-weight: 900; letter-spacing: 0.08em; margin: 0; }
@@ -118,13 +123,17 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .format-a5 .pl-shipping-price { font-size: 10pt; }
 .format-a5 .pl-shipping-grid .pl-section { letter-spacing: 0.01em; font-size: 10pt; }
 
-.format-a5 .pl-follow { margin-top: 2mm; }
+.format-a5 .pl-follow { margin-top: 1.5mm; }
 .format-a5 .pl-follow-title { padding-bottom: 0.5mm; margin-bottom: 0.8mm; }
-.format-a5 .pl-follow-head { font-size: 10pt; }
-.format-a5 .pl-follow-row { min-height: 7.5mm; }
-.format-a5 .pl-follow-line { height: 6.5mm; }
-.format-a5 .pl-sign { margin-top: 1.5mm; }
-.format-a5 .pl-follow-sign span { padding-bottom: 5mm; }
+.format-a5 .pl-sign { margin-top: 1.2mm; }
+.format-a5 .pl-follow-sign span { padding-bottom: 4mm; }
+/* A5 : les trois étapes côte à côte (une ligne « date / heure » chacune) au lieu
+   d'un tableau de trois lignes : le suivi tient sous les articles, sur la même
+   feuille, pour une commande courante. */
+.pl-follow-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3mm; }
+.pl-follow-cols .pl-follow-stage { font-size: 10pt; letter-spacing: 0.02em; }
+.pl-follow-hint { font-weight: 400; letter-spacing: 0; color: #333; }
+.pl-follow-cols .pl-follow-line { height: 6mm; }
 
 
 /* A4 : lignes aérées, colonnes conservation/emplacement, notes */
@@ -234,9 +243,14 @@ function packagingAndCost(vm: InternalOrderDocumentViewModel, format: OrderDocum
   return `<div class="pl-shipping-grid avoid"><div>${cartonBlock(vm, format)}</div><div>${shippingComparison(vm)}${notes}</div></div>`;
 }
 
-function followUpBlock(vm: InternalOrderDocumentViewModel): string {
+function followUpBlock(vm: InternalOrderDocumentViewModel, format: OrderDocumentFormat): string {
   const lastStage = vm.fulfillment === 'pickup' ? 'REMISE AU CLIENT' : 'EXPÉDITION';
   const stages = ['PRÉPARATION', 'EMBALLAGE', lastStage];
+  const sign = '<div class="pl-sign pl-follow-sign"><span>Préparé par</span><span>Contrôlé par</span></div>';
+  if (format === 'a5') {
+    const cols = stages.map((stage) => `<div><div class="pl-follow-stage"><span class="pl-follow-check"></span><span>${stage}</span></div><span class="pl-follow-line"></span></div>`).join('');
+    return `<div class="pl-follow avoid"><div class="pl-follow-title">SUIVI DE PRÉPARATION <span class="pl-follow-hint">· date et heure sous chaque étape</span></div><div class="pl-follow-cols">${cols}</div>${sign}</div>`;
+  }
   const rows = stages.map((stage) => `<div class="pl-follow-row"><div class="pl-follow-stage"><span class="pl-follow-check"></span><span>${stage}</span></div><span class="pl-follow-line"></span><span class="pl-follow-line"></span></div>`).join('');
   return `<div class="pl-follow avoid"><div class="pl-follow-title">SUIVI DE PRÉPARATION</div><div class="pl-follow-head"><span>ÉTAPE</span><span>DATE</span><span>HEURE</span></div>${rows}<div class="pl-sign pl-follow-sign"><span>Préparé par</span><span>Contrôlé par</span></div></div>`;
 }
@@ -251,19 +265,27 @@ function brandBlock(vm: InternalOrderDocumentViewModel): string {
   return vm.tenantName ? `<div class="pl-brandbox"><span class="pl-brand">${escapeHtml(vm.tenantName)}</span></div>` : '<div></div>';
 }
 
-/** Bloc adresse : CP et ville en gras juste sous la rue/complément, pays et mode en ligne compacte. */
+/** Bloc client à gauche : nom, puis rue et complément. */
 function addressBlock(vm: InternalOrderDocumentViewModel): string {
-  const lines = (vm.deliveryAddress ?? []).map((line) => `<div class="pl-address">${escapeHtml(line)}</div>`).join('');
-  if (vm.fulfillment === 'pickup') {
-    return `<div class="pl-addr"><div class="pl-customer">${escapeHtml(vm.customerName)}</div></div>`;
-  }
+  const lines = vm.fulfillment === 'pickup' ? '' : (vm.deliveryAddress ?? []).map((line) => `<div class="pl-address">${escapeHtml(line)}</div>`).join('');
+  return `<div class="pl-addr"><div class="pl-customer">${escapeHtml(vm.customerName)}</div>${lines}</div>`;
+}
+
+/**
+ * Destination à droite, sous le logo (place libre de l'en-tête) : CP et ville
+ * en gras, puis le pays. Toujours imprimés pour une livraison ; la ville n'est
+ * jamais tronquée. L'en-tête gagne les lignes que ce bloc prenait à gauche.
+ */
+function destinationBlock(vm: InternalOrderDocumentViewModel): string {
+  if (vm.fulfillment === 'pickup') return '';
   const parts = vm.destinationParts;
-  const postalCity = [parts?.postalCode, parts?.city].filter(Boolean).join(' ');
-  const place = postalCity
-    ? `<div class="pl-postal-city">${escapeHtml(postalCity)}</div>`
+  // La ville passe entière à la ligne sous le CP plutôt que d'être coupée (« Serra San / Quirico »).
+  const pieces = [parts?.postalCode, parts?.city].filter(Boolean).map((piece) => `<span class="pl-place-piece">${escapeHtml(piece!)}</span>`);
+  const place = pieces.length
+    ? `<div class="pl-postal-city">${pieces.join(' ')}</div>`
     : '<div class="pl-postal-city pl-missing">Destination non renseignée</div>';
   const country = parts?.country ? `<div class="pl-route">${escapeHtml(parts.country)}</div>` : '';
-  return `<div class="pl-addr"><div class="pl-customer">${escapeHtml(vm.customerName)}</div>${lines}${place}${country}</div>`;
+  return `<div class="pl-dest">${place}${country}</div>`;
 }
 
 function header(vm: InternalOrderDocumentViewModel): string {
@@ -271,7 +293,7 @@ function header(vm: InternalOrderDocumentViewModel): string {
   return `<div class="pl-head">
 <div class="pl-id">${when}<p class="pl-title">LISTE DE PRÉPARATION</p>
 <div class="pl-meta pl-when pl-ref-line"><span>Commande #${escapeHtml(vm.ref)}</span><span class="pl-mode">${escapeHtml(vm.fulfillmentBadge)}</span></div>${addressBlock(vm)}</div>
-${brandBlock(vm)}
+<div class="pl-side">${brandBlock(vm)}${destinationBlock(vm)}</div>
 </div>`;
 }
 
@@ -290,7 +312,7 @@ ${header(vm)}
 <div class="pl-section keep-next">${escapeHtml(summaryParts(vm).join(' · ').toUpperCase())}</div>
 ${format === 'a4' ? itemsTableA4(vm) : itemsTableA5(vm)}
 ${packagingAndCost(vm, format)}
-${followUpBlock(vm)}
+${followUpBlock(vm, format)}
 </section>`;
 }
 

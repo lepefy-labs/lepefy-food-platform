@@ -36,6 +36,7 @@ export function whatsappContactMessage(input: {
   const codes = new Set((input.issues ?? []).map((issue) => issue.code));
   const asks: string[] = [];
   if (codes.has('house_number_missing')) asks.push('le numéro de votre maison');
+  if (codes.has('street_type_missing') && !codes.has('name_in_street')) asks.push('le nom complet de votre rue (Via, Piazza…)');
   if (codes.has('name_in_street')) asks.push('le nom exact de votre rue');
   if (codes.has('recipient_name_incomplete')) asks.push('le prénom et le nom du destinataire');
   if (asks.length > 0) {

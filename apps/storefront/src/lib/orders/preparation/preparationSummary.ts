@@ -1,4 +1,5 @@
 import { formatDocumentDate, orderShortRef } from '@/lib/orders/documents/documentHtml';
+import { orderItemPhysicalCount } from '@/lib/orders/documents/itemFormat';
 import { pickingLineFormat, sortPickingItems, type DocumentItemRow, type DocumentOrderRow } from '@/lib/orders/documents/viewModels';
 
 /**
@@ -132,7 +133,8 @@ export function buildPreparationSummary(input: SummaryOrderInput[], catalogue: R
       customerName: order.full_name?.trim() || 'Client',
       fulfillmentLabel: pickup ? 'Retrait' : 'Livraison',
       destination: pickup ? null : [[a.postal_code, a.city].filter(Boolean).join(' '), a.country].filter(Boolean).join(', ') || null,
-      units: items.reduce((sum, item) => sum + item.quantity, 0),
+      // Pièces physiques (un lot de 3 compte 3), comme la liste de préparation.
+      units: items.reduce((sum, item) => sum + orderItemPhysicalCount(item.format_snapshot, item.quantity), 0),
       cold: items.some((item) => item.storage_type === 'fresh' || item.storage_type === 'frozen'),
     };
   });
