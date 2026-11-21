@@ -15,8 +15,21 @@ export function saleFormatUnitPriceLine(option: SaleFormatOption, base: SellingF
   return `${formatPrice(option.unitPrice, currency)} ${phrase}`;
 }
 
-/** « Économisez 0,60 € par rapport à 3 paquets à l’unité » — seulement si l'économie est positive. */
+/**
+ * Économie d'un format, avec UN seul prix de référence par option :
+ * - prix barré (promotion) : « Économisez 14,00 € », calculé sur ce prix barré
+ *   affiché juste à côté (59,90 € → 45,90 €) ;
+ * - sinon, un lot face aux unités : « Économisez 0,60 € par rapport à 3
+ *   paquets à l’unité ».
+ * Jamais les deux : deux références voisines (59,90 € et 60,00 €) faisaient
+ * paraître le calcul faux. null quand rien n'est économisé.
+ */
 export function saleFormatSavingsLine(option: SaleFormatOption, base: SellingFormat, currency = 'EUR'): string | null {
+  const compareAt = option.compareAtPrice;
+  if (compareAt != null && compareAt > option.price) {
+    const saving = Math.round((compareAt - option.price) * 100) / 100;
+    return saving >= 0.01 ? `Économisez ${formatPrice(saving, currency)}` : null;
+  }
   if (option.isBase || option.savings <= 0) return null;
   return `Économisez ${formatPrice(option.savings, currency)} par rapport à ${formatCount(base, option.units)} à l’unité`;
 }

@@ -119,6 +119,14 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
   // Encadré « Achetez N minimum » : produits à format unique seulement.
   const hasIndividualRule = !multiFormat && (minOrderQuantity > 1 || orderQuantityStep > 1);
   const quantityLabel = countLabel(quantity);
+  // Un lot choisi : « Quantité » avance d'un lot à la fois (carton de 10 → 10, 20, 30 paquets),
+  // jamais d'un paquet qui ajouterait « 1 carton + 1 paquet » par surprise. 1 paquet choisi : de 1 en 1.
+  const selectorFormat = multiFormat && selectedFormat ? selectedFormat : null;
+  const selectorMin = selectorFormat ? selectorFormat.units * selectorFormat.minimum : minOrderQuantity;
+  const selectorStep = selectorFormat ? selectorFormat.units * selectorFormat.step : orderQuantityStep;
+  // Le nombre compte des paquets : dit en clair à côté (« 20 paquets ») ; la composition
+  // réelle (« = 1 carton de 20 paquets ») est dite sous le choix du format.
+  const selectorLots = selectorFormat && !selectorFormat.isBase ? `${countLabel(quantity)}, de ${selectorStep} en ${selectorStep}` : null;
   const explicitQuantityLabel = `Ajouter ${quantityLabel}`;
   const ruleStepLine = stepLine(minOrderQuantity, orderQuantityStep);
   const fulfillmentPolicy = normalizeFulfillmentPolicy(product.fulfillment_policy);
@@ -436,7 +444,9 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
                   <>
                     <div className="flex items-center gap-4">
                       <span className="text-sm font-medium text-gray-700">Quantité</span>
-                      <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={maxPurchasable} onChange={changeQuantity} />
+                      <QuantitySelector value={quantity} min={selectorMin} step={selectorStep} max={maxPurchasable} onChange={changeQuantity}
+                        label={selectorLots ? `Quantité, de ${selectorStep} en ${selectorStep}` : undefined} />
+                      {selectorLots && <span className="text-sm font-semibold text-gray-900">{selectorLots}</span>}
                     </div>
                     <button
                       onClick={handleAddToCart}
@@ -471,7 +481,8 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
                     <>
                       <div className="shrink-0">
                         <span className="sr-only">Quantité</span>
-                        <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={maxPurchasable} onChange={changeQuantity} />
+                        <QuantitySelector value={quantity} min={selectorMin} step={selectorStep} max={maxPurchasable} onChange={changeQuantity}
+                          label={selectorLots ? `Quantité, de ${selectorStep} en ${selectorStep}` : undefined} />
                       </div>
                       <button
                         onClick={handleAddToCart}

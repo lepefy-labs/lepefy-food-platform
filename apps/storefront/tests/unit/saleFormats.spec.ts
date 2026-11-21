@@ -66,6 +66,21 @@ test('Ndole: single from 1, lot of 3 selectable, no preselection data, savings o
   expect(saleFormatCardChip(options)).toBe('2 formats · lot de 3 paquets à 9,90 €');
 });
 
+test('un seul prix de référence par format : le prix barré l’emporte sur la comparaison aux unités', () => {
+  // Bobolo carton de 20 : 45,90 € barré 59,90 €, 20 paquets à 3,00 € = 60,00 €.
+  const [base, , carton20] = buildSaleFormatOptions({
+    id: 'bobolo', price: 3, stock: 992, format_label: '1 paquet',
+    formats: [
+      { id: 'c10', price: 25.9, stock: 142, active: true, format_parent_id: 'bobolo', units_per_sale: 10, format_label: 'Carton de 10 paquets', format_position: 1, format_stock_mode: 'own' },
+      { id: 'c20', price: 45.9, compare_at_price: 59.9, stock: 145, active: true, format_parent_id: 'bobolo', units_per_sale: 20, format_label: 'Carton de 20 paquets', format_position: 2, format_stock_mode: 'own' },
+    ],
+  });
+  expect(sp(saleFormatSavingsLine(carton20!, paquet)!)).toBe('Économisez 14,00 €');
+  // Sans prix barré : la comparaison aux unités reste ; la base sans promotion n'a rien.
+  expect(saleFormatSavingsLine(base!, paquet)).toBeNull();
+  expect(sp(saleFormatSavingsLine({ ...carton20!, compareAtPrice: null }, paquet)!)).toBe('Économisez 14,10 € par rapport à 20 paquets à l’unité');
+});
+
 test('a lot below its units is sold out while the single stays purchasable', () => {
   const options = buildSaleFormatOptions(ndole(2));
   expect(options[0]!.purchasable).toBe(true);
