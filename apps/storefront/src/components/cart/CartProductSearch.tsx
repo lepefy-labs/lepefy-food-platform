@@ -6,6 +6,7 @@ import { IconArrowRight, IconLoader2, IconPhoto, IconPlus, IconRefresh, IconSear
 import type { ProductCardProduct } from '@/components/catalog/ProductCard';
 import { useQuickAdd } from '@/components/catalog/useQuickAdd';
 import { useSmartQuickAdd } from '@/components/catalog/useSmartQuickAdd';
+import { FormatPriceRiseNotice } from './FormatPriceRiseNotice';
 import { AvailabilityBadge } from '@/components/catalog/AvailabilityBadge';
 import { PromoBadge } from '@/components/catalog/PromoBadge';
 import { LepefyImage } from '@/components/images/LepefyImage';
@@ -300,7 +301,7 @@ function CartSearchResult({ product, currency, onOpen, onAdded, onDecrement }: {
   }
 
   return (
-    <li className="flex items-center gap-3 px-3 py-2">
+    <li className="flex flex-wrap items-center gap-3 px-3 py-2">
       <Link href={href} onClick={onOpen} tabIndex={-1} aria-hidden="true"
         className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-50 ring-1 ring-black/5">
         {product.image_url
@@ -335,10 +336,10 @@ function CartSearchResult({ product, currency, onOpen, onAdded, onDecrement }: {
             onDecrement={decrement}
           />
         ) : smart.needsChoice ? (
-          <Link href={href} onClick={onOpen}
-            className="inline-flex min-h-11 items-center rounded-xl border-2 border-[var(--color-primary)] bg-white px-3 text-sm font-bold"
+          <Link href={href} onClick={onOpen} aria-label={`${product.name} : choisir le format`}
+            className="inline-flex min-h-11 items-center rounded-xl border-2 border-[var(--color-primary)] bg-white px-3 text-center text-sm font-bold leading-tight"
             style={{ color: accent }}>
-            Choisir
+            Choisir le format
           </Link>
         ) : (
           <button
@@ -353,6 +354,10 @@ function CartSearchResult({ product, currency, onOpen, onAdded, onDecrement }: {
           </button>
         )}
       </div>
+      {smart.priceRise && (
+        <FormatPriceRiseNotice rise={smart.priceRise} sellingFormat={format} currency={currency}
+          onKeep={smart.keepUnits} onConfirm={smart.confirmDecrement} className="basis-full" />
+      )}
     </li>
   );
 }

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { firstAddWeightG, fitsHeadroom, parcelFitLabel, selectParcelFits } from '../../src/lib/cart/parcelFit';
+import { firstAddWeightG, fitsHeadroom, formatAddWeightG, formatFitsHeadroom, parcelFitLabel, selectParcelFits } from '../../src/lib/cart/parcelFit';
 import { addOnWarnings, isMissingAddOnColumn, MAX_ADD_ONS, parseAddOnIds } from '../../src/lib/catalog/addOns';
 import { assembleCartSuggestions } from '../../src/lib/cart/cartSuggestionRules';
 
@@ -41,4 +41,16 @@ test('add-on list: UUIDs only, order kept, duplicates removed, capped; warnings 
   expect(isMissingAddOnColumn({ code: '42703', message: 'column products.add_on_position does not exist' })).toBe(true);
   expect(isMissingAddOnColumn({ code: '23505', message: 'duplicate' })).toBe(false);
   expect(isMissingAddOnColumn(null)).toBe(false);
+});
+
+test('fiche à formats : l’étiquette dit à quoi le poids se rapporte, chaque format dit s’il rentre', () => {
+  expect(parcelFitLabel({ id: 'ndole', weight_grams: 500, min_order_quantity: 1 }, '1 paquet')).toBe('+500 g pour 1 paquet · livraison inchangée');
+  // Ndolè, marge de 1,8 kg : le paquet rentre, le lot de 4 × 500 g (2 kg) non.
+  expect(formatFitsHeadroom({ minimum: 1, row: { weight_grams: 500 } }, 1800)).toBe(true);
+  expect(formatFitsHeadroom({ minimum: 1, row: { weight_grams: 2000 } }, 1800)).toBe(false);
+  // Minimum du format compté ; poids ou marge inconnus : rien n'est affirmé.
+  expect(formatAddWeightG({ minimum: 2, row: { weight_grams: 2000 } })).toBe(4000);
+  expect(formatFitsHeadroom({ minimum: 1, row: { weight_grams: null } }, 1800)).toBeNull();
+  expect(formatFitsHeadroom({ minimum: 1, row: { weight_grams: 500 } }, null)).toBeNull();
+  expect(formatFitsHeadroom({ minimum: 1, row: { weight_grams: 500 } }, 0)).toBe(false);
 });

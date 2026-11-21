@@ -8,7 +8,7 @@ function product(id: string, stock = 5) {
   return { id, name: id, slug: id, price: 5, stock, image_url: null, weight_grams: null, storage_type: 'dry', category_name: 'Food', min_order_quantity: 1, order_quantity_step: 1 };
 }
 
-function fixture(options: { embedding?: unknown; semantic?: unknown[]; rpcError?: boolean; fallback?: unknown[] } = {}) {
+function fixture(options: { embedding?: unknown; semantic?: unknown[]; rpcError?: boolean; fallback?: unknown[]; cards?: unknown[]; cardsError?: boolean } = {}) {
   const calls: { url: URL; body: Record<string, unknown> | null }[] = [];
   const client = createClient('https://example.supabase.co', 'test-key', {
     realtime: { transport: class OfflineWebSocket { constructor() { throw new Error('REST only'); } } as never },
@@ -17,6 +17,15 @@ function fixture(options: { embedding?: unknown; semantic?: unknown[]; rpcError?
       const url = new URL(String(input));
       calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null });
       const rpc = url.pathname.includes('/rpc/');
+      // Cards des résultats sémantiques : relues par id avec la projection partagée.
+      const idFilter = url.searchParams.get('id');
+      if (!rpc && idFilter?.startsWith('in.')) {
+        const ids = idFilter.slice(4, -1).split(',');
+        const rows = ((options.cards ?? options.semantic ?? []) as { id: string; stock: number }[])
+          .filter((row) => ids.includes(row.id) && row.stock !== 0)
+          .reverse(); // ordre de la base, pas celui de la similarité
+        return new Response(JSON.stringify(options.cardsError ? { message: 'Unavailable' } : rows), { status: options.cardsError ? 500 : 200, headers: { 'content-type': 'application/json' } });
+      }
       const data = rpc ? options.rpcError ? { message: 'Unavailable' } : options.semantic ?? []
         : url.searchParams.get('select') === 'embedding' ? { embedding: options.embedding ?? null } : options.fallback ?? [];
       return new Response(JSON.stringify(data), { status: rpc && options.rpcError ? 500 : 200, headers: { 'content-type': 'application/json' } });
@@ -32,7 +41,12 @@ test('semantic order is retained, self and stock zero removed, category fills re
   expect(calls[0]!.url.searchParams.get('tenant_id')).toBe('eq.tenant-a');
   expect(calls[0]!.url.searchParams.get('active')).toBe('eq.true');
   expect(calls[1]!.body).toMatchObject({ query_embedding: [0.1, 0.2], p_tenant_id: 'tenant-a', match_count: 5, min_similarity: 0.35 });
-  const fallback = calls[2]!.url.searchParams;
+  const cards = calls[2]!.url.searchParams;
+  expect(cards.get('id')).toBe('in.(semantic)');
+  expect(cards.get('tenant_id')).toBe('eq.tenant-a');
+  expect(cards.get('format_parent_id')).toBe('is.null');
+  expect(cards.get('select')).toContain('formats:sale_formats(');
+  const fallback = calls[3]!.url.searchParams;
   expect(fallback.get('tenant_id')).toBe('eq.tenant-a');
   expect(fallback.get('active')).toBe('eq.true');
   expect(fallback.get('stock')).toBe('neq.0');
@@ -75,6 +89,23 @@ test('la règle de quantité minimale est propagée depuis les deux branches (s�
     expect.objectContaining({ id: 'semantic', min_order_quantity: 4, order_quantity_step: 1 }),
     expect.objectContaining({ id: 'fallback', min_order_quantity: 2, order_quantity_step: 1 }),
   ]);
+});
+
+test('les cards sémantiques gardent l’ordre de similarité et portent leurs formats de vente', async () => {
+  const formats = [{ id: 'lot', units_per_sale: 4, format_label: 'Lot de 4', price: 12, active: true }];
+  const { client } = fixture({
+    embedding: [0.1],
+    semantic: [product('a'), product('b')],
+    cards: [{ ...product('a'), formats }, { ...product('b'), formats: [] }],
+  });
+  const result = await getRelatedProducts(client, tenant, source, 2);
+  expect(result.map((p) => p.id)).toEqual(['a', 'b']);
+  expect(result[0]!.formats).toEqual(formats);
+});
+
+test('lecture des cards sémantiques en échec : repli catégorie', async () => {
+  const { client } = fixture({ embedding: [0.1], semantic: [product('a')], cardsError: true, fallback: [product('fallback')] });
+  expect((await getRelatedProducts(client, tenant, source, 4)).map((p) => p.id)).toEqual(['fallback']);
 });
 
 test('malformed embedding and empty category results are a valid empty enhancement', async () => {

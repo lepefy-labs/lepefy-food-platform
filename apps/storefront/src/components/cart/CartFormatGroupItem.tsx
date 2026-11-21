@@ -10,6 +10,7 @@ import { cheaperWithMoreUnits } from '@/lib/catalog/saleFormats';
 import { setFormatUnits, useFormatUnits } from '@/lib/cart/useFormatUnits';
 import type { CartFormatGroup } from '@/lib/cart/useCartFormatGroups';
 import { CartStepper } from './CartStepper';
+import { FormatPriceRiseNotice } from './FormatPriceRiseNotice';
 
 interface CartFormatGroupItemProps {
   group: CartFormatGroup;
@@ -85,7 +86,12 @@ export function CartFormatGroupItem({ group, currency, variant = 'page', onRemov
     </p>
   );
 
-  const cheaperNotice = cheaper && (
+  const priceRiseNotice = (
+    <FormatPriceRiseNotice rise={control.priceRise} sellingFormat={sellingFormat} currency={currency}
+      onKeep={control.keepUnits} onConfirm={control.confirmDecrement} className="mt-1.5" />
+  );
+
+  const cheaperNotice = !control.priceRise && cheaper && (
     <p className="mt-1.5 flex flex-wrap items-center gap-x-2 rounded-lg bg-green-50 px-2 py-1 text-xs font-semibold leading-snug text-green-900" role="status">
       <span>{cheaperWithMoreLine(cheaper, total, sellingFormat, currency)}.</span>
       <button type="button" onClick={() => setFormatUnits(parent, options, cheaper.units)} className="inline-flex min-h-9 items-center font-bold underline underline-offset-2">
@@ -106,6 +112,7 @@ export function CartFormatGroupItem({ group, currency, variant = 'page', onRemov
           <p className="line-clamp-2 text-sm font-bold leading-snug text-gray-950">{parent.name}</p>
           <p className="mt-1 text-xs text-gray-700">{priceLine}</p>
           {composition}
+          {priceRiseNotice}
           {cheaperNotice}
           {stockNotice}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -131,6 +138,7 @@ export function CartFormatGroupItem({ group, currency, variant = 'page', onRemov
           </Link>
           <p className="mt-0.5 text-sm leading-snug text-gray-700">{formatCount(sellingFormat, control.units)} · {priceLine}</p>
           {composition}
+          {priceRiseNotice}
           {cheaperNotice}
           {stockNotice}
         </div>

@@ -4,6 +4,7 @@ import type { ProductCardProduct } from './ProductCard';
 import { useQuickAdd } from './useQuickAdd';
 import { useCartLineQuantity } from '@/lib/cart/useCartLineQuantity';
 import { useFormatUnits } from '@/lib/cart/useFormatUnits';
+import type { DecrementPriceRise } from '@/lib/catalog/saleFormats';
 import { buildSaleFormatOptions } from '@/lib/catalog/saleFormats';
 import { saleFormatOfferLine } from '@/lib/storefrontCopy/saleFormatCopy';
 
@@ -13,7 +14,11 @@ export interface SmartQuickAdd {
   inCart: boolean;
   /** Rien d'achetable (épuisé, stock sous le minimum). */
   unavailable: boolean;
-  /** Seuls des lots sont achetables : le choix se fait sur la fiche produit. */
+  /**
+   * Plusieurs formats achetables (même règle que la card, « Choisir le
+   * format ») : le premier ajout passe par le choix du format sur la fiche
+   * produit, jamais un paquet à l'unité ajouté d'office.
+   */
   needsChoice: boolean;
   /** Quantité posée par « Ajouter » (minimum du produit ou du format de base). */
   firstAdd: number;
@@ -26,6 +31,10 @@ export interface SmartQuickAdd {
   add: () => boolean;
   increment: () => void;
   decrement: () => 'decremented' | 'removed' | 'unchanged';
+  /** Fiche à formats : « − » qui ferait payer plus, en attente du choix du client. */
+  priceRise: DecrementPriceRise | null;
+  confirmDecrement: () => void;
+  keepUnits: () => void;
 }
 
 /**
@@ -55,24 +64,33 @@ export function useSmartQuickAdd(product: ProductCardProduct, currency = 'EUR'):
       add: quick.addToCart,
       increment: line.increment,
       decrement: line.decrement,
+      priceRise: null,
+      confirmDecrement: () => {},
+      keepUnits: () => {},
     };
   }
   const base = options.find((option) => option.isBase);
   const baseBuyable = Boolean(base?.purchasable);
-  const unavailable = !options.some((option) => option.purchasable);
+  const purchasable = options.filter((option) => option.purchasable);
+  const unavailable = purchasable.length === 0;
+  // Règle de la card (`choosesFormat`) : ajout direct seulement si la base est le seul format achetable.
+  const choosesFormat = !(purchasable.length === 1 && purchasable[0]!.isBase);
   const firstAdd = base ? base.units * base.minimum : 1;
   return {
     quantity: formatUnits.units,
     inCart: formatUnits.units > 0,
     unavailable,
-    needsChoice: !unavailable && !baseBuyable && formatUnits.units === 0,
+    needsChoice: !unavailable && choosesFormat && formatUnits.units === 0,
     firstAdd,
     canIncrement: formatUnits.canIncrement,
     removesOnDecrement: formatUnits.removesOnDecrement,
     offerLine: saleFormatOfferLine(options, currency),
     lastLineId: base?.id ?? product.id,
-    add: () => (baseBuyable ? formatUnits.addUnits(firstAdd) : false),
+    add: () => (baseBuyable && !choosesFormat ? formatUnits.addUnits(firstAdd) : false),
     increment: formatUnits.increment,
     decrement: formatUnits.decrement,
+    priceRise: formatUnits.priceRise,
+    confirmDecrement: formatUnits.confirmDecrement,
+    keepUnits: formatUnits.keepUnits,
   };
 }

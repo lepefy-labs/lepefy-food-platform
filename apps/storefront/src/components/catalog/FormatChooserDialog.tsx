@@ -21,6 +21,8 @@ interface FormatChooserDialogProps {
    * panier recompose ensuite la combinaison la moins chère. true = ajouté.
    */
   onAddUnits: (option: SaleFormatOption) => boolean;
+  /** Marge de poids sans hausse de livraison (« Ça rentre dans votre colis ») ; absent = non affiché. */
+  shippingHeadroomG?: number | null;
 }
 
 /**
@@ -28,7 +30,7 @@ interface FormatChooserDialogProps {
  * le « + » n'ajoute jamais un lot par surprise. Feuille en bas de l'écran sur
  * mobile, fenêtre centrée au-delà ; Échap ferme, Tab reste dans la fenêtre.
  */
-export function FormatChooserDialog({ open, product, options, onClose, onAddUnits }: FormatChooserDialogProps) {
+export function FormatChooserDialog({ open, product, options, onClose, onAddUnits, shippingHeadroomG }: FormatChooserDialogProps) {
   const { currency } = useTenant();
   const panelRef = useRef<HTMLDivElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -82,6 +84,7 @@ export function FormatChooserDialog({ open, product, options, onClose, onAddUnit
           unitContent={contentLabel(sellingFormat) ?? product.net_quantity_display ?? null}
           legend="Format"
           compact
+          shippingHeadroomG={shippingHeadroomG}
         />
         {prompt && (
           <p role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">

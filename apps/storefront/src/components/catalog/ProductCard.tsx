@@ -30,6 +30,7 @@ import { buildSaleFormatOptions, type SaleFormatFields, type SaleFormatRow } fro
 import { bundleCaption, saleFormatCardChip, saleFormatOfferLine } from '@/lib/storefrontCopy/saleFormatCopy';
 import { useFormatUnits } from '@/lib/cart/useFormatUnits';
 import { FormatChooserDialog } from './FormatChooserDialog';
+import { FormatPriceRiseNotice } from '@/components/cart/FormatPriceRiseNotice';
 
 /**
  * Forme minimale requise par la card — satisfaite à la fois par
@@ -90,6 +91,8 @@ interface ProductCardProps {
   confirmOnAdd?: boolean;
   /** Après un ajout réussi depuis le bouton de la carte (mesure de l'emplacement d'une suggestion). */
   onAdded?: (product: ProductCardProduct) => void;
+  /** « Ça rentre dans votre colis » : le choix du format dit si chaque format garde la livraison inchangée. */
+  shippingHeadroomG?: number | null;
 }
 
 const STORAGE_TAG_LABELS: Record<'dry' | 'fresh' | 'frozen', string> = {
@@ -116,7 +119,7 @@ function getGridStorageLabel(product: ProductCardProduct): 'Frais' | 'Surgelé' 
   return null;
 }
 
-export function ProductCard({ product, variant = 'grid', compactMobile = false, catalogScope = 'shop', confirmOnAdd = true, onAdded }: ProductCardProps) {
+export function ProductCard({ product, variant = 'grid', compactMobile = false, catalogScope = 'shop', confirmOnAdd = true, onAdded, shippingHeadroomG }: ProductCardProps) {
   const { currency } = useTenant();
   const merchandise = catalogScope === 'gadgets';
   const { addToCart, added, outOfStock, atLimit, availability } = useQuickAdd(product, !merchandise);
@@ -187,6 +190,10 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
     ? (formatUnits.canIncrement ? quantityNoun(sellingFormat, formatUnits.units) ?? 'dans le panier' : 'maximum disponible')
     : line.canIncrement ? 'dans le panier' : 'maximum disponible';
   const formatCaption = multiFormat && formatUnits.units > 0 ? bundleCaption(formatUnits.current, formatOptions, sellingFormat, currency) : null;
+  const priceRiseNotice = multiFormat && (
+    <FormatPriceRiseNotice rise={formatUnits.priceRise} sellingFormat={sellingFormat} currency={currency}
+      onKeep={formatUnits.keepUnits} onConfirm={formatUnits.confirmDecrement} className="mt-1.5" />
+  );
   const formatCaptionLine = formatCaption && formatCaption !== 'dans le panier' && (
     <p aria-live="polite" className={`mt-1 text-xs font-semibold leading-snug ${formatUnits.current && formatUnits.current.savings > 0 ? 'text-green-800' : 'text-gray-700'}`}>{formatCaption}</p>
   );
@@ -343,7 +350,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             {!merchandise && !multiFormat && availability === 'below_minimum' && (
               <p className="mt-2 text-xs leading-snug text-gray-700">{belowMinimumDetail(minOrderQuantity)}</p>
             )}
-            {showStepper && <div ref={stepperRef} className="mt-2">{stepper}{formatCaptionLine}</div>}
+            {showStepper && <div ref={stepperRef} className="mt-2">{stepper}{formatCaptionLine}{priceRiseNotice}</div>}
             {!merchandise && !showStepper && (
               <button
                 ref={ctaRef}
@@ -387,7 +394,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             )}
             {showFulfillment && <FulfillmentPolicyChip policy={fulfillmentPolicy} className="mt-1" />}
             {unavailable && <AvailabilityBadge state={availability} className="mt-1" />}
-            {showStepper && <div ref={stepperRef} className="mt-2">{stepper}{formatCaptionLine}</div>}
+            {showStepper && <div ref={stepperRef} className="mt-2">{stepper}{formatCaptionLine}{priceRiseNotice}</div>}
           </div>
         )}
       </div>
@@ -410,6 +417,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
           product={product}
           options={formatOptions}
           onClose={() => setFormatDialogOpen(false)}
+          shippingHeadroomG={shippingHeadroomG}
           onAddUnits={(option) => {
             const added = formatUnits.addUnits(option.units * option.minimum);
             if (added) {

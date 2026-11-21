@@ -5,6 +5,7 @@ import type { SaleFormatOption } from '@/lib/catalog/saleFormats';
 import { formatPrice } from '@/lib/utils/format';
 import type { SellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { saleFormatSavingsLine, saleFormatUnitPriceLine } from '@/lib/storefrontCopy/saleFormatCopy';
+import { formatFitsHeadroom } from '@/lib/cart/parcelFit';
 
 interface SaleFormatPickerProps {
   options: SaleFormatOption[];
@@ -18,6 +19,12 @@ interface SaleFormatPickerProps {
   unitContent: string | null;
   legend?: string;
   compact?: boolean;
+  /**
+   * Marge de poids avant une hausse de livraison (« Ça rentre dans votre
+   * colis ») : chaque format dit s'il garde la livraison inchangée. Absent =
+   * rien d'affiché.
+   */
+  shippingHeadroomG?: number | null;
 }
 
 /**
@@ -25,7 +32,7 @@ interface SaleFormatPickerProps {
  * card). Boutons radio natifs : flèches, Espace et lecteurs d'écran sans code
  * en plus. Un format épuisé reste visible mais désactivé.
  */
-export function SaleFormatPicker({ options, value, onChange, currency, baseFormat, unitContent, legend = 'Format', compact = false }: SaleFormatPickerProps) {
+export function SaleFormatPicker({ options, value, onChange, currency, baseFormat, unitContent, legend = 'Format', compact = false, shippingHeadroomG }: SaleFormatPickerProps) {
   const name = useId();
   return (
     <fieldset className="grid gap-2">
@@ -36,6 +43,7 @@ export function SaleFormatPicker({ options, value, onChange, currency, baseForma
         const content = option.units > 1 && unitContent ? `${option.units} × ${unitContent}` : unitContent;
         const unitLine = saleFormatUnitPriceLine(option, baseFormat, currency);
         const savings = saleFormatSavingsLine(option, baseFormat, currency);
+        const fits = !disabled && shippingHeadroomG !== undefined ? formatFitsHeadroom(option, shippingHeadroomG) : null;
         return (
           <label
             key={option.id}
@@ -66,6 +74,11 @@ export function SaleFormatPicker({ options, value, onChange, currency, baseForma
               ) : savings ? (
                 <span className="mt-1 inline-block rounded-md bg-green-100 px-1.5 py-0.5 text-xs font-bold leading-snug text-green-900">{savings}</span>
               ) : null}
+              {fits !== null && (
+                <span className={`mt-1 block text-xs font-semibold leading-snug ${fits ? 'text-emerald-800' : 'text-gray-700'}`}>
+                  {fits ? 'Livraison inchangée' : 'La livraison peut augmenter'}
+                </span>
+              )}
             </span>
             <span className="text-right">
               <span className={`block font-extrabold tabular-nums text-gray-950 ${compact ? 'text-sm' : 'text-base'}`}>{formatPrice(option.price, currency)}</span>

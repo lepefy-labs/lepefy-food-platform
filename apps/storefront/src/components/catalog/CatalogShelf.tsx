@@ -34,6 +34,8 @@ interface CatalogShelfProps {
   note?: (product: ProductCardProduct) => string | null;
   /** Après un ajout depuis une carte du bloc. */
   onAdded?: (product: ProductCardProduct) => void;
+  /** « Ça rentre dans votre colis » : marge transmise au choix du format des cartes. */
+  shippingHeadroomG?: number | null;
 }
 
 /**
@@ -41,7 +43,7 @@ interface CatalogShelfProps {
  * avec son bouton « Tout voir » : même forme que les anciens accès de l'en-tête
  * (bord et texte de la couleur du bloc, total dans la pastille). Rien sans produit.
  */
-export function CatalogShelf({ id, title, icon, tone, href, count = 0, allLabel, products, confirmOnAdd, className = 'mt-5', subtitle, note, onAdded }: CatalogShelfProps) {
+export function CatalogShelf({ id, title, icon, tone, href, count = 0, allLabel, products, confirmOnAdd, className = 'mt-5', subtitle, note, onAdded, shippingHeadroomG }: CatalogShelfProps) {
   if (products.length === 0) return null;
   const colors = TONES[tone];
   return (
@@ -64,7 +66,7 @@ export function CatalogShelf({ id, title, icon, tone, href, count = 0, allLabel,
       <ul className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 md:gap-4">
         {products.map((product) => (
           <li key={product.id} className="w-[44vw] max-w-[220px] shrink-0 snap-start sm:w-[30vw]">
-            <ProductCard product={product} compactMobile confirmOnAdd={confirmOnAdd} onAdded={onAdded} />
+            <ProductCard product={product} compactMobile confirmOnAdd={confirmOnAdd} onAdded={onAdded} shippingHeadroomG={shippingHeadroomG} />
             {note?.(product) && <p className="mt-1 px-1 text-xs font-semibold text-emerald-800">{note(product)}</p>}
           </li>
         ))}

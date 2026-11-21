@@ -35,6 +35,7 @@ import type { ProductWithCategory } from '@lepefy/types';
 import { buildSaleFormatOptions, describeBundle, planFormatBundle, type SaleFormatRow } from '@/lib/catalog/saleFormats';
 import { useFormatUnits } from '@/lib/cart/useFormatUnits';
 import { bundleCaption } from '@/lib/storefrontCopy/saleFormatCopy';
+import { FormatPriceRiseNotice } from '@/components/cart/FormatPriceRiseNotice';
 import { SaleFormatPicker } from './SaleFormatPicker';
 
 export function ProductDetail({ product }: { product: ProductWithCategory & { formats?: SaleFormatRow[] | null } }) {
@@ -405,6 +406,10 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
             <>
               <div className="hidden py-3 px-4 bg-gray-200 rounded-lg text-gray-800 text-sm font-semibold text-center md:block">{AVAILABILITY_COPY.unavailableCta}</div>
               <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[55] border-t border-gray-200 bg-white/95 shadow-[0_-8px_24px_rgba(15,23,42,0.10)] backdrop-blur md:hidden">
+                {multiFormat && showsCartLine && (
+                  <FormatPriceRiseNotice rise={formatUnits.priceRise} sellingFormat={sellingFormat} currency={currency}
+                    onKeep={formatUnits.keepUnits} onConfirm={formatUnits.confirmDecrement} className="mx-3 mt-2" />
+                )}
                 <div className="mx-auto max-w-7xl px-3 py-2.5">
                   <div className="flex min-h-12 items-center justify-center rounded-xl bg-gray-200 px-4 text-sm font-semibold text-gray-800">
                     {AVAILABILITY_COPY.unavailableCta}
@@ -422,6 +427,10 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
                       <span className="text-sm font-medium text-gray-700">Quantité dans le panier</span>
                       {cartStepper}
                     </div>
+                    {multiFormat && (
+                      <FormatPriceRiseNotice rise={formatUnits.priceRise} sellingFormat={sellingFormat} currency={currency}
+                        onKeep={formatUnits.keepUnits} onConfirm={formatUnits.confirmDecrement} className="text-sm" />
+                    )}
                   </>
                 ) : (
                   <>
@@ -441,6 +450,10 @@ export function ProductDetail({ product }: { product: ProductWithCategory & { fo
               </div>
 
               <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[55] border-t border-gray-200 bg-white/95 shadow-[0_-8px_24px_rgba(15,23,42,0.10)] backdrop-blur md:hidden">
+                {multiFormat && showsCartLine && (
+                  <FormatPriceRiseNotice rise={formatUnits.priceRise} sellingFormat={sellingFormat} currency={currency}
+                    onKeep={formatUnits.keepUnits} onConfirm={formatUnits.confirmDecrement} className="mx-3 mt-2" />
+                )}
                 <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-2.5">
                   {showsCartLine ? (
                     <>

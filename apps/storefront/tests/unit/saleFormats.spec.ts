@@ -5,6 +5,7 @@ import {
   aggregateStockDemand,
   buildSaleFormatOptions,
   cheaperWithMoreUnits,
+  decrementPriceRise,
   formatQuantityLabel,
   formatSavings,
   lowestUnitPrice,
@@ -24,7 +25,7 @@ import {
   type AttachCandidate,
 } from '../../src/lib/catalog/saleFormatsAdmin';
 import { orderItemFormatLabel, orderItemPhysicalUnits } from '../../src/lib/orders/documents/itemFormat';
-import { bundleCaption, cheaperWithMoreLine, saleFormatCardChip, saleFormatOfferLine, saleFormatSavingsLine, saleFormatUnitPriceLine } from '../../src/lib/storefrontCopy/saleFormatCopy';
+import { bundleCaption, cheaperWithMoreLine, decrementPriceRiseLine, saleFormatCardChip, saleFormatOfferLine, saleFormatSavingsLine, saleFormatUnitPriceLine } from '../../src/lib/storefrontCopy/saleFormatCopy';
 import { resolveSellingFormat } from '../../src/lib/storefrontCopy/sellingFormat';
 
 // Demo prices only (pilot price is the tenant's decision).
@@ -284,6 +285,18 @@ test.describe('Une unité de moins ne coûte jamais plus sans le dire', () => {
     // Ndole : 2 paquets à 7,00 € contre le lot de 3 à 9,90 € : pas moins cher.
     const ndoleOptions = buildSaleFormatOptions(ndole(7));
     expect(cheaperWithMoreUnits(2, 7, ndoleOptions, 7, { weightBudgetG: 99999 })).toBeNull();
+  });
+
+  test('le « − » qui fait perdre un lot est annoncé avant, avec le montant', () => {
+    // 11 paquets = carton de 10 + 1 paquet (28,90 €) → 10 = carton seul (25,90 €) : baisse, rien à dire.
+    expect(decrementPriceRise(11, planFormatBundle(11, bobolo)!.total, bobolo)).toBeNull();
+    // 10 (25,90 €) → 9 paquets (27,00 €) : 1,10 € de plus.
+    const rise = decrementPriceRise(10, 25.9, bobolo)!;
+    expect(rise).toEqual({ fromUnits: 10, units: 9, currentTotal: 25.9, total: 27, extra: 1.1 });
+    expect(sp(decrementPriceRiseLine(rise, paquet))).toBe('À 9 paquets, vous paieriez 27,00 € au lieu de 25,90 €, soit 1,10 € de plus.');
+    // Dernière unité (retrait) et produit à format unique : jamais d'avis.
+    expect(decrementPriceRise(1, 3, bobolo)).toBeNull();
+    expect(decrementPriceRise(5, 15, bobolo.slice(0, 1))).toBeNull();
   });
 
   test('même prix : dit sans prétendre une économie', () => {

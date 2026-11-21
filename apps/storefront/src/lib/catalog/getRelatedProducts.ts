@@ -1,4 +1,3 @@
-import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import type { createPublicClient } from '@/lib/supabase/public';
 import type { SemanticMatch } from '@lepefy/types';
 import type { ProductCardProduct } from '@/components/catalog/ProductCard';
@@ -72,27 +71,27 @@ export async function getRelatedProducts(
       if (error) {
         console.error('[products/[slug]] match_products a échoué, repli sur la catégorie :', error.message);
       } else {
-        candidates = ((semantic ?? []) as SemanticMatch[])
+        // L'ordre vient de la similarité ; les données de la card viennent de la
+        // projection partagée (formats de vente compris), comme le repli
+        // catégorie : deux cards du même carrousel se comportent pareil.
+        const ids = ((semantic ?? []) as SemanticMatch[])
           .filter((p) => p.id !== product.id && p.stock !== 0)
-          .map((p) => ({
-            id:           p.id,
-            name:         p.name,
-            slug:         p.slug,
-            price:        p.price,
-            image_url:    p.image_url,
-            weight_grams: p.weight_grams,
-            stock:        p.stock,
-            storage_type: p.storage_type,
-            category:     p.category_name ? { name: p.category_name } : null,
-            min_order_quantity:  p.min_order_quantity,
-            order_quantity_step: p.order_quantity_step,
-            net_quantity_display: p.net_quantity_display ?? null,
-            sale_unit:           p.sale_unit ?? null,
-            net_content_value:   p.net_content_value ?? null,
-            net_content_unit:    p.net_content_unit ?? null,
-            pack_count:          p.pack_count ?? null,
-            fulfillment_policy:  normalizeFulfillmentPolicy(p.fulfillment_policy),
-          }));
+          .map((p) => p.id);
+        if (ids.length > 0) {
+          const { data: cards, error: cardsError } = await supabase
+            .from('products')
+            .select(PRODUCT_CARD_SELECT)
+            .eq('tenant_id', tenant.id)
+            .eq('active', true).is('format_parent_id', null)
+            .neq('stock', 0)
+            .in('id', ids);
+          if (cardsError) {
+            console.error('[products/[slug]] lecture des cards similaires a échoué, repli sur la catégorie :', cardsError.message);
+          } else {
+            const byId = new Map(((cards ?? []) as unknown as ProductCardProduct[]).map((card) => [card.id, card]));
+            candidates = ids.map((id) => byId.get(id)).filter((card): card is ProductCardProduct => Boolean(card));
+          }
+        }
       }
     }
   }

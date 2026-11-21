@@ -249,6 +249,36 @@ export function maxBundleUnits(options: SaleFormatOption[], ceiling = 999): numb
   return candidate;
 }
 
+/** Une unité de moins qui coûterait plus : le « − » demande d'abord confirmation. */
+export interface DecrementPriceRise {
+  /** Unités actuelles (celles que le client garderait). */
+  fromUnits: number;
+  /** Unités après le « − ». */
+  units: number;
+  /** Total actuel. */
+  currentTotal: number;
+  /** Total après le « − » (plus élevé). */
+  total: number;
+  /** Différence payée en plus. */
+  extra: number;
+}
+
+/**
+ * Le « − » retire une unité de base puis recompose au meilleur prix : à 10
+ * paquets (carton à 25,90 €), 9 paquets coûtent 27,00 €. Retourne cette hausse
+ * pour la dire AVANT d'appliquer le changement ; null quand le « − » ne fait
+ * pas payer plus (cas courant) ou qu'il vide la fiche.
+ */
+export function decrementPriceRise(units: number, currentTotal: number, options: SaleFormatOption[]): DecrementPriceRise | null {
+  const from = Math.trunc(units);
+  if (from <= 1 || options.length < 2) return null;
+  const plan = planFormatBundle(from - 1, options);
+  if (!plan) return null;
+  const extraCents = Math.round(plan.total * 100) - Math.round(currentTotal * 100);
+  if (extraCents <= 0) return null;
+  return { fromUnits: from, units: from - 1, currentTotal, total: plan.total, extra: extraCents / 100 };
+}
+
 /** Quelques unités de plus pour payer moins (ou autant) que la composition actuelle. */
 export interface CheaperWithMore {
   /** Unités de base à ajouter (au moins 1). */

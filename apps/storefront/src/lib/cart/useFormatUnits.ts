@@ -1,10 +1,13 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useCartStore } from '@/stores/cartStore';
 import { useHydratedCartItems } from './useHydratedCart';
 import {
+  decrementPriceRise,
   maxBundleUnits,
   planFormatBundle,
+  type DecrementPriceRise,
   type FormatBundlePlan,
   type SaleFormatOption,
 } from '@/lib/catalog/saleFormats';
@@ -21,7 +24,17 @@ export interface FormatUnitsControl {
   /** Le prochain « − » vide la fiche du panier (corbeille). */
   removesOnDecrement: boolean;
   increment: () => void;
+  /**
+   * Retire une unité. Si la recomposition ferait payer plus (on perd un lot),
+   * rien ne change : `priceRise` est rempli et le client choisit.
+   */
   decrement: () => 'decremented' | 'removed' | 'unchanged';
+  /** Hausse de prix en attente de confirmation après un « − », null sinon. */
+  priceRise: DecrementPriceRise | null;
+  /** Applique le « − » malgré la hausse annoncée. */
+  confirmDecrement: () => void;
+  /** Garde la quantité actuelle (ferme l'avis). */
+  keepUnits: () => void;
   /** Ajoute `count` unités de base (choix d'un format : 1 paquet = 1, lot de 3 = 3). */
   addUnits: (count: number) => boolean;
 }
@@ -29,6 +42,11 @@ export interface FormatUnitsControl {
 function cartUnits(options: SaleFormatOption[]): number {
   const items = useCartStore.getState().items;
   return options.reduce((sum, option) => sum + (items.find((item) => item.product.id === option.id)?.quantity ?? 0) * option.units, 0);
+}
+
+function cartTotal(options: SaleFormatOption[]): number {
+  const items = useCartStore.getState().items;
+  return options.reduce((sum, option) => sum + (items.find((item) => item.product.id === option.id)?.quantity ?? 0) * option.price, 0);
 }
 
 /**
@@ -76,6 +94,12 @@ export function useFormatUnits(parent: FormatParentForCart, options: SaleFormatO
       }
     : null;
   const maxUnits = options.length ? maxBundleUnits(options) : 0;
+  // Avis « une unité de moins coûte plus » : valable seulement pour la quantité où il a été demandé.
+  const [pendingRise, setPendingRise] = useState<DecrementPriceRise | null>(null);
+  const priceRise = pendingRise && pendingRise.fromUnits === units ? pendingRise : null;
+  useEffect(() => {
+    if (pendingRise && pendingRise.fromUnits !== units) setPendingRise(null);
+  }, [pendingRise, units]);
   return {
     units,
     current,
@@ -83,16 +107,32 @@ export function useFormatUnits(parent: FormatParentForCart, options: SaleFormatO
     canIncrement: units < maxUnits,
     removesOnDecrement: units === 1,
     increment: () => {
+      setPendingRise(null);
       const live = cartUnits(options);
       if (live < maxUnits) setFormatUnits(parent, options, live + 1);
     },
     decrement: () => {
       const live = cartUnits(options);
       if (live <= 0) return 'unchanged';
+      const rise = decrementPriceRise(live, cartTotal(options), options);
+      if (rise) {
+        setPendingRise(rise);
+        return 'unchanged';
+      }
+      setPendingRise(null);
       setFormatUnits(parent, options, live - 1);
       return live - 1 === 0 ? 'removed' : 'decremented';
     },
+    priceRise,
+    confirmDecrement: () => {
+      const rise = pendingRise;
+      setPendingRise(null);
+      // Relit le panier : le changement ne s'applique qu'à la quantité annoncée.
+      if (rise && cartUnits(options) === rise.fromUnits) setFormatUnits(parent, options, rise.units);
+    },
+    keepUnits: () => setPendingRise(null),
     addUnits: (count) => {
+      setPendingRise(null);
       const live = cartUnits(options);
       const target = Math.min(maxUnits, live + Math.max(0, count));
       if (target <= live) return false;

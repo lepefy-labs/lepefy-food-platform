@@ -22,6 +22,7 @@ import { buildSaleFormatOptions } from '@/lib/catalog/saleFormats';
 import { useFormatUnits } from '@/lib/cart/useFormatUnits';
 import { bundleCaption } from '@/lib/storefrontCopy/saleFormatCopy';
 import { useSmartQuickAdd } from '@/components/catalog/useSmartQuickAdd';
+import { FormatPriceRiseNotice } from './FormatPriceRiseNotice';
 import { PromoBadge } from '@/components/catalog/PromoBadge';
 import { describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { AVAILABILITY_COPY } from '@/lib/storefrontCopy/availability';
@@ -98,6 +99,8 @@ function RecommendationItem({ product, onAdded, onClose }: {
         {atLimit ? AVAILABILITY_COPY.atLimitCta : outOfStock ? AVAILABILITY_COPY.unavailableCta : hasMinRule ? `Ajouter ${minOrderQuantity}` : 'Ajouter'}
       </button>
       )}
+      <FormatPriceRiseNotice rise={smart.priceRise} sellingFormat={resolveSellingFormat(product)} currency={currency}
+        onKeep={smart.keepUnits} onConfirm={smart.confirmDecrement} className="mt-1.5" />
     </li>
   );
 }
@@ -237,6 +240,10 @@ function ConfirmationPanel({ product, continueHref, onClose }: {
               </div>
               {formatCaption && formatCaption !== 'dans le panier' && (
                 <p aria-live="polite" className="mt-1.5 text-sm font-semibold text-green-800">{formatCaption}</p>
+              )}
+              {multiFormat && (
+                <FormatPriceRiseNotice rise={formatUnits.priceRise} sellingFormat={resolveSellingFormat(product)} currency={currency}
+                  onKeep={formatUnits.keepUnits} onConfirm={formatUnits.confirmDecrement} className="mt-1.5 text-sm" />
               )}
               {hasMinRule && line.quantity === minOrderQuantity && (
                 <p role="status" className="mt-1.5 text-sm font-semibold text-gray-800">Minimum de {minOrderQuantity} ajouté.</p>

@@ -1,4 +1,4 @@
-import { formatQuantityLabel, type CheaperWithMore, type FormatBundlePlan, type SaleFormatOption } from '@/lib/catalog/saleFormats';
+import { formatQuantityLabel, type CheaperWithMore, type DecrementPriceRise, type FormatBundlePlan, type SaleFormatOption } from '@/lib/catalog/saleFormats';
 import { formatPrice } from '@/lib/utils/format';
 import { formatCount, unitPhrase, type SellingFormat } from './sellingFormat';
 
@@ -75,6 +75,14 @@ export function cheaperWithMoreLine(hint: CheaperWithMore, currentTotal: number,
   return Math.round(hint.total * 100) < Math.round(currentTotal * 100)
     ? `Avec ${extra} de plus : ${formatPrice(hint.total, currency)} au lieu de ${formatPrice(currentTotal, currency)}`
     : `Avec ${extra} de plus : même prix, ${formatPrice(hint.total, currency)}`;
+}
+
+/**
+ * Avis avant un « − » qui ferait payer plus (on perd un lot) :
+ * « À 9 paquets, vous paieriez 27,00 € au lieu de 25,90 €, soit 1,10 € de plus. »
+ */
+export function decrementPriceRiseLine(rise: DecrementPriceRise, base: SellingFormat, currency = 'EUR'): string {
+  return `À ${formatCount(base, rise.units)}, vous paieriez ${formatPrice(rise.total, currency)} au lieu de ${formatPrice(rise.currentTotal, currency)}, soit ${formatPrice(rise.extra, currency)} de plus.`;
 }
 
 function lowerFirst(text: string): string {
