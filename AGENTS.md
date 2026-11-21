@@ -58,7 +58,7 @@ Non-negotiable invariants:
 
 1. the tenant is resolved only server-side from the recipient `phone_number_id`; never from the customer number, a client-supplied tenant id or the deployment env;
 2. no Meta token, app secret or verify token in the database or repository (env var references only);
-3. never connect, migrate or activate a real tenant number (e.g. Chloe Food) without explicit requester approval — follow the onboarding checklist of the document;
+3. never connect, migrate or activate a real tenant number (e.g. Chloe Food) without explicit requester approval; follow the onboarding checklist of the document;
 4. deterministic data (prices, stock, shipping, order status, tracking, payments) never comes from AI;
 5. the document is a mandatory co-change: update its state, file map, invariants and troubleshooting in the same delivery unit.
 
@@ -142,13 +142,29 @@ docs/ADMIN_DESIGN_SYSTEM.md
 
 Non-negotiable rules:
 
-1. colours only through the admin tokens (`lib/admin/tokens.ts`, Tailwind `a-*` and `tone-*`): no raw Tailwind palette (`gray-*`, `violet-*`, `emerald-*`…), no hex values, no `dark:` variants, no storefront `var(--color-*)` / `bg-primary`-style classes — tokens already switch light/dark; tenant colour only through `--tenant-*` (identity, storefront previews), intentionally white elements (logo, QR, previews) use an explicit `bg-white`;
-2. three colour families never mix: Lepefy brand (actions, selection, focus), tenant branding (identity only), semantic tones (`info`, `success`, `warning`, `urgent`, `danger`, `neutral`) for states — a state's tone comes from `lib/admin/statusRegistry.ts`, never from a page;
+1. colours only through the admin tokens (`lib/admin/tokens.ts`, Tailwind `a-*` and `tone-*`): no raw Tailwind palette (`gray-*`, `violet-*`, `emerald-*`…), no hex values, no `dark:` variants, no storefront `var(--color-*)` / `bg-primary`-style classes (tokens already switch light/dark); tenant colour only through `--tenant-*` (identity, storefront previews), intentionally white elements (logo, QR, previews) use an explicit `bg-white`;
+2. three colour families never mix: Lepefy brand (actions, selection, focus), tenant branding (identity only), semantic tones (`info`, `success`, `warning`, `urgent`, `danger`, `neutral`) for states: a state's tone comes from `lib/admin/statusRegistry.ts`, never from a page;
 3. no text under 12px (`text-[10px]`, `text-[11px]`, `text-2xs` are forbidden), metadata uses `text-a-text-3`;
 4. use the shared kit (`app/admin/_components/ui`, `data`, `shell`) before writing markup: buttons, badges, KPI cards, page header, dialogs, toasts, tables, filters, pagination; no native `confirm()` (use `ConfirmDialog` / `useConfirm`), no hand-made `fixed inset-0` overlays (use `Dialog` / `Drawer`), action outcomes through `useAdminMutation` / `useAdminToast`; amounts and dates through `lib/admin/format.ts`;
 5. lists are Server Components driven by URL state (search, filters, sort, pagination on the server over the full dataset), never client-side sorting of a partial page;
 6. navigation entries come from the registry (`lib/admin/navigation.ts`); hiding an entry is UX, never a substitute for the server permission check;
 7. `tests/unit/adminDesignGuard.spec.ts` checks every file of `app/admin` and must stay green; the document is a mandatory co-change when the kit or the rules change.
+
+### Writing style contract (no AI tells)
+
+Applies to the **whole project**: storefront, admin, e-mails, PDFs, API error messages, Nala prompts, documentation, code comments, commit messages and PR descriptions.
+
+1. **Long dashes go away progressively.** Whenever you edit a file, replace the em dash `—` (and the en dash `–` or `--` used as a dash in prose) in the strings, comments and paragraphs you touch, and in the other visible strings of the same component or section, with the punctuation the sentence needs: comma, colon, parentheses, a full stop, or the `·` separator the UI already uses. Do not run a repo-wide rewrite inside an unrelated change; a dedicated clean-up commit is fine when requested.
+2. **Never add a new one.** No `—` in new UI copy, e-mails, docs, comments or commit text.
+3. **Exceptions** (leave as is): code, regexes and parsers that must match the character (e.g. legacy product names such as « Bobolo sous vide — carton de 10 paquets »), stored data and database values, quoted third-party text, migration files already applied, and test fixtures that reproduce real data.
+4. **No other classic AI tells** in new or edited text:
+   - decorative emoji in sentences, headings or docs (product UI icons decided by the owner, such as the shelf icons, stay);
+   - filler openers and closers (« Bien sûr ! », « Excellente question », « En résumé », « N'hésitez pas à… », "Great question", "In conclusion");
+   - buzzwords: « fluide », « robuste », « sans couture », « révolutionnaire », "seamless", "robust", "leverage", "delve", "elevate", "unlock", "empower", "game-changer";
+   - constructions such as « non seulement… mais aussi », rule-of-three padding, rhetorical questions in UI copy, and bold scattered through sentences;
+   - English Title Case in French or Italian headings, and mixed quote styles in the same text (French UI uses « » and the typographic apostrophe).
+5. Write plainly: short sentences, concrete facts and numbers, the words the shop and its customers use. The requester's own copy wins over these rules.
+
 
 ## Core workflow
 

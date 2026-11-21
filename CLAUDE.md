@@ -436,6 +436,7 @@ ENGINEERING_INGEST_TOKEN=            # bearer of POST /api/internal/engineering/
 
 - **Locale**: All UI strings are in **French** (`fr-FR`), currency EUR
 - **Icons**: Use `@tabler/icons-react` exclusively
+- **Writing style**: no AI tells anywhere in the project (UI, e-mails, docs, comments, commits): replace long dashes `—` progressively in the text you touch, never add new ones, no decorative emoji, filler or buzzwords. Full rule and exceptions: `AGENTS.md` → « Writing style contract (no AI tells) »
 - **Forms**: React Hook Form + Zod validation
 - **Routing**: Next.js App Router; customer-facing pages live under `src/app/(shop)/`, API routes under `src/app/api/`
 - **Types**: Shared domain types live in `packages/types/`; import as `@lepefy/types`
